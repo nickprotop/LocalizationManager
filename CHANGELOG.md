@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add release.sh script and simplify release workflow
+
 ### Changed
 - Remove version numbers from release artifact filenames
 
