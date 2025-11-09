@@ -6,6 +6,16 @@ on:
       - 'release-patch'
       - 'release-minor'
       - 'release-major'
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
@@ -30,12 +40,16 @@ jobs:
       - name: Install zip utility
         run: sudo apt-get update && sudo apt-get install -y zip
 
-      - name: Extract bump type from tag
+      - name: Extract bump type from tag or input
         id: bump
         run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/release-}
-          echo "type=$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "Bump type: $TAG_NAME"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BUMP_TYPE="${{ inputs.bump_type }}"
+          else
+            BUMP_TYPE=${GITHUB_REF#refs/tags/release-}
+          fi
+          echo "type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "Bump type: $BUMP_TYPE"
 
       - name: Bump version in all files
         run: |
