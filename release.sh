@@ -268,7 +268,7 @@ main() {
     # Create version bump commit
     print_step "Creating version bump commit..."
     git add LocalizationManager.csproj CHANGELOG.md
-    git commit -m "Bump version to v${NEW_VERSION}"
+    git commit -m "Release v${NEW_VERSION}"
     print_success "Created version bump commit"
 
     # Store commit SHA for potential rollback

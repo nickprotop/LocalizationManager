@@ -46,10 +46,10 @@ jobs:
 
           if [ -z "$PREV_TAG" ]; then
             # First release - get all commits (excluding automated commits)
-            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges | grep -v "\[skip ci\]" | grep -v "Update CHANGELOG" | grep -v "Bump version to" | head -20)
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges | grep -v "\[skip ci\]" | grep -v "Update CHANGELOG" | grep -v "Release v" | head -20)
           else
             # Get commits since last version tag (excluding automated commits)
-            COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -v "\[skip ci\]" | grep -v "Update CHANGELOG" | grep -v "Bump version to")
+            COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -v "\[skip ci\]" | grep -v "Update CHANGELOG" | grep -v "Release v")
           fi
 
           # Build changelog for GitHub release
