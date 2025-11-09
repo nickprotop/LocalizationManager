@@ -20,7 +20,9 @@
 // SOFTWARE.
 
 using LocalizationManager.Core;
+using LocalizationManager.Core.Enums;
 using LocalizationManager.Core.Models;
+using LocalizationManager.Core.Output;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using System.ComponentModel;
@@ -29,17 +31,34 @@ using System.Text;
 namespace LocalizationManager.Commands;
 
 /// <summary>
-/// Command to export resource files to CSV format.
+/// Command to export resource files to various formats.
 /// </summary>
-public class ExportCommandSettings : BaseCommandSettings
+public class ExportCommandSettings : BaseFormattableCommandSettings
 {
     [CommandOption("-o|--output <FILE>")]
-    [Description("Output CSV file path (default: resources.csv)")]
-    public string OutputFile { get; set; } = "resources.csv";
+    [Description("Output file path (default: resources.csv for csv, resources.json for json, resources.txt for simple)")]
+    public string? OutputFile { get; set; }
 
     [CommandOption("--include-status")]
     [Description("Include validation status in export")]
     public bool IncludeStatus { get; set; }
+
+    /// <summary>
+    /// Gets the output file path with appropriate extension based on format.
+    /// </summary>
+    public string GetOutputFilePath()
+    {
+        if (!string.IsNullOrEmpty(OutputFile))
+            return OutputFile;
+
+        var format = GetOutputFormat();
+        return format switch
+        {
+            OutputFormat.Json => "resources.json",
+            OutputFormat.Simple => "resources.txt",
+            _ => "resources.csv"
+        };
+    }
 }
 
 public class ExportCommand : Command<ExportCommandSettings>
@@ -47,9 +66,14 @@ public class ExportCommand : Command<ExportCommandSettings>
     public override int Execute(CommandContext context, ExportCommandSettings settings, CancellationToken cancellationToken = default)
     {
         var resourcePath = settings.GetResourcePath();
+        var format = settings.GetOutputFormat();
+        var isTableFormat = format == OutputFormat.Table;
 
-        AnsiConsole.MarkupLine($"[blue]Scanning:[/] {resourcePath}");
-        AnsiConsole.WriteLine();
+        if (isTableFormat)
+        {
+            AnsiConsole.MarkupLine($"[blue]Scanning:[/] {resourcePath}");
+            AnsiConsole.WriteLine();
+        }
 
         try
         {
@@ -59,7 +83,14 @@ public class ExportCommand : Command<ExportCommandSettings>
 
             if (!languages.Any())
             {
-                AnsiConsole.MarkupLine("[red]✗ No .resx files found![/]");
+                if (isTableFormat)
+                {
+                    AnsiConsole.MarkupLine("[red]✗ No .resx files found![/]");
+                }
+                else
+                {
+                    Console.Error.WriteLine("No .resx files found!");
+                }
                 return 1;
             }
 
@@ -73,16 +104,29 @@ public class ExportCommand : Command<ExportCommandSettings>
                 {
                     var resourceFile = parser.Parse(lang);
                     resourceFiles.Add(resourceFile);
-                    AnsiConsole.MarkupLine($"[dim]Parsed {lang.Name}: {resourceFile.Count} entries[/]");
+                    if (isTableFormat)
+                    {
+                        AnsiConsole.MarkupLine($"[dim]Parsed {lang.Name}: {resourceFile.Count} entries[/]");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ Error parsing {lang.Name}: {ex.Message}[/]");
+                    if (isTableFormat)
+                    {
+                        AnsiConsole.MarkupLine($"[red]✗ Error parsing {lang.Name}: {ex.Message}[/]");
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine($"Error parsing {lang.Name}: {ex.Message}");
+                    }
                     return 1;
                 }
             }
 
-            AnsiConsole.WriteLine();
+            if (isTableFormat)
+            {
+                AnsiConsole.WriteLine();
+            }
 
             // Validate if status requested
             Core.Models.ValidationResult? validationResult = null;
@@ -92,22 +136,57 @@ public class ExportCommand : Command<ExportCommandSettings>
                 validationResult = validator.Validate(resourceFiles);
             }
 
-            // Export to CSV
-            ExportToCsv(resourceFiles, settings.OutputFile, validationResult);
+            // Export based on format
+            var outputFile = settings.GetOutputFilePath();
 
-            AnsiConsole.MarkupLine($"[green]✓ Exported {resourceFiles.First().Count} keys to:[/]");
-            AnsiConsole.MarkupLine($"  [cyan]{Path.GetFullPath(settings.OutputFile)}[/]");
+            switch (format)
+            {
+                case OutputFormat.Json:
+                    ExportToJson(resourceFiles, outputFile, validationResult);
+                    break;
+                case OutputFormat.Simple:
+                    ExportToSimple(resourceFiles, outputFile, validationResult);
+                    break;
+                case OutputFormat.Table:
+                default:
+                    ExportToCsv(resourceFiles, outputFile, validationResult);
+                    break;
+            }
+
+            if (isTableFormat)
+            {
+                AnsiConsole.MarkupLine($"[green]✓ Exported {resourceFiles.First().Count} keys to:[/]");
+                AnsiConsole.MarkupLine($"  [cyan]{Path.GetFullPath(outputFile)}[/]");
+            }
+            else
+            {
+                Console.Error.WriteLine($"Exported {resourceFiles.First().Count} keys to: {Path.GetFullPath(outputFile)}");
+            }
 
             return 0;
         }
         catch (DirectoryNotFoundException ex)
         {
-            AnsiConsole.MarkupLine($"[red]✗ {ex.Message}[/]");
+            if (isTableFormat)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ {ex.Message}[/]");
+            }
+            else
+            {
+                Console.Error.WriteLine($"Error: {ex.Message}");
+            }
             return 1;
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"[red]✗ Unexpected error: {ex.Message}[/]");
+            if (isTableFormat)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ Unexpected error: {ex.Message}[/]");
+            }
+            else
+            {
+                Console.Error.WriteLine($"Unexpected error: {ex.Message}");
+            }
             return 1;
         }
     }
@@ -214,5 +293,103 @@ public class ExportCommand : Command<ExportCommandSettings>
         });
 
         return string.Join(",", escapedFields);
+    }
+
+    private void ExportToJson(List<ResourceFile> resourceFiles, string outputFile, Core.Models.ValidationResult? validationResult)
+    {
+        var defaultFile = resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
+        if (defaultFile == null)
+        {
+            throw new InvalidOperationException("No default language found");
+        }
+
+        var allKeys = defaultFile.Entries.Select(e => e.Key).OrderBy(k => k).ToList();
+
+        var exportData = allKeys.Select(key =>
+        {
+            var translations = new Dictionary<string, string?>();
+            foreach (var resourceFile in resourceFiles)
+            {
+                var entry = resourceFile.Entries.FirstOrDefault(e => e.Key == key);
+                translations[resourceFile.Language.Name] = entry?.Value;
+            }
+
+            var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == key);
+
+            var item = new Dictionary<string, object?>
+            {
+                ["key"] = key,
+                ["translations"] = translations,
+                ["comment"] = defaultEntry?.Comment
+            };
+
+            if (validationResult != null)
+            {
+                item["status"] = GetKeyStatus(key, resourceFiles, validationResult);
+            }
+
+            return item;
+        }).ToList();
+
+        var output = new
+        {
+            languages = resourceFiles.Select(rf => rf.Language.Name).ToList(),
+            totalKeys = allKeys.Count,
+            entries = exportData
+        };
+
+        File.WriteAllText(outputFile, OutputFormatter.FormatJson(output), Encoding.UTF8);
+    }
+
+    private void ExportToSimple(List<ResourceFile> resourceFiles, string outputFile, Core.Models.ValidationResult? validationResult)
+    {
+        var sb = new StringBuilder();
+        var defaultFile = resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
+        if (defaultFile == null)
+        {
+            throw new InvalidOperationException("No default language found");
+        }
+
+        var allKeys = defaultFile.Entries.Select(e => e.Key).OrderBy(k => k).ToList();
+
+        // Header
+        sb.AppendLine("Resource Export");
+        sb.AppendLine($"Languages: {string.Join(", ", resourceFiles.Select(rf => rf.Language.Name))}");
+        sb.AppendLine($"Total Keys: {allKeys.Count}");
+        sb.AppendLine();
+        sb.AppendLine(new string('=', 80));
+        sb.AppendLine();
+
+        // Keys
+        foreach (var key in allKeys)
+        {
+            sb.AppendLine($"Key: {key}");
+
+            // Add translations for each language
+            foreach (var resourceFile in resourceFiles)
+            {
+                var entry = resourceFile.Entries.FirstOrDefault(e => e.Key == key);
+                var value = entry?.Value ?? "(empty)";
+                sb.AppendLine($"  {resourceFile.Language.Name}: {value}");
+            }
+
+            // Add comment
+            var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == key);
+            if (!string.IsNullOrEmpty(defaultEntry?.Comment))
+            {
+                sb.AppendLine($"  Comment: {defaultEntry.Comment}");
+            }
+
+            // Add status if requested
+            if (validationResult != null)
+            {
+                var status = GetKeyStatus(key, resourceFiles, validationResult);
+                sb.AppendLine($"  Status: {status}");
+            }
+
+            sb.AppendLine();
+        }
+
+        File.WriteAllText(outputFile, sb.ToString(), Encoding.UTF8);
     }
 }

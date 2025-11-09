@@ -145,6 +145,34 @@ lrm validate --path ./Resources || exit 1
 lrm validate --path ./Resources || true
 ```
 
+### JSON Format for CI/CD
+
+Use `--format json` for commands to get structured output that's easy to parse in CI/CD pipelines:
+
+```bash
+# Validate and save results as JSON
+lrm validate --format json > validation.json
+
+# Parse validation results with jq
+IS_VALID=$(lrm validate --format json | jq '.isValid')
+ISSUE_COUNT=$(lrm validate --format json | jq '.totalIssues')
+
+# Get statistics as JSON
+lrm stats --format json > stats.json
+
+# Parse specific values
+TOTAL_KEYS=$(lrm stats --format json | jq '.statistics[0].totalKeys')
+
+# Export in JSON format for processing
+lrm export --format json -o translations.json
+```
+
+**Benefits of JSON format:**
+- Easily parsable by scripts and tools (jq, Python, etc.)
+- Structured data for reporting and dashboards
+- Machine-readable for automation
+- Can be stored as CI/CD artifacts for historical analysis
+
 ---
 
 ## Common Use Cases
@@ -188,10 +216,18 @@ jobs:
 ```yaml
 - name: Check translation coverage
   run: |
-    OUTPUT=$(lrm stats --path ./Resources)
-    echo "$OUTPUT"
-    # Add custom threshold checks here
-    # Example: Parse output and fail if coverage < 90%
+    # Use JSON format for programmatic parsing
+    lrm stats --format json --path ./Resources > stats.json
+
+    # Parse with jq to check coverage
+    COVERAGE=$(jq '.statistics[] | select(.language == "Greek") | .coveragePercentage' stats.json)
+
+    if (( $(echo "$COVERAGE < 90" | bc -l) )); then
+      echo "Coverage too low: $COVERAGE%"
+      exit 1
+    fi
+
+    echo "Coverage OK: $COVERAGE%"
 ```
 
 ### 4. Validate Multiple Resource Folders

@@ -20,6 +20,8 @@
 // SOFTWARE.
 
 using LocalizationManager.Core;
+using LocalizationManager.Core.Enums;
+using LocalizationManager.Core.Output;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using System.ComponentModel;
@@ -31,7 +33,7 @@ namespace LocalizationManager.Commands;
 /// </summary>
 public class ViewCommand : Command<ViewCommand.Settings>
 {
-    public class Settings : BaseCommandSettings
+    public class Settings : BaseFormattableCommandSettings
     {
         [CommandArgument(0, "<KEY>")]
         [Description("The key to view")]
@@ -40,10 +42,6 @@ public class ViewCommand : Command<ViewCommand.Settings>
         [CommandOption("--show-comments")]
         [Description("Show comments for the key")]
         public bool ShowComments { get; set; }
-
-        [CommandOption("--format <FORMAT>")]
-        [Description("Output format: table (default), json, or simple")]
-        public string Format { get; set; } = "table";
     }
 
     public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken = default)
@@ -52,11 +50,8 @@ public class ViewCommand : Command<ViewCommand.Settings>
 
         try
         {
-            if (settings.Format != "table")
-            {
-                // Don't show scanning message for non-table formats
-            }
-            else
+            var format = settings.GetOutputFormat();
+            if (format == OutputFormat.Table)
             {
                 AnsiConsole.MarkupLine($"[blue]Scanning:[/] {resourcePath}");
                 AnsiConsole.WriteLine();
@@ -106,15 +101,15 @@ public class ViewCommand : Command<ViewCommand.Settings>
             }
 
             // Display based on format
-            switch (settings.Format.ToLower())
+            switch (format)
             {
-                case "json":
+                case OutputFormat.Json:
                     DisplayJson(settings.Key, resourceFiles, settings.ShowComments);
                     break;
-                case "simple":
+                case OutputFormat.Simple:
                     DisplaySimple(settings.Key, resourceFiles, settings.ShowComments);
                     break;
-                case "table":
+                case OutputFormat.Table:
                 default:
                     DisplayTable(settings.Key, resourceFiles, settings.ShowComments);
                     break;
@@ -202,32 +197,34 @@ public class ViewCommand : Command<ViewCommand.Settings>
 
     private void DisplayJson(string key, List<Core.Models.ResourceFile> resourceFiles, bool showComments)
     {
-        Console.WriteLine("{");
-        Console.WriteLine($"  \"key\": \"{key}\",");
-        Console.WriteLine("  \"translations\": {");
+        var translations = new Dictionary<string, object?>();
 
-        var translations = new List<string>();
         foreach (var rf in resourceFiles)
         {
             var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
-            var value = entry?.Value ?? null;
-            var comment = entry?.Comment;
+            var langCode = rf.Language.GetDisplayCode();
 
-            var jsonValue = value == null ? "null" : $"\"{EscapeJson(value)}\"";
-
-            if (showComments && !string.IsNullOrWhiteSpace(comment))
+            if (showComments && entry != null && !string.IsNullOrWhiteSpace(entry.Comment))
             {
-                translations.Add($"    \"{rf.Language.Code}\": {{ \"value\": {jsonValue}, \"comment\": \"{EscapeJson(comment)}\" }}");
+                translations[langCode] = new
+                {
+                    value = entry.Value,
+                    comment = entry.Comment
+                };
             }
             else
             {
-                translations.Add($"    \"{rf.Language.Code}\": {jsonValue}");
+                translations[langCode] = entry?.Value;
             }
         }
 
-        Console.WriteLine(string.Join(",\n", translations));
-        Console.WriteLine("  }");
-        Console.WriteLine("}");
+        var output = new
+        {
+            key = key,
+            translations = translations
+        };
+
+        Console.WriteLine(OutputFormatter.FormatJson(output));
     }
 
     private void DisplaySimple(string key, List<Core.Models.ResourceFile> resourceFiles, bool showComments)
@@ -248,15 +245,5 @@ public class ViewCommand : Command<ViewCommand.Settings>
                 Console.WriteLine($"  Comment: {entry.Comment}");
             }
         }
-    }
-
-    private string EscapeJson(string value)
-    {
-        return value
-            .Replace("\\", "\\\\")
-            .Replace("\"", "\\\"")
-            .Replace("\n", "\\n")
-            .Replace("\r", "\\r")
-            .Replace("\t", "\\t");
     }
 }

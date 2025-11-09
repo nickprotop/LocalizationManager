@@ -19,44 +19,27 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-namespace LocalizationManager.Core.Models;
+using Spectre.Console.Cli;
+using System.ComponentModel;
+using LocalizationManager.Core.Enums;
+
+namespace LocalizationManager.Commands;
 
 /// <summary>
-/// Represents metadata about a detected language resource file.
+/// Base settings for commands that support formatted output.
 /// </summary>
-public class LanguageInfo
+public class BaseFormattableCommandSettings : BaseCommandSettings
 {
-    /// <summary>
-    /// Base name of the resource file (e.g., "SharedResource").
-    /// </summary>
-    public required string BaseName { get; set; }
+    [CommandOption("-f|--format <FORMAT>")]
+    [Description("Output format: table (default), json, or simple")]
+    [DefaultValue("table")]
+    public string Format { get; set; } = "table";
 
     /// <summary>
-    /// Culture code (e.g., "en", "el", "fr").
+    /// Gets the parsed output format.
     /// </summary>
-    public required string Code { get; set; }
-
-    /// <summary>
-    /// Display name of the language (e.g., "English (en)", "Greek (el)").
-    /// </summary>
-    public required string Name { get; set; }
-
-    /// <summary>
-    /// Indicates if this is the default language (no culture suffix).
-    /// </summary>
-    public bool IsDefault { get; set; }
-
-    /// <summary>
-    /// Full file path to the .resx file.
-    /// </summary>
-    public required string FilePath { get; set; }
-
-    /// <summary>
-    /// Gets a display-friendly language code.
-    /// Returns "default" for the default language (empty code), otherwise returns the code.
-    /// </summary>
-    public string GetDisplayCode()
+    public OutputFormat GetOutputFormat()
     {
-        return string.IsNullOrEmpty(Code) ? "default" : Code;
+        return Core.Output.OutputFormatter.ParseFormat(Format, OutputFormat.Table);
     }
 }

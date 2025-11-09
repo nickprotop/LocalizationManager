@@ -55,9 +55,10 @@ LRM solves this by providing:
 - **Language Management** - Add/remove language files with validation
 - **Validation** - Detect missing translations, duplicates, empty values
 - **Statistics** - Translation coverage with progress bars
-- **CSV Import/Export** - Work with translators using spreadsheets
+- **Multiple Output Formats** - Table, JSON, and simple text formats for all commands
+- **Export/Import** - CSV, JSON, and text formats for working with translators
 - **Batch Operations** - Add, update, delete keys across all languages
-- **CI/CD Ready** - Exit codes, GitHub Actions support
+- **CI/CD Ready** - Exit codes, JSON output, GitHub Actions support
 - **Multi-platform** - Linux (x64/ARM64), Windows (x64/ARM64)
 - **Self-contained** - No .NET runtime required
 - **Shell Completion** - Bash and Zsh support
@@ -91,14 +92,23 @@ cd YourProject/Resources
 # Validate all .resx files
 lrm validate
 
+# Validate with JSON output (for CI/CD)
+lrm validate --format json
+
 # View translation statistics
 lrm stats
+
+# View stats as JSON
+lrm stats --format json
 
 # Launch interactive editor
 lrm edit
 
 # View a specific key
 lrm view SaveButton
+
+# View key details as JSON
+lrm view SaveButton --format json
 
 # Add a new key
 lrm add NewKey -i
@@ -109,8 +119,11 @@ lrm list-languages
 # Add a new language
 lrm add-language --culture fr
 
-# Export to CSV
-lrm export -o translations.csv
+# Export to CSV (default)
+lrm export
+
+# Export to JSON format
+lrm export --format json
 
 # Get help
 lrm --help

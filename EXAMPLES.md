@@ -99,6 +99,12 @@ if [ $? -ne 0 ]; then
     echo "Validation failed! Fix translations before deploying."
     exit 1
 fi
+
+# Use JSON format for programmatic parsing in CI/CD pipelines
+lrm validate --format json > validation-results.json
+
+# Parse JSON with jq
+lrm validate --format json | jq '.isValid'
 ```
 
 ---
@@ -269,13 +275,19 @@ done
 ### Export for Translators
 
 ```bash
-# Export all keys to CSV
+# Export all keys to CSV (default format)
 lrm export -o translations.csv
+
+# Export to JSON format (good for automated processing)
+lrm export --format json -o translations.json
+
+# Export to simple text format
+lrm export --format simple -o translations.txt
 
 # Export with validation status (shows missing/empty)
 lrm export --include-status -o review.csv
 
-# CSV format:
+# CSV format example:
 # Key,English (Default),Ελληνικά (el),Status,Comment
 # Save,Save,Αποθήκευση,OK,Save button label
 # Cancel,Cancel,Ακύρωση,OK,

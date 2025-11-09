@@ -20,6 +20,8 @@
 // SOFTWARE.
 
 using LocalizationManager.Core;
+using LocalizationManager.Core.Enums;
+using LocalizationManager.Core.Output;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -28,14 +30,19 @@ namespace LocalizationManager.Commands;
 /// <summary>
 /// Command to display statistics about resource files and translation coverage.
 /// </summary>
-public class StatsCommand : Command<BaseCommandSettings>
+public class StatsCommand : Command<BaseFormattableCommandSettings>
 {
-    public override int Execute(CommandContext context, BaseCommandSettings settings, CancellationToken cancellationToken = default)
+    public override int Execute(CommandContext context, BaseFormattableCommandSettings settings, CancellationToken cancellationToken = default)
     {
         var resourcePath = settings.GetResourcePath();
+        var format = settings.GetOutputFormat();
+        var isTableFormat = format == OutputFormat.Table;
 
-        AnsiConsole.MarkupLine($"[blue]Scanning:[/] {resourcePath}");
-        AnsiConsole.WriteLine();
+        if (isTableFormat)
+        {
+            AnsiConsole.MarkupLine($"[blue]Scanning:[/] {resourcePath}");
+            AnsiConsole.WriteLine();
+        }
 
         try
         {
@@ -45,7 +52,14 @@ public class StatsCommand : Command<BaseCommandSettings>
 
             if (!languages.Any())
             {
-                AnsiConsole.MarkupLine("[red]✗ No .resx files found![/]");
+                if (isTableFormat)
+                {
+                    AnsiConsole.MarkupLine("[red]✗ No .resx files found![/]");
+                }
+                else
+                {
+                    Console.Error.WriteLine("No .resx files found!");
+                }
                 return 1;
             }
 
@@ -62,29 +76,62 @@ public class StatsCommand : Command<BaseCommandSettings>
                 }
                 catch (Exception ex)
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ Error parsing {lang.Name}: {ex.Message}[/]");
+                    if (isTableFormat)
+                    {
+                        AnsiConsole.MarkupLine($"[red]✗ Error parsing {lang.Name}: {ex.Message}[/]");
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine($"Error parsing {lang.Name}: {ex.Message}");
+                    }
                     return 1;
                 }
             }
 
-            // Display statistics
-            DisplayStatistics(resourceFiles);
+            // Display statistics based on format
+            switch (format)
+            {
+                case OutputFormat.Json:
+                    DisplayJson(resourceFiles);
+                    break;
+                case OutputFormat.Simple:
+                    DisplaySimple(resourceFiles);
+                    break;
+                case OutputFormat.Table:
+                default:
+                    DisplayTable(resourceFiles);
+                    break;
+            }
 
             return 0;
         }
         catch (DirectoryNotFoundException ex)
         {
-            AnsiConsole.MarkupLine($"[red]✗ {ex.Message}[/]");
+            if (isTableFormat)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ {ex.Message}[/]");
+            }
+            else
+            {
+                Console.Error.WriteLine($"Error: {ex.Message}");
+            }
             return 1;
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"[red]✗ Unexpected error: {ex.Message}[/]");
+            if (isTableFormat)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ Unexpected error: {ex.Message}[/]");
+            }
+            else
+            {
+                Console.Error.WriteLine($"Unexpected error: {ex.Message}");
+            }
             return 1;
         }
     }
 
-    private void DisplayStatistics(List<LocalizationManager.Core.Models.ResourceFile> resourceFiles)
+    private void DisplayTable(List<LocalizationManager.Core.Models.ResourceFile> resourceFiles)
     {
         // Create statistics table
         var table = new Table();
@@ -138,6 +185,52 @@ public class StatsCommand : Command<BaseCommandSettings>
 
                 AnsiConsole.Write(barChart);
             }
+        }
+    }
+
+    private void DisplayJson(List<LocalizationManager.Core.Models.ResourceFile> resourceFiles)
+    {
+        var stats = resourceFiles.Select(rf => new
+        {
+            language = rf.Language.Name,
+            isDefault = rf.Language.IsDefault,
+            totalKeys = rf.Count,
+            completedKeys = rf.CompletedCount,
+            emptyKeys = rf.Count - rf.CompletedCount,
+            coveragePercentage = rf.CompletionPercentage,
+            filePath = rf.Language.FilePath,
+            fileSizeBytes = new FileInfo(rf.Language.FilePath).Length
+        }).ToList();
+
+        var output = new
+        {
+            totalLanguages = resourceFiles.Count,
+            statistics = stats
+        };
+
+        Console.WriteLine(OutputFormatter.FormatJson(output));
+    }
+
+    private void DisplaySimple(List<LocalizationManager.Core.Models.ResourceFile> resourceFiles)
+    {
+        Console.WriteLine("Localization Statistics");
+        Console.WriteLine("======================");
+        Console.WriteLine();
+
+        foreach (var rf in resourceFiles)
+        {
+            var fileInfo = new FileInfo(rf.Language.FilePath);
+            var fileSizeKb = (fileInfo.Length / 1024.0).ToString("F1");
+            var emptyCount = rf.Count - rf.CompletedCount;
+            var defaultMarker = rf.Language.IsDefault ? " (default)" : "";
+
+            Console.WriteLine($"{rf.Language.Name}{defaultMarker}");
+            Console.WriteLine($"  Total Keys:    {rf.Count}");
+            Console.WriteLine($"  Completed:     {rf.CompletedCount}");
+            Console.WriteLine($"  Empty:         {emptyCount}");
+            Console.WriteLine($"  Coverage:      {rf.CompletionPercentage:F1}%");
+            Console.WriteLine($"  File Size:     {fileSizeKb} KB");
+            Console.WriteLine();
         }
     }
 }

@@ -45,19 +45,22 @@ app.Configure(config =>
         .WithDescription("Validate resource files for missing keys, duplicates, and empty values")
         .WithExample(new[] { "validate" })
         .WithExample(new[] { "validate", "--path", "../Resources" })
-        .WithExample(new[] { "validate", "-p", "./Resources" });
+        .WithExample(new[] { "validate", "--format", "json" })
+        .WithExample(new[] { "validate", "--format", "simple" });
 
     config.AddCommand<StatsCommand>("stats")
         .WithDescription("Display statistics about resource files and translation coverage")
         .WithExample(new[] { "stats" })
         .WithExample(new[] { "stats", "--path", "./Resources" })
-        .WithExample(new[] { "stats", "-p", "./Resources" });
+        .WithExample(new[] { "stats", "--format", "json" })
+        .WithExample(new[] { "stats", "--format", "simple" });
 
     config.AddCommand<ViewCommand>("view")
         .WithDescription("View details of a specific localization key")
         .WithExample(new[] { "view", "SaveButton" })
         .WithExample(new[] { "view", "SaveButton", "--show-comments" })
-        .WithExample(new[] { "view", "SaveButton", "--format", "json" });
+        .WithExample(new[] { "view", "SaveButton", "--format", "json" })
+        .WithExample(new[] { "view", "SaveButton", "--format", "simple" });
 
     config.AddCommand<AddCommand>("add")
         .WithDescription("Add a new localization key to all language files")
@@ -80,10 +83,11 @@ app.Configure(config =>
         .WithExample(new[] { "delete", "OldKey", "-y", "--no-backup" });
 
     config.AddCommand<ExportCommand>("export")
-        .WithDescription("Export resource files to CSV format")
+        .WithDescription("Export resource files to various formats (CSV, JSON, or simple text)")
         .WithExample(new[] { "export" })
         .WithExample(new[] { "export", "-o", "translations.csv" })
-        .WithExample(new[] { "export", "-o", "translations.csv", "--include-status" });
+        .WithExample(new[] { "export", "--format", "json", "-o", "translations.json" })
+        .WithExample(new[] { "export", "--format", "simple", "--include-status" });
 
     config.AddCommand<ImportCommand>("import")
         .WithDescription("Import translations from CSV format")

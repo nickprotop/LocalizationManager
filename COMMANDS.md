@@ -11,7 +11,7 @@ This document provides detailed information about all LRM commands, their option
 - [add](#add) - Add new keys
 - [update](#update) - Update existing keys
 - [delete](#delete) - Delete keys
-- [export](#export) - Export to CSV
+- [export](#export) - Export to various formats
 - [import](#import) - Import from CSV
 - [edit](#edit) - Interactive TUI editor
 - [add-language](#add-language) - Create new language file
@@ -36,6 +36,7 @@ All commands support these options:
 
 **Options:**
 - `-p, --path <PATH>` - Resource folder path
+- `-f, --format <FORMAT>` - Output format: `table` (default), `json`, or `simple`
 
 **What it checks:**
 - Missing keys in translation files
@@ -49,25 +50,43 @@ All commands support these options:
 
 **Examples:**
 ```bash
-# Validate current directory
+# Validate current directory (table format by default)
 lrm validate
 
 # Validate specific path
 lrm validate --path ../Resources
 
-# Short form
-lrm validate -p ./Resources
+# Output as JSON (useful for CI/CD pipelines)
+lrm validate --format json
+
+# Output as simple text (no colors or formatting)
+lrm validate --format simple
 ```
 
-**Output example:**
+**Output formats:**
+
+**Table (default):**
 ```
 ✓ All validations passed!
+No issues found.
+```
 
-Summary:
-  ✓ No missing keys
-  ✓ No duplicate keys
-  ✓ No empty values
-  ✓ No extra keys
+**JSON:**
+```json
+{
+  "isValid": true,
+  "totalIssues": 0,
+  "missingKeys": {},
+  "extraKeys": {},
+  "duplicateKeys": {},
+  "emptyValues": {}
+}
+```
+
+**Simple:**
+```
+✓ All validations passed!
+No issues found.
 ```
 
 ---
@@ -80,21 +99,29 @@ Summary:
 
 **Options:**
 - `-p, --path <PATH>` - Resource folder path
+- `-f, --format <FORMAT>` - Output format: `table` (default), `json`, or `simple`
 
 **Information shown:**
 - Total keys per language
 - Missing keys count
 - Translation coverage percentage
-- Visual progress bars
+- Visual progress bars (table format only)
 - Per-language statistics table
+- File sizes
 
 **Examples:**
 ```bash
-# Show stats for current directory
+# Show stats for current directory (table format with charts)
 lrm stats
 
 # Show stats for specific path
 lrm stats --path ./Resources
+
+# Output as JSON (useful for programmatic analysis)
+lrm stats --format json
+
+# Output as simple text (no colors or charts)
+lrm stats --format simple
 ```
 
 **Output example:**
@@ -162,8 +189,8 @@ Key: SaveButton
 ```json
 {
   "key": "SaveButton",
-  "values": {
-    "en": "Save",
+  "translations": {
+    "default": "Save",
     "el": "Σώσει"
   }
 }
@@ -292,39 +319,79 @@ Are you sure? [y/N]:
 
 ## export
 
-**Description:** Export all translations to CSV format for review or editing in Excel/spreadsheet applications.
+**Description:** Export all translations to various formats (CSV, JSON, or simple text) for review or editing.
 
 **Arguments:** None
 
 **Options:**
 - `-p, --path <PATH>` - Resource folder path
-- `-o, --output <FILE>` - Output CSV file path (default: `resources.csv`)
-- `--include-status` - Include validation status column (shows if key has issues)
+- `-f, --format <FORMAT>` - Output format: `table` (CSV, default), `json`, or `simple`
+- `-o, --output <FILE>` - Output file path (default: `resources.csv` for CSV, `resources.json` for JSON, `resources.txt` for simple)
+- `--include-status` - Include validation status (shows if key has issues)
 
-**CSV Format:**
+**Examples:**
+```bash
+# Export to CSV (default format)
+lrm export
+
+# Export to JSON format
+lrm export --format json
+
+# Export to simple text format
+lrm export --format simple
+
+# Export to custom file
+lrm export -o translations.csv
+
+# Export JSON with custom output file
+lrm export --format json -o translations.json
+
+# Include validation status
+lrm export --include-status
+```
+
+**Output formats:**
+
+**CSV (table format, default):**
 ```
 Key,English,Greek,Comment
 SaveButton,Save,Σώσει,"Button label"
 CancelButton,Cancel,Ακύρωση,""
 ```
 
-**Examples:**
-```bash
-# Export to default file (resources.csv)
-lrm export
-
-# Export to custom file
-lrm export -o translations.csv
-
-# Include validation status
-lrm export -o translations.csv --include-status
+**JSON:**
+```json
+{
+  "languages": ["English", "Greek"],
+  "totalKeys": 2,
+  "entries": [
+    {
+      "key": "SaveButton",
+      "translations": {
+        "English": "Save",
+        "Greek": "Σώσει"
+      },
+      "comment": "Button label"
+    }
+  ]
+}
 ```
 
-**With validation status:**
+**Simple:**
 ```
-Key,English,Greek,Status,Comment
-SaveButton,Save,Σώσει,OK,"Button label"
-MissingKey,Value,,"Missing in Greek",""
+Resource Export
+Languages: English, Greek
+Total Keys: 2
+================================================================================
+
+Key: SaveButton
+  English: Save
+  Greek: Σώσει
+  Comment: Button label
+
+Key: CancelButton
+  English: Cancel
+  Greek: Ακύρωση
 ```
 
 ---

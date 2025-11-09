@@ -20,6 +20,8 @@
 // SOFTWARE.
 
 using LocalizationManager.Core;
+using LocalizationManager.Core.Enums;
+using LocalizationManager.Core.Output;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -28,14 +30,19 @@ namespace LocalizationManager.Commands;
 /// <summary>
 /// Command to validate resource files for missing keys, duplicates, and empty values.
 /// </summary>
-public class ValidateCommand : Command<BaseCommandSettings>
+public class ValidateCommand : Command<BaseFormattableCommandSettings>
 {
-    public override int Execute(CommandContext context, BaseCommandSettings settings, CancellationToken cancellationToken = default)
+    public override int Execute(CommandContext context, BaseFormattableCommandSettings settings, CancellationToken cancellationToken = default)
     {
         var resourcePath = settings.GetResourcePath();
+        var format = settings.GetOutputFormat();
+        var isTableFormat = format == OutputFormat.Table;
 
-        AnsiConsole.MarkupLine($"[blue]Scanning:[/] {resourcePath}");
-        AnsiConsole.WriteLine();
+        if (isTableFormat)
+        {
+            AnsiConsole.MarkupLine($"[blue]Scanning:[/] {resourcePath}");
+            AnsiConsole.WriteLine();
+        }
 
         try
         {
@@ -45,17 +52,27 @@ public class ValidateCommand : Command<BaseCommandSettings>
 
             if (!languages.Any())
             {
-                AnsiConsole.MarkupLine("[red]✗ No .resx files found![/]");
+                if (isTableFormat)
+                {
+                    AnsiConsole.MarkupLine("[red]✗ No .resx files found![/]");
+                }
+                else
+                {
+                    Console.Error.WriteLine("No .resx files found!");
+                }
                 return 1;
             }
 
-            AnsiConsole.MarkupLine($"[green]✓ Found {languages.Count} language(s):[/]");
-            foreach (var lang in languages)
+            if (isTableFormat)
             {
-                var marker = lang.IsDefault ? "[yellow](default)[/]" : "";
-                AnsiConsole.MarkupLine($"  • {lang.Name} {marker}");
+                AnsiConsole.MarkupLine($"[green]✓ Found {languages.Count} language(s):[/]");
+                foreach (var lang in languages)
+                {
+                    var marker = lang.IsDefault ? "[yellow](default)[/]" : "";
+                    AnsiConsole.MarkupLine($"  • {lang.Name} {marker}");
+                }
+                AnsiConsole.WriteLine();
             }
-            AnsiConsole.WriteLine();
 
             // Parse resource files
             var parser = new ResourceFileParser();
@@ -67,38 +84,78 @@ public class ValidateCommand : Command<BaseCommandSettings>
                 {
                     var resourceFile = parser.Parse(lang);
                     resourceFiles.Add(resourceFile);
-                    AnsiConsole.MarkupLine($"[dim]Parsed {lang.Name}: {resourceFile.Count} entries[/]");
+                    if (isTableFormat)
+                    {
+                        AnsiConsole.MarkupLine($"[dim]Parsed {lang.Name}: {resourceFile.Count} entries[/]");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ Error parsing {lang.Name}: {ex.Message}[/]");
+                    if (isTableFormat)
+                    {
+                        AnsiConsole.MarkupLine($"[red]✗ Error parsing {lang.Name}: {ex.Message}[/]");
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine($"Error parsing {lang.Name}: {ex.Message}");
+                    }
                     return 1;
                 }
             }
-            AnsiConsole.WriteLine();
+
+            if (isTableFormat)
+            {
+                AnsiConsole.WriteLine();
+            }
 
             // Validate
             var validator = new ResourceValidator();
             var validationResult = validator.Validate(resourceFiles);
 
-            // Display results
-            DisplayValidationResults(validationResult);
+            // Display results based on format
+            switch (format)
+            {
+                case OutputFormat.Json:
+                    DisplayJson(validationResult);
+                    break;
+                case OutputFormat.Simple:
+                    DisplaySimple(validationResult);
+                    break;
+                case OutputFormat.Table:
+                default:
+                    DisplayTable(validationResult);
+                    break;
+            }
 
             return validationResult.IsValid ? 0 : 1;
         }
         catch (DirectoryNotFoundException ex)
         {
-            AnsiConsole.MarkupLine($"[red]✗ {ex.Message}[/]");
+            if (isTableFormat)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ {ex.Message}[/]");
+            }
+            else
+            {
+                Console.Error.WriteLine($"Error: {ex.Message}");
+            }
             return 1;
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"[red]✗ Unexpected error: {ex.Message}[/]");
+            if (isTableFormat)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ Unexpected error: {ex.Message}[/]");
+            }
+            else
+            {
+                Console.Error.WriteLine($"Unexpected error: {ex.Message}");
+            }
             return 1;
         }
     }
 
-    private void DisplayValidationResults(LocalizationManager.Core.Models.ValidationResult result)
+    private void DisplayTable(LocalizationManager.Core.Models.ValidationResult result)
     {
         if (result.IsValid)
         {
@@ -120,8 +177,9 @@ public class ValidateCommand : Command<BaseCommandSettings>
 
             foreach (var kvp in result.MissingKeys.Where(kv => kv.Value.Any()))
             {
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
                 table.AddRow(
-                    kvp.Key,
+                    langDisplay,
                     string.Join(", ", kvp.Value.Take(10)) + (kvp.Value.Count > 10 ? $" ... ({kvp.Value.Count - 10} more)" : "")
                 );
             }
@@ -140,8 +198,9 @@ public class ValidateCommand : Command<BaseCommandSettings>
 
             foreach (var kvp in result.ExtraKeys.Where(kv => kv.Value.Any()))
             {
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
                 table.AddRow(
-                    kvp.Key,
+                    langDisplay,
                     string.Join(", ", kvp.Value.Take(10)) + (kvp.Value.Count > 10 ? $" ... ({kvp.Value.Count - 10} more)" : "")
                 );
             }
@@ -160,8 +219,9 @@ public class ValidateCommand : Command<BaseCommandSettings>
 
             foreach (var kvp in result.DuplicateKeys.Where(kv => kv.Value.Any()))
             {
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
                 table.AddRow(
-                    kvp.Key,
+                    langDisplay,
                     string.Join(", ", kvp.Value)
                 );
             }
@@ -180,13 +240,107 @@ public class ValidateCommand : Command<BaseCommandSettings>
 
             foreach (var kvp in result.EmptyValues.Where(kv => kv.Value.Any()))
             {
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
                 table.AddRow(
-                    kvp.Key,
+                    langDisplay,
                     string.Join(", ", kvp.Value.Take(10)) + (kvp.Value.Count > 10 ? $" ... ({kvp.Value.Count - 10} more)" : "")
                 );
             }
 
             AnsiConsole.Write(table);
+        }
+    }
+
+    private void DisplayJson(LocalizationManager.Core.Models.ValidationResult result)
+    {
+        // Normalize language codes for display (empty string -> "default")
+        var normalizedMissingKeys = result.MissingKeys.ToDictionary(
+            kvp => string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key,
+            kvp => kvp.Value
+        );
+        var normalizedExtraKeys = result.ExtraKeys.ToDictionary(
+            kvp => string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key,
+            kvp => kvp.Value
+        );
+        var normalizedDuplicateKeys = result.DuplicateKeys.ToDictionary(
+            kvp => string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key,
+            kvp => kvp.Value
+        );
+        var normalizedEmptyValues = result.EmptyValues.ToDictionary(
+            kvp => string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key,
+            kvp => kvp.Value
+        );
+
+        var output = new
+        {
+            isValid = result.IsValid,
+            totalIssues = result.TotalIssues,
+            missingKeys = normalizedMissingKeys,
+            extraKeys = normalizedExtraKeys,
+            duplicateKeys = normalizedDuplicateKeys,
+            emptyValues = normalizedEmptyValues
+        };
+
+        Console.WriteLine(OutputFormatter.FormatJson(output));
+    }
+
+    private void DisplaySimple(LocalizationManager.Core.Models.ValidationResult result)
+    {
+        if (result.IsValid)
+        {
+            Console.WriteLine("✓ All validations passed!");
+            Console.WriteLine("No issues found.");
+            return;
+        }
+
+        Console.WriteLine($"⚠ Validation found {result.TotalIssues} issue(s)");
+        Console.WriteLine();
+
+        // Missing keys
+        if (result.MissingKeys.Any(kv => kv.Value.Any()))
+        {
+            Console.WriteLine("Missing Translations:");
+            foreach (var kvp in result.MissingKeys.Where(kv => kv.Value.Any()))
+            {
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
+                Console.WriteLine($"  {langDisplay}: {string.Join(", ", kvp.Value)}");
+            }
+            Console.WriteLine();
+        }
+
+        // Extra keys
+        if (result.ExtraKeys.Any(kv => kv.Value.Any()))
+        {
+            Console.WriteLine("Extra Keys (not in default):");
+            foreach (var kvp in result.ExtraKeys.Where(kv => kv.Value.Any()))
+            {
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
+                Console.WriteLine($"  {langDisplay}: {string.Join(", ", kvp.Value)}");
+            }
+            Console.WriteLine();
+        }
+
+        // Duplicate keys
+        if (result.DuplicateKeys.Any(kv => kv.Value.Any()))
+        {
+            Console.WriteLine("Duplicate Keys:");
+            foreach (var kvp in result.DuplicateKeys.Where(kv => kv.Value.Any()))
+            {
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
+                Console.WriteLine($"  {langDisplay}: {string.Join(", ", kvp.Value)}");
+            }
+            Console.WriteLine();
+        }
+
+        // Empty values
+        if (result.EmptyValues.Any(kv => kv.Value.Any()))
+        {
+            Console.WriteLine("Empty Values:");
+            foreach (var kvp in result.EmptyValues.Where(kv => kv.Value.Any()))
+            {
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
+                Console.WriteLine($"  {langDisplay}: {string.Join(", ", kvp.Value)}");
+            }
         }
     }
 }
