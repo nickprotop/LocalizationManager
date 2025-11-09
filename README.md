@@ -4,7 +4,7 @@ A powerful C# .NET 9 console utility for managing .resx localization files with 
 
 **Author:** Nikolaos Protopapas
 **License:** MIT License
-**Version:** 0.6.1
+**Version:** 0.6.2
 
 ---
 
@@ -27,7 +27,7 @@ Whether you're developing on a Linux workstation, managing resources on a server
 
 ## Features
 
-### ✅ Current (v0.6.1)
+### ✅ Current (v0.6.2)
 - **Auto-discovery** - Automatically detects all .resx files and languages in a folder
 - **Dynamic language support** - Use `--lang code:value` for any language in your project (no hardcoded languages!)
 - **Language validation** - Invalid language codes show helpful errors with available languages
@@ -63,8 +63,8 @@ Download the latest release for your platform:
 **Linux (64-bit Intel/AMD):**
 ```bash
 # Download and extract
-wget https://github.com/nickprotop/LocalizationManager/releases/download/v0.6.1/lrm-0.6.1-linux-x64.tar.gz
-tar -xzf lrm-0.6.1-linux-x64.tar.gz
+wget https://github.com/nickprotop/LocalizationManager/releases/download/v0.6.2/lrm-0.6.2-linux-x64.tar.gz
+tar -xzf lrm-0.6.2-linux-x64.tar.gz
 
 # Install system-wide
 sudo cp lrm /usr/local/bin/
@@ -79,18 +79,18 @@ chmod +x ~/.local/bin/lrm
 
 **Linux (ARM64 - Raspberry Pi, etc.):**
 ```bash
-wget https://github.com/nickprotop/LocalizationManager/releases/download/v0.6.1/lrm-0.6.1-linux-arm64.tar.gz
-tar -xzf lrm-0.6.1-linux-arm64.tar.gz
+wget https://github.com/nickprotop/LocalizationManager/releases/download/v0.6.2/lrm-0.6.2-linux-arm64.tar.gz
+tar -xzf lrm-0.6.2-linux-arm64.tar.gz
 # Installation same as above
 ```
 
 **Windows (64-bit):**
-1. Download `lrm-0.6.1-win-x64.zip`
+1. Download `lrm-0.6.2-win-x64.zip`
 2. Extract `lrm.exe` to a folder
 3. Add folder to PATH or move `lrm.exe` to an existing PATH directory
 
 **Windows (ARM64):**
-1. Download `lrm-0.6.1-win-arm64.zip`
+1. Download `lrm-0.6.2-win-arm64.zip`
 2. Extract and install same as above
 
 ### Option 2: Build from Source
@@ -118,10 +118,10 @@ publish/
 ├── linux-arm64/lrm         # 78MB
 ├── win-x64/lrm.exe         # 72MB
 ├── win-arm64/lrm.exe       # 80MB
-├── lrm-0.6.1-linux-x64.tar.gz      (~31MB)
-├── lrm-0.6.1-linux-arm64.tar.gz    (~30MB)
-├── lrm-0.6.1-win-x64.zip           (~31MB)
-└── lrm-0.6.1-win-arm64.zip         (~30MB)
+├── lrm-0.6.2-linux-x64.tar.gz      (~31MB)
+├── lrm-0.6.2-linux-arm64.tar.gz    (~30MB)
+├── lrm-0.6.2-win-x64.zip           (~31MB)
+└── lrm-0.6.2-win-arm64.zip         (~30MB)
 ```
 
 **Manual Build (Single Platform):**
