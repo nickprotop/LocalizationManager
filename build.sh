@@ -89,8 +89,8 @@ for platform in "${platforms[@]}"; do
         exe_name="lrm"
     fi
 
-    # Publish
-    dotnet publish \
+    # Publish (specify main project only, not test project)
+    dotnet publish "$PROJECT_NAME.csproj" \
         --configuration Release \
         --runtime "$platform" \
         --self-contained true \
