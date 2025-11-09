@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Fix release workflow to checkout main branch to prevent push conflicts
 - Fix YAML syntax error in update-changelog workflow
 - Fix CI workflow condition syntax
 - Fix ResourceFileParser to preserve file order and structure
