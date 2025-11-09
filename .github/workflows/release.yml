@@ -29,6 +29,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: main  # Always checkout main branch, not the tag
           fetch-depth: 0  # Full history needed for changelog
           token: ${{ secrets.GITHUB_TOKEN }}
 
