@@ -233,16 +233,24 @@ public void Validate_ShouldDetectMissingKeys_WhenTranslationIsMissing()
 
 ## Release Process
 
-Releases are automated via GitHub Actions:
+Releases are fully automated via GitHub Actions:
 
-1. Maintainer runs: `./bump-version.sh patch` (or `minor`/`major`)
-2. Commits version changes
-3. Pushes tag: `git tag release-patch && git push origin release-patch`
-4. GitHub Actions automatically:
-   - Runs tests
-   - Builds all platforms
-   - Creates GitHub release
-   - Uploads binaries
+1. Maintainer pushes a release tag: `git tag release-patch && git push origin release-patch`
+   - Use `release-patch` for bug fixes (0.6.2 → 0.6.3)
+   - Use `release-minor` for new features (0.6.2 → 0.7.0)
+   - Use `release-major` for breaking changes (0.6.2 → 1.0.0)
+
+2. GitHub Actions workflow automatically:
+   - Bumps version in `.csproj` and `README.md`
+   - Updates `CHANGELOG.md` with new version and date
+   - Commits version changes back to main
+   - Creates version tag (e.g., `v0.6.3`)
+   - Runs all tests
+   - Builds all 4 platforms (Linux/Windows x64/ARM64)
+   - Creates GitHub release with binaries and changelog
+   - Cleans up the trigger tag
+
+**Note:** Contributors don't need to worry about version numbers or releases. Maintainers handle the release process.
 
 See [BUILDING.md](BUILDING.md) for more details.
 
@@ -285,6 +293,56 @@ git merge upstream/main
 # Push to your fork
 git push origin main
 ```
+
+## Creating Demo GIF
+
+If you need to update or recreate the demo GIF (e.g., after adding new features):
+
+### Prerequisites
+
+- `asciinema` for recording terminal sessions
+- `agg` for converting recordings to GIF
+
+### Installation
+
+```bash
+# Install asciinema (if not already installed)
+sudo apt-get install asciinema
+
+# Download pre-built agg binary
+wget https://github.com/asciinema/agg/releases/download/v1.4.3/agg-x86_64-unknown-linux-gnu -O agg
+chmod +x agg
+sudo mv agg /usr/local/bin/
+```
+
+### Recording Process
+
+```bash
+# 1. Build the project first
+./build.sh
+
+# 2. Set optimal terminal size (120x30)
+resize -s 30 120
+
+# 3. Record the demo (runs demo.sh automatically)
+asciinema rec lrm-demo.cast -c ./demo.sh
+
+# 4. Convert to GIF
+agg lrm-demo.cast lrm-demo.gif --speed 1.5 --font-size 14 --theme monokai
+
+# 5. Move to assets folder
+mv lrm-demo.gif assets/
+
+# 6. Commit the updated GIF
+git add assets/lrm-demo.gif
+git commit -m "Update demo GIF with latest features"
+```
+
+**Notes:**
+- The `demo.sh` script automatically backs up and restores test data
+- Terminal size 120x30 is optimal for GitHub README display
+- Speed 1.5x provides good balance between watchability and brevity
+- Use `monokai` theme for consistency with existing demo
 
 ## Getting Help
 

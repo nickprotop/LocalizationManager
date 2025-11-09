@@ -13,6 +13,10 @@ A powerful C# .NET 9 console utility for managing .resx localization files with 
 **License:** MIT License
 **Version:** 0.6.2
 
+<p align="center">
+  <img src="assets/lrm-demo.gif" alt="LRM Demo" width="800">
+</p>
+
 ---
 
 ## Why This Tool Exists

@@ -84,7 +84,7 @@ public class ResourceFileParser
     }
 
     /// <summary>
-    /// Writes a ResourceFile back to disk, preserving XML structure.
+    /// Writes a ResourceFile back to disk, preserving XML structure and original entry order.
     /// </summary>
     /// <param name="resourceFile">The resource file to write.</param>
     /// <exception cref="InvalidOperationException">Thrown when writing fails.</exception>
@@ -97,26 +97,80 @@ public class ResourceFileParser
                 ? XDocument.Load(resourceFile.Language.FilePath)
                 : CreateNewResxDocument();
 
-            // Remove all existing data elements
-            xdoc.Root?.Elements("data").Remove();
-
-            // Add updated data elements
-            foreach (var entry in resourceFile.Entries.OrderBy(e => e.Key))
+            var root = xdoc.Root;
+            if (root == null)
             {
-                var dataElement = new XElement("data",
-                    new XAttribute("name", entry.Key),
-                    new XAttribute(XNamespace.Xml + "space", "preserve"));
+                throw new InvalidOperationException("Invalid XML structure: missing root element");
+            }
 
-                // Add value element
-                dataElement.Add(new XElement("value", entry.Value ?? string.Empty));
+            // Build a dictionary of new entries for quick lookup
+            var newEntries = resourceFile.Entries.ToDictionary(e => e.Key);
+            var processedKeys = new HashSet<string>();
 
-                // Add comment if present
-                if (!string.IsNullOrEmpty(entry.Comment))
+            // Update existing data elements in place (preserves original order)
+            foreach (var dataElement in root.Elements("data").ToList())
+            {
+                var key = dataElement.Attribute("name")?.Value;
+                if (string.IsNullOrEmpty(key)) continue;
+
+                if (newEntries.TryGetValue(key, out var entry))
                 {
-                    dataElement.Add(new XElement("comment", entry.Comment));
-                }
+                    // Update existing entry in place
+                    var valueElement = dataElement.Element("value");
+                    if (valueElement != null)
+                    {
+                        valueElement.Value = entry.Value ?? string.Empty;
+                    }
+                    else
+                    {
+                        dataElement.Add(new XElement("value", entry.Value ?? string.Empty));
+                    }
 
-                xdoc.Root?.Add(dataElement);
+                    // Update or add comment
+                    var commentElement = dataElement.Element("comment");
+                    if (!string.IsNullOrEmpty(entry.Comment))
+                    {
+                        if (commentElement != null)
+                        {
+                            commentElement.Value = entry.Comment;
+                        }
+                        else
+                        {
+                            dataElement.Add(new XElement("comment", entry.Comment));
+                        }
+                    }
+                    else if (commentElement != null)
+                    {
+                        // Remove comment if it's now empty
+                        commentElement.Remove();
+                    }
+
+                    processedKeys.Add(key);
+                }
+                else
+                {
+                    // Remove entries that are no longer present
+                    dataElement.Remove();
+                }
+            }
+
+            // Add new entries that weren't in the original file (at the end)
+            foreach (var entry in resourceFile.Entries)
+            {
+                if (!processedKeys.Contains(entry.Key))
+                {
+                    var dataElement = new XElement("data",
+                        new XAttribute("name", entry.Key),
+                        new XAttribute(XNamespace.Xml + "space", "preserve"),
+                        new XElement("value", entry.Value ?? string.Empty));
+
+                    if (!string.IsNullOrEmpty(entry.Comment))
+                    {
+                        dataElement.Add(new XElement("comment", entry.Comment));
+                    }
+
+                    root.Add(dataElement);
+                }
             }
 
             // Save with proper formatting
