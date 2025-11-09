@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix ResourceFileParser to preserve file order and structure
 
 ### Added
+- Add workflow_dispatch to release workflow for manual triggering
 - Add CI/CD integration and streamline documentation
 - Add GitHub Discussions badge and comparison table
 - Add community files and auto-updating changelog
