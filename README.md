@@ -3,6 +3,7 @@
 [![CI](https://github.com/nickprotop/LocalizationManager/actions/workflows/ci.yml/badge.svg)](https://github.com/nickprotop/LocalizationManager/actions/workflows/ci.yml)
 [![Release](https://github.com/nickprotop/LocalizationManager/actions/workflows/release.yml/badge.svg)](https://github.com/nickprotop/LocalizationManager/actions/workflows/release.yml)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/nickprotop/LocalizationManager)](https://github.com/nickprotop/LocalizationManager/releases)
+[![GitHub Discussions](https://img.shields.io/github/discussions/nickprotop/LocalizationManager)](https://github.com/nickprotop/LocalizationManager/discussions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/download/dotnet/9.0)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-blue)](https://github.com/nickprotop/LocalizationManager#installation)
@@ -33,6 +34,32 @@ This tool was created to fill that gap:
 - **Cross-platform** - Works on Linux, macOS, and Windows
 
 Whether you're developing on a Linux workstation, managing resources on a server, or working through SSH, LRM provides a complete solution for .NET localization management without requiring a GUI or Windows environment.
+
+---
+
+## Comparison with Alternatives
+
+| Feature | LRM | ResXResourceManager | Zeta Resource Editor | Visual Studio | Manual Editing |
+|---------|-----|---------------------|---------------------|---------------|----------------|
+| **Linux Support** | ✅ Native | ❌ Windows only | ❌ Windows only | ❌ Windows only | ✅ Any editor |
+| **Command Line** | ✅ Full CLI | ⚠️ PowerShell scripting | ❌ GUI only | ❌ GUI only | ⚠️ Manual XML |
+| **Terminal UI** | ✅ Interactive TUI | ❌ | ❌ | ❌ | ❌ |
+| **Auto-discovery** | ✅ Automatic | ⚠️ Manual selection | ⚠️ Manual selection | ⚠️ Manual selection | ❌ |
+| **Validation** | ✅ Built-in | ✅ Yes | ✅ Yes | ⚠️ Basic | ❌ |
+| **Statistics** | ✅ Charts + tables | ⚠️ Basic | ✅ Yes | ❌ | ❌ |
+| **CSV Import/Export** | ✅ Yes | ✅ Excel | ✅ Excel | ❌ | ❌ |
+| **CI/CD Ready** | ✅ Exit codes | ⚠️ Scripting | ❌ | ❌ | ⚠️ Custom scripts |
+| **SSH-Friendly** | ✅ Terminal-based | ❌ | ❌ | ❌ | ✅ vim/nano |
+| **No .NET Runtime** | ✅ Self-contained | ✅ Requires .NET | ✅ Requires .NET | ✅ Requires VS | ✅ |
+| **Open Source** | ✅ MIT | ✅ MIT | ⚠️ Requires DevExpress | ❌ | N/A |
+| **Installation** | Single binary | NuGet/Extension | Installer | Full IDE | None |
+| **Best For** | Linux devs, CLI, CI/CD | VS users, automation | Windows GUI users | VS developers | Quick edits |
+
+**Key Differentiators:**
+- ✅ **Only** terminal-based tool with full TUI editor
+- ✅ **Only** solution designed for Linux/.NET developers
+- ✅ **Only** tool with auto-discovery of all languages
+- ✅ **Only** CLI with built-in validation and statistics
 
 ---
 

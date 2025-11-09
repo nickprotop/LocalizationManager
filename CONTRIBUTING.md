@@ -254,9 +254,79 @@ Releases are fully automated via GitHub Actions:
 
 See [BUILDING.md](BUILDING.md) for more details.
 
+## GitHub Workflows
+
+The project uses three automated GitHub Actions workflows:
+
+### 1. CI Workflow (`.github/workflows/ci.yml`)
+
+**Triggers:** Push to `main` or pull requests to `main`
+
+**What it does:**
+- Restores dependencies
+- Builds the project in Release mode
+- Runs all unit and integration tests
+- Reports test results
+
+**Skip CI:** Add `[skip ci]` to commit message to skip (used for docs-only changes)
+
+**Example:**
+```bash
+git commit -m "Update documentation [skip ci]"
+```
+
+### 2. Update CHANGELOG Workflow (`.github/workflows/update-changelog.yml`)
+
+**Triggers:** Push to `main` (automatically after your code is merged)
+
+**What it does:**
+- Extracts all commits since last release
+- Categorizes commits by type:
+  - `fix`/`fixed`/`bugfix` → **Fixed** section
+  - `feat`/`add`/`added` → **Added** section
+  - `change`/`update`/`refactor` → **Changed** section
+- Updates `[Unreleased]` section in CHANGELOG.md
+- Commits changes back with `[skip ci]`
+
+**Important:**
+- Skips if CHANGELOG.md is the only file changed
+- Skips commits with `[skip ci]` or "Bump version"
+- Won't create infinite loops (uses `[skip ci]` and `paths-ignore`)
+- Won't trigger CI or release workflows
+
+**Commit message tips for better CHANGELOG entries:**
+```bash
+# Good - Will be categorized properly
+git commit -m "Fix ResourceFileParser order preservation"
+git commit -m "Add demo GIF to README"
+git commit -m "Change CI workflow trigger conditions"
+
+# Also works - Keywords detected
+git commit -m "Fixed null reference in validator"
+git commit -m "Added new export format"
+```
+
+### 3. Release Workflow (`.github/workflows/release.yml`)
+
+**Triggers:** Push of special tags: `release-patch`, `release-minor`, `release-major`
+
+**What it does:**
+- Bumps version in `.csproj` and `README.md`
+- Updates CHANGELOG.md with version and date
+- Commits version changes
+- Creates version tag (e.g., `v0.6.3`)
+- Runs all tests
+- Builds all 4 platforms
+- Creates GitHub release with binaries
+- Cleans up trigger tag
+
+**Note:** Only maintainers trigger releases.
+
 ## Development Workflow
 
-### Typical Development Cycle
+### Typical Development Cycle with Automation
+
+Here's how your changes flow through the automated system:
 
 ```bash
 # 1. Sync with upstream
@@ -266,18 +336,73 @@ git pull upstream main
 # 2. Create feature branch
 git checkout -b feature/my-feature
 
-# 3. Make changes and test
+# 3. Make changes and test locally
 dotnet build
 dotnet test
 
-# 4. Commit changes
+# 4. Commit changes (use descriptive prefixes for CHANGELOG)
 git add .
-git commit -m "Add my feature"
+git commit -m "Add support for nested resource files"
+# or: "Fix validation for empty values"
+# or: "Change export format to include metadata"
 
 # 5. Push to your fork
 git push origin feature/my-feature
 
 # 6. Create PR on GitHub
+#    → CI workflow runs automatically
+#    → Tests must pass before merge
+
+# 7. After PR is merged to main:
+#    → CI workflow runs again on main
+#    → Update CHANGELOG workflow extracts your commit
+#    → CHANGELOG.md is auto-updated with your changes
+#    → Categorized based on your commit message keywords
+```
+
+### What Happens After Merge
+
+1. **CI Workflow** runs all tests on `main` branch
+2. **Update CHANGELOG Workflow** automatically:
+   - Reads your commit message
+   - Categorizes it (Fixed/Added/Changed)
+   - Updates `[Unreleased]` section
+   - Commits back to `main`
+3. Your contribution is now documented and ready for the next release!
+
+**⚠️ Important:** Always pull after your PR is merged:
+
+```bash
+# After your PR is merged to main
+git checkout main
+git pull upstream main  # or: git pull origin main
+
+# This fetches the auto-updated CHANGELOG.md
+# Without this, your next push might conflict!
+```
+
+**Also pull after releases:**
+- When a maintainer creates a release, version files are updated
+- Always sync before starting new work to avoid conflicts
+
+### Commit Message Best Practices
+
+To ensure proper CHANGELOG categorization:
+
+```bash
+# ✅ Good - Clear categorization
+git commit -m "Fix memory leak in resource parser"
+git commit -m "Add JSON export format"
+git commit -m "Change validation to be case-insensitive"
+
+# ✅ Also good - Keywords are detected
+git commit -m "Fixed crash when loading empty files"
+git commit -m "Added support for comments in CSV"
+git commit -m "Refactor export logic for better performance"
+
+# ⚠️ Less ideal - Will default to "Changed"
+git commit -m "Update code"
+git commit -m "Make improvements"
 ```
 
 ### Keeping Your Fork Updated
