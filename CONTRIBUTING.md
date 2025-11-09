@@ -209,9 +209,8 @@ public void Validate_ShouldDetectMissingKeys_WhenTranslationIsMissing()
 1. **Update documentation** if you're adding/changing features
 2. **Add/update tests** for your changes
 3. **Ensure all tests pass** locally
-4. **Update CHANGELOG.md** under `[Unreleased]` section
-5. **Fill out the PR template** completely
-6. **Request review** from maintainers
+4. **Fill out the PR template** completely
+5. **Request review** from maintainers
 
 ### PR Checklist
 
@@ -220,7 +219,6 @@ public void Validate_ShouldDetectMissingKeys_WhenTranslationIsMissing()
 - [ ] Added/updated tests
 - [ ] All tests pass
 - [ ] Updated documentation (README, comments, etc.)
-- [ ] Updated CHANGELOG.md
 - [ ] No breaking changes (or documented if necessary)
 - [ ] Commit messages are clear and descriptive
 
@@ -257,8 +255,9 @@ Releases are created using the `release.sh` script:
 
 2. **Version bump:**
    - Bumps version in `LocalizationManager.csproj`
-   - Updates `CHANGELOG.md` with new version and date
-   - Creates a commit with version changes
+   - Generates `CHANGELOG.md` from commits since last release
+   - Categorizes commits (Fixed/Added/Changed) based on keywords
+   - Creates a commit with version changes and CHANGELOG
 
 3. **Tag and push:**
    - Creates version tag (e.g., `v0.6.4`)
@@ -299,38 +298,7 @@ The project uses three automated GitHub Actions workflows:
 git commit -m "Update documentation [skip ci]"
 ```
 
-### 2. Update CHANGELOG Workflow (`.github/workflows/update-changelog.yml`)
-
-**Triggers:** Push to `main` (automatically after your code is merged)
-
-**What it does:**
-- Extracts all commits since last release
-- Categorizes commits by type:
-  - `fix`/`fixed`/`bugfix` → **Fixed** section
-  - `feat`/`add`/`added` → **Added** section
-  - `change`/`update`/`refactor` → **Changed** section
-- Updates `[Unreleased]` section in CHANGELOG.md
-- Commits changes back with `[skip ci]`
-
-**Important:**
-- Skips if CHANGELOG.md is the only file changed
-- Skips commits with `[skip ci]` or "Bump version"
-- Won't create infinite loops (uses `[skip ci]` and `paths-ignore`)
-- Won't trigger CI or release workflows
-
-**Commit message tips for better CHANGELOG entries:**
-```bash
-# Good - Will be categorized properly
-git commit -m "Fix ResourceFileParser order preservation"
-git commit -m "Add demo GIF to README"
-git commit -m "Change CI workflow trigger conditions"
-
-# Also works - Keywords detected
-git commit -m "Fixed null reference in validator"
-git commit -m "Added new export format"
-```
-
-### 3. Release Workflow (`.github/workflows/release.yml`)
+### 2. Release Workflow (`.github/workflows/release.yml`)
 
 **Triggers:** Push of version tags (e.g., `v0.6.4`, `v1.0.0`)
 
@@ -376,48 +344,31 @@ git push origin feature/my-feature
 #    → Tests must pass before merge
 
 # 7. After PR is merged to main:
-#    → CI workflow runs again on main
-#    → Update CHANGELOG workflow extracts your commit
-#    → CHANGELOG.md is auto-updated with your changes
-#    → Categorized based on your commit message keywords
+#    → CI workflow runs tests
+#    → Your changes are included in the next release CHANGELOG
 ```
 
 ### What Happens After Merge
 
 1. **CI Workflow** runs all tests on `main` branch
-2. **Update CHANGELOG Workflow** automatically:
-   - Reads your commit message
-   - Categorizes it (Fixed/Added/Changed)
-   - Updates `[Unreleased]` section
-   - Commits back to `main`
-3. Your contribution is now documented and ready for the next release!
+2. Your commit is tracked in git history
+3. When a release is created, your commit will be included in the CHANGELOG
 
-**⚠️ Important:** Always pull after your PR is merged:
-
-```bash
-# After your PR is merged to main
-git checkout main
-git pull upstream main  # or: git pull origin main
-
-# This fetches the auto-updated CHANGELOG.md
-# Without this, your next push might conflict!
-```
-
-**Also pull after releases:**
+**⚠️ Important:** Always pull after releases:
 - When a maintainer creates a release, `LocalizationManager.csproj` and `CHANGELOG.md` are updated
 - Always sync before starting new work to avoid conflicts
 
 ### Commit Message Best Practices
 
-To ensure proper CHANGELOG categorization:
+For better CHANGELOG generation during releases, use descriptive commit messages with keywords:
 
 ```bash
 # ✅ Good - Clear categorization
-git commit -m "Fix memory leak in resource parser"
-git commit -m "Add JSON export format"
-git commit -m "Change validation to be case-insensitive"
+git commit -m "Fix memory leak in resource parser"       # → CHANGELOG Fixed section
+git commit -m "Add JSON export format"                   # → CHANGELOG Added section
+git commit -m "Change validation to be case-insensitive" # → CHANGELOG Changed section
 
-# ✅ Also good - Keywords are detected
+# ✅ Also good - Keywords detected
 git commit -m "Fixed crash when loading empty files"
 git commit -m "Added support for comments in CSV"
 git commit -m "Refactor export logic for better performance"
@@ -426,6 +377,11 @@ git commit -m "Refactor export logic for better performance"
 git commit -m "Update code"
 git commit -m "Make improvements"
 ```
+
+**Keywords for categorization:**
+- **Fixed:** `fix`, `fixed`, `bugfix`
+- **Added:** `feat`, `add`, `added`
+- **Changed:** `change`, `changed`, `update`, `refactor`
 
 ### Keeping Your Fork Updated
 

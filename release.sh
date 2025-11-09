@@ -164,25 +164,106 @@ main() {
     print_success "Version bumped: $CURRENT_VERSION → $NEW_VERSION"
 
     # Update CHANGELOG.md
-    print_step "Updating CHANGELOG.md..."
+    print_step "Generating CHANGELOG from commits..."
     DATE=$(date +%Y-%m-%d)
 
-    # Create new version section with current date
-    sed -i "s/## \[Unreleased\]/## [Unreleased]\n\n## [$NEW_VERSION] - $DATE/" CHANGELOG.md
-
-    # Update version comparison links at bottom
+    # Get previous tag for commit range
     PREV_TAG=$(git describe --tags --abbrev=0 --match "v[0-9]*" 2>/dev/null || echo "")
-    if [ -n "$PREV_TAG" ]; then
-        # Update [Unreleased] link
-        sed -i "s|\[Unreleased\]:.*|[Unreleased]: https://github.com/nickprotop/LocalizationManager/compare/v$NEW_VERSION...HEAD|" CHANGELOG.md
-        # Add new version link
-        sed -i "/\[Unreleased\]:/a [$NEW_VERSION]: https://github.com/nickprotop/LocalizationManager/compare/${PREV_TAG}...v$NEW_VERSION" CHANGELOG.md
+
+    # Extract commits since last release
+    if [ -z "$PREV_TAG" ]; then
+        # No previous release, get all commits
+        COMMITS=$(git log --pretty=format:"%s" --no-merges)
     else
-        # First release
-        sed -i "/\[Unreleased\]:/a [$NEW_VERSION]: https://github.com/nickprotop/LocalizationManager/releases/tag/v$NEW_VERSION" CHANGELOG.md
+        # Get commits since last release
+        COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"%s" --no-merges)
     fi
 
-    print_success "Updated CHANGELOG.md"
+    # Categorize commits
+    FIXED=""
+    ADDED=""
+    CHANGED=""
+
+    while IFS= read -r commit; do
+        # Skip empty lines and filtered commits
+        [ -z "$commit" ] && continue
+        echo "$commit" | grep -q "\[skip ci\]" && continue
+        echo "$commit" | grep -q "Update CHANGELOG" && continue
+
+        # Categorize by conventional commit prefix or keywords
+        if echo "$commit" | grep -qiE "^(fix|fixed|bugfix)"; then
+            FIXED="${FIXED}- ${commit}\n"
+        elif echo "$commit" | grep -qiE "^(feat|add|added)"; then
+            ADDED="${ADDED}- ${commit}\n"
+        elif echo "$commit" | grep -qiE "^(change|changed|update|refactor)"; then
+            CHANGED="${CHANGED}- ${commit}\n"
+        else
+            # Default to Changed for uncategorized
+            CHANGED="${CHANGED}- ${commit}\n"
+        fi
+    done <<< "$COMMITS"
+
+    # Build new version section
+    echo "## [$NEW_VERSION] - $DATE" > /tmp/new_version.txt
+    echo "" >> /tmp/new_version.txt
+
+    # Add Fixed section if not empty
+    if [ -n "$FIXED" ]; then
+        echo "### Fixed" >> /tmp/new_version.txt
+        echo -e "$FIXED" >> /tmp/new_version.txt
+    fi
+
+    # Add Added section if not empty
+    if [ -n "$ADDED" ]; then
+        echo "### Added" >> /tmp/new_version.txt
+        echo -e "$ADDED" >> /tmp/new_version.txt
+    fi
+
+    # Add Changed section if not empty
+    if [ -n "$CHANGED" ]; then
+        echo "### Changed" >> /tmp/new_version.txt
+        echo -e "$CHANGED" >> /tmp/new_version.txt
+    fi
+
+    # Find where to insert (after header, before first version)
+    FIRST_VERSION_LINE=$(grep -n "^## \[" CHANGELOG.md | head -1 | cut -d: -f1)
+
+    if [ -n "$FIRST_VERSION_LINE" ]; then
+        # Insert new version before first existing version
+        head -n $((FIRST_VERSION_LINE - 1)) CHANGELOG.md > /tmp/changelog_new.md
+        cat /tmp/new_version.txt >> /tmp/changelog_new.md
+        tail -n +$FIRST_VERSION_LINE CHANGELOG.md >> /tmp/changelog_new.md
+        mv /tmp/changelog_new.md CHANGELOG.md
+    else
+        # No existing versions, append after header
+        cat /tmp/new_version.txt >> CHANGELOG.md
+    fi
+
+    # Update version comparison links at bottom
+    if [ -n "$PREV_TAG" ]; then
+        # Check if version links section exists
+        if grep -q "^\[" CHANGELOG.md; then
+            # Add new version link at the beginning of links section
+            FIRST_LINK_LINE=$(grep -n "^\[" CHANGELOG.md | head -1 | cut -d: -f1)
+            head -n $((FIRST_LINK_LINE - 1)) CHANGELOG.md > /tmp/changelog_new.md
+            echo "[$NEW_VERSION]: https://github.com/nickprotop/LocalizationManager/compare/${PREV_TAG}...v$NEW_VERSION" >> /tmp/changelog_new.md
+            tail -n +$FIRST_LINK_LINE CHANGELOG.md >> /tmp/changelog_new.md
+            mv /tmp/changelog_new.md CHANGELOG.md
+        else
+            # No links section, create it
+            echo "" >> CHANGELOG.md
+            echo "[$NEW_VERSION]: https://github.com/nickprotop/LocalizationManager/compare/${PREV_TAG}...v$NEW_VERSION" >> CHANGELOG.md
+        fi
+    else
+        # First release
+        echo "" >> CHANGELOG.md
+        echo "[$NEW_VERSION]: https://github.com/nickprotop/LocalizationManager/releases/tag/v$NEW_VERSION" >> CHANGELOG.md
+    fi
+
+    # Cleanup temp files
+    rm -f /tmp/new_version.txt
+
+    print_success "Generated CHANGELOG from commits"
 
     # Amend the bump commit to include CHANGELOG changes
     print_step "Including CHANGELOG in version commit..."

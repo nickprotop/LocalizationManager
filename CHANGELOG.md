@@ -5,18 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Fixed
-- Fix GitHub Action version references from @v1 to @v0
-- Fix action.yml to use static filenames without version numbers
-
-### Added
-- Add release.sh script and simplify release workflow
-
-### Changed
-- Remove version numbers from release artifact filenames
-
 ## [0.6.3] - 2025-11-09
 
 ### Fixed
@@ -95,7 +83,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **License:**
   - MIT License with copyright headers in all source files
 
-[Unreleased]: https://github.com/nickprotop/LocalizationManager/compare/v0.6.3...HEAD
 [0.6.3]: https://github.com/nickprotop/LocalizationManager/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/nickprotop/LocalizationManager/compare/v0.6.0...v0.6.2
 [0.6.0]: https://github.com/nickprotop/LocalizationManager/releases/tag/v0.6.0
