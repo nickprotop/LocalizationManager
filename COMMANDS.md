@@ -153,7 +153,7 @@ Summary Table:
 
 **Options:**
 - `-p, --path <PATH>` - Resource folder path
-- `-c, --config-file <PATH>` - Path to configuration file
+- `--config-file <PATH>` - Path to configuration file
 - `-f, --format <FORMAT>` - Output format: `table` (default), `json`, or `simple`
 - `--regex` - Treat KEY as a regular expression pattern
 - `--show-comments` - Include comments in output
