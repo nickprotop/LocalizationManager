@@ -146,17 +146,28 @@ Summary Table:
 
 ## view
 
-**Description:** View details of a specific key across all languages.
+**Description:** View details of a specific key or multiple keys matching a regex pattern across all languages.
 
 **Arguments:**
-- `<KEY>` - The key to view (required)
+- `<KEY>` - The key or regex pattern to view (required)
 
 **Options:**
 - `-p, --path <PATH>` - Resource folder path
+- `-c, --config-file <PATH>` - Path to configuration file
+- `-f, --format <FORMAT>` - Output format: `table` (default), `json`, or `simple`
+- `--regex` - Treat KEY as a regular expression pattern
 - `--show-comments` - Include comments in output
-- `--format <FORMAT>` - Output format: `table` (default), `json`, or `simple`
+- `--limit <COUNT>` - Maximum number of keys to display (default: 100, 0 for no limit)
+- `--no-limit` - Show all matches without limit (same as --limit 0)
+- `--sort` - Sort matched keys alphabetically
+
+**Modes:**
+- **Exact match (default):** View a single specific key
+- **Regex mode (with --regex):** View all keys matching a pattern
 
 **Examples:**
+
+**Single Key (Exact Match):**
 ```bash
 # View key in table format (default)
 lrm view SaveButton
@@ -171,9 +182,36 @@ lrm view SaveButton --format json
 lrm view SaveButton --format simple
 ```
 
+**Multiple Keys (Regex Pattern):**
+```bash
+# View all Error keys
+lrm view "Error\..*" --regex
+
+# View all button keys with comments
+lrm view "Button\..*" --regex --show-comments
+
+# View numbered items (Item1, Item2, etc.)
+lrm view "Item[0-9]+" --regex
+
+# View all keys containing "Validation"
+lrm view ".*Validation.*" --regex
+
+# View with sorting
+lrm view "Success\..*" --regex --sort
+
+# View all matches (no limit)
+lrm view ".*" --regex --no-limit
+
+# Custom limit of 50 matches
+lrm view ".*Label.*" --regex --limit 50
+
+# JSON output for automation
+lrm view "Error\..*" --regex --format json
+```
+
 **Output formats:**
 
-**Table (default):**
+**Table (single key):**
 ```
 Key: SaveButton
 
@@ -183,9 +221,32 @@ Key: SaveButton
 │ English   │ Save   │
 │ Greek     │ Σώσει  │
 └───────────┴────────┘
+
+Present in 2/2 language(s), 0 empty value(s)
 ```
 
-**JSON:**
+**Table (multiple keys with regex):**
+```
+Pattern: Error\..*
+Matched 3 key(s)
+
+┌───────────────────┬──────────────┬─────────────────┐
+│ Key               │ Language     │ Value           │
+├───────────────────┼──────────────┼─────────────────┤
+│ Error.NotFound    │ English      │ Item not found  │
+│                   │ Greek        │ Δεν βρέθηκε     │
+├───────────────────┼──────────────┼─────────────────┤
+│ Error.Validation  │ English      │ Invalid         │
+│                   │ Greek        │ Άκυρο           │
+├───────────────────┼──────────────┼─────────────────┤
+│ Error.Unauthorized│ English      │ Access denied   │
+│                   │ Greek        │ Απαγορεύεται    │
+└───────────────────┴──────────────┴─────────────────┘
+
+Showing 3 key(s) across 2 language(s)
+```
+
+**JSON (single key):**
 ```json
 {
   "key": "SaveButton",
@@ -195,6 +256,68 @@ Key: SaveButton
   }
 }
 ```
+
+**JSON (multiple keys with regex):**
+```json
+{
+  "pattern": "Error\\..*",
+  "matchCount": 3,
+  "keys": [
+    {
+      "key": "Error.NotFound",
+      "translations": {
+        "default": "Item not found",
+        "el": "Δεν βρέθηκε"
+      }
+    },
+    {
+      "key": "Error.Validation",
+      "translations": {
+        "default": "Invalid",
+        "el": "Άκυρο"
+      }
+    },
+    {
+      "key": "Error.Unauthorized",
+      "translations": {
+        "default": "Access denied",
+        "el": "Απαγορεύεται"
+      }
+    }
+  ]
+}
+```
+
+**Simple (multiple keys):**
+```
+Pattern: Error\..*
+Matched 3 key(s)
+
+--- Error.NotFound ---
+English (default): Item not found
+Greek: Δεν βρέθηκε
+
+--- Error.Validation ---
+English (default): Invalid
+Greek: Άκυρο
+
+--- Error.Unauthorized ---
+English (default): Access denied
+Greek: Απαγορεύεται
+```
+
+**Safety Features:**
+- **Regex timeout:** 1-second limit prevents ReDoS attacks
+- **Default limit:** Shows first 100 matches to avoid overwhelming output
+- **Invalid pattern detection:** Clear error messages for malformed regex
+- **Backward compatible:** Exact match by default, regex is opt-in
+
+**Use Cases:**
+- **Namespace exploration:** View all keys in a namespace (e.g., `Error.*`)
+- **Pattern discovery:** Find keys by pattern without knowing exact names
+- **Documentation:** Generate translation reports for specific areas
+- **Validation:** Check translations for entire feature groups
+- **CI/CD integration:** Export specific key groups as JSON
 
 ---
 

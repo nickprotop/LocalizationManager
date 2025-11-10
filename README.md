@@ -56,6 +56,8 @@ LRM solves this by providing:
 - **Validation** - Detect missing translations, duplicates, empty values
 - **Statistics** - Translation coverage with progress bars
 - **Multiple Output Formats** - Table, JSON, and simple text formats for all commands
+- **Configuration File Support** - Auto-load settings from `lrm.json` or specify custom config
+- **Regex Pattern Matching** - View and explore multiple keys with powerful regex patterns
 - **Export/Import** - CSV, JSON, and text formats for working with translators
 - **Batch Operations** - Add, update, delete keys across all languages
 - **CI/CD Ready** - Exit codes, JSON output, GitHub Actions support
@@ -110,6 +112,12 @@ lrm view SaveButton
 # View key details as JSON
 lrm view SaveButton --format json
 
+# View multiple keys with regex pattern
+lrm view "^Error\\..*" --regex
+
+# View all button-related keys
+lrm view "Button\\.*" --regex --sort
+
 # Add a new key
 lrm add NewKey -i
 
@@ -135,17 +143,18 @@ See [EXAMPLES.md](EXAMPLES.md) for detailed usage scenarios and workflows.
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `validate` | Validate resource files for missing translations, duplicates, empty values |
-| `stats` | Display translation statistics and coverage |
-| `view` | View details of a specific key across all languages |
-| `add` | Add a new key to all language files |
-| `update` | Update values for an existing key |
-| `delete` | Delete a key from all language files |
-| `export` | Export translations to CSV format |
-| `import` | Import translations from CSV |
-| `edit` | Launch interactive Terminal UI editor |
+| Command | Description | Format Support |
+|---------|-------------|----------------|
+| `validate` | Validate resource files for missing translations, duplicates, empty values | Table, JSON, Simple |
+| `stats` | Display translation statistics and coverage | Table, JSON, Simple |
+| `view` | View details of a specific key or regex pattern across all languages | Table, JSON, Simple |
+| `add` | Add a new key to all language files | N/A |
+| `update` | Update values for an existing key | N/A |
+| `delete` | Delete a key from all language files | N/A |
+| `export` | Export translations to CSV, JSON, or text format | CSV, JSON, Text |
+| `import` | Import translations from CSV | Table, JSON, Simple |
+| `edit` | Launch interactive Terminal UI editor | N/A |
+| `list-languages` | List all detected language files | Table, JSON, Simple |
 
 See [COMMANDS.md](COMMANDS.md) for complete command reference with all options and examples.
 

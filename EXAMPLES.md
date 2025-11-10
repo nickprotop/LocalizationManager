@@ -6,6 +6,7 @@ This document provides comprehensive examples of how to use the Localization Res
 
 - [Initial Setup](#initial-setup)
 - [Validation Workflows](#validation-workflows)
+- [Viewing Keys](#viewing-keys)
 - [Adding New Keys](#adding-new-keys)
 - [Updating Existing Keys](#updating-existing-keys)
 - [Deleting Keys](#deleting-keys)
@@ -105,6 +106,182 @@ lrm validate --format json > validation-results.json
 
 # Parse JSON with jq
 lrm validate --format json | jq '.isValid'
+```
+
+---
+
+## Viewing Keys
+
+### View Single Key
+```bash
+# View specific key across all languages
+lrm view SaveButton
+
+# Include comments
+lrm view SaveButton --show-comments
+
+# Output as JSON
+lrm view SaveButton --format json
+```
+
+**Output example:**
+```
+Key: SaveButton
+
+┌──────────────────┬────────────────┐
+│ Language         │ Value          │
+├──────────────────┼────────────────┤
+│ English (default)│ Save           │
+│ Ελληνικά (el)    │ Αποθήκευση     │
+└──────────────────┴────────────────┘
+
+Present in 2/2 language(s), 0 empty value(s)
+```
+
+### View Multiple Keys with Regex Patterns
+
+**View all Error keys:**
+```bash
+# View all keys starting with "Error."
+lrm view "Error\..*" --regex
+
+# Output:
+# Pattern: Error\..*
+# Matched 5 key(s)
+#
+# ┌────────────────────┬──────────────┬─────────────────┐
+# │ Key                │ Language     │ Value           │
+# ├────────────────────┼──────────────┼─────────────────┤
+# │ Error.NotFound     │ English      │ Item not found  │
+# │                    │ Greek        │ Δεν βρέθηκε     │
+# ├────────────────────┼──────────────┼─────────────────┤
+# │ Error.Validation   │ English      │ Invalid         │
+# │                    │ Greek        │ Άκυρο           │
+# └────────────────────┴──────────────┴─────────────────┘
+```
+
+**View all Button keys:**
+```bash
+# View all button-related keys
+lrm view "Button\..*" --regex
+
+# With comments
+lrm view "Button\..*" --regex --show-comments
+
+# Sorted alphabetically
+lrm view "Button\..*" --regex --sort
+```
+
+**View numbered items:**
+```bash
+# View Item1, Item2, Item3, etc.
+lrm view "Item[0-9]+" --regex
+
+# View dialog keys (Dialog1, Dialog2, ...)
+lrm view "Dialog[0-9]+" --regex --sort
+```
+
+**View keys containing a specific word:**
+```bash
+# View all keys containing "Validation"
+lrm view ".*Validation.*" --regex
+
+# View all keys containing "Success"
+lrm view ".*Success.*" --regex --sort
+```
+
+**Control output limit:**
+```bash
+# Default limit (100 matches)
+lrm view ".*" --regex
+
+# Custom limit (first 50 matches)
+lrm view ".*Label.*" --regex --limit 50
+
+# No limit (show all matches)
+lrm view ".*" --regex --no-limit
+
+# Alternative syntax for no limit
+lrm view ".*" --regex --limit 0
+```
+
+### JSON Output for Automation
+```bash
+# Get all Error keys as JSON for CI/CD
+lrm view "Error\..*" --regex --format json > errors.json
+
+# Get all validation messages for documentation
+lrm view ".*Validation.*" --regex --format json | jq '.keys[].key'
+
+# Count matches programmatically
+lrm view "Button\..*" --regex --format json | jq '.matchCount'
+```
+
+**JSON output example:**
+```json
+{
+  "pattern": "Error\\..*",
+  "matchCount": 5,
+  "keys": [
+    {
+      "key": "Error.NotFound",
+      "translations": {
+        "default": "Item not found",
+        "el": "Δεν βρέθηκε"
+      }
+    }
+  ]
+}
+```
+
+### Simple Text Output
+```bash
+# Plain text output (no colors/formatting)
+lrm view "Success\..*" --regex --format simple
+
+# Output:
+# Pattern: Success\..*
+# Matched 2 key(s)
+#
+# --- Success.Save ---
+# English (default): Saved successfully
+# Greek: Αποθηκεύτηκε επιτυχώς
+#
+# --- Success.Delete ---
+# English (default): Deleted successfully
+# Greek: Διαγράφηκε επιτυχώς
+```
+
+### Use Cases for Regex View
+
+**Explore namespaces:**
+```bash
+# See all API error messages
+lrm view "Api\.Error\..*" --regex
+
+# See all UI labels
+lrm view "Ui\.Label\..*" --regex --sort
+
+# See all dialog titles
+lrm view "Dialog\.Title\..*" --regex
+```
+
+**Generate translation reports:**
+```bash
+# Export all error messages for review
+lrm view "Error\..*" --regex --format json > error-translations.json
+
+# Export feature-specific translations
+lrm view "UserProfile\..*" --regex --format json > profile-translations.json
+```
+
+**Validation workflows:**
+```bash
+# Check all Success messages exist in all languages
+lrm view "Success\..*" --regex --show-comments
+
+# Audit all numbered items are translated
+lrm view "Item[0-9]+" --regex
 ```
 
 ---

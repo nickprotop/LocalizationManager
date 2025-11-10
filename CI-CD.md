@@ -175,6 +175,29 @@ lrm export --format json -o translations.json
 
 ---
 
+## Configuration File Support
+
+LRM supports configuration files to avoid repeating common options. Create a `lrm.json` file in your resource directory:
+
+```json
+{
+}
+```
+
+LRM will automatically discover and use `lrm.json` in the resource path, or you can specify a custom config file:
+
+```bash
+# Use auto-discovered lrm.json
+lrm validate --path ./Resources
+
+# Use custom config file
+lrm validate --config-file ./my-config.json --path ./Resources
+```
+
+In CI/CD workflows, you can commit your `lrm.json` to version control and all commands will use it automatically.
+
+---
+
 ## Common Use Cases
 
 ### 1. Validate on Pull Requests
@@ -291,6 +314,48 @@ jobs:
         with:
           name: weekly-translation-report
           path: weekly-report.csv
+```
+
+### 7. Explore Keys by Namespace with Regex Patterns
+
+Use the `view` command with regex patterns to explore and document keys by namespace:
+
+```yaml
+- name: Document Error Messages
+  run: |
+    # Export all error message keys to JSON for documentation
+    lrm view "^Error\\..*" --regex --format json > error-messages.json
+
+- name: Document UI Labels
+  run: |
+    # Export all label and button keys
+    lrm view "^(Label|Button)\\." --regex --sort --format json > ui-elements.json
+
+- name: Verify Validation Messages
+  run: |
+    # Check that all validation keys are present
+    VALIDATION_KEYS=$(lrm view "Validation" --regex --format json | jq '.matchCount')
+    if [ "$VALIDATION_KEYS" -lt 10 ]; then
+      echo "Warning: Only $VALIDATION_KEYS validation keys found"
+      exit 1
+    fi
+```
+
+### 8. Generate Translation Reports by Category
+
+```yaml
+- name: Generate category-based translation reports
+  run: |
+    # Create reports for different key namespaces
+    for category in Error Success Warning Label Button; do
+      echo "Generating report for $category keys..."
+      lrm view "^${category}\\." --regex --format simple --no-limit > "${category}-translations.txt"
+    done
+
+- uses: actions/upload-artifact@v4
+  with:
+    name: translation-reports
+    path: "*-translations.txt"
 ```
 
 ---
