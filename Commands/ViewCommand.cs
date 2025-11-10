@@ -25,6 +25,7 @@ using LocalizationManager.Core.Output;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using System.ComponentModel;
+using System.Text.RegularExpressions;
 
 namespace LocalizationManager.Commands;
 
@@ -36,12 +37,29 @@ public class ViewCommand : Command<ViewCommand.Settings>
     public class Settings : BaseFormattableCommandSettings
     {
         [CommandArgument(0, "<KEY>")]
-        [Description("The key to view")]
+        [Description("The key or pattern to view")]
         public required string Key { get; set; }
 
+        [CommandOption("--regex")]
+        [Description("Treat the key as a regular expression pattern")]
+        public bool UseRegex { get; set; }
+
         [CommandOption("--show-comments")]
-        [Description("Show comments for the key")]
+        [Description("Show comments for the key(s)")]
         public bool ShowComments { get; set; }
+
+        [CommandOption("--limit <COUNT>")]
+        [Description("Maximum number of keys to display (default: 100, 0 for no limit)")]
+        [DefaultValue(100)]
+        public int Limit { get; set; } = 100;
+
+        [CommandOption("--no-limit")]
+        [Description("Show all matches without limit")]
+        public bool NoLimit { get; set; }
+
+        [CommandOption("--sort")]
+        [Description("Sort matched keys alphabetically")]
+        public bool Sort { get; set; }
     }
 
     public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken = default)
@@ -96,10 +114,72 @@ public class ViewCommand : Command<ViewCommand.Settings>
                 return 1;
             }
 
-            var existingEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == settings.Key);
-            if (existingEntry == null)
+            // Find matching keys
+            List<string> matchedKeys;
+
+            if (settings.UseRegex)
             {
-                AnsiConsole.MarkupLine($"[red]✗ Key '{settings.Key}' not found![/]");
+                try
+                {
+                    var regex = new Regex(settings.Key, RegexOptions.None, TimeSpan.FromSeconds(1));
+                    matchedKeys = defaultFile.Entries
+                        .Where(e => regex.IsMatch(e.Key))
+                        .Select(e => e.Key)
+                        .ToList();
+                }
+                catch (RegexMatchTimeoutException)
+                {
+                    AnsiConsole.MarkupLine("[red]✗ Regex pattern timed out (too complex)[/]");
+                    return 1;
+                }
+                catch (RegexParseException ex)
+                {
+                    AnsiConsole.MarkupLine($"[red]✗ Invalid regex pattern: {ex.Message}[/]");
+                    return 1;
+                }
+                catch (ArgumentException ex)
+                {
+                    AnsiConsole.MarkupLine($"[red]✗ Invalid regex pattern: {ex.Message}[/]");
+                    return 1;
+                }
+            }
+            else
+            {
+                // Exact match (backward compatible)
+                var existingEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == settings.Key);
+                if (existingEntry == null)
+                {
+                    AnsiConsole.MarkupLine($"[red]✗ Key '{settings.Key}' not found![/]");
+                    return 1;
+                }
+                matchedKeys = new List<string> { settings.Key };
+            }
+
+            // Apply sorting if requested
+            if (settings.Sort)
+            {
+                matchedKeys = matchedKeys.OrderBy(k => k).ToList();
+            }
+
+            // Apply limit
+            var effectiveLimit = settings.NoLimit || settings.Limit == 0 ? int.MaxValue : settings.Limit;
+            var totalMatches = matchedKeys.Count;
+
+            if (matchedKeys.Count > effectiveLimit)
+            {
+                if (format == OutputFormat.Table)
+                {
+                    AnsiConsole.MarkupLine($"[yellow]⚠ Found {totalMatches} matches, showing first {effectiveLimit}. Use --limit to adjust.[/]");
+                    AnsiConsole.WriteLine();
+                }
+                matchedKeys = matchedKeys.Take(effectiveLimit).ToList();
+            }
+
+            // Check if we have any matches
+            if (matchedKeys.Count == 0)
+            {
+                var patternType = settings.UseRegex ? "pattern" : "key";
+                AnsiConsole.MarkupLine($"[red]✗ No keys match {patternType} '{settings.Key}'[/]");
                 return 1;
             }
 
@@ -107,14 +187,14 @@ public class ViewCommand : Command<ViewCommand.Settings>
             switch (format)
             {
                 case OutputFormat.Json:
-                    DisplayJson(settings.Key, resourceFiles, settings.ShowComments);
+                    DisplayJson(matchedKeys, resourceFiles, settings.ShowComments, settings);
                     break;
                 case OutputFormat.Simple:
-                    DisplaySimple(settings.Key, resourceFiles, settings.ShowComments);
+                    DisplaySimple(matchedKeys, resourceFiles, settings.ShowComments, settings);
                     break;
                 case OutputFormat.Table:
                 default:
-                    DisplayTable(settings.Key, resourceFiles, settings.ShowComments, settings);
+                    DisplayTable(matchedKeys, resourceFiles, settings.ShowComments, settings);
                     break;
             }
 
@@ -141,10 +221,24 @@ public class ViewCommand : Command<ViewCommand.Settings>
         }
     }
 
-    private void DisplayTable(string key, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings)
+    private void DisplayTable(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings)
     {
         DisplayConfigNotice(settings);
 
+        if (keys.Count == 1)
+        {
+            // Single key - use backward compatible format
+            DisplaySingleKeyTable(keys[0], resourceFiles, showComments);
+        }
+        else
+        {
+            // Multiple keys - new grouped format
+            DisplayMultipleKeysTable(keys, resourceFiles, showComments, settings);
+        }
+    }
+
+    private void DisplaySingleKeyTable(string key, List<Core.Models.ResourceFile> resourceFiles, bool showComments)
+    {
         AnsiConsole.MarkupLine($"[yellow]Key:[/] [bold]{key}[/]");
         AnsiConsole.WriteLine();
 
@@ -209,7 +303,71 @@ public class ViewCommand : Command<ViewCommand.Settings>
         AnsiConsole.MarkupLine($"[dim]Present in {present}/{total} language(s), {empty} empty value(s)[/]");
     }
 
-    private void DisplayJson(string key, List<Core.Models.ResourceFile> resourceFiles, bool showComments)
+    private void DisplayMultipleKeysTable(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings)
+    {
+        var patternDisplay = settings.UseRegex ? $"Pattern: {settings.Key}" : $"Keys: {keys.Count}";
+        AnsiConsole.MarkupLine($"[yellow]{patternDisplay}[/]");
+        AnsiConsole.MarkupLine($"[dim]Matched {keys.Count} key(s)[/]");
+        AnsiConsole.WriteLine();
+
+        var table = new Table();
+        table.AddColumn("Key");
+        table.AddColumn("Language");
+        table.AddColumn("Value");
+        if (showComments)
+        {
+            table.AddColumn("Comment");
+        }
+
+        foreach (var key in keys)
+        {
+            bool firstRowForKey = true;
+            foreach (var rf in resourceFiles)
+            {
+                var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                var langName = rf.Language.IsDefault
+                    ? $"{rf.Language.Name} [yellow](default)[/]"
+                    : rf.Language.Name;
+
+                var keyDisplay = firstRowForKey ? key : "";
+                var value = entry?.IsEmpty == true ? "[dim](empty)[/]" : entry?.Value ?? "[red](missing)[/]";
+
+                if (showComments)
+                {
+                    var comment = entry == null || string.IsNullOrWhiteSpace(entry.Comment)
+                        ? "[dim](no comment)[/]"
+                        : entry.Comment;
+                    table.AddRow(keyDisplay, langName, value, comment);
+                }
+                else
+                {
+                    table.AddRow(keyDisplay, langName, value);
+                }
+
+                firstRowForKey = false;
+            }
+        }
+
+        AnsiConsole.Write(table);
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[dim]Showing {keys.Count} key(s) across {resourceFiles.Count} language(s)[/]");
+    }
+
+    private void DisplayJson(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings)
+    {
+        if (keys.Count == 1)
+        {
+            // Single key - backward compatible format
+            DisplaySingleKeyJson(keys[0], resourceFiles, showComments);
+        }
+        else
+        {
+            // Multiple keys - array format
+            DisplayMultipleKeysJson(keys, resourceFiles, showComments, settings);
+        }
+    }
+
+    private void DisplaySingleKeyJson(string key, List<Core.Models.ResourceFile> resourceFiles, bool showComments)
     {
         var translations = new Dictionary<string, object?>();
 
@@ -241,7 +399,64 @@ public class ViewCommand : Command<ViewCommand.Settings>
         Console.WriteLine(OutputFormatter.FormatJson(output));
     }
 
-    private void DisplaySimple(string key, List<Core.Models.ResourceFile> resourceFiles, bool showComments)
+    private void DisplayMultipleKeysJson(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings)
+    {
+        var keyObjects = new List<object>();
+
+        foreach (var key in keys)
+        {
+            var translations = new Dictionary<string, object?>();
+            foreach (var rf in resourceFiles)
+            {
+                var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                var langCode = rf.Language.GetDisplayCode();
+
+                if (showComments && entry != null && !string.IsNullOrWhiteSpace(entry.Comment))
+                {
+                    translations[langCode] = new
+                    {
+                        value = entry.Value,
+                        comment = entry.Comment
+                    };
+                }
+                else
+                {
+                    translations[langCode] = entry?.Value;
+                }
+            }
+
+            keyObjects.Add(new
+            {
+                key = key,
+                translations = translations
+            });
+        }
+
+        var output = new
+        {
+            pattern = settings.UseRegex ? settings.Key : (string?)null,
+            matchCount = keys.Count,
+            keys = keyObjects
+        };
+
+        Console.WriteLine(OutputFormatter.FormatJson(output));
+    }
+
+    private void DisplaySimple(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings)
+    {
+        if (keys.Count == 1)
+        {
+            // Single key - backward compatible format
+            DisplaySingleKeySimple(keys[0], resourceFiles, showComments);
+        }
+        else
+        {
+            // Multiple keys
+            DisplayMultipleKeysSimple(keys, resourceFiles, showComments, settings);
+        }
+    }
+
+    private void DisplaySingleKeySimple(string key, List<Core.Models.ResourceFile> resourceFiles, bool showComments)
     {
         Console.WriteLine($"Key: {key}");
         Console.WriteLine();
@@ -257,6 +472,42 @@ public class ViewCommand : Command<ViewCommand.Settings>
             if (showComments && entry != null && !string.IsNullOrWhiteSpace(entry.Comment))
             {
                 Console.WriteLine($"  Comment: {entry.Comment}");
+            }
+        }
+    }
+
+    private void DisplayMultipleKeysSimple(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings)
+    {
+        var patternDisplay = settings.UseRegex ? $"Pattern: {settings.Key}" : $"Keys: {keys.Count}";
+        Console.WriteLine(patternDisplay);
+        Console.WriteLine($"Matched {keys.Count} key(s)");
+        Console.WriteLine();
+
+        for (int i = 0; i < keys.Count; i++)
+        {
+            var key = keys[i];
+            Console.WriteLine($"--- {key} ---");
+
+            foreach (var rf in resourceFiles)
+            {
+                var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                var langLabel = rf.Language.IsDefault
+                    ? $"{rf.Language.Name} (default)"
+                    : rf.Language.Name;
+                var value = entry?.Value ?? "(missing)";
+
+                Console.WriteLine($"{langLabel}: {value}");
+
+                if (showComments && entry != null && !string.IsNullOrWhiteSpace(entry.Comment))
+                {
+                    Console.WriteLine($"  Comment: {entry.Comment}");
+                }
+            }
+
+            // Add blank line between keys except after last one
+            if (i < keys.Count - 1)
+            {
+                Console.WriteLine();
             }
         }
     }
