@@ -112,11 +112,14 @@ lrm view SaveButton
 # View key details as JSON
 lrm view SaveButton --format json
 
-# View multiple keys with regex pattern
-lrm view "^Error\\..*" --regex
+# View multiple keys with wildcard pattern (simple and intuitive)
+lrm view "Error.*"
 
 # View all button-related keys
-lrm view "Button\\.*" --regex --sort
+lrm view "Button.*" --sort
+
+# View keys ending with .Text
+lrm view "*.Text"
 
 # Add a new key
 lrm add NewKey -i

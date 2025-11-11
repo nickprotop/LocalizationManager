@@ -320,6 +320,195 @@ public class ViewCommandIntegrationTests : IDisposable
         }
     }
 
+    [Fact]
+    public void WildcardMatch_StarOnly_ReturnsAllKeys()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var pattern = "*";
+
+        // Act
+        var convertedPattern = Commands.ViewCommand.ConvertWildcardToRegex(pattern);
+        var regex = new Regex(convertedPattern, RegexOptions.None, TimeSpan.FromSeconds(1));
+        var matchedKeys = defaultFile.Entries
+            .Where(e => regex.IsMatch(e.Key))
+            .Select(e => e.Key)
+            .ToList();
+
+        // Assert
+        Assert.Equal(12, matchedKeys.Count); // All keys
+    }
+
+    [Fact]
+    public void WildcardMatch_StarAtEnd_ReturnsMatchingKeys()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var pattern = "Error.*";
+
+        // Act
+        var convertedPattern = Commands.ViewCommand.ConvertWildcardToRegex(pattern);
+        var regex = new Regex(convertedPattern, RegexOptions.None, TimeSpan.FromSeconds(1));
+        var matchedKeys = defaultFile.Entries
+            .Where(e => regex.IsMatch(e.Key))
+            .Select(e => e.Key)
+            .ToList();
+
+        // Assert
+        Assert.Equal(3, matchedKeys.Count);
+        Assert.Contains("Error.NotFound", matchedKeys);
+        Assert.Contains("Error.Validation", matchedKeys);
+        Assert.Contains("Error.Unauthorized", matchedKeys);
+    }
+
+    [Fact]
+    public void WildcardMatch_StarAtBeginning_ReturnsMatchingKeys()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var pattern = "*.Save";
+
+        // Act
+        var convertedPattern = Commands.ViewCommand.ConvertWildcardToRegex(pattern);
+        var regex = new Regex(convertedPattern, RegexOptions.None, TimeSpan.FromSeconds(1));
+        var matchedKeys = defaultFile.Entries
+            .Where(e => regex.IsMatch(e.Key))
+            .Select(e => e.Key)
+            .ToList();
+
+        // Assert
+        Assert.Single(matchedKeys);
+        Assert.Contains("Success.Save", matchedKeys);
+    }
+
+    [Fact]
+    public void WildcardMatch_StarInMiddle_ReturnsMatchingKeys()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var pattern = "Button.*";
+
+        // Act
+        var convertedPattern = Commands.ViewCommand.ConvertWildcardToRegex(pattern);
+        var regex = new Regex(convertedPattern, RegexOptions.None, TimeSpan.FromSeconds(1));
+        var matchedKeys = defaultFile.Entries
+            .Where(e => regex.IsMatch(e.Key))
+            .Select(e => e.Key)
+            .ToList();
+
+        // Assert - Matches Button.Cancel and Button.Submit
+        Assert.Equal(2, matchedKeys.Count);
+        Assert.Contains("Button.Cancel", matchedKeys);
+        Assert.Contains("Button.Submit", matchedKeys);
+    }
+
+    [Fact]
+    public void WildcardMatch_QuestionMark_ReturnsMatchingKeys()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var pattern = "Item?";
+
+        // Act
+        var convertedPattern = Commands.ViewCommand.ConvertWildcardToRegex(pattern);
+        var regex = new Regex(convertedPattern, RegexOptions.None, TimeSpan.FromSeconds(1));
+        var matchedKeys = defaultFile.Entries
+            .Where(e => regex.IsMatch(e.Key))
+            .Select(e => e.Key)
+            .ToList();
+
+        // Assert
+        Assert.Equal(3, matchedKeys.Count);
+        Assert.Contains("Item1", matchedKeys);
+        Assert.Contains("Item2", matchedKeys);
+        Assert.Contains("Item3", matchedKeys);
+    }
+
+    [Fact]
+    public void WildcardMatch_CombinedStarAndQuestion_ReturnsMatchingKeys()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var pattern = "*.*";
+
+        // Act
+        var convertedPattern = Commands.ViewCommand.ConvertWildcardToRegex(pattern);
+        var regex = new Regex(convertedPattern, RegexOptions.None, TimeSpan.FromSeconds(1));
+        var matchedKeys = defaultFile.Entries
+            .Where(e => regex.IsMatch(e.Key))
+            .Select(e => e.Key)
+            .ToList();
+
+        // Assert - All keys with dots
+        Assert.Equal(9, matchedKeys.Count); // All keys except Item1, Item2, Item3
+    }
+
+    [Fact]
+    public void WildcardMatch_EscapedStar_MatchesLiteralStar()
+    {
+        // Arrange
+        var pattern = "Test\\*Key";
+
+        // Act
+        var convertedPattern = Commands.ViewCommand.ConvertWildcardToRegex(pattern);
+
+        // Assert - Should match literal asterisk
+        Assert.Contains("\\*", convertedPattern);
+        Assert.DoesNotContain(".*", convertedPattern.Replace("^", "").Replace("$", "").Replace("\\*", ""));
+    }
+
+    [Fact]
+    public void WildcardMatch_EscapedQuestion_MatchesLiteralQuestion()
+    {
+        // Arrange
+        var pattern = "Test\\?Key";
+
+        // Act
+        var convertedPattern = Commands.ViewCommand.ConvertWildcardToRegex(pattern);
+
+        // Assert - Should match literal question mark
+        Assert.Contains("\\?", convertedPattern);
+        // Check that it's not converted to . (single character match)
+        var cleanPattern = convertedPattern.Replace("^", "").Replace("$", "").Replace("\\?", "");
+        Assert.DoesNotContain(".", cleanPattern);
+    }
+
+    [Fact]
+    public void IsWildcardPattern_DetectsWildcards()
+    {
+        // Arrange & Act & Assert
+        Assert.True(Commands.ViewCommand.IsWildcardPattern("App.*"));
+        Assert.True(Commands.ViewCommand.IsWildcardPattern("*.Text"));
+        Assert.True(Commands.ViewCommand.IsWildcardPattern("Error.???"));
+        Assert.True(Commands.ViewCommand.IsWildcardPattern("*"));
+    }
+
+    [Fact]
+    public void IsWildcardPattern_DetectsWildcardsRegardlessOfRegexSyntax()
+    {
+        // Arrange & Act & Assert
+        // The --regex flag determines behavior, not pattern detection
+        // If pattern has wildcards, IsWildcardPattern returns true
+        Assert.True(Commands.ViewCommand.IsWildcardPattern("^App.*"));  // Has *
+        Assert.True(Commands.ViewCommand.IsWildcardPattern("App.*$"));  // Has *
+        Assert.False(Commands.ViewCommand.IsWildcardPattern("App[0-9]"));  // No wildcards
+        Assert.False(Commands.ViewCommand.IsWildcardPattern("(Error|Success)"));  // No wildcards
+    }
+
+    [Fact]
+    public void IsWildcardPattern_IgnoresEscapedWildcards()
+    {
+        // Arrange & Act & Assert
+        Assert.False(Commands.ViewCommand.IsWildcardPattern("Test\\*Key"));
+        Assert.False(Commands.ViewCommand.IsWildcardPattern("Test\\?Key"));
+    }
+
     public void Dispose()
     {
         // Cleanup test directory

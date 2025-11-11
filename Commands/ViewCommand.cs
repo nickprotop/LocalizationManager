@@ -74,7 +74,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
             var format = settings.GetOutputFormat();
             if (format == OutputFormat.Table)
             {
-                AnsiConsole.MarkupLine($"[blue]Scanning:[/] {resourcePath}");
+                AnsiConsole.MarkupLine($"[blue]Scanning:[/] {Markup.Escape(resourcePath)}");
                 AnsiConsole.WriteLine();
             }
 
@@ -116,6 +116,16 @@ public class ViewCommand : Command<ViewCommand.Settings>
 
             // Find matching keys
             List<string> matchedKeys;
+            bool usedWildcards = false;
+            string originalPattern = settings.Key;
+
+            // Auto-detect and convert wildcard patterns to regex
+            if (!settings.UseRegex && IsWildcardPattern(settings.Key))
+            {
+                settings.Key = ConvertWildcardToRegex(settings.Key);
+                settings.UseRegex = true;
+                usedWildcards = true;
+            }
 
             if (settings.UseRegex)
             {
@@ -149,7 +159,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
                 var existingEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == settings.Key);
                 if (existingEntry == null)
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ Key '{settings.Key}' not found![/]");
+                    AnsiConsole.MarkupLine($"[red]✗ Key '{Markup.Escape(settings.Key)}' not found![/]");
                     return 1;
                 }
                 matchedKeys = new List<string> { settings.Key };
@@ -178,8 +188,10 @@ public class ViewCommand : Command<ViewCommand.Settings>
             // Check if we have any matches
             if (matchedKeys.Count == 0)
             {
-                var patternType = settings.UseRegex ? "pattern" : "key";
-                AnsiConsole.MarkupLine($"[red]✗ No keys match {patternType} '{settings.Key}'[/]");
+                var patternType = usedWildcards ? "wildcard" : (settings.UseRegex ? "pattern" : "key");
+                var displayPattern = usedWildcards ? originalPattern : settings.Key;
+                // Escape pattern to prevent Spectre.Console markup interpretation
+                AnsiConsole.MarkupLine($"[red]✗ No keys match {patternType} '{Markup.Escape(displayPattern)}'[/]");
                 return 1;
             }
 
@@ -187,14 +199,14 @@ public class ViewCommand : Command<ViewCommand.Settings>
             switch (format)
             {
                 case OutputFormat.Json:
-                    DisplayJson(matchedKeys, resourceFiles, settings.ShowComments, settings);
+                    DisplayJson(matchedKeys, resourceFiles, settings.ShowComments, settings, usedWildcards, originalPattern);
                     break;
                 case OutputFormat.Simple:
-                    DisplaySimple(matchedKeys, resourceFiles, settings.ShowComments, settings);
+                    DisplaySimple(matchedKeys, resourceFiles, settings.ShowComments, settings, usedWildcards, originalPattern);
                     break;
                 case OutputFormat.Table:
                 default:
-                    DisplayTable(matchedKeys, resourceFiles, settings.ShowComments, settings);
+                    DisplayTable(matchedKeys, resourceFiles, settings.ShowComments, settings, usedWildcards, originalPattern);
                     break;
             }
 
@@ -221,7 +233,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
         }
     }
 
-    private void DisplayTable(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings)
+    private void DisplayTable(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings, bool usedWildcards, string originalPattern)
     {
         DisplayConfigNotice(settings);
 
@@ -233,13 +245,13 @@ public class ViewCommand : Command<ViewCommand.Settings>
         else
         {
             // Multiple keys - new grouped format
-            DisplayMultipleKeysTable(keys, resourceFiles, showComments, settings);
+            DisplayMultipleKeysTable(keys, resourceFiles, showComments, settings, usedWildcards, originalPattern);
         }
     }
 
     private void DisplaySingleKeyTable(string key, List<Core.Models.ResourceFile> resourceFiles, bool showComments)
     {
-        AnsiConsole.MarkupLine($"[yellow]Key:[/] [bold]{key}[/]");
+        AnsiConsole.MarkupLine($"[yellow]Key:[/] [bold]{Markup.Escape(key)}[/]");
         AnsiConsole.WriteLine();
 
         var table = new Table();
@@ -303,9 +315,24 @@ public class ViewCommand : Command<ViewCommand.Settings>
         AnsiConsole.MarkupLine($"[dim]Present in {present}/{total} language(s), {empty} empty value(s)[/]");
     }
 
-    private void DisplayMultipleKeysTable(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings)
+    private void DisplayMultipleKeysTable(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings, bool usedWildcards, string originalPattern)
     {
-        var patternDisplay = settings.UseRegex ? $"Pattern: {settings.Key}" : $"Keys: {keys.Count}";
+        string patternDisplay;
+        if (usedWildcards)
+        {
+            // Escape pattern to prevent Spectre.Console markup interpretation
+            patternDisplay = $"Pattern: {Markup.Escape(originalPattern)} [dim](wildcard)[/]";
+        }
+        else if (settings.UseRegex)
+        {
+            // Escape pattern to prevent Spectre.Console markup interpretation
+            patternDisplay = $"Pattern: {Markup.Escape(originalPattern)} [dim](regex)[/]";
+        }
+        else
+        {
+            patternDisplay = $"Keys: {keys.Count}";
+        }
+
         AnsiConsole.MarkupLine($"[yellow]{patternDisplay}[/]");
         AnsiConsole.MarkupLine($"[dim]Matched {keys.Count} key(s)[/]");
         AnsiConsole.WriteLine();
@@ -353,7 +380,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
         AnsiConsole.MarkupLine($"[dim]Showing {keys.Count} key(s) across {resourceFiles.Count} language(s)[/]");
     }
 
-    private void DisplayJson(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings)
+    private void DisplayJson(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings, bool usedWildcards, string originalPattern)
     {
         if (keys.Count == 1)
         {
@@ -363,7 +390,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
         else
         {
             // Multiple keys - array format
-            DisplayMultipleKeysJson(keys, resourceFiles, showComments, settings);
+            DisplayMultipleKeysJson(keys, resourceFiles, showComments, settings, usedWildcards, originalPattern);
         }
     }
 
@@ -399,7 +426,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
         Console.WriteLine(OutputFormatter.FormatJson(output));
     }
 
-    private void DisplayMultipleKeysJson(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings)
+    private void DisplayMultipleKeysJson(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings, bool usedWildcards, string originalPattern)
     {
         var keyObjects = new List<object>();
 
@@ -434,7 +461,8 @@ public class ViewCommand : Command<ViewCommand.Settings>
 
         var output = new
         {
-            pattern = settings.UseRegex ? settings.Key : (string?)null,
+            pattern = settings.UseRegex || usedWildcards ? originalPattern : (string?)null,
+            patternType = usedWildcards ? "wildcard" : (settings.UseRegex ? "regex" : (string?)null),
             matchCount = keys.Count,
             keys = keyObjects
         };
@@ -442,7 +470,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
         Console.WriteLine(OutputFormatter.FormatJson(output));
     }
 
-    private void DisplaySimple(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings)
+    private void DisplaySimple(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings, bool usedWildcards, string originalPattern)
     {
         if (keys.Count == 1)
         {
@@ -452,7 +480,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
         else
         {
             // Multiple keys
-            DisplayMultipleKeysSimple(keys, resourceFiles, showComments, settings);
+            DisplayMultipleKeysSimple(keys, resourceFiles, showComments, settings, usedWildcards, originalPattern);
         }
     }
 
@@ -476,9 +504,22 @@ public class ViewCommand : Command<ViewCommand.Settings>
         }
     }
 
-    private void DisplayMultipleKeysSimple(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings)
+    private void DisplayMultipleKeysSimple(List<string> keys, List<Core.Models.ResourceFile> resourceFiles, bool showComments, Settings settings, bool usedWildcards, string originalPattern)
     {
-        var patternDisplay = settings.UseRegex ? $"Pattern: {settings.Key}" : $"Keys: {keys.Count}";
+        string patternDisplay;
+        if (usedWildcards)
+        {
+            patternDisplay = $"Pattern: {originalPattern} (wildcard)";
+        }
+        else if (settings.UseRegex)
+        {
+            patternDisplay = $"Pattern: {originalPattern} (regex)";
+        }
+        else
+        {
+            patternDisplay = $"Keys: {keys.Count}";
+        }
+
         Console.WriteLine(patternDisplay);
         Console.WriteLine($"Matched {keys.Count} key(s)");
         Console.WriteLine();
@@ -510,5 +551,85 @@ public class ViewCommand : Command<ViewCommand.Settings>
                 Console.WriteLine();
             }
         }
+    }
+
+    /// <summary>
+    /// Detects if a pattern contains wildcard characters (* or ?) that should be converted to regex.
+    /// Handles backslash escaping for literal wildcard characters.
+    /// </summary>
+    internal static bool IsWildcardPattern(string pattern)
+    {
+        // Simply check if pattern contains unescaped wildcards
+        // The --regex flag takes precedence, so we don't need "smart" detection
+        for (int i = 0; i < pattern.Length; i++)
+        {
+            char c = pattern[i];
+
+            // Check if this is an escaped character
+            if (c == '\\' && i + 1 < pattern.Length)
+            {
+                i++; // Skip next character
+                continue;
+            }
+
+            // Check for unescaped wildcards
+            if (c == '*' || c == '?')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Converts a wildcard pattern to a regex pattern.
+    /// Supports:
+    /// - * for zero or more characters
+    /// - ? for exactly one character
+    /// - \* and \? for literal asterisk and question mark
+    /// </summary>
+    internal static string ConvertWildcardToRegex(string wildcardPattern)
+    {
+        var result = new System.Text.StringBuilder();
+
+        for (int i = 0; i < wildcardPattern.Length; i++)
+        {
+            char c = wildcardPattern[i];
+
+            if (c == '\\' && i + 1 < wildcardPattern.Length)
+            {
+                char next = wildcardPattern[i + 1];
+                if (next == '*' || next == '?')
+                {
+                    // Escaped wildcard - treat as literal
+                    result.Append('\\').Append(next);
+                    i++; // Skip next character
+                }
+                else
+                {
+                    // Other escaped character - escape for regex
+                    result.Append(Regex.Escape(c.ToString()));
+                }
+            }
+            else if (c == '*')
+            {
+                // Wildcard: match any characters
+                result.Append(".*");
+            }
+            else if (c == '?')
+            {
+                // Wildcard: match single character
+                result.Append('.');
+            }
+            else
+            {
+                // Regular character - escape for regex
+                result.Append(Regex.Escape(c.ToString()));
+            }
+        }
+
+        // Anchor to match entire string
+        return "^" + result.ToString() + "$";
     }
 }

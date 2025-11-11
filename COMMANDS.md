@@ -163,7 +163,8 @@ Summary Table:
 
 **Modes:**
 - **Exact match (default):** View a single specific key
-- **Regex mode (with --regex):** View all keys matching a pattern
+- **Wildcard mode (automatic):** Use `*` and `?` for simple pattern matching
+- **Regex mode (with --regex):** View all keys matching a regex pattern
 
 **Examples:**
 
@@ -180,6 +181,40 @@ lrm view SaveButton --format json
 
 # Simple format (one line per language)
 lrm view SaveButton --format simple
+```
+
+**Wildcard Patterns (Automatic Detection):**
+```bash
+# View all Error keys (App.* → App followed by anything)
+lrm view "Error.*"
+
+# View all keys ending with .Text
+lrm view "*.Text"
+
+# View all Button keys
+lrm view "Button.*"
+
+# View all keys (match everything)
+lrm view "*"
+
+# View numbered items with single digit (Item1, Item2, etc.)
+lrm view "Item?"
+
+# View keys with exactly 4 characters
+lrm view "????"
+
+# View all keys containing "Error" anywhere
+lrm view "*Error*"
+
+# Combine wildcards: keys starting with App and ending with Text
+lrm view "App.*Text"
+
+# Escape wildcards to match literal * or ?
+lrm view "Special\*Key"  # Matches literal asterisk
+lrm view "Test\?Value"   # Matches literal question mark
+
+# With sorting and limit
+lrm view "Button.*" --sort --limit 10
 ```
 
 **Multiple Keys (Regex Pattern):**
@@ -209,6 +244,22 @@ lrm view ".*Label.*" --regex --limit 50
 lrm view "Error\..*" --regex --format json
 ```
 
+**Wildcards vs Regex:**
+
+Wildcards are simpler and more intuitive for most users:
+- `*` matches zero or more characters (like `.*` in regex)
+- `?` matches exactly one character (like `.` in regex)
+- Automatically detected - no flag needed
+- Special regex chars are escaped automatically
+
+Use explicit `--regex` when you need:
+- Alternation: `(Error|Warning)\..*`
+- Character classes: `Item[0-9]+`
+- Anchors: `^Start` or `End$`
+- Quantifiers: `Item[0-9]{2,4}`
+
+The tool automatically detects wildcards if the pattern contains `*` or `?` but doesn't have regex-specific syntax like `^`, `$`, `[`, `(`, `+`, or `|`.
+
 **Output formats:**
 
 **Table (single key):**
@@ -225,9 +276,9 @@ Key: SaveButton
 Present in 2/2 language(s), 0 empty value(s)
 ```
 
-**Table (multiple keys with regex):**
+**Table (multiple keys with wildcard):**
 ```
-Pattern: Error\..*
+Pattern: Error.* (wildcard)
 Matched 3 key(s)
 
 ┌───────────────────┬──────────────┬─────────────────┐

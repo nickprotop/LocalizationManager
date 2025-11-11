@@ -138,7 +138,90 @@ Key: SaveButton
 Present in 2/2 language(s), 0 empty value(s)
 ```
 
+### View Multiple Keys with Wildcard Patterns
+
+Wildcards are automatically detected and provide an intuitive way to match multiple keys:
+
+**View all Error keys (simple and intuitive):**
+```bash
+# View all keys starting with "Error."
+lrm view "Error.*"
+
+# Output:
+# Pattern: Error.* (wildcard)
+# Matched 3 key(s)
+#
+# ┌────────────────────┬──────────────┬─────────────────┐
+# │ Key                │ Language     │ Value           │
+# ├────────────────────┼──────────────┼─────────────────┤
+# │ Error.NotFound     │ English      │ Item not found  │
+# │                    │ Greek        │ Δεν βρέθηκε     │
+# └────────────────────┴──────────────┴─────────────────┘
+```
+
+**View all Button keys:**
+```bash
+# View all button-related keys
+lrm view "Button.*"
+
+# With comments
+lrm view "Button.*" --show-comments
+
+# Sorted alphabetically
+lrm view "Button.*" --sort
+```
+
+**View keys ending with specific suffix:**
+```bash
+# View all keys ending with ".Text"
+lrm view "*.Text"
+
+# View all keys ending with ".Title"
+lrm view "*.Title" --sort
+```
+
+**View keys containing a word:**
+```bash
+# View all keys containing "Error" anywhere
+lrm view "*Error*"
+
+# View all keys containing "Success"
+lrm view "*Success*" --sort
+```
+
+**Using ? for single character matching:**
+```bash
+# View Item1, Item2, Item3 (single digit)
+lrm view "Item?"
+
+# View keys with exactly 4 characters
+lrm view "????"
+
+# View Dialog1-9 but not Dialog10+
+lrm view "Dialog?"
+```
+
+**Escaping wildcards for literal matching:**
+```bash
+# Match literal asterisk in key name
+lrm view "Special\*Key"
+
+# Match literal question mark
+lrm view "Test\?Value"
+```
+
+**View all keys:**
+```bash
+# Match everything (with limit to prevent overwhelming output)
+lrm view "*" --limit 50
+
+# View all without limit
+lrm view "*" --no-limit
+```
+
 ### View Multiple Keys with Regex Patterns
+
+For advanced patterns, use the `--regex` flag:
 
 **View all Error keys:**
 ```bash
