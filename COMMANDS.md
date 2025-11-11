@@ -696,7 +696,8 @@ lrm import translations.csv --no-backup
 
 **Features:**
 - Side-by-side multi-language view
-- Advanced search and filtering (substring, wildcard, regex)
+- Advanced search and filtering (wildcard, substring, regex)
+- Smart wildcard detection (like CLI `view` command)
 - Search scope toggle (Keys+Values / Keys Only)
 - Language visibility controls
 - Real-time filtering with debouncing (300ms)
@@ -711,9 +712,10 @@ lrm import translations.csv --no-backup
 The TUI includes powerful filtering capabilities that mirror the CLI `view` command:
 
 **Filter Modes:**
-- **Substring** (default) - Simple text matching (case-insensitive)
-- **Wildcard** - Use `*` for any characters and `?` for single character
-- **Regex** - Full regular expression support with 1-second timeout
+- **Wildcard** (default) - Automatically detects and handles wildcards (`*` and `?`)
+  - If pattern contains wildcards: uses wildcard matching
+  - If no wildcards: uses substring matching (contains)
+- **Regex** - Full regular expression support with 1-second timeout (when checkbox is checked)
 
 **Search Scope:**
 - **Keys+Values** (default) - Search in both key names and translation values
@@ -721,15 +723,15 @@ The TUI includes powerful filtering capabilities that mirror the CLI `view` comm
 
 **Filter Controls:**
 ```
-Search: [___________]
-Mode: [Substring▼]  ☐ Case-sensitive  [Keys+Values]
+Search: [___________] ☐ Case-sensitive  [Keys+Values]  ☐ Regex
 Show languages: ☑ Default  ☑ fr  ☑ el  [More...]
 ```
 
 **Example Filters:**
-- `Error.*` - All keys starting with "Error." (wildcard mode)
-- `^Api\..*` - Keys matching regex pattern (regex mode)
+- `Error*` - All keys starting with "Error" (wildcard mode, auto-detected)
+- `*Button` - All keys ending with "Button" (wildcard mode, auto-detected)
 - `button` - Keys or values containing "button" (substring mode)
+- Check "Regex" and type `^Api\..*` - Keys matching regex pattern (regex mode)
 
 **Language Visibility:**
 
@@ -758,7 +760,7 @@ The TUI automatically detects and warns about keys that exist in translation fil
 **Keyboard Shortcuts:**
 
 **Navigation:**
-- `↑/↓` or `j/k` - Navigate keys
+- `↑/↓` - Navigate keys
 - `PgUp/PgDn` - Page up/down
 
 **Key Management:**
@@ -779,6 +781,8 @@ The TUI automatically detects and warns about keys that exist in translation fil
 **Help:**
 - `F1` - Show help panel with all shortcuts
 
+All keyboard shortcuts are displayed in the status bar at the bottom of the screen.
+
 **Examples:**
 ```bash
 # Launch editor for current directory
@@ -795,8 +799,7 @@ lrm edit --path ../Resources
 ├─────────────────────────────────────────────────────────────┤
 │ File | Edit | Languages | Help                              │
 ├─────────────────────────────────────────────────────────────┤
-│ Search: [___________] F1=Help  F2=Add Lang  F3=Remove Lang │
-│ Mode: [Substring▼]  ☐ Case-sensitive  [Keys+Values]        │
+│ Search: [___________] ☐ Case-sensitive [Keys+Values] ☐ Regex│
 │ Show languages: ☑ Default  ☑ fr  ☑ el  [More...]           │
 ├────────────────┬──────────────┬───────────────┬─────────────┤
 │ Key            │ Default      │ French        │ Greek       │
@@ -806,16 +809,17 @@ lrm edit --path ../Resources
 │ ⚠ ExtraKey     │              │ Extra Value   │             │
 │ ...            │ ...          │ ...           │ ...         │
 └────────────────┴──────────────┴───────────────┴─────────────┘
-│ Keys: 256/260 | Languages: 3 | ⚠ Extra: 4 (fr, el) [MODIFIED]│
+│ Keys: 256/260 | Languages: 3 | ⚠ Extra: 4 (fr,el) | F1=Help...│
 └─────────────────────────────────────────────────────────────┘
 ```
 
 **Workflow Tips:**
 
 **Finding Keys:**
-- Use wildcard filters to explore namespaces: `Error.*`, `Button.*`
+- Use wildcard filters to explore namespaces: `Error*`, `Button*`
+- Wildcards are auto-detected - just type `*` or `?` in your search
 - Toggle to "Keys Only" mode for pattern-based key searches
-- Use regex mode for complex patterns: `^(Error|Warning)\..*`
+- Check "Regex" checkbox for complex patterns: `^(Error|Warning)\..*`
 
 **Managing Translations:**
 - Hide languages you're not currently working on
