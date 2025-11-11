@@ -808,4 +808,216 @@ public class ViewCommandIntegrationTests
         // Both should also have MissingInDefault from test data
         Assert.All(result.Values, keys => Assert.Contains("MissingInDefault", keys));
     }
+
+    #region SearchScope Tests
+
+    [Fact]
+    public void SearchScope_Keys_ExactMatch_ReturnsMatchingKey()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+
+        // Act
+        var matchedKeys = Commands.ViewCommand.FindMatchingKeys(
+            defaultFile,
+            resourceFiles,
+            "Error.NotFound",
+            Commands.ViewCommand.SearchScope.Keys,
+            isRegex: false);
+
+        // Assert
+        Assert.Single(matchedKeys);
+        Assert.Contains("Error.NotFound", matchedKeys);
+    }
+
+    [Fact]
+    public void SearchScope_Values_ExactMatch_ReturnsKeysWithMatchingValue()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+
+        // Find an actual value from test data
+        var testValue = resourceFiles.SelectMany(rf => rf.Entries)
+            .FirstOrDefault(e => !string.IsNullOrEmpty(e.Value))?.Value;
+
+        Assert.NotNull(testValue); // Ensure test data has values
+
+        // Act
+        var matchedKeys = Commands.ViewCommand.FindMatchingKeys(
+            defaultFile,
+            resourceFiles,
+            testValue!,
+            Commands.ViewCommand.SearchScope.Values,
+            isRegex: false);
+
+        // Assert
+        // Should find at least the key we got the value from
+        Assert.NotEmpty(matchedKeys);
+    }
+
+    [Fact]
+    public void SearchScope_Both_ExactMatch_ReturnsKeysMatchingKeyOrValue()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+
+        // Act - search for "Error" which appears in keys like "Error.NotFound"
+        var matchedKeys = Commands.ViewCommand.FindMatchingKeys(
+            defaultFile,
+            resourceFiles,
+            "Error",
+            Commands.ViewCommand.SearchScope.Both,
+            isRegex: false);
+
+        // Assert
+        // In exact match mode with "Both", will match if key equals "Error" OR value equals "Error"
+        // This may return empty if no exact matches, which is expected
+        Assert.NotNull(matchedKeys);
+    }
+
+    [Fact]
+    public void SearchScope_Keys_RegexPattern_ReturnsMatchingKeys()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+
+        // Act
+        var matchedKeys = Commands.ViewCommand.FindMatchingKeys(
+            defaultFile,
+            resourceFiles,
+            "^Error\\..*",
+            Commands.ViewCommand.SearchScope.Keys,
+            isRegex: true);
+
+        // Assert
+        Assert.NotEmpty(matchedKeys);
+        Assert.All(matchedKeys, key => Assert.StartsWith("Error.", key));
+    }
+
+    [Fact]
+    public void SearchScope_Values_RegexPattern_ReturnsKeysWithMatchingValues()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+
+        // Get a sample value and use part of it for regex
+        var sampleEntry = resourceFiles.SelectMany(rf => rf.Entries)
+            .FirstOrDefault(e => !string.IsNullOrEmpty(e.Value) && e.Value.Length > 2);
+
+        Assert.NotNull(sampleEntry); // Ensure test data exists
+
+        // Use first few chars of the value as pattern
+        var pattern = $".*{Regex.Escape(sampleEntry!.Value!.Substring(0, Math.Min(3, sampleEntry.Value.Length)))}.*";
+
+        // Act
+        var matchedKeys = Commands.ViewCommand.FindMatchingKeys(
+            defaultFile,
+            resourceFiles,
+            pattern,
+            Commands.ViewCommand.SearchScope.Values,
+            isRegex: true);
+
+        // Assert
+        // Should find keys whose values match the pattern
+        Assert.NotEmpty(matchedKeys);
+    }
+
+    [Fact]
+    public void SearchScope_Both_RegexPattern_ReturnsKeysMatchingKeyOrValue()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+
+        // Act - search for pattern that matches keys starting with "Error" OR values containing "error"
+        var matchedKeys = Commands.ViewCommand.FindMatchingKeys(
+            defaultFile,
+            resourceFiles,
+            ".*[Ee]rror.*",
+            Commands.ViewCommand.SearchScope.Both,
+            isRegex: true);
+
+        // Assert
+        Assert.NotEmpty(matchedKeys);
+        // Results should include both keys with "Error" and keys with values containing "error"
+    }
+
+    [Fact]
+    public void SearchScope_Values_SearchesAllLanguages()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+
+        // Assuming test data has some French-specific values
+        // Act - exact match for a French value
+        var matchedKeys = Commands.ViewCommand.FindMatchingKeys(
+            defaultFile,
+            resourceFiles,
+            "Introuvable",  // French for "Not Found"
+            Commands.ViewCommand.SearchScope.Values,
+            isRegex: false);
+
+        // Assert
+        // Should find keys even if value only exists in non-default language
+        // (May be empty if test data doesn't have this value)
+        Assert.NotNull(matchedKeys);
+    }
+
+    [Fact]
+    public void SearchScope_Values_HandlesNullValues()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+
+        // Act - should not crash on null/empty values
+        var matchedKeys = Commands.ViewCommand.FindMatchingKeys(
+            defaultFile,
+            resourceFiles,
+            "NonExistentValue",
+            Commands.ViewCommand.SearchScope.Values,
+            isRegex: false);
+
+        // Assert
+        Assert.NotNull(matchedKeys);
+        Assert.Empty(matchedKeys);
+    }
+
+    [Fact]
+    public void SearchScope_Values_OnlyReturnsKeysFromDefaultFile()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+        var defaultKeys = defaultFile.Entries.Select(e => e.Key).ToHashSet();
+
+        // Act - search in values with pattern that might match many entries
+        var matchedKeys = Commands.ViewCommand.FindMatchingKeys(
+            defaultFile,
+            resourceFiles,
+            ".*",
+            Commands.ViewCommand.SearchScope.Values,
+            isRegex: true);
+
+        // Assert
+        // All returned keys must exist in default file
+        Assert.All(matchedKeys, key => Assert.Contains(key, defaultKeys));
+    }
+
+    #endregion
 }

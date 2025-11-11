@@ -21,6 +21,7 @@
 
 using LocalizationManager.Core;
 using LocalizationManager.Core.Enums;
+using LocalizationManager.Core.Models;
 using LocalizationManager.Core.Output;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -76,6 +77,31 @@ public class ViewCommand : Command<ViewCommand.Settings>
         [CommandOption("--no-translations")]
         [Description("Alias for --keys-only")]
         public bool NoTranslations { get; set; }
+
+        [CommandOption("--search-in|--scope <SCOPE>")]
+        [Description("Where to search: keys (default), values, or both")]
+        [DefaultValue(SearchScope.Keys)]
+        public SearchScope SearchIn { get; set; } = SearchScope.Keys;
+
+        [CommandOption("--case-sensitive")]
+        [Description("Make search case-sensitive (default is case-insensitive)")]
+        [DefaultValue(false)]
+        public bool CaseSensitive { get; set; } = false;
+    }
+
+    /// <summary>
+    /// Defines where to search for the pattern
+    /// </summary>
+    public enum SearchScope
+    {
+        [Description("Search only in key names")]
+        Keys,
+
+        [Description("Search only in translation values")]
+        Values,
+
+        [Description("Search in both keys and values")]
+        Both
     }
 
     public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken = default)
@@ -143,42 +169,32 @@ public class ViewCommand : Command<ViewCommand.Settings>
                 usedWildcards = true;
             }
 
-            if (settings.UseRegex)
+            // Find matching keys based on search scope
+            try
             {
-                try
-                {
-                    var regex = new Regex(settings.Key, RegexOptions.None, TimeSpan.FromSeconds(1));
-                    matchedKeys = defaultFile.Entries
-                        .Where(e => regex.IsMatch(e.Key))
-                        .Select(e => e.Key)
-                        .ToList();
-                }
-                catch (RegexMatchTimeoutException)
-                {
-                    AnsiConsole.MarkupLine("[red]✗ Regex pattern timed out (too complex)[/]");
-                    return 1;
-                }
-                catch (RegexParseException ex)
-                {
-                    AnsiConsole.MarkupLine($"[red]✗ Invalid regex pattern: {ex.Message}[/]");
-                    return 1;
-                }
-                catch (ArgumentException ex)
-                {
-                    AnsiConsole.MarkupLine($"[red]✗ Invalid regex pattern: {ex.Message}[/]");
-                    return 1;
-                }
-            }
-            else
-            {
-                // Exact match (backward compatible)
-                var existingEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == settings.Key);
-                if (existingEntry == null)
+                matchedKeys = FindMatchingKeys(defaultFile, resourceFiles, settings.Key, settings.SearchIn, settings.UseRegex, settings.CaseSensitive);
+
+                // For exact match with keys-only scope, show error if not found
+                if (!settings.UseRegex && settings.SearchIn == SearchScope.Keys && matchedKeys.Count == 0)
                 {
                     AnsiConsole.MarkupLine($"[red]✗ Key '{Markup.Escape(settings.Key)}' not found![/]");
                     return 1;
                 }
-                matchedKeys = new List<string> { settings.Key };
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                AnsiConsole.MarkupLine("[red]✗ Regex pattern timed out (too complex)[/]");
+                return 1;
+            }
+            catch (RegexParseException ex)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ Invalid regex pattern: {ex.Message}[/]");
+                return 1;
+            }
+            catch (ArgumentException ex)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ Invalid regex pattern: {ex.Message}[/]");
+                return 1;
             }
 
             // Apply sorting if requested
@@ -761,5 +777,119 @@ public class ViewCommand : Command<ViewCommand.Settings>
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Find keys matching the pattern based on search scope
+    /// </summary>
+    internal static List<string> FindMatchingKeys(
+        ResourceFile defaultFile,
+        List<ResourceFile> resourceFiles,
+        string pattern,
+        SearchScope scope,
+        bool isRegex,
+        bool caseSensitive = false)
+    {
+        var matchedKeys = new HashSet<string>();
+
+        if (isRegex)
+        {
+            var regexOptions = caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase;
+            var regex = new Regex(pattern, regexOptions, TimeSpan.FromSeconds(1));
+            return FindMatchingKeysWithRegex(defaultFile, resourceFiles, regex, scope);
+        }
+
+        // Exact match
+        return FindMatchingKeysExact(defaultFile, resourceFiles, pattern, scope, caseSensitive);
+    }
+
+    /// <summary>
+    /// Find keys matching exact pattern based on search scope
+    /// </summary>
+    private static List<string> FindMatchingKeysExact(
+        ResourceFile defaultFile,
+        List<ResourceFile> resourceFiles,
+        string pattern,
+        SearchScope scope,
+        bool caseSensitive = false)
+    {
+        var matchedKeys = new HashSet<string>();
+        var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+
+        // Search in keys
+        if (scope == SearchScope.Keys || scope == SearchScope.Both)
+        {
+            var entry = defaultFile.Entries.FirstOrDefault(e => e.Key.Equals(pattern, comparison));
+            if (entry != null)
+            {
+                matchedKeys.Add(entry.Key);
+            }
+        }
+
+        // Search in values
+        if (scope == SearchScope.Values || scope == SearchScope.Both)
+        {
+            // Get all keys from default to ensure we return valid keys
+            var allKeys = defaultFile.Entries.Select(e => e.Key).ToHashSet();
+
+            foreach (var resourceFile in resourceFiles)
+            {
+                foreach (var entry in resourceFile.Entries)
+                {
+                    // Only include keys that exist in default file
+                    if (allKeys.Contains(entry.Key) && entry.Value != null && entry.Value.Equals(pattern, comparison))
+                    {
+                        matchedKeys.Add(entry.Key);
+                    }
+                }
+            }
+        }
+
+        return matchedKeys.ToList();
+    }
+
+    /// <summary>
+    /// Find keys matching regex pattern based on search scope
+    /// </summary>
+    private static List<string> FindMatchingKeysWithRegex(
+        ResourceFile defaultFile,
+        List<ResourceFile> resourceFiles,
+        Regex regex,
+        SearchScope scope)
+    {
+        var matchedKeys = new HashSet<string>();
+
+        // Search in keys
+        if (scope == SearchScope.Keys || scope == SearchScope.Both)
+        {
+            foreach (var entry in defaultFile.Entries)
+            {
+                if (regex.IsMatch(entry.Key))
+                {
+                    matchedKeys.Add(entry.Key);
+                }
+            }
+        }
+
+        // Search in values
+        if (scope == SearchScope.Values || scope == SearchScope.Both)
+        {
+            // Get all keys from default to ensure we return valid keys
+            var allKeys = defaultFile.Entries.Select(e => e.Key).ToHashSet();
+
+            foreach (var resourceFile in resourceFiles)
+            {
+                foreach (var entry in resourceFile.Entries)
+                {
+                    // Only include keys that exist in default file
+                    if (allKeys.Contains(entry.Key) && entry.Value != null && regex.IsMatch(entry.Value))
+                    {
+                        matchedKeys.Add(entry.Key);
+                    }
+                }
+            }
+        }
+
+        return matchedKeys.ToList();
     }
 }
