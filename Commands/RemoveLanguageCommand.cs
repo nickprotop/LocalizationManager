@@ -38,6 +38,9 @@ public class RemoveLanguageCommand : Command<RemoveLanguageCommandSettings>
 {
     public override int Execute(CommandContext context, RemoveLanguageCommandSettings settings, CancellationToken cancellationToken = default)
     {
+        // Load configuration if available
+        settings.LoadConfiguration();
+
         try
         {
             var manager = new LanguageFileManager();
@@ -92,9 +95,10 @@ public class RemoveLanguageCommand : Command<RemoveLanguageCommandSettings>
                 AnsiConsole.MarkupLine($"[red]✗ Language file not found for culture '{settings.Culture}'[/]");
                 AnsiConsole.MarkupLine($"[grey]Base name: {baseName}[/]");
                 AnsiConsole.MarkupLine("[grey]Available languages:[/]");
+                var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
                 foreach (var lang in languages.Where(l => l.BaseName == baseName))
                 {
-                    var code = string.IsNullOrEmpty(lang.Code) ? "(default)" : lang.Code;
+                    var code = string.IsNullOrEmpty(lang.Code) ? $"({defaultCode})" : lang.Code;
                     var name = string.IsNullOrEmpty(lang.Code) ? "Default" : lang.Name;
                     AnsiConsole.MarkupLine($"  [grey]- {code} ({name})[/]");
                 }

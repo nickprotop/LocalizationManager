@@ -35,7 +35,11 @@ public class EditCommand : Command<BaseCommandSettings>
 {
     public override int Execute(CommandContext context, BaseCommandSettings settings, CancellationToken cancellationToken = default)
     {
+        // Load configuration if available
+        settings.LoadConfiguration();
+
         var resourcePath = settings.GetResourcePath();
+        var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
 
         try
         {
@@ -69,7 +73,7 @@ public class EditCommand : Command<BaseCommandSettings>
 
             // Launch TUI
             Application.Init();
-            Application.Run(new ResourceEditorWindow(resourceFiles, parser));
+            Application.Run(new ResourceEditorWindow(resourceFiles, parser, defaultCode));
             Application.Shutdown();
 
             return 0;

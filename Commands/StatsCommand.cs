@@ -98,7 +98,7 @@ public class StatsCommand : Command<BaseFormattableCommandSettings>
                     DisplayJson(resourceFiles);
                     break;
                 case OutputFormat.Simple:
-                    DisplaySimple(resourceFiles);
+                    DisplaySimple(resourceFiles, settings);
                     break;
                 case OutputFormat.Table:
                 default:
@@ -225,7 +225,7 @@ public class StatsCommand : Command<BaseFormattableCommandSettings>
         Console.WriteLine(OutputFormatter.FormatJson(output));
     }
 
-    private void DisplaySimple(List<LocalizationManager.Core.Models.ResourceFile> resourceFiles)
+    private void DisplaySimple(List<LocalizationManager.Core.Models.ResourceFile> resourceFiles, BaseFormattableCommandSettings settings)
     {
         Console.WriteLine("Localization Statistics");
         Console.WriteLine("======================");
@@ -236,7 +236,8 @@ public class StatsCommand : Command<BaseFormattableCommandSettings>
             var fileInfo = new FileInfo(rf.Language.FilePath);
             var fileSizeKb = (fileInfo.Length / 1024.0).ToString("F1");
             var emptyCount = rf.Count - rf.CompletedCount;
-            var defaultMarker = rf.Language.IsDefault ? " (default)" : "";
+            var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
+            var defaultMarker = rf.Language.IsDefault ? $" ({defaultCode})" : "";
 
             Console.WriteLine($"{rf.Language.Name}{defaultMarker}");
             Console.WriteLine($"  Total Keys:    {rf.Count}");

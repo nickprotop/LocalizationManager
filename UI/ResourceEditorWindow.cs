@@ -38,6 +38,7 @@ public class ResourceEditorWindow : Window
     private readonly ResourceFileParser _parser;
     private readonly ResourceValidator _validator;
     private readonly ResourceFilterService _filterService;
+    private readonly string _defaultLanguageCode;
     private TableView? _tableView;
     private TextField? _searchField;
     private Label? _statusLabel;
@@ -51,12 +52,13 @@ public class ResourceEditorWindow : Window
     private List<CheckBox> _languageCheckboxes = new();
     private CheckBox? _regexCheckBox;
 
-    public ResourceEditorWindow(List<ResourceFile> resourceFiles, ResourceFileParser parser)
+    public ResourceEditorWindow(List<ResourceFile> resourceFiles, ResourceFileParser parser, string defaultLanguageCode = "default")
     {
         _resourceFiles = resourceFiles;
         _parser = parser;
         _validator = new ResourceValidator();
         _filterService = new ResourceFilterService();
+        _defaultLanguageCode = defaultLanguageCode;
 
         Title = $"Localization Resource Manager - Interactive Editor ({Application.QuitKey} to quit)";
 
@@ -255,7 +257,7 @@ public class ResourceEditorWindow : Window
         {
             var rf = _resourceFiles[i];
             var displayName = string.IsNullOrEmpty(rf.Language.Code)
-                ? "Default"
+                ? _defaultLanguageCode
                 : rf.Language.Code;
 
             var checkbox = new CheckBox
@@ -811,7 +813,7 @@ public class ResourceEditorWindow : Window
 
         var languageList = _resourceFiles.Select(rf =>
         {
-            var code = string.IsNullOrEmpty(rf.Language.Code) ? "(default)" : rf.Language.Code;
+            var code = string.IsNullOrEmpty(rf.Language.Code) ? $"({_defaultLanguageCode})" : rf.Language.Code;
             var isDefault = rf.Language.IsDefault ? " [DEFAULT]" : "";
             return $"{code,-12} {rf.Language.Name,-25} ({rf.Entries.Count,4} entries){isDefault}";
         }).ToList();
@@ -1265,7 +1267,7 @@ public class ResourceEditorWindow : Window
         foreach (var rf in _resourceFiles)
         {
             var displayName = string.IsNullOrEmpty(rf.Language.Code)
-                ? $"Default ({rf.Language.Name})"
+                ? $"{_defaultLanguageCode} ({rf.Language.Name})"
                 : $"{rf.Language.Code} ({rf.Language.Name})";
 
             var checkbox = new CheckBox

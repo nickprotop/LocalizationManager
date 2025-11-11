@@ -65,6 +65,7 @@ public class ListLanguagesCommand : Command<ListLanguagesCommandSettings>
                         ? (int)((double)entryCount / totalDefaultEntries * 100)
                         : 100;
 
+                    var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
                     languageStats.Add(new LanguageStats
                     {
                         BaseName = lang.BaseName,
@@ -72,7 +73,7 @@ public class ListLanguagesCommand : Command<ListLanguagesCommandSettings>
                             ? "Default"
                             : lang.Name,
                         Code = string.IsNullOrEmpty(lang.Code)
-                            ? "(default)"
+                            ? $"({defaultCode})"
                             : lang.Code,
                         FileName = Path.GetFileName(lang.FilePath),
                         EntryCount = entryCount,

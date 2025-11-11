@@ -122,7 +122,7 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
                     DisplayJson(validationResult);
                     break;
                 case OutputFormat.Simple:
-                    DisplaySimple(validationResult);
+                    DisplaySimple(validationResult, settings);
                     break;
                 case OutputFormat.Table:
                 default:
@@ -189,9 +189,10 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
             table.AddColumn("Language");
             table.AddColumn("Missing Keys");
 
+            var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
             foreach (var kvp in result.MissingKeys.Where(kv => kv.Value.Any()))
             {
-                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? defaultCode : kvp.Key;
                 table.AddRow(
                     langDisplay,
                     string.Join(", ", kvp.Value.Take(10)) + (kvp.Value.Count > 10 ? $" ... ({kvp.Value.Count - 10} more)" : "")
@@ -210,9 +211,10 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
             table.AddColumn("Language");
             table.AddColumn("Extra Keys");
 
+            var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
             foreach (var kvp in result.ExtraKeys.Where(kv => kv.Value.Any()))
             {
-                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? defaultCode : kvp.Key;
                 table.AddRow(
                     langDisplay,
                     string.Join(", ", kvp.Value.Take(10)) + (kvp.Value.Count > 10 ? $" ... ({kvp.Value.Count - 10} more)" : "")
@@ -231,9 +233,10 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
             table.AddColumn("Language");
             table.AddColumn("Duplicate Keys");
 
+            var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
             foreach (var kvp in result.DuplicateKeys.Where(kv => kv.Value.Any()))
             {
-                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? defaultCode : kvp.Key;
                 table.AddRow(
                     langDisplay,
                     string.Join(", ", kvp.Value)
@@ -252,9 +255,10 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
             table.AddColumn("Language");
             table.AddColumn("Empty Keys");
 
+            var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
             foreach (var kvp in result.EmptyValues.Where(kv => kv.Value.Any()))
             {
-                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? defaultCode : kvp.Key;
                 table.AddRow(
                     langDisplay,
                     string.Join(", ", kvp.Value.Take(10)) + (kvp.Value.Count > 10 ? $" ... ({kvp.Value.Count - 10} more)" : "")
@@ -298,7 +302,7 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
         Console.WriteLine(OutputFormatter.FormatJson(output));
     }
 
-    private void DisplaySimple(LocalizationManager.Core.Models.ValidationResult result)
+    private void DisplaySimple(LocalizationManager.Core.Models.ValidationResult result, BaseFormattableCommandSettings settings)
     {
         if (result.IsValid)
         {
@@ -314,9 +318,10 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
         if (result.MissingKeys.Any(kv => kv.Value.Any()))
         {
             Console.WriteLine("Missing Translations:");
+            var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
             foreach (var kvp in result.MissingKeys.Where(kv => kv.Value.Any()))
             {
-                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? defaultCode : kvp.Key;
                 Console.WriteLine($"  {langDisplay}: {string.Join(", ", kvp.Value)}");
             }
             Console.WriteLine();
@@ -326,9 +331,10 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
         if (result.ExtraKeys.Any(kv => kv.Value.Any()))
         {
             Console.WriteLine("Extra Keys (not in default):");
+            var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
             foreach (var kvp in result.ExtraKeys.Where(kv => kv.Value.Any()))
             {
-                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? defaultCode : kvp.Key;
                 Console.WriteLine($"  {langDisplay}: {string.Join(", ", kvp.Value)}");
             }
             Console.WriteLine();
@@ -338,9 +344,10 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
         if (result.DuplicateKeys.Any(kv => kv.Value.Any()))
         {
             Console.WriteLine("Duplicate Keys:");
+            var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
             foreach (var kvp in result.DuplicateKeys.Where(kv => kv.Value.Any()))
             {
-                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? defaultCode : kvp.Key;
                 Console.WriteLine($"  {langDisplay}: {string.Join(", ", kvp.Value)}");
             }
             Console.WriteLine();
@@ -350,9 +357,10 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
         if (result.EmptyValues.Any(kv => kv.Value.Any()))
         {
             Console.WriteLine("Empty Values:");
+            var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
             foreach (var kvp in result.EmptyValues.Where(kv => kv.Value.Any()))
             {
-                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? "default" : kvp.Key;
+                var langDisplay = string.IsNullOrEmpty(kvp.Key) ? defaultCode : kvp.Key;
                 Console.WriteLine($"  {langDisplay}: {string.Join(", ", kvp.Value)}");
             }
         }

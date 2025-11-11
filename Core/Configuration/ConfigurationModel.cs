@@ -6,5 +6,9 @@ namespace LocalizationManager.Core.Configuration;
 /// </summary>
 public class ConfigurationModel
 {
-    // Configuration options will be added here in future versions
+    /// <summary>
+    /// The language code to display for the default language (e.g., "en", "fr").
+    /// If not set, displays "default". Only affects display output, not internal logic.
+    /// </summary>
+    public string? DefaultLanguageCode { get; set; }
 }

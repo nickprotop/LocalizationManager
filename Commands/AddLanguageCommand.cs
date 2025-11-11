@@ -46,6 +46,9 @@ public class AddLanguageCommand : Command<AddLanguageCommandSettings>
 {
     public override int Execute(CommandContext context, AddLanguageCommandSettings settings, CancellationToken cancellationToken = default)
     {
+        // Load configuration if available
+        settings.LoadConfiguration();
+
         try
         {
             var manager = new LanguageFileManager();
@@ -142,9 +145,10 @@ public class AddLanguageCommand : Command<AddLanguageCommandSettings>
                 }
 
                 AnsiConsole.MarkupLine("[grey]Available languages:[/]");
+                var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
                 foreach (var lang in languages.Where(l => l.BaseName == baseName))
                 {
-                    var code = string.IsNullOrEmpty(lang.Code) ? "(default)" : lang.Code;
+                    var code = string.IsNullOrEmpty(lang.Code) ? $"({defaultCode})" : lang.Code;
                     AnsiConsole.MarkupLine($"  [grey]- {code}[/]");
                 }
                 return 1;

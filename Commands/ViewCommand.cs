@@ -480,8 +480,9 @@ public class ViewCommand : Command<ViewCommand.Settings>
             foreach (var rf in resourceFiles)
             {
                 var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
                 var langName = rf.Language.IsDefault
-                    ? $"{rf.Language.Name} [yellow](default)[/]"
+                    ? $"{rf.Language.Name} [yellow]({defaultCode})[/]"
                     : rf.Language.Name;
 
                 var keyDisplay = firstRowForKey ? key : "";
@@ -648,8 +649,9 @@ public class ViewCommand : Command<ViewCommand.Settings>
             foreach (var rf in resourceFiles)
             {
                 var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
                 var langLabel = rf.Language.IsDefault
-                    ? $"{rf.Language.Name} (default)"
+                    ? $"{rf.Language.Name} ({defaultCode})"
                     : rf.Language.Name;
                 var value = entry?.Value ?? "(missing)";
 
