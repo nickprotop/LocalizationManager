@@ -156,6 +156,8 @@ Summary Table:
 - `--config-file <PATH>` - Path to configuration file
 - `-f, --format <FORMAT>` - Output format: `table` (default), `json`, or `simple`
 - `--regex` - Treat KEY as a regular expression pattern
+- `--search-in|--scope <SCOPE>` - Where to search: `keys` (default), `values`, or `both`
+- `--case-sensitive` - Make search case-sensitive (default is case-insensitive)
 - `--show-comments` - Include comments in output
 - `--limit <COUNT>` - Maximum number of keys to display (default: 100, 0 for no limit)
 - `--no-limit` - Show all matches without limit (same as --limit 0)
@@ -285,6 +287,54 @@ lrm view "Error.*" --keys-only --format json
 lrm view "*" --keys-only --format simple --limit 10
 # Output: Plain list of key names
 ```
+
+**Search Scope:**
+
+Control where the pattern is searched using `--search-in` (or alias `--scope`):
+
+```bash
+# Search in key names only (default behavior)
+lrm view "Error" --search-in keys
+lrm view "Error.*"  # Same - keys is default
+
+# Search in translation values only
+lrm view "Not Found" --search-in values
+# Finds keys whose translations contain "Not Found"
+
+# Find keys by French translation
+lrm view "Introuvable" --search-in values --cultures fr
+# Searches all languages' values, displays only French
+
+# Search in both keys and values
+lrm view "Cancel" --search-in both
+# Returns key if EITHER key name OR any translation matches
+
+# Combine with wildcards
+lrm view "*error*" --search-in values
+# Find all keys with values containing "error"
+
+# Combine with regex
+lrm view ".*[Ff]ound.*" --regex --search-in values
+# Find keys with values matching regex pattern
+
+# Find untranslated strings
+lrm view "Save" --search-in values --cultures fr
+# Shows keys where French translation equals "Save" (untranslated)
+
+# Audit terminology
+lrm view "contact support" --search-in values --format json
+# Find all keys mentioning "contact support" in any language
+
+# Use alias --scope
+lrm view "Button" --scope both
+```
+
+**Key Points:**
+- `--search-in keys` (default): Searches key names only (backward compatible)
+- `--search-in values`: Searches translation values across ALL languages
+- `--search-in both`: Matches if key OR any value matches
+- `--cultures` affects display, not search scope - all languages are still searched
+- Searches are **case-insensitive by default** - use `--case-sensitive` to enable exact case matching
 
 **Extra Keys Warning:**
 

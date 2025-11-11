@@ -127,6 +127,15 @@ lrm view "Error.*" --cultures en,fr
 # Get only key names (for automation)
 lrm view "Button.*" --keys-only --format json
 
+# Search in translation values (find keys by their translations)
+lrm view "Not Found" --search-in values
+
+# Find keys by French translation
+lrm view "Enregistrer" --search-in values --cultures fr
+
+# Search in both keys and values
+lrm view "Cancel" --search-in both
+
 # Add a new key
 lrm add NewKey -i
 
