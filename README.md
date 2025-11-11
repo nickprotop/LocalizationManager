@@ -136,6 +136,18 @@ lrm view "Enregistrer" --search-in values --cultures fr
 # Search in both keys and values
 lrm view "Cancel" --search-in both
 
+# Search in comments
+lrm view "*deprecated*" --search-in comments
+
+# Count matching keys
+lrm view "Error.*" --count
+
+# Filter by translation status
+lrm view "*" --status untranslated
+
+# Exclude specific patterns (multiple --not flags recommended)
+lrm view "*" --not "Test.*" --not "Debug.*"
+
 # Add a new key
 lrm add NewKey -i
 

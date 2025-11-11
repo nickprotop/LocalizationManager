@@ -79,7 +79,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
         public bool NoTranslations { get; set; }
 
         [CommandOption("--search-in|--scope <SCOPE>")]
-        [Description("Where to search: keys (default), values, or both")]
+        [Description("Where to search: keys (default), values, both, comments, or all")]
         [DefaultValue(SearchScope.Keys)]
         public SearchScope SearchIn { get; set; } = SearchScope.Keys;
 
@@ -87,6 +87,19 @@ public class ViewCommand : Command<ViewCommand.Settings>
         [Description("Make search case-sensitive (default is case-insensitive)")]
         [DefaultValue(false)]
         public bool CaseSensitive { get; set; } = false;
+
+        [CommandOption("--count")]
+        [Description("Show only the count of matching keys")]
+        [DefaultValue(false)]
+        public bool Count { get; set; } = false;
+
+        [CommandOption("--status <STATUS>")]
+        [Description("Filter by translation status: empty, missing, untranslated, complete, or partial")]
+        public TranslationStatus? Status { get; set; }
+
+        [CommandOption("--not <PATTERNS>")]
+        [Description("Exclude keys matching these patterns (can be used multiple times, supports wildcards)")]
+        public string[]? NotPatterns { get; set; }
     }
 
     /// <summary>
@@ -101,7 +114,34 @@ public class ViewCommand : Command<ViewCommand.Settings>
         Values,
 
         [Description("Search in both keys and values")]
-        Both
+        Both,
+
+        [Description("Search only in comments")]
+        Comments,
+
+        [Description("Search in keys, values, and comments")]
+        All
+    }
+
+    /// <summary>
+    /// Defines translation status for filtering
+    /// </summary>
+    public enum TranslationStatus
+    {
+        [Description("Keys with empty or whitespace-only values in any language")]
+        Empty,
+
+        [Description("Keys missing in any language file")]
+        Missing,
+
+        [Description("Keys that are untranslated (empty, missing, or identical to default)")]
+        Untranslated,
+
+        [Description("Keys with translations in all languages")]
+        Complete,
+
+        [Description("Keys with some but not all translations")]
+        Partial
     }
 
     public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken = default)
@@ -203,21 +243,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
                 matchedKeys = matchedKeys.OrderBy(k => k).ToList();
             }
 
-            // Apply limit
-            var effectiveLimit = settings.NoLimit || settings.Limit == 0 ? int.MaxValue : settings.Limit;
-            var totalMatches = matchedKeys.Count;
-
-            if (matchedKeys.Count > effectiveLimit)
-            {
-                if (format == OutputFormat.Table)
-                {
-                    AnsiConsole.MarkupLine($"[yellow]⚠ Found {totalMatches} matches, showing first {effectiveLimit}. Use --limit to adjust.[/]");
-                    AnsiConsole.WriteLine();
-                }
-                matchedKeys = matchedKeys.Take(effectiveLimit).ToList();
-            }
-
-            // Apply culture filtering
+            // Apply culture filtering (before status filtering so status checks filtered languages only)
             List<string> invalidCodes;
             if (!string.IsNullOrEmpty(settings.Cultures) || !string.IsNullOrEmpty(settings.ExcludeCultures))
             {
@@ -243,6 +269,39 @@ public class ViewCommand : Command<ViewCommand.Settings>
                         AnsiConsole.WriteLine();
                     }
                 }
+            }
+
+            // Apply status filtering
+            if (settings.Status.HasValue)
+            {
+                matchedKeys = FilterByStatus(matchedKeys, defaultFile, resourceFiles, settings.Status.Value);
+            }
+
+            // Apply exclusion patterns
+            if (settings.NotPatterns != null && settings.NotPatterns.Length > 0)
+            {
+                matchedKeys = ApplyExclusions(matchedKeys, settings.NotPatterns, settings.CaseSensitive);
+            }
+
+            // Apply limit
+            var effectiveLimit = settings.NoLimit || settings.Limit == 0 ? int.MaxValue : settings.Limit;
+            var totalMatches = matchedKeys.Count;
+
+            if (matchedKeys.Count > effectiveLimit)
+            {
+                if (format == OutputFormat.Table)
+                {
+                    AnsiConsole.MarkupLine($"[yellow]⚠ Found {totalMatches} matches, showing first {effectiveLimit}. Use --limit to adjust.[/]");
+                    AnsiConsole.WriteLine();
+                }
+                matchedKeys = matchedKeys.Take(effectiveLimit).ToList();
+            }
+
+            // Handle --count flag (exit early)
+            if (settings.Count)
+            {
+                DisplayCount(matchedKeys.Count, settings, usedWildcards, originalPattern, format);
+                return 0;
             }
 
             // Detect extra keys in filtered languages (not in default)
@@ -306,6 +365,34 @@ public class ViewCommand : Command<ViewCommand.Settings>
         {
             AnsiConsole.MarkupLine($"[dim]Using configuration from: {settings.LoadedConfigurationPath}[/]");
             AnsiConsole.WriteLine();
+        }
+    }
+
+    private void DisplayCount(int count, Settings settings, bool usedWildcards, string originalPattern, OutputFormat format)
+    {
+        DisplayConfigNotice(settings);
+
+        string patternType = usedWildcards ? "wildcard" : (settings.UseRegex ? "regex" : "exact");
+
+        if (format == OutputFormat.Json)
+        {
+            var output = new
+            {
+                pattern = originalPattern,
+                patternType = patternType,
+                matchCount = count
+            };
+            Console.WriteLine(OutputFormatter.FormatJson(output));
+        }
+        else if (format == OutputFormat.Simple)
+        {
+            Console.WriteLine($"Pattern: {originalPattern} ({patternType})");
+            Console.WriteLine($"Found {count} matching key(s)");
+        }
+        else // Table format
+        {
+            AnsiConsole.MarkupLine($"[yellow]Pattern: {Markup.Escape(originalPattern)} [dim]({patternType})[/][/]");
+            AnsiConsole.MarkupLine($"[green]Found {count} matching key(s)[/]");
         }
     }
 
@@ -817,7 +904,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
         var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
 
         // Search in keys
-        if (scope == SearchScope.Keys || scope == SearchScope.Both)
+        if (scope == SearchScope.Keys || scope == SearchScope.Both || scope == SearchScope.All)
         {
             var entry = defaultFile.Entries.FirstOrDefault(e => e.Key.Equals(pattern, comparison));
             if (entry != null)
@@ -827,7 +914,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
         }
 
         // Search in values
-        if (scope == SearchScope.Values || scope == SearchScope.Both)
+        if (scope == SearchScope.Values || scope == SearchScope.Both || scope == SearchScope.All)
         {
             // Get all keys from default to ensure we return valid keys
             var allKeys = defaultFile.Entries.Select(e => e.Key).ToHashSet();
@@ -838,6 +925,25 @@ public class ViewCommand : Command<ViewCommand.Settings>
                 {
                     // Only include keys that exist in default file
                     if (allKeys.Contains(entry.Key) && entry.Value != null && entry.Value.Equals(pattern, comparison))
+                    {
+                        matchedKeys.Add(entry.Key);
+                    }
+                }
+            }
+        }
+
+        // Search in comments
+        if (scope == SearchScope.Comments || scope == SearchScope.All)
+        {
+            // Get all keys from default to ensure we return valid keys
+            var allKeys = defaultFile.Entries.Select(e => e.Key).ToHashSet();
+
+            foreach (var resourceFile in resourceFiles)
+            {
+                foreach (var entry in resourceFile.Entries)
+                {
+                    // Only include keys that exist in default file
+                    if (allKeys.Contains(entry.Key) && entry.Comment != null && entry.Comment.Equals(pattern, comparison))
                     {
                         matchedKeys.Add(entry.Key);
                     }
@@ -860,7 +966,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
         var matchedKeys = new HashSet<string>();
 
         // Search in keys
-        if (scope == SearchScope.Keys || scope == SearchScope.Both)
+        if (scope == SearchScope.Keys || scope == SearchScope.Both || scope == SearchScope.All)
         {
             foreach (var entry in defaultFile.Entries)
             {
@@ -872,7 +978,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
         }
 
         // Search in values
-        if (scope == SearchScope.Values || scope == SearchScope.Both)
+        if (scope == SearchScope.Values || scope == SearchScope.Both || scope == SearchScope.All)
         {
             // Get all keys from default to ensure we return valid keys
             var allKeys = defaultFile.Entries.Select(e => e.Key).ToHashSet();
@@ -890,6 +996,179 @@ public class ViewCommand : Command<ViewCommand.Settings>
             }
         }
 
+        // Search in comments
+        if (scope == SearchScope.Comments || scope == SearchScope.All)
+        {
+            // Get all keys from default to ensure we return valid keys
+            var allKeys = defaultFile.Entries.Select(e => e.Key).ToHashSet();
+
+            foreach (var resourceFile in resourceFiles)
+            {
+                foreach (var entry in resourceFile.Entries)
+                {
+                    // Only include keys that exist in default file
+                    if (allKeys.Contains(entry.Key) && entry.Comment != null && regex.IsMatch(entry.Comment))
+                    {
+                        matchedKeys.Add(entry.Key);
+                    }
+                }
+            }
+        }
+
         return matchedKeys.ToList();
+    }
+
+    /// <summary>
+    /// Filter keys by translation status
+    /// </summary>
+    internal static List<string> FilterByStatus(
+        List<string> keys,
+        ResourceFile defaultFile,
+        List<ResourceFile> resourceFiles,
+        TranslationStatus status)
+    {
+        var result = new List<string>();
+
+        foreach (var key in keys)
+        {
+            bool includeKey = false;
+
+            switch (status)
+            {
+                case TranslationStatus.Empty:
+                    // Check if any language has empty/whitespace value
+                    includeKey = resourceFiles.Any(rf =>
+                    {
+                        var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                        return entry == null || string.IsNullOrWhiteSpace(entry.Value);
+                    });
+                    break;
+
+                case TranslationStatus.Missing:
+                    // Check if key is missing in any language file
+                    includeKey = resourceFiles.Any(rf => !rf.Entries.Any(e => e.Key == key));
+                    break;
+
+                case TranslationStatus.Untranslated:
+                    // Check if any language is missing, empty, or identical to default
+                    var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == key);
+                    var defaultValue = defaultEntry?.Value ?? "";
+
+                    includeKey = resourceFiles.Where(rf => !rf.Language.IsDefault).Any(rf =>
+                    {
+                        var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                        // Missing, empty, or same as default
+                        return entry == null ||
+                               string.IsNullOrWhiteSpace(entry.Value) ||
+                               entry.Value == defaultValue;
+                    });
+                    break;
+
+                case TranslationStatus.Complete:
+                    // Check if all languages have non-empty translations
+                    includeKey = resourceFiles.All(rf =>
+                    {
+                        var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                        return entry != null && !string.IsNullOrWhiteSpace(entry.Value);
+                    });
+                    break;
+
+                case TranslationStatus.Partial:
+                    // Has some translations but not all (or some are empty)
+                    var hasAnyTranslation = false;
+                    var hasAnyMissing = false;
+
+                    foreach (var rf in resourceFiles.Where(rf => !rf.Language.IsDefault))
+                    {
+                        var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                        if (entry != null && !string.IsNullOrWhiteSpace(entry.Value))
+                        {
+                            hasAnyTranslation = true;
+                        }
+                        else
+                        {
+                            hasAnyMissing = true;
+                        }
+                    }
+
+                    includeKey = hasAnyTranslation && hasAnyMissing;
+                    break;
+            }
+
+            if (includeKey)
+            {
+                result.Add(key);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Apply exclusion patterns to filter out matching keys
+    /// </summary>
+    internal static List<string> ApplyExclusions(
+        List<string> keys,
+        string[] notPatternsArray,
+        bool caseSensitive = false)
+    {
+        if (notPatternsArray == null || notPatternsArray.Length == 0)
+        {
+            return keys;
+        }
+
+        // Flatten array and split by commas (supports both multiple --not flags and comma-separated)
+        var patterns = notPatternsArray
+            .SelectMany(p => p.Split(','))
+            .Select(p => p.Trim())
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .ToList();
+
+        if (!patterns.Any())
+        {
+            return keys;
+        }
+
+        var result = new List<string>();
+        var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+
+        foreach (var key in keys)
+        {
+            bool shouldExclude = false;
+
+            foreach (var pattern in patterns)
+            {
+                // Check if pattern is a wildcard pattern
+                if (IsWildcardPattern(pattern))
+                {
+                    // Convert wildcard to regex
+                    var regexPattern = ConvertWildcardToRegex(pattern);
+                    var regexOptions = caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase;
+                    var regex = new Regex(regexPattern, regexOptions, TimeSpan.FromSeconds(1));
+
+                    if (regex.IsMatch(key))
+                    {
+                        shouldExclude = true;
+                        break;
+                    }
+                }
+                else
+                {
+                    // Exact match
+                    if (key.Equals(pattern, comparison))
+                    {
+                        shouldExclude = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!shouldExclude)
+            {
+                result.Add(key);
+            }
+        }
+
+        return result;
     }
 }

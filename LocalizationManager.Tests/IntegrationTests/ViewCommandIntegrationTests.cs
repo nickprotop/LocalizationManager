@@ -1020,4 +1020,384 @@ public class ViewCommandIntegrationTests
     }
 
     #endregion
+
+    #region Comments Search Tests
+
+    [Fact]
+    public void SearchScope_Comments_ExactMatch_FindsKeyByComment()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+
+        // Find a key with a comment
+        var entryWithComment = defaultFile.Entries.FirstOrDefault(e => !string.IsNullOrWhiteSpace(e.Comment));
+        if (entryWithComment == null)
+        {
+            // Skip test if no comments exist
+            return;
+        }
+
+        // Act
+        var matchedKeys = Commands.ViewCommand.FindMatchingKeys(
+            defaultFile,
+            resourceFiles,
+            entryWithComment.Comment!,
+            Commands.ViewCommand.SearchScope.Comments,
+            isRegex: false);
+
+        // Assert
+        Assert.Contains(entryWithComment.Key, matchedKeys);
+    }
+
+    [Fact]
+    public void SearchScope_Comments_RegexPattern_FindsMatchingKeys()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+
+        // Act - search for any comment content
+        var matchedKeys = Commands.ViewCommand.FindMatchingKeys(
+            defaultFile,
+            resourceFiles,
+            ".*",
+            Commands.ViewCommand.SearchScope.Comments,
+            isRegex: true);
+
+        // Assert - should match keys with comments
+        var keysWithComments = defaultFile.Entries
+            .Where(e => !string.IsNullOrWhiteSpace(e.Comment))
+            .Select(e => e.Key)
+            .ToList();
+
+        if (keysWithComments.Any())
+        {
+            Assert.NotEmpty(matchedKeys);
+        }
+    }
+
+    [Fact]
+    public void SearchScope_All_SearchesInKeysValuesAndComments()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+
+        // Find a pattern that exists in at least one of keys/values/comments
+        var testPattern = "Error";
+
+        // Act
+        var matchedKeys = Commands.ViewCommand.FindMatchingKeys(
+            defaultFile,
+            resourceFiles,
+            $".*{testPattern}.*",
+            Commands.ViewCommand.SearchScope.All,
+            isRegex: true,
+            caseSensitive: false);
+
+        // Assert - should find keys in any location
+        Assert.NotEmpty(matchedKeys);
+    }
+
+    #endregion
+
+    #region Status Filtering Tests
+
+    [Fact]
+    public void FilterByStatus_Empty_ReturnsKeysWithEmptyValues()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+        var allKeys = defaultFile.Entries.Select(e => e.Key).ToList();
+
+        // Act
+        var emptyKeys = Commands.ViewCommand.FilterByStatus(
+            allKeys,
+            defaultFile,
+            resourceFiles,
+            Commands.ViewCommand.TranslationStatus.Empty);
+
+        // Assert
+        foreach (var key in emptyKeys)
+        {
+            var hasEmpty = resourceFiles.Any(rf =>
+            {
+                var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                return entry == null || string.IsNullOrWhiteSpace(entry.Value);
+            });
+            Assert.True(hasEmpty, $"Key {key} should have at least one empty value");
+        }
+    }
+
+    [Fact]
+    public void FilterByStatus_Complete_ReturnsFullyTranslatedKeys()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+        var allKeys = defaultFile.Entries.Select(e => e.Key).ToList();
+
+        // Act
+        var completeKeys = Commands.ViewCommand.FilterByStatus(
+            allKeys,
+            defaultFile,
+            resourceFiles,
+            Commands.ViewCommand.TranslationStatus.Complete);
+
+        // Assert
+        foreach (var key in completeKeys)
+        {
+            var allHaveValues = resourceFiles.All(rf =>
+            {
+                var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                return entry != null && !string.IsNullOrWhiteSpace(entry.Value);
+            });
+            Assert.True(allHaveValues, $"Key {key} should have non-empty values in all languages");
+        }
+    }
+
+    [Fact]
+    public void FilterByStatus_Missing_ReturnsKeysAbsentFromAnyLanguage()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+        var allKeys = defaultFile.Entries.Select(e => e.Key).ToList();
+
+        // Act
+        var missingKeys = Commands.ViewCommand.FilterByStatus(
+            allKeys,
+            defaultFile,
+            resourceFiles,
+            Commands.ViewCommand.TranslationStatus.Missing);
+
+        // Assert
+        foreach (var key in missingKeys)
+        {
+            var isMissing = resourceFiles.Any(rf => !rf.Entries.Any(e => e.Key == key));
+            Assert.True(isMissing, $"Key {key} should be missing from at least one language file");
+        }
+    }
+
+    [Fact]
+    public void FilterByStatus_Untranslated_ReturnsKeysWithMissingOrSameAsDefault()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+        var allKeys = defaultFile.Entries.Select(e => e.Key).ToList();
+
+        // Act
+        var untranslatedKeys = Commands.ViewCommand.FilterByStatus(
+            allKeys,
+            defaultFile,
+            resourceFiles,
+            Commands.ViewCommand.TranslationStatus.Untranslated);
+
+        // Assert
+        foreach (var key in untranslatedKeys)
+        {
+            var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == key);
+            var defaultValue = defaultEntry?.Value ?? "";
+
+            var hasUntranslated = resourceFiles.Where(rf => !rf.Language.IsDefault).Any(rf =>
+            {
+                var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                return entry == null ||
+                       string.IsNullOrWhiteSpace(entry.Value) ||
+                       entry.Value == defaultValue;
+            });
+            Assert.True(hasUntranslated, $"Key {key} should be untranslated in at least one non-default language");
+        }
+    }
+
+    [Fact]
+    public void FilterByStatus_Partial_ReturnsKeysWithSomeButNotAllTranslations()
+    {
+        // Arrange
+        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+        var allKeys = defaultFile.Entries.Select(e => e.Key).ToList();
+
+        // Act
+        var partialKeys = Commands.ViewCommand.FilterByStatus(
+            allKeys,
+            defaultFile,
+            resourceFiles,
+            Commands.ViewCommand.TranslationStatus.Partial);
+
+        // Assert
+        foreach (var key in partialKeys)
+        {
+            var hasAnyTranslation = false;
+            var hasAnyMissing = false;
+
+            foreach (var rf in resourceFiles.Where(rf => !rf.Language.IsDefault))
+            {
+                var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                if (entry != null && !string.IsNullOrWhiteSpace(entry.Value))
+                {
+                    hasAnyTranslation = true;
+                }
+                else
+                {
+                    hasAnyMissing = true;
+                }
+            }
+
+            Assert.True(hasAnyTranslation && hasAnyMissing,
+                $"Key {key} should have some but not all translations");
+        }
+    }
+
+    #endregion
+
+    #region Inverse Matching Tests
+
+    [Fact]
+    public void ApplyExclusions_SingleExactPattern_ExcludesMatchingKey()
+    {
+        // Arrange
+        var keys = new List<string> { "Button.Save", "Button.Cancel", "Error.NotFound" };
+        var notPattern = new[] { "Button.Save" };
+
+        // Act
+        var result = Commands.ViewCommand.ApplyExclusions(keys, notPattern);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.DoesNotContain("Button.Save", result);
+        Assert.Contains("Button.Cancel", result);
+        Assert.Contains("Error.NotFound", result);
+    }
+
+    [Fact]
+    public void ApplyExclusions_WildcardPattern_ExcludesMatchingKeys()
+    {
+        // Arrange
+        var keys = new List<string> { "Button.Save", "Button.Cancel", "Error.NotFound", "Success.Created" };
+        var notPattern = new[] { "Button.*" };
+
+        // Act
+        var result = Commands.ViewCommand.ApplyExclusions(keys, notPattern);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.DoesNotContain("Button.Save", result);
+        Assert.DoesNotContain("Button.Cancel", result);
+        Assert.Contains("Error.NotFound", result);
+        Assert.Contains("Success.Created", result);
+    }
+
+    [Fact]
+    public void ApplyExclusions_MultiplePatterns_CommaSeparated_ExcludesAllMatches()
+    {
+        // Arrange
+        var keys = new List<string> { "Button.Save", "Button.Cancel", "Error.NotFound", "Success.Created", "Link.Home" };
+        var notPatterns = new[] { "Button.*,Error.*" };
+
+        // Act
+        var result = Commands.ViewCommand.ApplyExclusions(keys, notPatterns);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.DoesNotContain("Button.Save", result);
+        Assert.DoesNotContain("Button.Cancel", result);
+        Assert.DoesNotContain("Error.NotFound", result);
+        Assert.Contains("Success.Created", result);
+        Assert.Contains("Link.Home", result);
+    }
+
+    [Fact]
+    public void ApplyExclusions_MultiplePatterns_MultipleFlags_ExcludesAllMatches()
+    {
+        // Arrange
+        var keys = new List<string> { "Button.Save", "Button.Cancel", "Error.NotFound", "Success.Created", "Link.Home" };
+        var notPatterns = new[] { "Button.*", "Error.*" };
+
+        // Act
+        var result = Commands.ViewCommand.ApplyExclusions(keys, notPatterns);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.DoesNotContain("Button.Save", result);
+        Assert.DoesNotContain("Button.Cancel", result);
+        Assert.DoesNotContain("Error.NotFound", result);
+        Assert.Contains("Success.Created", result);
+        Assert.Contains("Link.Home", result);
+    }
+
+    [Fact]
+    public void ApplyExclusions_CaseInsensitiveByDefault()
+    {
+        // Arrange
+        var keys = new List<string> { "Button.Save", "button.cancel", "ERROR.NotFound" };
+        var notPattern = new[] { "BUTTON.*" };
+
+        // Act
+        var result = Commands.ViewCommand.ApplyExclusions(keys, notPattern, caseSensitive: false);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Contains("ERROR.NotFound", result);
+    }
+
+    [Fact]
+    public void ApplyExclusions_CaseSensitive_RespectsCase()
+    {
+        // Arrange
+        var keys = new List<string> { "Button.Save", "button.cancel", "ERROR.NotFound" };
+        var notPattern = new[] { "button.*" };
+
+        // Act
+        var result = Commands.ViewCommand.ApplyExclusions(keys, notPattern, caseSensitive: true);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.Contains("Button.Save", result); // Different case, not excluded
+        Assert.DoesNotContain("button.cancel", result); // Exact case, excluded
+        Assert.Contains("ERROR.NotFound", result);
+    }
+
+    [Fact]
+    public void ApplyExclusions_EmptyArray_ReturnsAllKeys()
+    {
+        // Arrange
+        var keys = new List<string> { "Button.Save", "Error.NotFound" };
+        var notPattern = Array.Empty<string>();
+
+        // Act
+        var result = Commands.ViewCommand.ApplyExclusions(keys, notPattern);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.Equal(keys, result);
+    }
+
+    [Fact]
+    public void ApplyExclusions_NullArray_ReturnsAllKeys()
+    {
+        // Arrange
+        var keys = new List<string> { "Button.Save", "Error.NotFound" };
+        string[]? notPattern = null;
+
+        // Act
+        var result = Commands.ViewCommand.ApplyExclusions(keys, notPattern!);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.Equal(keys, result);
+    }
+
+    #endregion
 }

@@ -156,8 +156,11 @@ Summary Table:
 - `--config-file <PATH>` - Path to configuration file
 - `-f, --format <FORMAT>` - Output format: `table` (default), `json`, or `simple`
 - `--regex` - Treat KEY as a regular expression pattern
-- `--search-in|--scope <SCOPE>` - Where to search: `keys` (default), `values`, or `both`
+- `--search-in|--scope <SCOPE>` - Where to search: `keys` (default), `values`, `both`, `comments`, or `all`
 - `--case-sensitive` - Make search case-sensitive (default is case-insensitive)
+- `--count` - Show only the count of matching keys (no details)
+- `--status <STATUS>` - Filter by translation status: `empty`, `missing`, `untranslated`, `complete`, or `partial`
+- `--not <PATTERNS>` - Exclude keys matching these patterns (comma-separated, supports wildcards)
 - `--show-comments` - Include comments in output
 - `--limit <COUNT>` - Maximum number of keys to display (default: 100, 0 for no limit)
 - `--no-limit` - Show all matches without limit (same as --limit 0)
@@ -309,6 +312,14 @@ lrm view "Introuvable" --search-in values --cultures fr
 lrm view "Cancel" --search-in both
 # Returns key if EITHER key name OR any translation matches
 
+# Search in comments only
+lrm view "*deprecated*" --search-in comments
+# Find all keys with "deprecated" in comments
+
+# Search everywhere (keys, values, AND comments)
+lrm view "password" --search-in all
+# Find "password" in any location
+
 # Combine with wildcards
 lrm view "*error*" --search-in values
 # Find all keys with values containing "error"
@@ -325,6 +336,10 @@ lrm view "Save" --search-in values --cultures fr
 lrm view "contact support" --search-in values --format json
 # Find all keys mentioning "contact support" in any language
 
+# Find keys with specific context/comments
+lrm view "*navigation*" --search-in comments
+# Find keys with navigation-related comments
+
 # Use alias --scope
 lrm view "Button" --scope both
 ```
@@ -333,8 +348,149 @@ lrm view "Button" --scope both
 - `--search-in keys` (default): Searches key names only (backward compatible)
 - `--search-in values`: Searches translation values across ALL languages
 - `--search-in both`: Matches if key OR any value matches
+- `--search-in comments`: Searches comments across ALL languages
+- `--search-in all`: Searches keys, values, AND comments everywhere
 - `--cultures` affects display, not search scope - all languages are still searched
 - Searches are **case-insensitive by default** - use `--case-sensitive` to enable exact case matching
+
+**Count-Only Mode:**
+
+Get just the count of matching keys without displaying details using `--count`:
+
+```bash
+# Count all Error keys
+lrm view "Error.*" --count
+# Output: Pattern: Error.* (wildcard)
+#         Found 15 matching key(s)
+
+# Count with JSON output for automation
+lrm view "Button.*" --count --format json
+# Output: {"pattern":"Button.*","patternType":"wildcard","matchCount":8}
+
+# Count complete translations
+lrm view "*" --status complete --count
+# Output: Found 42 matching key(s)
+
+# Count with multiple filters
+lrm view "*" --cultures fr --status untranslated --count
+# Output: Found 12 matching key(s)
+```
+
+**Status Filtering:**
+
+Filter keys by their translation completeness using `--status`:
+
+```bash
+# Find keys with empty values in any language
+lrm view "*" --status empty
+# Shows keys where at least one language has empty/whitespace value
+
+# Find keys missing from any language file
+lrm view "*" --status missing
+# Shows keys that don't exist in one or more language files
+
+# Find untranslated keys (empty, missing, or same as default)
+lrm view "*" --status untranslated
+# Shows keys needing translation work
+
+# Find fully translated keys
+lrm view "*" --status complete
+# Shows keys with non-empty values in all languages
+
+# Find partially translated keys
+lrm view "*" --status partial
+# Shows keys with some but not all translations
+
+# Combine with pattern matching
+lrm view "Error.*" --status untranslated
+# Find untranslated Error keys
+
+# Check specific language
+lrm view "*" --cultures fr --status untranslated
+# Find keys untranslated in French only
+
+# Export for translators
+lrm view "*" --status partial --format json --limit 0
+# Get all partially translated keys as JSON
+
+# Count untranslated keys
+lrm view "*" --status untranslated --count
+# Quick summary of translation work needed
+```
+
+**Status Types:**
+- `empty`: Keys with empty/whitespace values in any language
+- `missing`: Keys absent from any language file
+- `untranslated`: Keys that are empty, missing, OR identical to default value
+- `complete`: Keys with non-empty translations in all languages
+- `partial`: Keys with some but not all translations
+
+**Note:** When using `--cultures` with `--status`, the status check applies only to the filtered languages. For example, `--cultures fr --status untranslated` finds keys untranslated in French only, not all languages.
+
+**Inverse Matching (Exclusions):**
+
+Exclude keys matching specific patterns using `--not`:
+
+```bash
+# Exclude specific key
+lrm view "Button.*" --not Button.Cancel
+# Shows all Button keys except Cancel
+
+# Exclude with wildcards
+lrm view "*" --not "Test.*" --limit 50
+# Show first 50 keys, excluding all Test keys
+
+# Multiple exclusion patterns (comma-separated)
+lrm view "*" --not "Button.*,Link.*,Icon.*"
+# Exclude multiple namespaces
+
+# Multiple exclusion patterns (multiple flags - recommended for shell safety)
+lrm view "*" --not "Button.*" --not "Link.*" --not "Icon.*"
+# Same as above, but cleaner syntax
+
+# Combine with other filters
+lrm view "*" --status untranslated --not "Debug.*" --not "Test.*"
+# Find untranslated keys, excluding debug/test keys
+
+# Complex filtering (multiple flags)
+lrm view "App.*" --not "App.Internal.*" --not "App.Debug.*"
+# Show App keys except internal and debug
+
+# Complex filtering (comma-separated - needs quotes)
+lrm view "App.*" --not "App.Internal.*,App.Debug.*"
+# Same as above, comma-separated (must quote the whole string)
+
+# Case-insensitive by default
+lrm view "*" --not "BUTTON.*"
+# Excludes button.*, Button.*, BUTTON.*, etc.
+
+# Case-sensitive exclusion
+lrm view "*" --not "Button.*" --case-sensitive
+# Only excludes exact case matches
+
+# Export filtered results
+lrm view "*" --status partial --not "Test.*" --format json
+# Get partially translated keys, excluding tests
+```
+
+**Exclusion Patterns:**
+- Supports exact matches: `Button.Save`
+- Supports wildcards: `Test.*`, `*.Debug`, `*temp*`
+- **Multiple patterns:** Use multiple `--not` flags (recommended) or comma-separated in quotes
+- Matches key names only (not values or comments)
+- Case-insensitive by default, use `--case-sensitive` to change
+
+**Syntax Options:**
+```bash
+# Option 1: Multiple flags (recommended - shell-safe)
+lrm view "*" --not "Test.*" --not "Debug.*"
+
+# Option 2: Comma-separated (must quote the entire value)
+lrm view "*" --not "Test.*,Debug.*"
+
+# Option 3: Mix both (all patterns are combined)
+lrm view "*" --not "Test.*,Debug.*" --not "Temp.*"
+```
 
 **Extra Keys Warning:**
 
