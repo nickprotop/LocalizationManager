@@ -687,7 +687,7 @@ lrm import translations.csv --no-backup
 
 ## edit
 
-**Description:** Launch the interactive Terminal UI (TUI) editor for visual editing of all translations.
+**Description:** Launch the interactive Terminal UI (TUI) editor for visual editing of all translations with advanced filtering and language management.
 
 **Arguments:** None
 
@@ -696,23 +696,88 @@ lrm import translations.csv --no-backup
 
 **Features:**
 - Side-by-side multi-language view
-- Real-time search and filtering
+- Advanced search and filtering (substring, wildcard, regex)
+- Search scope toggle (Keys+Values / Keys Only)
+- Language visibility controls
+- Real-time filtering with debouncing (300ms)
+- Extra keys detection and warnings
 - Visual key editing
 - Automatic validation
 - Unsaved changes tracking
 - Keyboard-driven interface
 
+**Search and Filtering:**
+
+The TUI includes powerful filtering capabilities that mirror the CLI `view` command:
+
+**Filter Modes:**
+- **Substring** (default) - Simple text matching (case-insensitive)
+- **Wildcard** - Use `*` for any characters and `?` for single character
+- **Regex** - Full regular expression support with 1-second timeout
+
+**Search Scope:**
+- **Keys+Values** (default) - Search in both key names and translation values
+- **Keys Only** - Search only in key names (useful for patterns like `Error.*`)
+
+**Filter Controls:**
+```
+Search: [___________]
+Mode: [Substring▼]  ☐ Case-sensitive  [Keys+Values]
+Show languages: ☑ Default  ☑ fr  ☑ el  [More...]
+```
+
+**Example Filters:**
+- `Error.*` - All keys starting with "Error." (wildcard mode)
+- `^Api\..*` - Keys matching regex pattern (regex mode)
+- `button` - Keys or values containing "button" (substring mode)
+
+**Language Visibility:**
+
+Control which language columns are displayed:
+
+**Quick Toggle Checkboxes:**
+- First 3-4 languages shown as checkboxes below search controls
+- Click to instantly show/hide language columns
+- Changes are reflected immediately in the table
+
+**Full Language Dialog:**
+- Click "More..." button to open complete language selector
+- Select/deselect all languages
+- "Select All" and "Select None" quick actions
+- Apply changes to rebuild table with selected languages
+
+**Extra Keys Detection:**
+
+The TUI automatically detects and warns about keys that exist in translation files but not in the default language file:
+
+- Keys with warnings are marked with "⚠ " prefix in the key column
+- Status bar shows: `⚠ Extra: N (lang1, lang2...)`
+- These keys indicate structural inconsistencies
+- Use `validate` command for detailed analysis
+
 **Keyboard Shortcuts:**
+
+**Navigation:**
 - `↑/↓` or `j/k` - Navigate keys
+- `PgUp/PgDn` - Page up/down
+
+**Key Management:**
 - `Enter` - Edit selected key
 - `Ctrl+N` - Add new key
 - `Del` - Delete selected key
+
+**Language Management:**
+- `F2` - Add new language
+- `F3` - Remove language
+- `Ctrl+L` - Show language list
+
+**File Operations:**
 - `Ctrl+S` - Save all changes (creates backup)
-- `Ctrl+Q` - Quit editor
-- `F1` - Show help panel
 - `F6` - Run validation
-- `/` - Search/filter keys
-- `Esc` - Clear search
+- `Ctrl+Q` - Quit editor
+
+**Help:**
+- `F1` - Show help panel with all shortcuts
 
 **Examples:**
 ```bash
@@ -723,18 +788,44 @@ lrm edit
 lrm edit --path ../Resources
 ```
 
-**TUI Screenshot:**
+**TUI Interface:**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Search: [_________]                      [Modified] [F1=Help]│
+│ Localization Resource Manager - Interactive Editor          │
+├─────────────────────────────────────────────────────────────┤
+│ File | Edit | Languages | Help                              │
+├─────────────────────────────────────────────────────────────┤
+│ Search: [___________] F1=Help  F2=Add Lang  F3=Remove Lang │
+│ Mode: [Substring▼]  ☐ Case-sensitive  [Keys+Values]        │
+│ Show languages: ☑ Default  ☑ fr  ☑ el  [More...]           │
 ├────────────────┬──────────────┬───────────────┬─────────────┤
-│ Key            │ English      │ Greek         │ Comment     │
+│ Key            │ Default      │ French        │ Greek       │
 ├────────────────┼──────────────┼───────────────┼─────────────┤
-│ SaveButton     │ Save         │ Σώσει         │ Button      │
-│ CancelButton   │ Cancel       │ Ακύρωση       │ Button      │
+│ SaveButton     │ Save         │ Enregistrer   │ Σώσει       │
+│ CancelButton   │ Cancel       │ Annuler       │ Ακύρωση     │
+│ ⚠ ExtraKey     │              │ Extra Value   │             │
 │ ...            │ ...          │ ...           │ ...         │
 └────────────────┴──────────────┴───────────────┴─────────────┘
+│ Keys: 256/260 | Languages: 3 | ⚠ Extra: 4 (fr, el) [MODIFIED]│
+└─────────────────────────────────────────────────────────────┘
 ```
+
+**Workflow Tips:**
+
+**Finding Keys:**
+- Use wildcard filters to explore namespaces: `Error.*`, `Button.*`
+- Toggle to "Keys Only" mode for pattern-based key searches
+- Use regex mode for complex patterns: `^(Error|Warning)\..*`
+
+**Managing Translations:**
+- Hide languages you're not currently working on
+- Focus on specific culture pairs (e.g., Default + French only)
+- Extra key warnings help identify inconsistencies
+
+**Performance:**
+- Search input is debounced (300ms) for smooth typing
+- Regex patterns have 1-second timeout to prevent hangs
+- Filter results update in real-time as you type
 
 ---
 

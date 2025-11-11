@@ -763,13 +763,72 @@ lrm edit --path ./Resources
 
 ### Common TUI Workflows
 
-**Search and Edit:**
+**Basic Search and Edit:**
 1. Launch editor: `lrm edit`
 2. Type in search box to filter keys
 3. Use arrow keys to navigate
 4. Press Enter to edit selected key
 5. Modify values for all languages
 6. Press Ctrl+S to save
+
+**Advanced Filtering:**
+
+**Example 1: Find all error messages**
+1. Type `Error.*` in search box
+2. Select "Wildcard" from Mode dropdown
+3. Toggle to "Keys Only" for pattern matching on keys
+4. Results show all keys starting with "Error."
+
+**Example 2: Find translations containing "button"**
+1. Type `button` in search box
+2. Keep "Substring" mode (default)
+3. Keep "Keys+Values" scope (default)
+4. Case-insensitive by default
+5. Results show keys and values containing "button"
+
+**Example 3: Complex regex pattern**
+1. Type `^(Error|Warning)\..*` in search box
+2. Select "Regex" mode
+3. Toggle "Keys Only" for faster search
+4. Results show all Error.* and Warning.* keys
+
+**Language Visibility Management:**
+
+**Hide/Show Specific Languages:**
+1. Use checkboxes below search controls
+2. Uncheck languages you're not working on
+3. Table rebuilds instantly with selected columns
+4. Useful for focusing on specific translation pairs
+
+**Select Many Languages:**
+1. Click "More..." button
+2. Use "Select All" / "Select None" buttons
+3. Check/uncheck specific languages
+4. Click "Apply" to update table
+5. Main UI checkboxes sync automatically
+
+**Example Workflow - French Translation Focus:**
+1. Uncheck all languages except Default and French
+2. Search for empty French values: `^\s*$` (regex mode, French column)
+3. Edit each key to add French translation
+4. Check other languages when done
+
+**Working with Extra Keys:**
+
+The TUI automatically detects keys that exist in translation files but not in default:
+
+1. Keys with warnings show "⚠ " prefix
+2. Status bar shows count: `⚠ Extra: 4 (fr, el)`
+3. These indicate structural issues
+4. Remove extra keys or add to default language
+
+**Example - Fix Extra Keys:**
+1. Look for "⚠ " prefix in key column
+2. Press Enter to edit the key
+3. Either:
+   - Delete the key (if it's truly extra)
+   - Add it to default language (if it belongs)
+4. Run F6 validation to confirm fixes
 
 **Add New Keys:**
 1. Press Ctrl+N
@@ -791,6 +850,11 @@ lrm edit --path ./Resources
 **Save and Exit:**
 1. Press Ctrl+S to save (prompts for backup)
 2. Press Ctrl+Q to quit (prompts if unsaved changes)
+
+**Language Management:**
+1. Press F2 to add new language
+2. Press F3 to remove language
+3. Press Ctrl+L to list all languages
 
 ---
 
