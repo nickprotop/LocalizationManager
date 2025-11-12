@@ -97,7 +97,7 @@ public class DeleteCommand : Command<DeleteCommand.Settings>
             var existingEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == settings.Key);
             if (existingEntry == null)
             {
-                AnsiConsole.MarkupLine($"[red]✗ Key '{settings.Key}' not found![/]");
+                AnsiConsole.MarkupLine($"[red]✗ Key '{settings.Key.EscapeMarkup()}' not found![/]");
                 return 1;
             }
 
@@ -109,12 +109,12 @@ public class DeleteCommand : Command<DeleteCommand.Settings>
             foreach (var rf in resourceFiles)
             {
                 var entry = rf.Entries.FirstOrDefault(e => e.Key == settings.Key);
-                var value = entry?.Value ?? "[dim](not found)[/]";
+                var value = entry?.Value?.EscapeMarkup() ?? "[dim](not found)[/]";
                 table.AddRow(rf.Language.Name, value);
             }
 
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[yellow]Key to delete:[/] [bold]{settings.Key}[/]");
+            AnsiConsole.MarkupLine($"[yellow]Key to delete:[/] [bold]{settings.Key.EscapeMarkup()}[/]");
             AnsiConsole.WriteLine();
             AnsiConsole.Write(table);
             AnsiConsole.WriteLine();
@@ -122,7 +122,7 @@ public class DeleteCommand : Command<DeleteCommand.Settings>
             // Confirmation
             if (!settings.SkipConfirmation)
             {
-                if (!AnsiConsole.Confirm($"Delete key '{settings.Key}' from all languages?", false))
+                if (!AnsiConsole.Confirm($"Delete key '{settings.Key.EscapeMarkup()}' from all languages?", false))
                 {
                     AnsiConsole.MarkupLine("[yellow]⚠ Deletion cancelled[/]");
                     return 0;
@@ -156,7 +156,7 @@ public class DeleteCommand : Command<DeleteCommand.Settings>
                 parser.Write(rf);
             }
 
-            AnsiConsole.MarkupLine($"[green]✓ Successfully deleted key '{settings.Key}' from {deletedCount} language file(s)[/]");
+            AnsiConsole.MarkupLine($"[green]✓ Successfully deleted key '{settings.Key.EscapeMarkup()}' from {deletedCount} language file(s)[/]");
             return 0;
         }
         catch (DirectoryNotFoundException ex)

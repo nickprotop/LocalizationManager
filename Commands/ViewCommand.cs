@@ -435,7 +435,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
 
             foreach (var key in keys)
             {
-                table.AddRow(key);
+                table.AddRow(key.EscapeMarkup());
             }
 
             AnsiConsole.Write(table);
@@ -485,14 +485,14 @@ public class ViewCommand : Command<ViewCommand.Settings>
                     ? $"{rf.Language.Name} [yellow]({defaultCode})[/]"
                     : rf.Language.Name;
 
-                var keyDisplay = firstRowForKey ? key : "";
-                var value = entry?.IsEmpty == true ? "[dim](empty)[/]" : entry?.Value ?? "[red](missing)[/]";
+                var keyDisplay = firstRowForKey ? key.EscapeMarkup() : "";
+                var value = entry?.IsEmpty == true ? "[dim](empty)[/]" : (entry?.Value?.EscapeMarkup() ?? "[red](missing)[/]");
 
                 if (showComments)
                 {
                     var comment = entry == null || string.IsNullOrWhiteSpace(entry.Comment)
                         ? "[dim](no comment)[/]"
-                        : entry.Comment;
+                        : entry.Comment.EscapeMarkup();
                     table.AddRow(keyDisplay, langName, value, comment);
                 }
                 else

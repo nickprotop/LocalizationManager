@@ -16,6 +16,11 @@ public class ConfigurationModel
     /// Translation configuration settings.
     /// </summary>
     public TranslationConfiguration? Translation { get; set; }
+
+    /// <summary>
+    /// Code scanning configuration settings.
+    /// </summary>
+    public ScanningConfiguration? Scanning { get; set; }
 }
 
 /// <summary>
@@ -111,4 +116,24 @@ public class TranslationApiKeys
             _ => null
         };
     }
+}
+
+/// <summary>
+/// Configuration settings for code scanning feature.
+/// </summary>
+public class ScanningConfiguration
+{
+    /// <summary>
+    /// Resource class names to detect in code (e.g., "Resources", "Strings", "AppResources").
+    /// These are the class names whose property accesses will be detected as localization key references.
+    /// Example: If set to ["Resources", "Strings"], will detect Resources.KeyName and Strings.KeyName.
+    /// </summary>
+    public List<string>? ResourceClassNames { get; set; }
+
+    /// <summary>
+    /// Localization method names to detect (e.g., "GetString", "Translate", "L").
+    /// These are method names that accept localization keys as string parameters.
+    /// Example: If set to ["GetString", "T"], will detect GetString("KeyName") and T("KeyName").
+    /// </summary>
+    public List<string>? LocalizationMethods { get; set; }
 }

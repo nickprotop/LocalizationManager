@@ -109,7 +109,7 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
             var existingEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == settings.Key);
             if (existingEntry == null)
             {
-                AnsiConsole.MarkupLine($"[red]✗ Key '{settings.Key}' not found![/]");
+                AnsiConsole.MarkupLine($"[red]✗ Key '{settings.Key.EscapeMarkup()}' not found![/]");
                 AnsiConsole.MarkupLine("[yellow]💡 Tip: Use 'add' command to create new keys[/]");
                 return 1;
             }
@@ -122,12 +122,12 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
             foreach (var rf in resourceFiles)
             {
                 var entry = rf.Entries.FirstOrDefault(e => e.Key == settings.Key);
-                var value = entry?.Value ?? "[dim](empty)[/]";
+                var value = entry?.Value?.EscapeMarkup() ?? "[dim](empty)[/]";
                 currentTable.AddRow(rf.Language.Name, value);
             }
 
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[yellow]Updating key:[/] [bold]{settings.Key}[/]");
+            AnsiConsole.MarkupLine($"[yellow]Updating key:[/] [bold]{settings.Key.EscapeMarkup()}[/]");
             AnsiConsole.WriteLine();
             AnsiConsole.Write(currentTable);
             AnsiConsole.WriteLine();
@@ -215,8 +215,8 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
                     if (rf != null)
                     {
                         var entry = rf.Entries.FirstOrDefault(e => e.Key == settings.Key);
-                        var oldValue = entry?.Value ?? "[dim](empty)[/]";
-                        previewTable.AddRow(rf.Language.Name, oldValue, kvp.Value);
+                        var oldValue = entry?.Value?.EscapeMarkup() ?? "[dim](empty)[/]";
+                        previewTable.AddRow(rf.Language.Name, oldValue, kvp.Value.EscapeMarkup());
                     }
                 }
 
@@ -279,7 +279,7 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
                 parser.Write(rf);
             }
 
-            AnsiConsole.MarkupLine($"[green]✓ Successfully updated key '{settings.Key}' in {updatedCount} language(s)[/]");
+            AnsiConsole.MarkupLine($"[green]✓ Successfully updated key '{settings.Key.EscapeMarkup()}' in {updatedCount} language(s)[/]");
             return 0;
         }
         catch (DirectoryNotFoundException ex)

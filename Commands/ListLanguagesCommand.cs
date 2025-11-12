@@ -143,9 +143,9 @@ public class ListLanguagesCommand : Command<ListLanguagesCommandSettings>
                     : $"[yellow]{stat.Coverage}%[/]";
 
                 table.AddRow(
-                    stat.LanguageName,
+                    stat.LanguageName.EscapeMarkup(),
                     stat.Code,
-                    stat.FileName,
+                    stat.FileName.EscapeMarkup(),
                     stat.EntryCount.ToString(),
                     coverageDisplay
                 );

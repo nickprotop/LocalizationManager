@@ -169,8 +169,8 @@ public class StatsCommand : Command<BaseFormattableCommandSettings>
                                "red";
 
             var languageDisplay = rf.Language.IsDefault
-                ? $"[yellow]{rf.Language.Name}[/]"
-                : rf.Language.Name;
+                ? $"[yellow]{rf.Language.Name.EscapeMarkup()}[/]"
+                : rf.Language.Name.EscapeMarkup();
 
             table.AddRow(
                 languageDisplay,

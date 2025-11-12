@@ -195,7 +195,7 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
                 var langDisplay = string.IsNullOrEmpty(kvp.Key) ? defaultCode : kvp.Key;
                 table.AddRow(
                     langDisplay,
-                    string.Join(", ", kvp.Value.Take(10)) + (kvp.Value.Count > 10 ? $" ... ({kvp.Value.Count - 10} more)" : "")
+                    string.Join(", ", kvp.Value.Take(10).Select(k => k.EscapeMarkup())) + (kvp.Value.Count > 10 ? $" ... ({kvp.Value.Count - 10} more)" : "")
                 );
             }
 
@@ -217,7 +217,7 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
                 var langDisplay = string.IsNullOrEmpty(kvp.Key) ? defaultCode : kvp.Key;
                 table.AddRow(
                     langDisplay,
-                    string.Join(", ", kvp.Value.Take(10)) + (kvp.Value.Count > 10 ? $" ... ({kvp.Value.Count - 10} more)" : "")
+                    string.Join(", ", kvp.Value.Take(10).Select(k => k.EscapeMarkup())) + (kvp.Value.Count > 10 ? $" ... ({kvp.Value.Count - 10} more)" : "")
                 );
             }
 
@@ -239,7 +239,7 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
                 var langDisplay = string.IsNullOrEmpty(kvp.Key) ? defaultCode : kvp.Key;
                 table.AddRow(
                     langDisplay,
-                    string.Join(", ", kvp.Value)
+                    string.Join(", ", kvp.Value.Select(k => k.EscapeMarkup()))
                 );
             }
 
@@ -261,7 +261,7 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
                 var langDisplay = string.IsNullOrEmpty(kvp.Key) ? defaultCode : kvp.Key;
                 table.AddRow(
                     langDisplay,
-                    string.Join(", ", kvp.Value.Take(10)) + (kvp.Value.Count > 10 ? $" ... ({kvp.Value.Count - 10} more)" : "")
+                    string.Join(", ", kvp.Value.Take(10).Select(k => k.EscapeMarkup())) + (kvp.Value.Count > 10 ? $" ... ({kvp.Value.Count - 10} more)" : "")
                 );
             }
 

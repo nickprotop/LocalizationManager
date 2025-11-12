@@ -97,7 +97,7 @@ public class AddCommand : Command<AddCommandSettings>
             var defaultFile = resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
             if (defaultFile != null && defaultFile.Entries.Any(e => e.Key == settings.Key))
             {
-                AnsiConsole.MarkupLine($"[red]✗ Key '{settings.Key}' already exists![/]");
+                AnsiConsole.MarkupLine($"[red]✗ Key '{settings.Key.EscapeMarkup()}' already exists![/]");
                 return 1;
             }
 
@@ -216,7 +216,7 @@ public class AddCommand : Command<AddCommandSettings>
             }
 
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[green bold]✓ Successfully added key '{settings.Key}' to {resourceFiles.Count} file(s)[/]");
+            AnsiConsole.MarkupLine($"[green bold]✓ Successfully added key '{settings.Key.EscapeMarkup()}' to {resourceFiles.Count} file(s)[/]");
 
             return 0;
         }
