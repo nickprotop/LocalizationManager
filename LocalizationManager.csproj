@@ -7,9 +7,9 @@
     <Nullable>enable</Nullable>
 
     <!-- Version and Assembly Information -->
-    <Version>0.6.8</Version>
-    <AssemblyVersion>0.6.8.0</AssemblyVersion>
-    <FileVersion>0.6.8.0</FileVersion>
+    <Version>0.6.9</Version>
+    <AssemblyVersion>0.6.9.0</AssemblyVersion>
+    <FileVersion>0.6.9.0</FileVersion>
     <Authors>Nikolaos Protopapas</Authors>
     <Company>Nikolaos Protopapas</Company>
     <Product>Localization Resource Manager (LRM)</Product>
