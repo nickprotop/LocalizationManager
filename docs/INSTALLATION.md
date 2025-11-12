@@ -30,6 +30,7 @@ This script will:
 - ✅ Auto-detect your architecture (x64 or ARM64)
 - ✅ Download the latest release
 - ✅ Install to `~/.local/bin/lrm`
+- ✅ Install shell completions (bash & zsh)
 - ✅ Verify the installation
 
 **Choose your platform for manual installation:**
@@ -279,7 +280,34 @@ For detailed build instructions, see [BUILDING.md](BUILDING.md).
 
 Shell completion (tab completion) makes using LRM faster by auto-completing commands and options.
 
-### Bash Completion
+### Automatic Installation (Recommended)
+
+**Shell completions are automatically installed** by `install-lrm.sh` for both bash and zsh!
+
+**Bash:**
+- Installed to: `~/.local/share/bash-completion/completions/lrm`
+- Works immediately in new shell sessions
+- No configuration needed (requires bash-completion package)
+
+**Zsh:**
+- Installed to: `~/.zsh/completions/_lrm`
+- Requires one-time setup in `~/.zshrc` (installer shows instructions):
+  ```zsh
+  fpath=(~/.zsh/completions $fpath)
+  autoload -Uz compinit && compinit
+  ```
+
+**Test it:**
+```bash
+lrm <TAB>          # Shows all commands
+lrm val<TAB>       # Completes to 'validate'
+lrm --p<TAB>       # Completes to '--path'
+```
+
+<details>
+<summary><b>Manual Installation (if needed)</b></summary>
+
+### Bash Completion (Manual)
 
 **System-wide (requires sudo):**
 ```bash
@@ -301,7 +329,7 @@ echo 'source /path/to/LocalizationManager/lrm-completion.bash' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### Zsh Completion
+### Zsh Completion (Manual)
 
 **System-wide (requires sudo):**
 ```bash
@@ -324,13 +352,7 @@ EOF
 # Restart shell or: exec zsh
 ```
 
-### Test Completion
-
-```bash
-lrm <TAB>          # Shows all commands
-lrm val<TAB>       # Completes to 'validate'
-lrm --p<TAB>       # Completes to '--path'
-```
+</details>
 
 ---
 
@@ -485,7 +507,23 @@ uname -m
 
 ## Uninstallation
 
-### Linux/macOS
+### Automated Uninstallation (Recommended)
+
+```bash
+curl -sSL https://raw.githubusercontent.com/nickprotop/LocalizationManager/main/uninstall-lrm.sh | bash
+```
+
+This removes:
+- ✓ Binary (`~/.local/bin/lrm`)
+- ✓ Bash completion (`~/.local/share/bash-completion/completions/lrm`)
+- ✓ Zsh completion (`~/.zsh/completions/_lrm`)
+
+**Note:** You may want to manually remove PATH/fpath modifications from your shell RC files (instructions shown after uninstall).
+
+<details>
+<summary><b>Manual Uninstallation</b></summary>
+
+### Linux/macOS (Manual)
 
 **System-wide:**
 ```bash
@@ -510,6 +548,8 @@ rm ~/.local/share/bash-completion/completions/lrm
 sudo rm /usr/share/zsh/site-functions/_lrm
 rm ~/.zsh/completions/_lrm
 ```
+
+</details>
 
 ### Windows
 
