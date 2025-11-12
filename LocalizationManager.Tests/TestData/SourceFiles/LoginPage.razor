@@ -1,0 +1,60 @@
+@* Copyright (c) 2025 Test File *@
+@* This file contains realistic Razor component patterns for testing the Razor scanner *@
+
+@page "/login"
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<LoginPage> Localizer
+
+<div class="login-container">
+    <h1>@Resources.Login_Title</h1>
+    <p>@Resources.Login_WelcomeMessage</p>
+
+    <EditForm Model="@loginModel" OnValidSubmit="@HandleLogin">
+        <div class="form-group">
+            <label>@Localizer["Login_Username"]</label>
+            <InputText @bind-Value="loginModel.Username" placeholder="@Resources.Login_UsernamePlaceholder" />
+        </div>
+
+        <div class="form-group">
+            <label>@Localizer["Login_Password"]</label>
+            <InputPassword @bind-Value="loginModel.Password" />
+        </div>
+
+        <div class="form-actions">
+            <button type="submit">@Resources.Button_Login</button>
+            <a href="/forgot-password">@Localizer["Login_ForgotPassword"]</a>
+        </div>
+    </EditForm>
+
+    @if (showError)
+    {
+        <div class="alert alert-error">
+            @Localizer["Login_ErrorMessage"]
+        </div>
+    }
+
+    @* Code block with resource access *@
+    @code {
+        private LoginModel loginModel = new();
+        private bool showError = false;
+
+        private async Task HandleLogin()
+        {
+            // Property access in code block
+            var validatingMsg = Resources.Login_Validating;
+            var successMsg = Resources.Login_Success;
+
+            // Method call in code block
+            var errorMsg = GetString("Login_Failed");
+
+            // Missing keys - for testing detection
+            var missingMsg1 = Resources.MissingRazorKey;
+            var missingMsg2 = Localizer["MissingRazorIndexer"];
+
+            // Dynamic key - low confidence
+            var dynamicMsg = GetString($"Login_{loginModel.Status}");
+        }
+
+        private string GetString(string key) => Localizer[key];
+    }
+</div>

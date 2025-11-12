@@ -1,0 +1,90 @@
+@* Copyright (c) 2025 Test File *@
+@* This file contains realistic MVC Razor view patterns for testing *@
+
+@model TestApp.Models.HomeViewModel
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<HomeView> Localizer
+@inject IHtmlLocalizer<HomeView> HtmlLocalizer
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>@Resources.Home_Title - @Resources.Site_Name</title>
+</head>
+<body>
+    <header>
+        <nav>
+            <ul>
+                <li><a href="/">@Resources.Nav_Home</a></li>
+                <li><a href="/products">@Resources.Nav_Products</a></li>
+                <li><a href="/about">@Localizer["Nav_About"]</a></li>
+                <li><a href="/contact">@Localizer["Nav_Contact"]</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <h1>@Resources.Home_WelcomeTitle</h1>
+        <p>@HtmlLocalizer["Home_WelcomeMessage"]</p>
+
+        <section class="features">
+            <h2>@Resources.Home_FeaturesTitle</h2>
+            <div class="feature-grid">
+                <div class="feature">
+                    <h3>@Localizer["Feature_Fast"]</h3>
+                    <p>@Resources.Feature_FastDescription</p>
+                </div>
+                <div class="feature">
+                    <h3>@Localizer["Feature_Secure"]</h3>
+                    <p>@Resources.Feature_SecureDescription</p>
+                </div>
+            </div>
+        </section>
+
+        @if (Model.ShowNotification)
+        {
+            <div class="notification">
+                @Localizer["Notification_Message"]
+            </div>
+        }
+
+        @* Code block patterns *@
+        @{
+            var pageTitle = Resources.Home_PageTitle;
+            var metaDesc = GetString("Home_MetaDescription");
+            var copyright = Localizer["Footer_Copyright"];
+
+            // Missing keys - for testing detection
+            var missingView1 = Resources.MissingViewKey;
+            var missingView2 = Localizer["MissingViewIndexer"];
+
+            // Dynamic pattern
+            var dynamicKey = GetString($"Content_{Model.Section}");
+        }
+
+        <div class="content">
+            @foreach (var item in Model.Items)
+            {
+                <article>
+                    <h3>@item.Title</h3>
+                    <p>@item.Description</p>
+                    <button>@Resources.Button_ReadMore</button>
+                </article>
+            }
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 @Resources.Footer_CompanyName. @Localizer["Footer_AllRights"]</p>
+        <ul>
+            <li><a href="/privacy">@Resources.Footer_Privacy</a></li>
+            <li><a href="/terms">@Localizer["Footer_Terms"]</a></li>
+        </ul>
+    </footer>
+
+    @functions {
+        private string GetString(string key) => Localizer[key];
+    }
+</body>
+</html>
