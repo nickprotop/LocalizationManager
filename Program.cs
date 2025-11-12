@@ -126,6 +126,23 @@ app.Configure(config =>
         .WithExample(new[] { "translate", "--only-missing", "--dry-run" })
         .WithExample(new[] { "translate", "Error*", "--provider", "google", "--source-language", "en" });
 
+    config.AddCommand<ScanCommand>("scan")
+        .WithDescription("Scan source code for localization key references and detect missing or unused keys")
+        .WithExample(new[] { "scan" })
+        .WithExample(new[] { "scan", "--source-path", "./src" })
+        .WithExample(new[] { "scan", "--strict" })
+        .WithExample(new[] { "scan", "--show-missing" })
+        .WithExample(new[] { "scan", "--show-unused" })
+        .WithExample(new[] { "scan", "--format", "json" })
+        .WithExample(new[] { "scan", "--exclude", "**/*.g.cs,**/bin/**" });
+
+    config.AddCommand<CheckCommand>("check")
+        .WithDescription("Run both validation and code scanning (validate + scan)")
+        .WithExample(new[] { "check" })
+        .WithExample(new[] { "check", "--source-path", "./src" })
+        .WithExample(new[] { "check", "--strict" })
+        .WithExample(new[] { "check", "--format", "json" });
+
     config.AddBranch("config", cfg =>
     {
         cfg.SetDescription("Configuration commands for API keys and settings");

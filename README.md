@@ -94,6 +94,13 @@ LRM solves this by providing:
   - Real-time validation and search
 - **🔍 Validation** - Detect missing translations, duplicates, empty values
 - **📊 Statistics** - Translation coverage with progress bars
+- **🔎 Code Scanning** - Find unused keys and missing references in source code
+  - Scan C#, Razor, and XAML files for localization key usage
+  - Detect unused keys (in .resx but not in code)
+  - Detect missing keys (in code but not in .resx)
+  - Configurable resource class names and localization methods
+  - Strict mode for high-confidence static references only
+  - Pattern detection: property access, indexers, method calls, XAML
 - **🌐 Language Management** - Add/remove language files with validation
 - **📤 Export/Import** - CSV, JSON, and text formats for working with translators
 - **🎯 Regex Pattern Matching** - View and explore multiple keys with powerful regex patterns
@@ -199,6 +206,21 @@ lrm view "*" --status untranslated
 # Exclude specific patterns (multiple --not flags recommended)
 lrm view "*" --not "Test.*" --not "Debug.*"
 
+# Scan source code for key usage
+lrm scan
+
+# Find unused keys (in .resx but not in code)
+lrm scan --show-unused
+
+# Find missing keys (in code but not in .resx)
+lrm scan --show-missing
+
+# Scan with custom resource classes
+lrm scan --resource-classes "Resources,AppStrings" --source-path ./src
+
+# Strict mode (high-confidence static references only)
+lrm scan --strict --exclude "**/obj/**,**/bin/**"
+
 # Add a new key
 lrm add NewKey -i
 
@@ -229,6 +251,7 @@ See [EXAMPLES.md](docs/EXAMPLES.md) for detailed usage scenarios and workflows.
 | `validate` | Validate resource files for missing translations, duplicates, empty values | Table, JSON, Simple |
 | `stats` | Display translation statistics and coverage | Table, JSON, Simple |
 | `view` | View details of a specific key or regex pattern across all languages | Table, JSON, Simple |
+| `scan` 🆕 | Scan source code for key usage and find unused/missing keys | Table, JSON, Simple |
 | `add` | Add a new key to all language files | N/A |
 | `update` | Update values for an existing key | N/A |
 | `delete` | Delete a key from all language files | N/A |
@@ -375,6 +398,7 @@ LocalizationManager/
 |----------|-------------|
 | [docs/INSTALLATION.md](docs/INSTALLATION.md) | Complete installation guide for all platforms |
 | [docs/COMMANDS.md](docs/COMMANDS.md) | Detailed command reference with all options |
+| [**docs/CONFIGURATION.md**](docs/CONFIGURATION.md) 🆕 | **Configuration file guide (lrm.json schema and examples)** |
 | [docs/EXAMPLES.md](docs/EXAMPLES.md) | Usage examples and workflow scenarios |
 | [**docs/CICD.md**](docs/CICD.md) 🆕 | **CI/CD automation workflows with translation tracking** ⭐ |
 | [**docs/TRANSLATION.md**](docs/TRANSLATION.md) 🆕 | **Machine translation guide (Google/DeepL/LibreTranslate)** |
@@ -411,6 +435,8 @@ dotnet run -- --help
 - **CI/CD Automation** - Complete workflows for GitHub Actions, GitLab CI, Azure DevOps
 - **Translation Tracking** - Per-language translation reports with JSON output
 - **In-app Translation** - TUI integration with Ctrl+T, F4, F5 shortcuts
+- **Code Scanning** - Find unused keys and missing references in source code (C#, Razor, XAML)
+- **Configuration File** - Complete lrm.json support for project-wide defaults
 
 ### 🚧 In Progress
 - **Translation Memory** - Suggest translations based on similar keys
@@ -422,9 +448,9 @@ dotnet run -- --help
 - **Web UI** - Browser-based editor as alternative to TUI
 - **Multiple File Formats** - Support for `.po`, `.xliff`, JSON
 - **Translation Comments** - Add translator notes and context
-- **Key Usage Detection** - Find unused keys in codebase
 - **Translation Workflows** - Review/approve flows for human validation
 - **Context Screenshots** - Attach UI screenshots to keys for translator context
+- **Advanced Code Scanning** - Support for JavaScript, TypeScript, and other languages
 
 See [GitHub Discussions](https://github.com/nickprotop/LocalizationManager/discussions) for feature requests and ideas.
 

@@ -107,6 +107,30 @@ fi
 lrm validate
 ```
 
+### Enhanced Flow with Code Scanning
+
+```bash
+# 1. Validate .resx files
+lrm validate
+
+# 2. Scan code for missing keys
+lrm scan --format json > scan-results.json
+
+# 3. Add missing keys found in code
+if [ -s scan-results.json ]; then
+  missing_keys=$(jq -r '.missingKeys[]?.key // empty' scan-results.json)
+  for key in $missing_keys; do
+    lrm add --key "$key" --value "$key" --comment "Auto-added from code scan"
+  done
+fi
+
+# 4. Translate missing keys
+lrm translate --only-missing --provider google
+
+# 5. Re-validate
+lrm validate
+```
+
 ### Exit Codes
 
 LRM uses standard exit codes for CI integration:
@@ -153,7 +177,207 @@ jobs:
           path: ./Resources
 ```
 
-### Complete Workflow with Tracking
+### Complete Workflow with Code Scanning
+
+Create `.github/workflows/auto-translate-with-scan.yml`:
+
+```yaml
+name: Auto-Translate with Code Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'Resources/**/*.resx'
+      - 'src/**/*.cs'
+      - 'src/**/*.razor'
+  pull_request:
+    paths:
+      - 'Resources/**/*.resx'
+      - 'src/**/*.cs'
+      - 'src/**/*.razor'
+  workflow_dispatch:
+
+jobs:
+  scan-and-translate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔧 Download LRM
+        run: |
+          wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-linux-x64.tar.gz
+          tar -xzf lrm-linux-x64.tar.gz
+          chmod +x linux-x64/lrm
+          echo "${{ github.workspace }}/linux-x64" >> $GITHUB_PATH
+
+      - name: ✅ Step 1 - Validate .resx Files
+        id: validate
+        run: |
+          echo "### 🔍 Validation Report" >> $GITHUB_STEP_SUMMARY
+          lrm validate -p ./Resources || {
+            echo "❌ Validation failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          }
+          echo "✅ All resource files are valid" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🔎 Step 2 - Scan Code for Missing Keys
+        id: scan
+        run: |
+          lrm scan -p ./Resources --source-path ./src --format json > scan-results.json
+          cat scan-results.json
+
+          missing_count=$(jq -r '.summary.missingKeys // 0' scan-results.json)
+          echo "missing_keys_count=$missing_count" >> $GITHUB_OUTPUT
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Code Scan Results" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$missing_count" -eq "0" ]; then
+            echo "✨ No missing keys found in code!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Found **$missing_count** keys used in code but missing from .resx:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details>" >> $GITHUB_STEP_SUMMARY
+            echo "<summary>View missing keys</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            jq -r '.missingKeys[]? | "- `\(.key)` (\(.referenceCount) refs) - \(.references[0].file):\(.references[0].line)"' scan-results.json >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: ➕ Step 3 - Add Missing Keys from Code
+        if: steps.scan.outputs.missing_keys_count != '0'
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ➕ Adding Missing Keys" >> $GITHUB_STEP_SUMMARY
+
+          added_count=0
+          while IFS= read -r key; do
+            if [ -n "$key" ]; then
+              lrm add -p ./Resources --key "$key" --value "$key" --comment "Auto-added from code scan" || true
+              added_count=$((added_count + 1))
+            fi
+          done < <(jq -r '.missingKeys[]?.key // empty' scan-results.json)
+
+          echo "Added **$added_count** new keys to resource files" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🔎 Step 4 - Check for Untranslated Keys
+        id: check_missing
+        run: |
+          lrm validate -p ./Resources --missing-only --format json > missing.json
+          cat missing.json
+
+          missing_count=$(jq -r '.missingCount // 0' missing.json)
+          echo "translation_missing_count=$missing_count" >> $GITHUB_OUTPUT
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Untranslated Keys" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$missing_count" -eq "0" ]; then
+            echo "✨ No missing translations!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Found **$missing_count** keys needing translation:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            jq -r '.languages[]? | "- **\(.code)**: \(.missingCount) keys"' missing.json >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 🌐 Step 5 - Auto-Translate Missing Keys
+        if: steps.check_missing.outputs.translation_missing_count != '0'
+        env:
+          LRM_GOOGLE_API_KEY: ${{ secrets.GOOGLE_TRANSLATE_API_KEY }}
+        run: |
+          lrm translate -p ./Resources --only-missing --provider google --format json > translation-results.json
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🤖 Translation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          jq -r '
+            .translations // [] |
+            group_by(.language) |
+            map({
+              language: .[0].language,
+              translated: map(select(.status == "success" or .status == "✓")) | length,
+              total: length
+            }) |
+            .[] | "- **\(.language)**: \(.translated)/\(.total) keys translated"
+          ' translation-results.json >> $GITHUB_STEP_SUMMARY
+
+      - name: ✅ Step 6 - Final Validation
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔄 Final Validation" >> $GITHUB_STEP_SUMMARY
+          lrm validate -p ./Resources || {
+            echo "⚠️ Validation failed after changes" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          }
+          echo "✅ All validation checks passed" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📋 Step 7 - Final Status
+        run: |
+          lrm scan -p ./Resources --source-path ./src --format json > final-scan.json
+          lrm validate -p ./Resources --missing-only --format json > final-missing.json
+
+          missing_in_code=$(jq -r '.summary.missingKeys // 0' final-scan.json)
+          missing_translations=$(jq -r '.missingCount // 0' final-missing.json)
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✨ Final Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Keys missing from .resx (found in code): **$missing_in_code**" >> $GITHUB_STEP_SUMMARY
+          echo "- Keys needing translation: **$missing_translations**" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$missing_in_code" -eq "0" ] && [ "$missing_translations" -eq "0" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🎉 **Perfect!** All keys synchronized and translated!" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📦 Upload Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: translation-reports
+          path: |
+            scan-results.json
+            missing.json
+            translation-results.json
+            final-scan.json
+            final-missing.json
+          retention-days: 30
+
+      - name: 💾 Commit Changes
+        if: (steps.scan.outputs.missing_keys_count != '0' || steps.check_missing.outputs.translation_missing_count != '0') && github.event_name != 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add Resources/**/*.resx
+
+          commit_msg="🌐 Auto-sync and translate localization keys\n\n"
+
+          if [ "${{ steps.scan.outputs.missing_keys_count }}" != "0" ]; then
+            commit_msg+="Added ${{ steps.scan.outputs.missing_keys_count }} keys found in code\n"
+          fi
+
+          if [ "${{ steps.check_missing.outputs.translation_missing_count }}" != "0" ]; then
+            commit_msg+="Translated ${{ steps.check_missing.outputs.translation_missing_count }} missing keys\n"
+          fi
+
+          commit_msg+="\n🤖 Generated by LocalizationManager"
+
+          git commit -m "$commit_msg" || echo "No changes to commit"
+          git push
+```
+
+### Complete Workflow with Tracking (Original)
 
 Create `.github/workflows/auto-translate.yml`:
 
@@ -608,6 +832,136 @@ pipeline {
 ## Shell Scripts
 
 ### Bash Script (Linux/macOS)
+
+#### Enhanced Script with Code Scanning
+
+Create `scripts/auto-translate-with-scan.sh`:
+
+```bash
+#!/bin/bash
+set -e
+
+echo "🚀 LocalizationManager Auto-Translation with Code Scan"
+echo "======================================================"
+echo ""
+
+# Configuration
+RESOURCES_PATH="${RESOURCES_PATH:-./Resources}"
+SOURCE_PATH="${SOURCE_PATH:-./src}"
+PROVIDER="${PROVIDER:-google}"
+
+# Step 1: Validate .resx files
+echo "📋 Step 1: Validating .resx files..."
+lrm validate -p "$RESOURCES_PATH"
+echo "✅ Validation passed"
+echo ""
+
+# Step 2: Scan code for missing keys
+echo "🔍 Step 2: Scanning code for missing keys..."
+lrm scan -p "$RESOURCES_PATH" --source-path "$SOURCE_PATH" --format json > scan-results.json
+
+missing_in_code=$(jq -r '.summary.missingKeys // 0' scan-results.json)
+
+if [ "$missing_in_code" -eq "0" ]; then
+    echo "✨ No missing keys found in code!"
+else
+    echo "📊 Found $missing_in_code keys in code but missing from .resx:"
+    jq -r '.missingKeys[] | "  - \(.key) (\(.referenceCount) refs)"' scan-results.json
+fi
+echo ""
+
+# Step 3: Add missing keys from code
+if [ "$missing_in_code" -gt "0" ]; then
+    echo "➕ Step 3: Adding missing keys to .resx..."
+    added_count=0
+    while IFS= read -r key; do
+        if [ -n "$key" ]; then
+            lrm add -p "$RESOURCES_PATH" --key "$key" --value "$key" --comment "Auto-added from code scan" || true
+            added_count=$((added_count + 1))
+        fi
+    done < <(jq -r '.missingKeys[]?.key // empty' scan-results.json)
+    echo "✅ Added $added_count keys"
+    echo ""
+fi
+
+# Step 4: Check for missing translations
+echo "🔍 Step 4: Checking for missing translations..."
+lrm validate -p "$RESOURCES_PATH" --missing-only --format json > missing.json
+
+missing_count=$(jq -r '.missingCount // 0' missing.json)
+
+if [ "$missing_count" -eq "0" ]; then
+    echo "✨ No missing translations found!"
+else
+    echo "📊 Found $missing_count missing translations:"
+    jq -r '.languages[] | "  - \(.code): \(.missingCount) keys"' missing.json
+fi
+echo ""
+
+# Step 5: Translate missing keys
+if [ "$missing_count" -gt "0" ]; then
+    echo "🌐 Step 5: Translating missing keys..."
+    lrm translate -p "$RESOURCES_PATH" --only-missing --provider "$PROVIDER" --format json > translation-results.json
+
+    echo ""
+    echo "📝 Translation results by language:"
+    jq -r '
+      .translations |
+      group_by(.language) |
+      map({
+        language: .[0].language,
+        count: length,
+        success: map(select(.status == "success" or .status == "✓")) | length
+      }) |
+      .[] | "  - \(.language): \(.success)/\(.count) translated"
+    ' translation-results.json
+    echo ""
+fi
+
+# Step 6: Final validation
+echo "✅ Step 6: Final validation..."
+lrm validate -p "$RESOURCES_PATH"
+echo "✅ Validation passed"
+echo ""
+
+# Step 7: Final status
+echo "🔍 Step 7: Final status check..."
+lrm scan -p "$RESOURCES_PATH" --source-path "$SOURCE_PATH" --format json > final-scan.json
+lrm validate -p "$RESOURCES_PATH" --missing-only --format json > final-missing.json
+
+final_missing_code=$(jq -r '.summary.missingKeys // 0' final-scan.json)
+final_missing_trans=$(jq -r '.missingCount // 0' final-missing.json)
+
+echo "📊 Final Status:"
+echo "  - Keys missing from .resx (found in code): $final_missing_code"
+echo "  - Keys needing translation: $final_missing_trans"
+echo ""
+
+if [ "$final_missing_code" -eq "0" ] && [ "$final_missing_trans" -eq "0" ]; then
+    echo "🎉 Perfect! All keys synchronized and translated!"
+else
+    echo "⚠️  Some keys still need attention"
+fi
+
+echo ""
+echo "📋 Reports saved:"
+echo "  - scan-results.json (initial code scan)"
+echo "  - missing.json (missing translations)"
+if [ -f translation-results.json ]; then
+    echo "  - translation-results.json (translation results)"
+fi
+echo "  - final-scan.json (final code scan)"
+echo "  - final-missing.json (final translation status)"
+echo ""
+echo "✨ Done!"
+```
+
+Make it executable:
+```bash
+chmod +x scripts/auto-translate-with-scan.sh
+```
+
+#### Basic Script (Original)
 
 Create `scripts/auto-translate.sh`:
 

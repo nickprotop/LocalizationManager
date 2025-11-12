@@ -18,6 +18,9 @@ This document provides detailed information about all LRM commands, their option
 - [add-language](#add-language) - Create new language file
 - [remove-language](#remove-language) - Delete language file
 - [list-languages](#list-languages) - List all languages
+- [scan](#scan) - Scan source code for key references
+- [translate](#translate) - Automatic translation (documented below)
+- [config](#config) - Configuration management (documented below)
 
 ---
 
@@ -41,7 +44,16 @@ LRM supports a configuration file to customize behavior and avoid repeating opti
 **Example `lrm.json`:**
 ```json
 {
-  "DefaultLanguageCode": "en"
+  "DefaultLanguageCode": "en",
+  "Translation": {
+    "DefaultProvider": "google",
+    "MaxRetries": 3,
+    "TimeoutSeconds": 30
+  },
+  "Scanning": {
+    "ResourceClassNames": ["Resources", "Strings", "AppResources"],
+    "LocalizationMethods": ["GetString", "Translate", "L", "T"]
+  }
 }
 ```
 
@@ -50,6 +62,29 @@ LRM supports a configuration file to customize behavior and avoid repeating opti
 | Option | Type | Description |
 |--------|------|-------------|
 | `DefaultLanguageCode` | string | Language code to display for the default language (e.g., "en", "fr", "de"). If not set, displays "default". Only affects Table, Simple, and TUI display formats. Does not affect JSON/CSV exports or internal logic. |
+| `Translation` | object | Translation provider configuration (see Translation section below) |
+| `Scanning` | object | Code scanning configuration (see Scanning section below) |
+
+**Scanning Configuration:**
+
+Configure default behavior for the `scan` command:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `ResourceClassNames` | string[] | Resource class names to detect in code (e.g., `["Resources", "Strings"]`). Default: `["Resources", "Strings", "AppResources"]` |
+| `LocalizationMethods` | string[] | Localization method names to detect (e.g., `["GetString", "T"]`). Default: `["GetString", "GetLocalizedString", "Translate", "L", "T"]` |
+
+**Priority System:**
+
+All configuration follows a consistent priority order:
+1. **Command-line arguments** (highest priority) - Override everything
+2. **Configuration file** (`lrm.json`) - Project-wide defaults
+3. **Built-in defaults** (lowest priority) - Fallback values
+
+This allows you to:
+- Set project-wide defaults in `lrm.json`
+- Override per-command via CLI arguments
+- Use sensible defaults when nothing is configured
 
 **Usage:**
 ```bash
@@ -1303,6 +1338,315 @@ lrm list-languages --path ./Resources
 - Check translation coverage
 - Export language list as JSON for automation
 - Identify incomplete translations
+
+---
+
+## scan
+
+**Description:** Scan source code for localization key references and detect unused or missing keys. Helps identify keys that exist in code but not in .resx files (missing) and keys in .resx files that are never used in code (unused).
+
+**Arguments:** None
+
+**Options:**
+- `-p, --path <PATH>` - Path to Resources folder (default: current directory)
+- `--source-path <PATH>` - Path to source code directory to scan (default: parent directory of resource path)
+- `--exclude <PATTERNS>` - Comma-separated glob patterns to exclude from scan (e.g., `**/*.g.cs,**/bin/**,**/obj/**`)
+- `--strict` - Strict mode: only detect high-confidence static references, ignore dynamic patterns
+- `--show-unused` - Show only unused keys (in .resx but not found in code)
+- `--show-missing` - Show only missing keys (referenced in code but not in .resx)
+- `--show-references` - Show detailed reference information for each key (top 20 by usage)
+- `--resource-classes <NAMES>` - Resource class names to detect (comma-separated, default: `Resources,Strings,AppResources`)
+- `--localization-methods <NAMES>` - Localization method names to detect (comma-separated, default: `GetString,GetLocalizedString,Translate,L,T`)
+- `-f, --format <FORMAT>` - Output format: `table` (default), `json`, or `simple`
+
+**Supported File Types:**
+- C# files (`.cs`)
+- Razor files (`.cshtml`, `.razor`)
+- XAML files (`.xaml`)
+
+**Detection Patterns:**
+
+The scanner automatically detects localization key references using various patterns:
+
+1. **Property Access:**
+   ```csharp
+   Resources.KeyName
+   Strings.SaveButton
+   AppResources.ErrorMessage
+   ```
+
+2. **Indexer Access:**
+   ```csharp
+   Localizer["KeyName"]
+   _localizer["ErrorMessage"]
+   ```
+
+3. **Method Calls:**
+   ```csharp
+   GetString("KeyName")
+   GetLocalizedString("ErrorMessage")
+   Translate("ButtonLabel")
+   L("Message")
+   T("Title")
+   ```
+
+4. **Razor Syntax:**
+   ```razor
+   @Localizer["KeyName"]
+   @Resources.ErrorMessage
+   ```
+
+5. **XAML Markup Extensions:**
+   ```xaml
+   {x:Static res:Resources.KeyName}
+   {x:Static local:Strings.ButtonText}
+   ```
+
+**Configuration Priority:**
+
+The scanner uses a priority system for configuration:
+1. **Command-line arguments** (highest priority)
+2. **Configuration file** (`lrm.json` - see Scanning section)
+3. **Built-in defaults** (lowest priority)
+
+This allows you to set project defaults in `lrm.json` and override them per-scan via CLI arguments.
+
+**Strict Mode:**
+
+When `--strict` is enabled, the scanner only detects high-confidence static references:
+- Property access: `Resources.KeyName`
+- String literals in method calls: `GetString("KeyName")`
+- XAML static references
+
+Dynamic patterns are ignored in strict mode:
+- Variable-based access: `Resources[variableName]`
+- String interpolation: `GetString($"{prefix}.{suffix}")`
+- Computed keys
+
+Use strict mode for CI/CD pipelines or when you want to avoid false positives.
+
+**Exit Codes:**
+- `0` - No issues found (all keys accounted for)
+- `1` - Issues detected (missing or unused keys found)
+
+**Examples:**
+
+**Basic scan:**
+```bash
+# Scan source code in parent directory
+lrm scan
+
+# Scan specific source directory
+lrm scan --source-path ./MyApp
+
+# Scan with specific resource path
+lrm scan --path ./Resources --source-path ./src
+```
+
+**Filter results:**
+```bash
+# Show only unused keys
+lrm scan --show-unused
+
+# Show only missing keys
+lrm scan --show-missing
+
+# Show detailed reference information
+lrm scan --show-references
+```
+
+**Exclude patterns:**
+```bash
+# Exclude generated files
+lrm scan --exclude "**/*.g.cs,**/*.designer.cs"
+
+# Exclude build outputs and test files
+lrm scan --exclude "**/bin/**,**/obj/**,**/Tests/**"
+
+# Multiple patterns
+lrm scan --exclude "**/*.g.cs" --exclude "**/obj/**"
+```
+
+**Strict mode:**
+```bash
+# Only high-confidence static references
+lrm scan --strict
+
+# Strict mode for CI/CD validation
+lrm scan --strict --format json
+```
+
+**Custom resource classes and methods:**
+```bash
+# Custom resource class names
+lrm scan --resource-classes "MyResources,AppStrings,Labels"
+
+# Custom localization methods
+lrm scan --localization-methods "GetText,Localize,__"
+
+# Both custom
+lrm scan --resource-classes "MyResources" --localization-methods "GetText,T"
+```
+
+**Output formats:**
+```bash
+# JSON output for automation
+lrm scan --format json
+
+# Simple text output
+lrm scan --format simple
+
+# Default table output (most detailed)
+lrm scan
+```
+
+**Output Examples:**
+
+**Table format (default):**
+```
+Scanning source: /home/user/MyApp/src
+Resource path: /home/user/MyApp/Resources
+
+✓ Scanned 145 files
+Found 423 key references (156 unique keys)
+⚠ 12 low-confidence references (dynamic keys)
+
+╭─────────────────────────────────────────────────────────╮
+│ Missing Keys (in code, not in .resx)                    │
+├──────────────────────┬────────────┬─────────────────────┤
+│ Key                  │ References │ Files               │
+├──────────────────────┼────────────┼─────────────────────┤
+│ Error.NotAuthorized  │ 3          │ AuthService.cs, ... │
+│ Button.Refresh       │ 1          │ MainWindow.xaml     │
+╰──────────────────────┴────────────┴─────────────────────╯
+
+╭─────────────────────────────────────────────────────────╮
+│ Unused Keys (in .resx, not in code)                     │
+├──────────────────────┬───────────────────────────────────┤
+│ Key                  │ Count                             │
+├──────────────────────┼───────────────────────────────────┤
+│ OldFeature.Title     │ -                                 │
+│ Deprecated.Message   │ -                                 │
+╰──────────────────────┴───────────────────────────────────╯
+
+✗ Found 2 missing keys and 2 unused keys
+```
+
+**JSON format:**
+```json
+{
+  "summary": {
+    "filesScanned": 145,
+    "totalReferences": 423,
+    "uniqueKeys": 156,
+    "missingKeys": 2,
+    "unusedKeys": 2,
+    "warnings": 12,
+    "hasIssues": true
+  },
+  "missingKeys": [
+    {
+      "key": "Error.NotAuthorized",
+      "referenceCount": 3,
+      "references": [
+        {
+          "file": "/home/user/MyApp/src/AuthService.cs",
+          "line": 42,
+          "pattern": "Resources.Error.NotAuthorized",
+          "confidence": "High",
+          "warning": null
+        }
+      ]
+    }
+  ],
+  "unusedKeys": [
+    "OldFeature.Title",
+    "Deprecated.Message"
+  ]
+}
+```
+
+**Simple format:**
+```
+Scanned: 145 files
+Found: 423 references (156 unique keys)
+Warnings: 12
+
+Missing Keys (2):
+  - Error.NotAuthorized (3 references)
+  - Button.Refresh (1 references)
+
+Unused Keys (2):
+  - OldFeature.Title
+  - Deprecated.Message
+
+Issues: 2 missing, 2 unused
+```
+
+**Use Cases:**
+
+**Code cleanup:**
+```bash
+# Find unused keys to remove
+lrm scan --show-unused
+```
+
+**Detect missing translations:**
+```bash
+# Find keys referenced in code but not in .resx
+lrm scan --show-missing
+```
+
+**Audit key usage:**
+```bash
+# See which keys are most frequently used
+lrm scan --show-references
+```
+
+**CI/CD validation:**
+```bash
+# Fail build if unused or missing keys exist
+lrm scan --strict --format json || exit 1
+```
+
+**Project-specific scanning:**
+```bash
+# Scan ASP.NET Core project with custom methods
+lrm scan \
+  --source-path ./MyWebApp \
+  --resource-classes "Resources,SharedResources" \
+  --localization-methods "GetString,T" \
+  --exclude "**/Migrations/**,**/wwwroot/**"
+```
+
+**Configuration file integration:**
+
+Instead of repeating CLI arguments, define scanning defaults in `lrm.json`:
+
+```json
+{
+  "Scanning": {
+    "ResourceClassNames": ["MyResources", "Strings", "Labels"],
+    "LocalizationMethods": ["GetText", "Localize", "L", "T"]
+  }
+}
+```
+
+Then simply run:
+```bash
+lrm scan
+```
+
+See the [Configuration File](#configuration-file) section for more details.
+
+**Tips:**
+
+1. **Start with default settings** to see all patterns, then use `--strict` to reduce false positives
+2. **Use exclusion patterns** to skip generated files, build outputs, and third-party code
+3. **Run regularly** as part of your development workflow to catch issues early
+4. **Combine with validate** command for complete resource file quality checks
+5. **Use JSON output** for integration with CI/CD pipelines and custom tooling
+6. **Check warnings** - dynamic patterns may indicate maintenance issues or legitimate use cases
 
 ---
 
