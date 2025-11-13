@@ -15,7 +15,7 @@ public static class TranslationProviderFactory
     /// <summary>
     /// Creates a translation provider by name.
     /// </summary>
-    /// <param name="providerName">The provider name (e.g., "deepl", "libretranslate").</param>
+    /// <param name="providerName">The provider name (e.g., "deepl", "libretranslate", "openai", "claude", "ollama", "azureopenai").</param>
     /// <param name="config">The configuration model containing API keys and settings.</param>
     /// <returns>An instance of the requested provider.</returns>
     /// <exception cref="ArgumentException">If the provider name is unknown.</exception>
@@ -27,14 +27,60 @@ public static class TranslationProviderFactory
         }
 
         var apiKey = ApiKeyResolver.GetApiKey(providerName, config);
+        var aiConfig = config?.Translation?.AIProviders;
 
         return providerName.ToLowerInvariant() switch
         {
             "google" => new GoogleTranslateProvider(apiKey),
             "deepl" => new DeepLProvider(apiKey),
             "libretranslate" => new LibreTranslateProvider(apiKey),
+            "ollama" => CreateOllamaProvider(apiKey, aiConfig?.Ollama),
+            "openai" => CreateOpenAIProvider(apiKey, aiConfig?.OpenAI),
+            "claude" => CreateClaudeProvider(apiKey, aiConfig?.Claude),
+            "azureopenai" => CreateAzureOpenAIProvider(apiKey, aiConfig?.AzureOpenAI),
             _ => throw new ArgumentException($"Unknown translation provider: {providerName}", nameof(providerName))
         };
+    }
+
+    private static OllamaProvider CreateOllamaProvider(string? apiKey, OllamaSettings? settings)
+    {
+        return new OllamaProvider(
+            apiUrl: settings?.ApiUrl,
+            model: settings?.Model,
+            customSystemPrompt: settings?.CustomSystemPrompt,
+            rateLimitRequestsPerMinute: settings?.RateLimitPerMinute ?? 10
+        );
+    }
+
+    private static OpenAIProvider CreateOpenAIProvider(string? apiKey, OpenAISettings? settings)
+    {
+        return new OpenAIProvider(
+            apiKey: apiKey,
+            model: settings?.Model,
+            customSystemPrompt: settings?.CustomSystemPrompt,
+            rateLimitRequestsPerMinute: settings?.RateLimitPerMinute ?? 60
+        );
+    }
+
+    private static ClaudeProvider CreateClaudeProvider(string? apiKey, ClaudeSettings? settings)
+    {
+        return new ClaudeProvider(
+            apiKey: apiKey,
+            model: settings?.Model,
+            customSystemPrompt: settings?.CustomSystemPrompt,
+            rateLimitRequestsPerMinute: settings?.RateLimitPerMinute ?? 50
+        );
+    }
+
+    private static AzureOpenAIProvider CreateAzureOpenAIProvider(string? apiKey, AzureOpenAISettings? settings)
+    {
+        return new AzureOpenAIProvider(
+            apiKey: apiKey,
+            endpoint: settings?.Endpoint,
+            deploymentName: settings?.DeploymentName,
+            customSystemPrompt: settings?.CustomSystemPrompt,
+            rateLimitRequestsPerMinute: settings?.RateLimitPerMinute ?? 60
+        );
     }
 
     /// <summary>
@@ -42,7 +88,7 @@ public static class TranslationProviderFactory
     /// </summary>
     public static string[] GetSupportedProviders()
     {
-        return new[] { "google", "deepl", "libretranslate" };
+        return new[] { "google", "deepl", "libretranslate", "ollama", "openai", "claude", "azureopenai" };
     }
 
     /// <summary>
@@ -59,7 +105,7 @@ public static class TranslationProviderFactory
 
         return providerName.ToLowerInvariant() switch
         {
-            "google" or "deepl" or "libretranslate" => true,
+            "google" or "deepl" or "libretranslate" or "ollama" or "openai" or "claude" or "azureopenai" => true,
             _ => false
         };
     }

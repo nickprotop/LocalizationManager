@@ -30,7 +30,7 @@ public class TranslationConfiguration
 {
     /// <summary>
     /// The default translation provider to use when not explicitly specified.
-    /// Supported values: "google", "deepl", "libretranslate".
+    /// Supported values: "google", "deepl", "libretranslate", "ollama", "openai", "claude", "azureopenai".
     /// Default: "google"
     /// </summary>
     public string DefaultProvider { get; set; } = "google";
@@ -72,6 +72,11 @@ public class TranslationConfiguration
     /// Default: false
     /// </summary>
     public bool UseSecureCredentialStore { get; set; } = false;
+
+    /// <summary>
+    /// Configuration settings for AI-powered translation providers.
+    /// </summary>
+    public AIProviderConfiguration? AIProviders { get; set; }
 }
 
 /// <summary>
@@ -102,6 +107,27 @@ public class TranslationApiKeys
     public string? LibreTranslate { get; set; }
 
     /// <summary>
+    /// OpenAI API key for GPT models.
+    /// Environment variable: LRM_OPENAI_API_KEY
+    /// Get your key at: https://platform.openai.com/api-keys
+    /// </summary>
+    public string? OpenAI { get; set; }
+
+    /// <summary>
+    /// Anthropic Claude API key.
+    /// Environment variable: LRM_CLAUDE_API_KEY
+    /// Get your key at: https://console.anthropic.com/
+    /// </summary>
+    public string? Claude { get; set; }
+
+    /// <summary>
+    /// Azure OpenAI API key.
+    /// Environment variable: LRM_AZUREOPENAI_API_KEY
+    /// Get your key from Azure Portal.
+    /// </summary>
+    public string? AzureOpenAI { get; set; }
+
+    /// <summary>
     /// Gets the API key for the specified provider.
     /// </summary>
     /// <param name="provider">The provider name (case-insensitive).</param>
@@ -113,6 +139,9 @@ public class TranslationApiKeys
             "google" => Google,
             "deepl" => DeepL,
             "libretranslate" => LibreTranslate,
+            "openai" => OpenAI,
+            "claude" => Claude,
+            "azureopenai" => AzureOpenAI,
             _ => null
         };
     }
@@ -136,4 +165,139 @@ public class ScanningConfiguration
     /// Example: If set to ["GetString", "T"], will detect GetString("KeyName") and T("KeyName").
     /// </summary>
     public List<string>? LocalizationMethods { get; set; }
+}
+
+/// <summary>
+/// Configuration settings for AI-powered translation providers.
+/// Allows customization of models, prompts, endpoints, and other AI-specific settings.
+/// </summary>
+public class AIProviderConfiguration
+{
+    /// <summary>
+    /// Ollama provider settings (local LLM).
+    /// </summary>
+    public OllamaSettings? Ollama { get; set; }
+
+    /// <summary>
+    /// OpenAI provider settings.
+    /// </summary>
+    public OpenAISettings? OpenAI { get; set; }
+
+    /// <summary>
+    /// Claude provider settings.
+    /// </summary>
+    public ClaudeSettings? Claude { get; set; }
+
+    /// <summary>
+    /// Azure OpenAI provider settings.
+    /// </summary>
+    public AzureOpenAISettings? AzureOpenAI { get; set; }
+}
+
+/// <summary>
+/// Configuration settings for Ollama provider.
+/// </summary>
+public class OllamaSettings
+{
+    /// <summary>
+    /// Ollama API endpoint URL.
+    /// Default: http://localhost:11434
+    /// </summary>
+    public string? ApiUrl { get; set; }
+
+    /// <summary>
+    /// Model to use for translation (e.g., "llama3.2", "mistral", "phi").
+    /// Default: llama3.2
+    /// </summary>
+    public string? Model { get; set; }
+
+    /// <summary>
+    /// Custom system prompt for translation.
+    /// If not set, uses the default prompt.
+    /// </summary>
+    public string? CustomSystemPrompt { get; set; }
+
+    /// <summary>
+    /// Rate limit in requests per minute.
+    /// Default: 10
+    /// </summary>
+    public int? RateLimitPerMinute { get; set; }
+}
+
+/// <summary>
+/// Configuration settings for OpenAI provider.
+/// </summary>
+public class OpenAISettings
+{
+    /// <summary>
+    /// Model to use for translation (e.g., "gpt-4", "gpt-4o-mini", "gpt-3.5-turbo").
+    /// Default: gpt-4o-mini
+    /// </summary>
+    public string? Model { get; set; }
+
+    /// <summary>
+    /// Custom system prompt for translation.
+    /// If not set, uses the default prompt.
+    /// </summary>
+    public string? CustomSystemPrompt { get; set; }
+
+    /// <summary>
+    /// Rate limit in requests per minute.
+    /// Default: 60
+    /// </summary>
+    public int? RateLimitPerMinute { get; set; }
+}
+
+/// <summary>
+/// Configuration settings for Claude provider.
+/// </summary>
+public class ClaudeSettings
+{
+    /// <summary>
+    /// Model to use for translation (e.g., "claude-3-5-sonnet-20241022", "claude-3-opus-20240229").
+    /// Default: claude-3-5-sonnet-20241022
+    /// </summary>
+    public string? Model { get; set; }
+
+    /// <summary>
+    /// Custom system prompt for translation.
+    /// If not set, uses the default prompt.
+    /// </summary>
+    public string? CustomSystemPrompt { get; set; }
+
+    /// <summary>
+    /// Rate limit in requests per minute.
+    /// Default: 50
+    /// </summary>
+    public int? RateLimitPerMinute { get; set; }
+}
+
+/// <summary>
+/// Configuration settings for Azure OpenAI provider.
+/// </summary>
+public class AzureOpenAISettings
+{
+    /// <summary>
+    /// Azure OpenAI endpoint URL (e.g., "https://your-resource.openai.azure.com").
+    /// Required for Azure OpenAI.
+    /// </summary>
+    public string? Endpoint { get; set; }
+
+    /// <summary>
+    /// Deployment name in Azure OpenAI.
+    /// Required for Azure OpenAI.
+    /// </summary>
+    public string? DeploymentName { get; set; }
+
+    /// <summary>
+    /// Custom system prompt for translation.
+    /// If not set, uses the default prompt.
+    /// </summary>
+    public string? CustomSystemPrompt { get; set; }
+
+    /// <summary>
+    /// Rate limit in requests per minute.
+    /// Default: 60
+    /// </summary>
+    public int? RateLimitPerMinute { get; set; }
 }
