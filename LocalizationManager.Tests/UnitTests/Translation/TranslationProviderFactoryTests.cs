@@ -131,19 +131,31 @@ public class TranslationProviderFactoryTests
 
         // Assert
         Assert.NotNull(providers);
-        Assert.Equal(3, providers.Length);
+        Assert.Equal(7, providers.Length);
         Assert.Contains("google", providers);
         Assert.Contains("deepl", providers);
         Assert.Contains("libretranslate", providers);
+        Assert.Contains("ollama", providers);
+        Assert.Contains("openai", providers);
+        Assert.Contains("claude", providers);
+        Assert.Contains("azureopenai", providers);
     }
 
     [Theory]
     [InlineData("google", true)]
     [InlineData("deepl", true)]
     [InlineData("libretranslate", true)]
+    [InlineData("ollama", true)]
+    [InlineData("openai", true)]
+    [InlineData("claude", true)]
+    [InlineData("azureopenai", true)]
     [InlineData("Google", true)]
     [InlineData("DEEPL", true)]
     [InlineData("LibreTranslate", true)]
+    [InlineData("OLLAMA", true)]
+    [InlineData("OpenAI", true)]
+    [InlineData("Claude", true)]
+    [InlineData("AzureOpenAI", true)]
     [InlineData("unknown", false)]
     [InlineData("", false)]
     [InlineData(null, false)]
