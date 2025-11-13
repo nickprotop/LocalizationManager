@@ -28,7 +28,7 @@ _lrm_completions() {
     local export_opts="--path -p --output -o --format --include-status --help -h"
     local import_opts="--path -p --overwrite --no-backup --help -h"
     local edit_opts="--path -p --help -h"
-    local translate_opts="--path -p --provider --target-languages --batch-size --only-missing --format --config-file --help -h"
+    local translate_opts="--path -p --provider --target-languages --batch-size --only-missing --overwrite --dry-run --no-cache --source-language --format --config-file --help -h"
     local config_opts="set-api-key get-api-key delete-api-key list-providers --help -h"
     local scan_opts="--path -p --source-path --exclude --strict --show-unused --show-missing --show-references --resource-classes --localization-methods --format --help -h"
     local check_opts="--path -p --source-path --exclude --strict --format --help -h"

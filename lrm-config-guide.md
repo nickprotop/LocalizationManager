@@ -446,13 +446,13 @@ Most configuration options can be overridden via command-line arguments. For exa
 
 ```bash
 # Override translation provider
-lrm translate --provider deepl --target-language es
+lrm translate --only-missing --provider deepl --target-language es
 
 # Use AI provider
-lrm translate --provider openai --target-language es
+lrm translate --only-missing --provider openai --target-language es
 
 # Use local Ollama
-lrm translate --provider ollama --target-language es
+lrm translate --only-missing --provider ollama --target-language es
 
 # Override scanning configuration
 lrm scan --source-path ./src --resource-classes "Loc,Resources"

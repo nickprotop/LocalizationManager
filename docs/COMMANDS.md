@@ -1715,9 +1715,9 @@ lrm translate [KEY_PATTERN] [OPTIONS]
 
 ### Examples
 
-**Translate all keys:**
+**Translate only missing keys (recommended):**
 ```bash
-lrm translate
+lrm translate --only-missing
 ```
 
 **Translate specific keys matching a pattern:**
@@ -1726,22 +1726,17 @@ lrm translate "Error*"
 lrm translate "Button_*"
 ```
 
-**Translate to specific languages:**
+**Translate only missing keys to specific languages:**
 ```bash
-lrm translate --target-languages fr,de,es
+lrm translate --only-missing --target-languages fr,de,es
 ```
 
 **Use a specific provider:**
 ```bash
-lrm translate --provider deepl
-lrm translate --provider azuretranslator
-lrm translate --provider openai
-lrm translate --provider ollama
-```
-
-**Only translate missing values:**
-```bash
-lrm translate --only-missing
+lrm translate --only-missing --provider deepl
+lrm translate --only-missing --provider azuretranslator
+lrm translate --only-missing --provider openai
+lrm translate --only-missing --provider ollama
 ```
 
 **Preview without saving (dry run):**

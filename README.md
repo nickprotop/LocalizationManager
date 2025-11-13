@@ -181,16 +181,16 @@ lrm view "Not Found" --search-in values
 lrm translate --only-missing
 
 # Translate using DeepL for highest quality
-lrm translate --provider deepl --target-languages fr,de,es
+lrm translate --only-missing --provider deepl --target-languages fr,de,es
 
 # Translate using OpenAI GPT (AI-powered)
-lrm translate --provider openai --target-languages fr,de,es
+lrm translate --only-missing --provider openai --target-languages fr,de,es
 
 # Translate using Ollama (local, private, no API key needed)
-lrm translate --provider ollama --target-languages fr,de,es
+lrm translate --only-missing --provider ollama --target-languages fr,de,es
 
 # Translate using Claude for nuanced translations
-lrm translate --provider claude --target-languages fr,de,es
+lrm translate --only-missing --provider claude --target-languages fr,de,es
 
 # Preview translations without saving
 lrm translate --dry-run

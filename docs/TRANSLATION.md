@@ -146,7 +146,7 @@ lrm config set-api-key --provider azuretranslator --key "your-subscription-key"
 ollama pull llama3.2
 
 # Ollama is now ready to use with LocalizationManager
-lrm translate --provider ollama
+lrm translate --only-missing --provider ollama
 ```
 
 ### OpenAI GPT
@@ -518,34 +518,34 @@ lrm translate "Button_*"
 
 Translate to specific languages:
 ```bash
-lrm translate --target-languages fr,de,es
+lrm translate --only-missing --target-languages fr,de,es
 ```
 
 ### Use Specific Provider
 
 Use DeepL for highest quality:
 ```bash
-lrm translate --provider deepl
+lrm translate --only-missing --provider deepl
 ```
 
 Use Ollama for local, private translations:
 ```bash
-lrm translate --provider ollama
+lrm translate --only-missing --provider ollama
 ```
 
 Use OpenAI GPT for high-quality AI translations:
 ```bash
-lrm translate --provider openai
+lrm translate --only-missing --provider openai
 ```
 
 Use Claude for nuanced, context-aware translations:
 ```bash
-lrm translate --provider claude
+lrm translate --only-missing --provider claude
 ```
 
 Use Azure OpenAI for enterprise deployments:
 ```bash
-lrm translate --provider azureopenai
+lrm translate --only-missing --provider azureopenai
 ```
 
 ### Only Translate Missing Values
