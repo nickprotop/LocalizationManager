@@ -369,17 +369,18 @@ lrm translate [KEY] [OPTIONS]
 
 **Arguments**:
 - `KEY`: Optional key pattern with wildcard support (e.g., `Error*`, `Button_*`)
-  - If omitted, translates all keys
+  - **Required** unless `--only-missing` is used (safety feature)
 
 **Options**:
-- `--provider <PROVIDER>`: Translation provider (google, deepl, libretranslate, ollama, openai, claude, azureopenai)
+- `--provider <PROVIDER>`: Translation provider (google, deepl, libretranslate, azuretranslator, ollama, openai, claude, azureopenai)
   - Default: From config or `google`
 - `--source-language <LANG>`: Source language code (e.g., `en`, `fr`, or `default`)
   - Default: Uses default language file (auto-detect)
   - The default language file (without language code suffix) is always used as source unless explicitly specified
 - `--target-languages <LANGS>`: Comma-separated target languages (e.g., `fr,de,es`)
   - Default: All non-default languages found in resource files
-- `--only-missing`: Only translate keys with missing or empty values
+- `--only-missing`: Only translate keys with missing or empty values (safe)
+- `--overwrite`: Allow overwriting existing translations when using KEY pattern
 - `--dry-run`: Preview translations without saving
 - `--no-cache`: Disable translation cache
 - `--batch-size <SIZE>`: Batch size for processing (default: 10)
@@ -431,13 +432,75 @@ lrm config list-providers
 
 List all translation providers and their configuration status.
 
+## Translation Safety
+
+LocalizationManager includes two-level safety protection to prevent accidental overwrites of existing translations:
+
+### Level 1: Execution Gate
+
+Translation requires explicit intent and will only execute when:
+- `--only-missing` flag is provided (translates only missing/empty keys), OR
+- A KEY pattern is provided (translates specific keys)
+
+Without either, the command will show an error:
+
+```bash
+# This will show an error
+lrm translate --target-languages es
+
+# These are valid
+lrm translate --only-missing --target-languages es
+lrm translate Welcome* --target-languages es
+```
+
+### Level 2: Overwrite Protection
+
+When using a KEY pattern that matches existing translations:
+- You'll be prompted for confirmation before overwriting
+- Use `--overwrite` flag to skip the confirmation prompt
+- Use `--only-missing` to safely skip existing translations
+
+```bash
+# Will prompt if Welcome* keys already have translations
+lrm translate Welcome* --target-languages es
+
+# Skip prompt with --overwrite
+lrm translate Welcome* --target-languages es --overwrite
+
+# Safe: only translate missing values
+lrm translate Welcome* --target-languages es --only-missing
+```
+
+### Safe Usage Patterns
+
+**Recommended for new translations:**
+```bash
+# Translate only missing keys across all languages
+lrm translate --only-missing
+```
+
+**Recommended for specific updates:**
+```bash
+# Translate specific new feature keys
+lrm translate NewFeature* --target-languages es,fr
+```
+
+**Use with caution:**
+```bash
+# Retranslate all keys (overwrites with confirmation)
+lrm translate "*" --target-languages es
+
+# Force retranslate without confirmation
+lrm translate "*" --target-languages es --overwrite
+```
+
 ## Examples
 
 ### Basic Translation
 
-Translate all keys to all target languages:
+Translate only missing keys to all target languages:
 ```bash
-lrm translate
+lrm translate --only-missing
 ```
 
 ### Translate Specific Keys

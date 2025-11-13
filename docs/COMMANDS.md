@@ -1704,7 +1704,8 @@ lrm translate [KEY_PATTERN] [OPTIONS]
 | `--provider <PROVIDER>` | Translation provider: `google`, `deepl`, `libretranslate`, `azuretranslator`, `openai`, `claude`, `azureopenai`, `ollama` (default: from config or `google`) |
 | `--source-language <LANG>` | Source language code (e.g., `en`, `fr`, or `default`). Always defaults to default language file (auto-detect). Specify explicitly to use a specific culture file as source |
 | `--target-languages <LANGS>` | Comma-separated target languages (e.g., `fr,de,es`). Default: all non-default languages |
-| `--only-missing` | Only translate keys with missing or empty values |
+| `--only-missing` | Only translate keys with missing or empty values (safe) |
+| `--overwrite` | Allow overwriting existing translations when using KEY pattern |
 | `--dry-run` | Preview translations without saving |
 | `--no-cache` | Disable translation cache |
 | `--batch-size <SIZE>` | Batch size for processing (default: 10) |
@@ -1761,6 +1762,43 @@ lrm translate "Welcome*" \
   --target-languages fr,de,es,it \
   --only-missing \
   --dry-run
+```
+
+**Translate specific keys with overwrite protection:**
+```bash
+# First attempt - will prompt if translations exist
+lrm translate Welcome* --target-languages fr
+
+# Skip prompt with --overwrite flag
+lrm translate Welcome* --target-languages fr --overwrite
+```
+
+### Translation Safety
+
+To prevent accidental overwrites of existing translations, the translate command requires explicit intent:
+
+**Level 1 - Execution Gate:**
+- Translation only executes when either `--only-missing` OR a KEY pattern is provided
+- Running `lrm translate` without either flag will show an error
+
+**Level 2 - Overwrite Protection:**
+- When using a KEY pattern that matches existing translations, you'll be prompted for confirmation
+- Use `--overwrite` flag to skip the confirmation prompt
+- Use `--only-missing` to safely translate only missing/empty keys
+
+**Safe usage patterns:**
+```bash
+# Safe: Only translate missing keys
+lrm translate --only-missing --target-languages es
+
+# Safe: Translate specific new keys
+lrm translate NewFeature* --target-languages es
+
+# Caution: Overwrites with confirmation
+lrm translate Welcome* --target-languages es
+
+# Caution: Overwrites without confirmation
+lrm translate Welcome* --target-languages es --overwrite
 ```
 
 ### Exit Codes

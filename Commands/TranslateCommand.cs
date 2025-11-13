@@ -43,6 +43,10 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
         [Description("Only translate keys with missing or empty values")]
         public bool OnlyMissing { get; set; }
 
+        [CommandOption("--overwrite")]
+        [Description("Allow overwriting existing translations (use with KEY pattern)")]
+        public bool Overwrite { get; set; }
+
         [CommandOption("--dry-run")]
         [Description("Preview translations without saving")]
         public bool DryRun { get; set; }
@@ -101,6 +105,21 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
                 return 0;
             }
 
+            // Level 1 Safety Check: Require explicit intent
+            if (!settings.OnlyMissing && string.IsNullOrWhiteSpace(settings.KeyPattern))
+            {
+                AnsiConsole.MarkupLine("[red]Error:[/] Translation requires explicit intent to prevent accidental overwrites.");
+                AnsiConsole.MarkupLine("");
+                AnsiConsole.MarkupLine("Choose one option:");
+                AnsiConsole.MarkupLine("  • Use [cyan]--only-missing[/] to translate only missing/empty keys (safe)");
+                AnsiConsole.MarkupLine("  • Specify a [cyan]KEY[/] pattern to translate specific keys");
+                AnsiConsole.MarkupLine("");
+                AnsiConsole.MarkupLine("Examples:");
+                AnsiConsole.MarkupLine("  [dim]lrm translate --only-missing --target-language es[/]");
+                AnsiConsole.MarkupLine("  [dim]lrm translate Welcome* --target-language es[/]");
+                return 1;
+            }
+
             // Determine target languages
             var targetLanguages = DetermineTargetLanguages(settings, languages);
 
@@ -113,6 +132,45 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
 
             // Determine source language
             var sourceLanguage = DetermineSourceLanguage(settings, defaultLanguage);
+
+            // Level 2 Safety Check: When KEY pattern is provided, check for existing translations
+            if (!string.IsNullOrWhiteSpace(settings.KeyPattern) && !settings.OnlyMissing && !settings.Overwrite)
+            {
+                var safetyParser = new ResourceFileParser();
+                var existingCount = 0;
+
+                foreach (var targetLang in targetLanguages)
+                {
+                    var targetLanguageInfo = languages.FirstOrDefault(f => f.Code == targetLang);
+                    if (targetLanguageInfo != null)
+                    {
+                        var targetFile = safetyParser.Parse(targetLanguageInfo);
+                        var targetDict = targetFile.Entries.ToDictionary(e => e.Key, e => e);
+
+                        foreach (var key in keysToTranslate)
+                        {
+                            if (targetDict.TryGetValue(key.Key, out var existing) && !string.IsNullOrWhiteSpace(existing.Value))
+                            {
+                                existingCount++;
+                            }
+                        }
+                    }
+                }
+
+                if (existingCount > 0)
+                {
+                    AnsiConsole.MarkupLine($"[yellow]Warning:[/] {existingCount} key(s) already have translations that will be overwritten.");
+                    AnsiConsole.MarkupLine("");
+
+                    if (!AnsiConsole.Confirm("Do you want to continue and overwrite existing translations?", false))
+                    {
+                        AnsiConsole.MarkupLine("");
+                        AnsiConsole.MarkupLine("[yellow]Translation cancelled.[/]");
+                        AnsiConsole.MarkupLine("Tip: Use [cyan]--overwrite[/] flag to skip this prompt, or [cyan]--only-missing[/] to translate only missing keys.");
+                        return 1;
+                    }
+                }
+            }
 
             // Get provider
             var providerName = settings.Provider ?? settings.LoadedConfiguration?.Translation?.DefaultProvider ?? "google";

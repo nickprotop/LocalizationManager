@@ -24,8 +24,8 @@ Configuration values are resolved in the following priority order:
 #### `defaultLanguageCode`
 
 - **Type:** `string`
-- **Default:** `null` (displays as "default")
-- **Description:** The language code to display for the default language (e.g., "en", "fr"). This only affects display output, not internal logic.
+- **Default:** `null` (displays as "default" for display, auto-detect for translations)
+- **Description:** The language code for the default resource file (e.g., "en", "fr"). Used for both display output and as the source language for translations. If not set, displays "default" and translations use auto-detect.
 - **Example:**
   ```json
   "defaultLanguageCode": "en"
@@ -41,21 +41,11 @@ Configuration for the machine translation feature.
 
 - **Type:** `string`
 - **Default:** `"google"`
-- **Allowed values:** `"google"`, `"deepl"`, `"libretranslate"`, `"ollama"`, `"openai"`, `"claude"`, `"azureopenai"`
+- **Allowed values:** `"google"`, `"deepl"`, `"libretranslate"`, `"azuretranslator"`, `"ollama"`, `"openai"`, `"claude"`, `"azureopenai"`
 - **Description:** The default translation provider to use when not explicitly specified.
 - **Example:**
   ```json
   "defaultProvider": "deepl"
-  ```
-
-#### `translation.defaultSourceLanguage`
-
-- **Type:** `string`
-- **Default:** `null` (auto-detect)
-- **Description:** The default source language for translation. Use ISO 639-1 language codes (e.g., "en", "es", "fr", "de"). If not set, the provider will attempt to auto-detect.
-- **Example:**
-  ```json
-  "defaultSourceLanguage": "en"
   ```
 
 #### `translation.maxRetries`
@@ -343,7 +333,6 @@ Configuration for the code scanning feature that detects localization key usage 
   "defaultLanguageCode": "en",
   "translation": {
     "defaultProvider": "deepl",
-    "defaultSourceLanguage": "en",
     "maxRetries": 5,
     "timeoutSeconds": 60,
     "batchSize": 15,
@@ -475,10 +464,11 @@ Command-line arguments always take priority over configuration file settings.
 
 ## Translation Provider Notes
 
-### Traditional Providers
+### Traditional Machine Translation Providers
 - **Google**: Requires API key, excellent for general-purpose translations
 - **DeepL**: Requires API key, highest quality for European languages
 - **LibreTranslate**: Open source, can run self-hosted, API key optional
+- **Azure AI Translator**: Requires Azure subscription, enterprise-grade, supports 130+ languages, excellent for production workloads
 
 ### AI-Powered Providers
 - **Ollama**: No API key needed, runs locally, completely private
