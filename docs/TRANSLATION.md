@@ -18,7 +18,7 @@ The translation feature allows you to automatically translate resource keys from
 
 ### Key Features
 
-- **Multiple Providers**: Support for Google Cloud Translation, DeepL, LibreTranslate, and AI services (OpenAI, Claude, Ollama, Azure OpenAI)
+- **Multiple Providers**: Support for Google Cloud Translation, DeepL, LibreTranslate, Azure AI Translator, and AI services (OpenAI, Claude, Ollama, Azure OpenAI)
 - **Flexible Configuration**: 3-tier priority for API keys (environment variables → secure store → config file)
 - **Smart Caching**: SQLite-based translation cache with 30-day expiration
 - **Rate Limiting**: Built-in rate limiting to protect against API quota exhaustion
@@ -77,6 +77,47 @@ The translation feature allows you to automatically translate resource keys from
 - API key for private instances
 
 **Rate limits**: Configurable (default: 10 requests/minute)
+
+### Azure AI Translator
+
+**Provider name**: `azuretranslator`
+
+**Features**:
+- High-quality neural machine translation from Microsoft
+- Supports 100+ languages
+- Auto-detect source language
+- Batch translation support (up to 100 text elements)
+- Enterprise-grade security and compliance
+- Regional deployment options
+- Excellent performance and reliability
+
+**Requirements**:
+- Azure subscription
+- Azure Cognitive Services - Translator resource
+- Subscription key (Ocp-Apim-Subscription-Key)
+- Optional: Region specification for multi-service resources
+
+**Rate limits**: Configurable (default: 100 requests/minute, varies by tier)
+
+**Pricing**:
+- Free tier: Up to 2M characters/month
+- Pay-as-you-go: $10 per million characters
+- Volume discounts available
+
+**Setup**:
+```bash
+# Create Translator resource in Azure Portal
+# Navigate to: Azure Portal → Create Resource → Translator
+
+# Get your API key and region
+# In Azure Portal: Translator resource → Keys and Endpoint
+
+# Set environment variable
+export LRM_AZURETRANSLATOR_API_KEY="your-subscription-key"
+
+# Or configure in lrm.json
+lrm config set-api-key --provider azuretranslator --key "your-subscription-key"
+```
 
 ### Ollama (Local LLM)
 
@@ -181,6 +222,7 @@ API keys are resolved using a 3-tier priority system:
    - `LRM_GOOGLE_API_KEY`
    - `LRM_DEEPL_API_KEY`
    - `LRM_LIBRETRANSLATE_API_KEY`
+   - `LRM_AZURETRANSLATOR_API_KEY`
    - `LRM_OPENAI_API_KEY`
    - `LRM_CLAUDE_API_KEY`
    - `LRM_AZUREOPENAI_API_KEY`
@@ -201,6 +243,7 @@ API keys are resolved using a 3-tier priority system:
 export LRM_GOOGLE_API_KEY="your-google-api-key"
 export LRM_DEEPL_API_KEY="your-deepl-api-key"
 export LRM_LIBRETRANSLATE_API_KEY="your-libretranslate-api-key"
+export LRM_AZURETRANSLATOR_API_KEY="your-azure-translator-key"
 export LRM_OPENAI_API_KEY="your-openai-api-key"
 export LRM_CLAUDE_API_KEY="your-claude-api-key"
 export LRM_AZUREOPENAI_API_KEY="your-azure-openai-api-key"
@@ -211,6 +254,7 @@ export LRM_AZUREOPENAI_API_KEY="your-azure-openai-api-key"
 $env:LRM_GOOGLE_API_KEY="your-google-api-key"
 $env:LRM_DEEPL_API_KEY="your-deepl-api-key"
 $env:LRM_LIBRETRANSLATE_API_KEY="your-libretranslate-api-key"
+$env:LRM_AZURETRANSLATOR_API_KEY="your-azure-translator-key"
 $env:LRM_OPENAI_API_KEY="your-openai-api-key"
 $env:LRM_CLAUDE_API_KEY="your-claude-api-key"
 $env:LRM_AZUREOPENAI_API_KEY="your-azure-openai-api-key"
@@ -221,6 +265,7 @@ $env:LRM_AZUREOPENAI_API_KEY="your-azure-openai-api-key"
 set LRM_GOOGLE_API_KEY=your-google-api-key
 set LRM_DEEPL_API_KEY=your-deepl-api-key
 set LRM_LIBRETRANSLATE_API_KEY=your-libretranslate-api-key
+set LRM_AZURETRANSLATOR_API_KEY=your-azure-translator-key
 set LRM_OPENAI_API_KEY=your-openai-api-key
 set LRM_CLAUDE_API_KEY=your-claude-api-key
 set LRM_AZUREOPENAI_API_KEY=your-azure-openai-api-key
@@ -243,6 +288,7 @@ Create or update `lrm.json` in your resource directory:
       "Google": "your-google-api-key",
       "DeepL": "your-deepl-api-key",
       "LibreTranslate": "your-libretranslate-api-key",
+      "AzureTranslator": "your-azure-translator-key",
       "OpenAI": "your-openai-api-key",
       "Claude": "your-claude-api-key",
       "AzureOpenAI": "your-azure-openai-api-key"
@@ -269,6 +315,11 @@ Create or update `lrm.json` in your resource directory:
         "DeploymentName": "gpt-4",
         "CustomSystemPrompt": null,
         "RateLimitPerMinute": 60
+      },
+      "AzureTranslator": {
+        "Region": "eastus",
+        "Endpoint": "https://api.cognitive.microsofttranslator.com",
+        "RateLimitPerMinute": 100
       }
     }
   }

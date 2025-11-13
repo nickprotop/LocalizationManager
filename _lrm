@@ -50,6 +50,11 @@ _lrm() {
         'google:Google Cloud Translation API'
         'deepl:DeepL Translation API'
         'libretranslate:LibreTranslate (open-source)'
+        'ollama:Ollama (local LLM)'
+        'openai:OpenAI GPT models'
+        'claude:Anthropic Claude'
+        'azureopenai:Azure OpenAI'
+        'azuretranslator:Azure AI Translator'
     )
 
     _arguments -C \

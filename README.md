@@ -36,7 +36,7 @@ LRM solves this by providing:
 | **Linux Support** | ✅ Native | ❌ Windows only | ❌ Windows only | ❌ Windows only | ✅ Any editor |
 | **Command Line** | ✅ Full CLI | ⚠️ PowerShell scripting | ❌ GUI only | ❌ GUI only | ⚠️ Manual XML |
 | **Terminal UI** | ✅ Interactive TUI | ❌ | ❌ | ❌ | ❌ |
-| **Machine Translation** | ✅ Google/DeepL/LibreTranslate/AI | ⚠️ External services | ❌ | ❌ | ❌ |
+| **Machine Translation** | ✅ 8 providers (Google/DeepL/Azure/OpenAI/Claude/Ollama) | ⚠️ External services | ❌ | ❌ | ❌ |
 | **CI/CD Integration** | ✅ Built-in | ⚠️ Complex | ❌ | ❌ | ⚠️ Custom scripts |
 | **Automation** | ✅ Full API | ⚠️ Limited | ❌ | ❌ | ❌ |
 | **Validation** | ✅ Built-in | ✅ | ✅ | ⚠️ Build-time | ❌ |
@@ -75,14 +75,14 @@ LRM solves this by providing:
 
 ## Features
 
-- **🤖 Machine Translation** - Automatic translation using multiple providers
-  - **Traditional services**: Google Cloud Translation, DeepL, LibreTranslate
+- **🤖 Machine Translation** - Automatic translation using 8 providers
+  - **Traditional NMT**: Google Cloud Translation, DeepL, LibreTranslate, Azure AI Translator
   - **AI-powered**: OpenAI GPT, Anthropic Claude, Azure OpenAI, Ollama (local LLM)
   - Smart caching to reduce costs (30-day SQLite cache)
   - Batch processing with rate limiting
   - Pattern matching for selective translation
   - Secure API key management (environment variables, encrypted store, or config file)
-  - Customizable models and prompts for AI providers
+  - Customizable models, prompts, and endpoints for AI providers
 - **🚀 CI/CD Automation** - Production-ready workflows for GitHub Actions, GitLab CI, Azure DevOps
   - Validate → Check Missing → Auto-Translate → Re-validate → Commit
   - Detailed translation reports per language

@@ -1626,7 +1626,7 @@ public class ResourceEditorWindow : Window
                         {
                             SourceText = sourceEntry.Value,
                             SourceLanguage = null, // Auto-detect
-                            TargetLanguage = targetLang
+                            TargetLanguage = targetLang!
                         };
 
                         // Try cache first
@@ -1659,7 +1659,7 @@ public class ResourceEditorWindow : Window
                         // Update DataTable
                         var row = _dataTable.Rows.Cast<DataRow>().FirstOrDefault(r =>
                             r["Key"].ToString()?.TrimStart('⚠', ' ') == key);
-                        if (row != null)
+                        if (row != null && response != null)
                         {
                             row[targetFile.Language.Name] = response.TranslatedText;
                         }

@@ -11,6 +11,7 @@
       "google": "",
       "deepL": "",
       "libreTranslate": "",
+      "azureTranslator": "",
       "openAI": "",
       "claude": "",
       "azureOpenAI": ""
@@ -37,6 +38,11 @@
         "deploymentName": "gpt-4",
         "customSystemPrompt": null,
         "rateLimitPerMinute": 60
+      },
+      "azureTranslator": {
+        "region": "eastus",
+        "endpoint": "https://api.cognitive.microsofttranslator.com",
+        "rateLimitPerMinute": 100
       }
     }
   },

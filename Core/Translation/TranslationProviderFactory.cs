@@ -15,7 +15,7 @@ public static class TranslationProviderFactory
     /// <summary>
     /// Creates a translation provider by name.
     /// </summary>
-    /// <param name="providerName">The provider name (e.g., "deepl", "libretranslate", "openai", "claude", "ollama", "azureopenai").</param>
+    /// <param name="providerName">The provider name (e.g., "deepl", "libretranslate", "openai", "claude", "ollama", "azureopenai", "azuretranslator").</param>
     /// <param name="config">The configuration model containing API keys and settings.</param>
     /// <returns>An instance of the requested provider.</returns>
     /// <exception cref="ArgumentException">If the provider name is unknown.</exception>
@@ -38,6 +38,7 @@ public static class TranslationProviderFactory
             "openai" => CreateOpenAIProvider(apiKey, aiConfig?.OpenAI),
             "claude" => CreateClaudeProvider(apiKey, aiConfig?.Claude),
             "azureopenai" => CreateAzureOpenAIProvider(apiKey, aiConfig?.AzureOpenAI),
+            "azuretranslator" => CreateAzureTranslatorProvider(apiKey, aiConfig?.AzureTranslator),
             _ => throw new ArgumentException($"Unknown translation provider: {providerName}", nameof(providerName))
         };
     }
@@ -83,12 +84,22 @@ public static class TranslationProviderFactory
         );
     }
 
+    private static AzureTranslatorProvider CreateAzureTranslatorProvider(string? apiKey, AzureTranslatorSettings? settings)
+    {
+        return new AzureTranslatorProvider(
+            apiKey: apiKey,
+            region: settings?.Region,
+            endpoint: settings?.Endpoint,
+            rateLimitRequestsPerMinute: settings?.RateLimitPerMinute ?? 100
+        );
+    }
+
     /// <summary>
     /// Gets the list of supported provider names.
     /// </summary>
     public static string[] GetSupportedProviders()
     {
-        return new[] { "google", "deepl", "libretranslate", "ollama", "openai", "claude", "azureopenai" };
+        return new[] { "google", "deepl", "libretranslate", "ollama", "openai", "claude", "azureopenai", "azuretranslator" };
     }
 
     /// <summary>
@@ -105,7 +116,7 @@ public static class TranslationProviderFactory
 
         return providerName.ToLowerInvariant() switch
         {
-            "google" or "deepl" or "libretranslate" or "ollama" or "openai" or "claude" or "azureopenai" => true,
+            "google" or "deepl" or "libretranslate" or "ollama" or "openai" or "claude" or "azureopenai" or "azuretranslator" => true,
             _ => false
         };
     }

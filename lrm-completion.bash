@@ -46,7 +46,7 @@ _lrm_completions() {
     local format_opts="table json simple csv tui"
 
     # Translation providers
-    local provider_opts="google deepl libretranslate ollama openai claude azureopenai"
+    local provider_opts="google deepl libretranslate ollama openai claude azureopenai azuretranslator"
 
     # Get the command and subcommand (first and second non-option words)
     local command=""

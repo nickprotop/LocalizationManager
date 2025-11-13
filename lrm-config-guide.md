@@ -176,6 +176,17 @@ Configuration for the machine translation feature.
   "azureOpenAI": "..."
   ```
 
+#### `translation.apiKeys.azureTranslator`
+
+- **Type:** `string`
+- **Environment variable:** `LRM_AZURETRANSLATOR_API_KEY`
+- **Description:** Azure AI Translator subscription key (Ocp-Apim-Subscription-Key)
+- **Get your key:** Azure Portal → Cognitive Services → Translator → Keys and Endpoint
+- **Example:**
+  ```json
+  "azureTranslator": "..."
+  ```
+
 ---
 
 ### AI Provider Settings
@@ -258,6 +269,24 @@ Configuration for Azure OpenAI provider.
   }
   ```
 
+#### `translation.aiProviders.azureTranslator`
+
+Configuration for Azure AI Translator provider.
+
+- **Type:** `object`
+- **Properties:**
+  - `region` (string, optional): Azure resource region (e.g., "eastus", "westus"). Required for multi-service or regional resources, optional for global resources.
+  - `endpoint` (string, optional): Custom endpoint URL. Default: "https://api.cognitive.microsofttranslator.com"
+  - `rateLimitPerMinute` (integer, default: `100`): Request rate limit
+- **Example:**
+  ```json
+  "azureTranslator": {
+    "region": "eastus",
+    "endpoint": "https://api.cognitive.microsofttranslator.com",
+    "rateLimitPerMinute": 100
+  }
+  ```
+
 ---
 
 ### Code Scanning Settings
@@ -323,6 +352,7 @@ Configuration for the code scanning feature that detects localization key usage 
       "google": "",
       "deepL": "",
       "libreTranslate": "",
+      "azureTranslator": "",
       "openAI": "",
       "claude": "",
       "azureOpenAI": ""
@@ -349,6 +379,11 @@ Configuration for the code scanning feature that detects localization key usage 
         "deploymentName": "gpt-4",
         "customSystemPrompt": null,
         "rateLimitPerMinute": 60
+      },
+      "azureTranslator": {
+        "region": "eastus",
+        "endpoint": "https://api.cognitive.microsofttranslator.com",
+        "rateLimitPerMinute": 100
       }
     }
   },

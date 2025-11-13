@@ -128,6 +128,13 @@ public class TranslationApiKeys
     public string? AzureOpenAI { get; set; }
 
     /// <summary>
+    /// Azure AI Translator subscription key.
+    /// Environment variable: LRM_AZURETRANSLATOR_API_KEY
+    /// Get your key from Azure Portal (Cognitive Services - Translator).
+    /// </summary>
+    public string? AzureTranslator { get; set; }
+
+    /// <summary>
     /// Gets the API key for the specified provider.
     /// </summary>
     /// <param name="provider">The provider name (case-insensitive).</param>
@@ -142,6 +149,7 @@ public class TranslationApiKeys
             "openai" => OpenAI,
             "claude" => Claude,
             "azureopenai" => AzureOpenAI,
+            "azuretranslator" => AzureTranslator,
             _ => null
         };
     }
@@ -192,6 +200,11 @@ public class AIProviderConfiguration
     /// Azure OpenAI provider settings.
     /// </summary>
     public AzureOpenAISettings? AzureOpenAI { get; set; }
+
+    /// <summary>
+    /// Azure AI Translator provider settings.
+    /// </summary>
+    public AzureTranslatorSettings? AzureTranslator { get; set; }
 }
 
 /// <summary>
@@ -298,6 +311,31 @@ public class AzureOpenAISettings
     /// <summary>
     /// Rate limit in requests per minute.
     /// Default: 60
+    /// </summary>
+    public int? RateLimitPerMinute { get; set; }
+}
+
+/// <summary>
+/// Configuration settings for Azure AI Translator provider.
+/// </summary>
+public class AzureTranslatorSettings
+{
+    /// <summary>
+    /// Azure resource region (e.g., "westus", "eastus").
+    /// Optional for global single-service resources.
+    /// Required for multi-service or regional resources.
+    /// </summary>
+    public string? Region { get; set; }
+
+    /// <summary>
+    /// Custom endpoint URL for Azure Translator.
+    /// Default: https://api.cognitive.microsofttranslator.com
+    /// </summary>
+    public string? Endpoint { get; set; }
+
+    /// <summary>
+    /// Rate limit in requests per minute.
+    /// Default: 100
     /// </summary>
     public int? RateLimitPerMinute { get; set; }
 }

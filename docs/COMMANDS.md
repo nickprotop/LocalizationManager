@@ -1683,7 +1683,7 @@ lrm import for_translation.csv --overwrite
 
 ## `translate` - Automatic Translation 🆕
 
-Automatically translate resource keys using machine translation providers (Google Cloud Translation, DeepL, or LibreTranslate).
+Automatically translate resource keys using machine translation providers (Google, DeepL, LibreTranslate, Azure AI Translator) or AI-powered translation (OpenAI, Claude, Azure OpenAI, Ollama).
 
 ### Basic Usage
 
@@ -1701,7 +1701,7 @@ lrm translate [KEY_PATTERN] [OPTIONS]
 
 | Option | Description |
 |--------|-------------|
-| `--provider <PROVIDER>` | Translation provider: `google`, `deepl`, `libretranslate` (default: from config or `google`) |
+| `--provider <PROVIDER>` | Translation provider: `google`, `deepl`, `libretranslate`, `azuretranslator`, `openai`, `claude`, `azureopenai`, `ollama` (default: from config or `google`) |
 | `--source-language <LANG>` | Source language code (e.g., `en`, `fr`, or `default`). Always defaults to default language file (auto-detect). Specify explicitly to use a specific culture file as source |
 | `--target-languages <LANGS>` | Comma-separated target languages (e.g., `fr,de,es`). Default: all non-default languages |
 | `--only-missing` | Only translate keys with missing or empty values |
@@ -1733,7 +1733,9 @@ lrm translate --target-languages fr,de,es
 **Use a specific provider:**
 ```bash
 lrm translate --provider deepl
-lrm translate --provider libretranslate
+lrm translate --provider azuretranslator
+lrm translate --provider openai
+lrm translate --provider ollama
 ```
 
 **Only translate missing values:**
@@ -1785,6 +1787,41 @@ lrm translate "Welcome*" \
 - **Languages**: 30+ languages
 - **Quality**: Good (open-source alternative)
 
+#### Azure AI Translator
+- **Provider name**: `azuretranslator`
+- **Requirements**: Azure account, Cognitive Services Translator resource
+- **Languages**: 100+ languages
+- **Quality**: High (neural machine translation)
+- **Configuration**: Requires API key and optionally region and endpoint
+
+#### OpenAI
+- **Provider name**: `openai`
+- **Requirements**: OpenAI API account and key
+- **Languages**: All major languages
+- **Quality**: Excellent (GPT models with context awareness)
+- **Configuration**: Requires API key, optionally specify model (e.g., gpt-4, gpt-3.5-turbo)
+
+#### Anthropic Claude
+- **Provider name**: `claude`
+- **Requirements**: Anthropic API account and key
+- **Languages**: All major languages
+- **Quality**: Excellent (Claude models with strong multilingual support)
+- **Configuration**: Requires API key, optionally specify model (e.g., claude-3-opus, claude-3-sonnet)
+
+#### Azure OpenAI
+- **Provider name**: `azureopenai`
+- **Requirements**: Azure account with OpenAI service deployment
+- **Languages**: All major languages
+- **Quality**: Excellent (GPT models via Azure)
+- **Configuration**: Requires API key, endpoint, and deployment name
+
+#### Ollama (Local LLM)
+- **Provider name**: `ollama`
+- **Requirements**: Ollama installed locally or accessible endpoint
+- **Languages**: Depends on model (e.g., llama3.2 supports many languages)
+- **Quality**: Good to Excellent (depends on model choice)
+- **Configuration**: API URL (default: http://localhost:11434), model name
+
 ---
 
 ## `config` - Configuration Management 🆕
@@ -1802,7 +1839,7 @@ lrm config set-api-key --provider <PROVIDER> --key <KEY>
 ```
 
 **Options:**
-- `-p, --provider <PROVIDER>` - Provider name: `google`, `deepl`, `libretranslate`
+- `-p, --provider <PROVIDER>` - Provider name: `google`, `deepl`, `libretranslate`, `azuretranslator`, `openai`, `claude`, `azureopenai`, `ollama`
 - `-k, --key <KEY>` - API key to store
 
 **Example:**
