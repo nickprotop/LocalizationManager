@@ -505,6 +505,7 @@ LocalizationManager.Tests/build/
 
 .claude/
 [Cc]laude.md
+CLAUDE.md
 
 # Environment files
 .env
