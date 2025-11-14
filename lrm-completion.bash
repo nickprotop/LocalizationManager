@@ -24,7 +24,7 @@ _lrm_completions() {
     local view_opts="--path -p --show-comments --format --regex --sort --no-limit --help -h"
     local add_opts="--path -p --lang -l --comment --no-backup --help -h"
     local update_opts="--path -p --lang -l --comment --interactive -i --yes -y --no-backup --help -h"
-    local delete_opts="--path -p --yes -y --no-backup --help -h"
+    local delete_opts="--path -p --yes -y --no-backup --occurrence --all --help -h"
     local export_opts="--path -p --output -o --format --include-status --help -h"
     local import_opts="--path -p --overwrite --no-backup --help -h"
     local edit_opts="--path -p --help -h"
@@ -94,6 +94,11 @@ _lrm_completions() {
         --batch-size)
             # Suggest batch sizes
             COMPREPLY=( $(compgen -W "5 10 20 50 100" -- "${cur}") )
+            return 0
+            ;;
+        --occurrence)
+            # Suggest occurrence numbers
+            COMPREPLY=( $(compgen -W "1 2 3 4 5" -- "${cur}") )
             return 0
             ;;
         --source-path)

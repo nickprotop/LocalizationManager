@@ -908,6 +908,59 @@ for key in "${deprecated_keys[@]}"; do
 done
 ```
 
+### Handling Duplicate Keys
+
+When you have duplicate keys in your resource files (multiple entries with the same key name), the delete command provides special handling:
+
+```bash
+# Interactive mode - prompts which occurrence to delete
+lrm delete DuplicateKey
+
+# Output:
+# Found 2 occurrences of key 'DuplicateKey':
+#   [1] "First value"
+#   [2] "Second value"
+#
+# Which occurrence do you want to delete?
+# > [1]
+#   [2]
+#   All
+#   Cancel
+```
+
+```bash
+# Delete specific occurrence directly (non-interactive)
+lrm delete DuplicateKey --occurrence 2
+
+# Delete all occurrences at once
+lrm delete DuplicateKey --all
+
+# Delete all occurrences without confirmation (for automation)
+lrm delete DuplicateKey --all -y
+```
+
+**How occurrence deletion works:**
+- Deletes the Nth occurrence from **all language files** (cross-file synchronization)
+- If you delete occurrence #2 from the default file, occurrence #2 is also deleted from all translation files
+- Uses occurrence order, not array indices, so it's safe even if files have different ordering
+
+**Example workflow:**
+```bash
+# 1. Validate to find duplicates
+lrm validate
+# Output: ⚠ Duplicate Keys found: ClearSelection (default, el)
+
+# 2. View all occurrences in TUI (shows as "ClearSelection [1]" and "ClearSelection [2]")
+lrm edit
+
+# 3. Delete the unwanted occurrence
+lrm delete ClearSelection --occurrence 2
+
+# 4. Verify duplicates are resolved
+lrm validate
+# Output: ✓ All validations passed!
+```
+
 ---
 
 ## Import/Export Workflows

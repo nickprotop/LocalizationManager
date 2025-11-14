@@ -827,7 +827,7 @@ Proceed with update? [y/N]:
 
 ## delete
 
-**Description:** Delete a key from all language files.
+**Description:** Delete a key from all language files. Supports handling duplicate keys by occurrence number.
 
 **Arguments:**
 - `<KEY>` - The key to delete (required)
@@ -836,6 +836,8 @@ Proceed with update? [y/N]:
 - `-p, --path <PATH>` - Resource folder path
 - `-y, --yes` - Skip confirmation prompt
 - `--no-backup` - Skip automatic backup creation
+- `--occurrence <NUMBER>` - Delete specific occurrence of a duplicate key (1-based index)
+- `--all` - Delete all occurrences of a duplicate key without prompting
 
 **Examples:**
 ```bash
@@ -849,7 +851,48 @@ lrm delete OldKey -y
 lrm delete OldKey -y --no-backup
 ```
 
-**Confirmation prompt:**
+**Handling Duplicate Keys:**
+
+When a key appears multiple times in your resource files (duplicates), the delete command provides interactive and automated options:
+
+```bash
+# Interactive mode - prompts which occurrence to delete
+lrm delete DuplicateKey
+
+# Delete specific occurrence (e.g., the 2nd occurrence)
+lrm delete DuplicateKey --occurrence 2
+
+# Delete all occurrences at once
+lrm delete DuplicateKey --all
+
+# Delete all occurrences without confirmation
+lrm delete DuplicateKey --all -y
+```
+
+**Interactive prompt for duplicates:**
+```
+Key to delete: ClearSelection
+
+┌───────────────┬─────────────────────┐
+│ Language      │ Value               │
+├───────────────┼─────────────────────┤
+│ Default       │ Clear Selection     │
+│ Ελληνικά (el) │ Καθαρισμός Επιλογής │
+└───────────────┴─────────────────────┘
+
+Found 2 occurrences of key 'ClearSelection':
+
+  [1] "Clear Selection"
+  [2] "Clear selection"
+
+Which occurrence do you want to delete?
+> [1]
+  [2]
+  All
+  Cancel
+```
+
+**Confirmation prompt (single key):**
 ```
 This will delete 'OldKey' from all languages:
   - English: Old Value
@@ -857,6 +900,11 @@ This will delete 'OldKey' from all languages:
 
 Are you sure? [y/N]:
 ```
+
+**Behavior with duplicates:**
+- Deletes the specified occurrence from **all language files** (cross-file synchronization by occurrence number)
+- If deleting occurrence #2, the 2nd occurrence is removed from default and all translation files
+- Prompts interactively when duplicates are detected and no `--occurrence` or `--all` flag is provided
 
 ---
 
@@ -991,10 +1039,11 @@ lrm import translations.csv --no-backup
 - **Search scope toggle** (Keys+Values / Keys Only / Comments / All)
 - **Comment editing** - Add/edit comments for each language
 - **Comment display toggle** - Show comments below values with double-row layout
+- **Duplicate key handling** - Shows duplicate keys as separate rows with [N] suffix (e.g., "ClearSelection [1]", "ClearSelection [2]")
 - Language visibility controls
 - Real-time filtering with debouncing (300ms)
 - Extra keys detection and warnings
-- Visual key editing with auto-translate button
+- Visual key editing with auto-translate button for specific occurrences
 - **8 translation providers** - Google, DeepL, LibreTranslate, Ollama, OpenAI, Claude, Azure OpenAI, Azure Translator
 - **Translation context** - Shows key name, source text, and comments when translating
 - Automatic validation
