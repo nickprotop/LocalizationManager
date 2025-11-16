@@ -22,17 +22,103 @@
 using LocalizationManager.Core;
 using LocalizationManager.Core.Enums;
 using LocalizationManager.Core.Output;
+using LocalizationManager.Core.Validation;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using System.ComponentModel;
 
 namespace LocalizationManager.Commands;
 
 /// <summary>
+/// Settings for the validate command.
+/// </summary>
+public class ValidateCommandSettings : BaseFormattableCommandSettings
+{
+    [CommandOption("--placeholder-types <TYPES>")]
+    [Description("Placeholder types to validate (dotnet, printf, icu, template, all). Comma-separated. Default: dotnet")]
+    [DefaultValue(null)]
+    public string? PlaceholderTypes { get; set; }
+
+    [CommandOption("--no-placeholder-validation")]
+    [Description("Disable placeholder validation")]
+    [DefaultValue(false)]
+    public bool NoPlaceholderValidation { get; set; }
+
+    /// <summary>
+    /// Gets the enabled placeholder types based on CLI options and configuration.
+    /// CLI options override configuration settings.
+    /// </summary>
+    public PlaceholderType GetEnabledPlaceholderTypes()
+    {
+        // If validation is disabled, return None
+        if (NoPlaceholderValidation)
+        {
+            return PlaceholderType.None;
+        }
+
+        // If CLI option is provided, use it (highest priority)
+        if (!string.IsNullOrEmpty(PlaceholderTypes))
+        {
+            return ParsePlaceholderTypes(PlaceholderTypes);
+        }
+
+        // If configuration has validation settings, use them
+        if (LoadedConfiguration?.Validation != null)
+        {
+            if (!LoadedConfiguration.Validation.EnablePlaceholderValidation)
+            {
+                return PlaceholderType.None;
+            }
+
+            if (LoadedConfiguration.Validation.PlaceholderTypes != null &&
+                LoadedConfiguration.Validation.PlaceholderTypes.Any())
+            {
+                return ParsePlaceholderTypes(string.Join(",", LoadedConfiguration.Validation.PlaceholderTypes));
+            }
+        }
+
+        // Default: .NET format only
+        return PlaceholderType.DotNetFormat;
+    }
+
+    private static PlaceholderType ParsePlaceholderTypes(string types)
+    {
+        var result = PlaceholderType.None;
+        var typeList = types.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (var type in typeList)
+        {
+            switch (type.ToLowerInvariant())
+            {
+                case "dotnet":
+                    result |= PlaceholderType.DotNetFormat;
+                    break;
+                case "printf":
+                    result |= PlaceholderType.PrintfStyle;
+                    break;
+                case "icu":
+                    result |= PlaceholderType.IcuMessageFormat;
+                    break;
+                case "template":
+                    result |= PlaceholderType.TemplateLiteral;
+                    break;
+                case "all":
+                    return PlaceholderType.All;
+                default:
+                    throw new ArgumentException($"Unknown placeholder type: {type}. Valid values: dotnet, printf, icu, template, all");
+            }
+        }
+
+        return result;
+    }
+}
+
+/// <summary>
 /// Command to validate resource files for missing keys, duplicates, and empty values.
 /// </summary>
-public class ValidateCommand : Command<BaseFormattableCommandSettings>
+public class ValidateCommand : Command<ValidateCommandSettings>
 {
-    public override int Execute(CommandContext context, BaseFormattableCommandSettings settings, CancellationToken cancellationToken = default)
+    public override int Execute(CommandContext context, ValidateCommandSettings settings, CancellationToken cancellationToken = default)
     {
         // Load configuration if available
         settings.LoadConfiguration();
@@ -113,7 +199,8 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
 
             // Validate
             var validator = new ResourceValidator();
-            var validationResult = validator.Validate(resourceFiles);
+            var enabledPlaceholderTypes = settings.GetEnabledPlaceholderTypes();
+            var validationResult = validator.Validate(resourceFiles, enabledPlaceholderTypes);
 
             // Display results based on format
             switch (format)
@@ -158,7 +245,7 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
         }
     }
 
-    private void DisplayConfigNotice(BaseFormattableCommandSettings settings)
+    private void DisplayConfigNotice(ValidateCommandSettings settings)
     {
         if (!string.IsNullOrEmpty(settings.LoadedConfigurationPath))
         {
@@ -167,7 +254,7 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
         }
     }
 
-    private void DisplayTable(LocalizationManager.Core.Models.ValidationResult result, BaseFormattableCommandSettings settings)
+    private void DisplayTable(LocalizationManager.Core.Models.ValidationResult result, ValidateCommandSettings settings)
     {
         DisplayConfigNotice(settings);
 
@@ -342,7 +429,7 @@ public class ValidateCommand : Command<BaseFormattableCommandSettings>
         Console.WriteLine(OutputFormatter.FormatJson(output));
     }
 
-    private void DisplaySimple(LocalizationManager.Core.Models.ValidationResult result, BaseFormattableCommandSettings settings)
+    private void DisplaySimple(LocalizationManager.Core.Models.ValidationResult result, ValidateCommandSettings settings)
     {
         if (result.IsValid)
         {

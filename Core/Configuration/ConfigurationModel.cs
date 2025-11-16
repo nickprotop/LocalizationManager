@@ -22,6 +22,11 @@ public class ConfigurationModel
     /// Code scanning configuration settings.
     /// </summary>
     public ScanningConfiguration? Scanning { get; set; }
+
+    /// <summary>
+    /// Validation configuration settings.
+    /// </summary>
+    public ValidationConfiguration? Validation { get; set; }
 }
 
 /// <summary>
@@ -334,4 +339,24 @@ public class AzureTranslatorSettings
     /// Default: 100
     /// </summary>
     public int? RateLimitPerMinute { get; set; }
+}
+
+/// <summary>
+/// Configuration settings for resource validation.
+/// </summary>
+public class ValidationConfiguration
+{
+    /// <summary>
+    /// Placeholder types to validate.
+    /// Supported values: "dotnet", "printf", "icu", "template", "all".
+    /// Multiple types can be combined (e.g., ["dotnet", "printf"]).
+    /// Default: ["dotnet"]
+    /// </summary>
+    public List<string>? PlaceholderTypes { get; set; }
+
+    /// <summary>
+    /// Whether to enable placeholder validation.
+    /// Default: true
+    /// </summary>
+    public bool EnablePlaceholderValidation { get; set; } = true;
 }

@@ -49,7 +49,7 @@ public class CheckCommand : Command<CheckCommand.Settings>
 
         // Step 1: Run validation
         var validateCommand = new ValidateCommand();
-        var validateSettings = new BaseFormattableCommandSettings
+        var validateSettings = new ValidateCommandSettings
         {
             ResourcePath = settings.ResourcePath,
             ConfigFilePath = settings.ConfigFilePath,
