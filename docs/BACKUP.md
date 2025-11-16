@@ -19,7 +19,6 @@ This document provides comprehensive information about LocalizationManager's bac
   - [Prune Old Backups](#prune-old-backups)
 - [Backup Rotation Policy](#backup-rotation-policy)
 - [TUI Integration](#tui-integration)
-- [Configuration](#configuration)
 - [Best Practices](#best-practices)
 
 ---
@@ -52,11 +51,7 @@ Each backup is assigned an incremental version number (v001, v002, etc.) and inc
 - SHA256 hash for integrity
 
 ### 🔄 Smart Rotation
-Configurable retention policies automatically clean up old backups while preserving:
-- All recent backups (default: 24 hours)
-- Daily backups (default: 7 days)
-- Weekly backups (default: 4 weeks)
-- Monthly backups (default: 6 months)
+The backup system automatically keeps up to 10 recent backup versions per file. Older backups are automatically pruned to save disk space.
 
 ### 📊 Diff Viewer
 Compare any two backup versions or compare a backup with the current state to see:
@@ -303,100 +298,42 @@ lrm backup prune --dry-run
 lrm backup prune --yes
 ```
 
-**Safety:** Pruning respects the configured retention policy and will never delete all backups.
+**Safety:** Pruning will never delete all backups - at least one backup will always be preserved.
 
 ---
 
 ## Backup Rotation Policy
 
-The rotation policy automatically manages backup retention to balance disk space and history preservation.
-
-### Default Policy
-
-```json
-{
-  "Backup": {
-    "Retention": {
-      "KeepAllForHours": 24,       // Keep all backups from last 24 hours
-      "KeepDailyForDays": 7,       // Keep one daily backup for 7 days
-      "KeepWeeklyForWeeks": 4,     // Keep one weekly backup for 4 weeks
-      "KeepMonthlyForMonths": 6,   // Keep one monthly backup for 6 months
-      "MaxTotalBackups": 100       // Never exceed 100 backups per file
-    }
-  }
-}
-```
+The backup system automatically keeps the most recent **10 backup versions** per file. When a new backup is created and the limit is exceeded, the oldest backup version is automatically deleted.
 
 ### How It Works
 
-The retention policy applies in stages:
+- **Maximum Versions:** 10 backups per file
+- **Rotation:** Automatic when limit exceeded
+- **Deletion:** Oldest backup removed first (FIFO)
+- **Safety:** At least one backup always preserved
 
-1. **Recent Backups (24 hours):** Keep ALL backups - no deletion
-2. **Daily Backups (7 days):** Keep one backup per day
-3. **Weekly Backups (4 weeks):** Keep one backup per week
-4. **Monthly Backups (6 months):** Keep one backup per month
-5. **Max Limit:** If total exceeds 100, keep only the most recent
-
-**Example Timeline:**
+**Example:**
 ```
-Today               : 10 backups (all kept)
-Yesterday           : 5 backups (1 kept, 4 deleted)
-2 days ago          : 8 backups (1 kept, 7 deleted)
-Last week           : 30 backups (1 kept, 29 deleted)
-Last month          : 50 backups (1 kept, 49 deleted)
-2 months ago        : 20 backups (1 kept, 19 deleted)
+Initial state: v001, v002, ..., v010 (10 backups)
+New backup created → v011
+Automatic cleanup → v001 deleted
+Final state: v002, v003, ..., v011 (10 backups)
 ```
 
-### Predefined Policies
+### Manual Pruning
 
-You can use predefined policies in your `lrm.json`:
+You can manually remove old backups using the `prune` command:
 
-**Minimal** (save disk space):
-```json
-{
-  "Backup": {
-    "Policy": "Minimal",
-    "Retention": {
-      "KeepAllForHours": 6,
-      "KeepDailyForDays": 3,
-      "KeepWeeklyForWeeks": 2,
-      "KeepMonthlyForMonths": 2,
-      "MaxTotalBackups": 20
-    }
-  }
-}
-```
+```bash
+# Remove old backups while keeping recent ones
+lrm backup prune
 
-**Aggressive** (keep more history):
-```json
-{
-  "Backup": {
-    "Policy": "Aggressive",
-    "Retention": {
-      "KeepAllForHours": 48,
-      "KeepDailyForDays": 14,
-      "KeepWeeklyForWeeks": 8,
-      "KeepMonthlyForMonths": 12,
-      "MaxTotalBackups": 200
-    }
-  }
-}
-```
+# Preview what would be deleted
+lrm backup prune --dry-run
 
-### Auto-Pruning
-
-Enable automatic pruning after creating backups:
-
-```json
-{
-  "Backup": {
-    "AutoBackup": {
-      "Enabled": true,
-      "AutoPrune": true,           // Automatically run rotation after backup
-      "MinBackupsBeforePrune": 10  // Don't prune until at least 10 backups exist
-    }
-  }
-}
+# Remove specific versions
+lrm backup prune --version 5
 ```
 
 ---
@@ -430,41 +367,6 @@ Press **F7** in the main resource editor to open the Backup Manager.
 | **Del**   | Delete selected backup              |
 | **P**     | Prune old backups                   |
 | **Esc**   | Close Backup Manager                |
-
----
-
-## Configuration
-
-Full configuration schema for the backup system:
-
-```json
-{
-  "Backup": {
-    "AutoBackup": {
-      "Enabled": true,              // Enable automatic backups
-      "CreateBeforeUpdate": true,   // Backup before update operations
-      "CreateBeforeDelete": true,   // Backup before delete operations
-      "CreateBeforeImport": true,   // Backup before import operations
-      "CreateBeforeTranslate": true, // Backup before translation
-      "AutoPrune": false,           // Auto-prune after each backup
-      "MinBackupsBeforePrune": 10   // Minimum backups before auto-pruning
-    },
-    "Retention": {
-      "KeepAllForHours": 24,        // Keep all recent backups (hours)
-      "KeepDailyForDays": 7,        // Keep daily backups (days)
-      "KeepWeeklyForWeeks": 4,      // Keep weekly backups (weeks)
-      "KeepMonthlyForMonths": 6,    // Keep monthly backups (months)
-      "MaxTotalBackups": 100        // Maximum total backups per file
-    },
-    "Storage": {
-      "Compression": false,         // Compress backup files (future)
-      "IncludeMetadata": true       // Include metadata in manifest
-    }
-  }
-}
-```
-
-**Note:** Place this in your `lrm.json` file in the resource directory.
 
 ---
 
@@ -507,19 +409,7 @@ If you accidentally modified a few keys, restore only those:
 lrm backup restore --version 3 --keys ErrorMessage,WarningText,SuccessText
 ```
 
-### 5. Configure Retention Based on Project Size
-
-For small projects:
-```json
-{ "Backup": { "Policy": "Minimal" } }
-```
-
-For large teams:
-```json
-{ "Backup": { "Policy": "Aggressive" } }
-```
-
-### 6. Periodic Cleanup
+### 5. Periodic Cleanup
 
 Run manual pruning periodically to free disk space:
 
@@ -531,27 +421,7 @@ lrm backup prune --dry-run
 lrm backup prune
 ```
 
-### 7. Backup Before Automation
-
-Always create a backup before running automated scripts:
-
-```bash
-#!/bin/bash
-# Safe translation script
-
-# Create backup first
-lrm backup create --operation "automated-translation"
-
-# Run translation
-lrm translate --to fr,de,el --provider google
-
-# Check the results
-if [ $? -ne 0 ]; then
-  echo "Translation failed! Restore with: lrm backup restore --version <latest>"
-fi
-```
-
-### 8. Export Important Backups
+### 6. Export Important Backups
 
 For critical snapshots, copy the backup file outside of `.lrm/`:
 
@@ -572,10 +442,11 @@ cp .lrm/backups/Resources.resx/v042_2025-01-15T10-30-45.resx \
 
 If a backup isn't being created automatically:
 
-1. Check configuration:
+1. Ensure you didn't use the `--no-backup` flag:
    ```bash
-   # Verify backup is enabled
-   cat lrm.json | grep -A 5 "Backup"
+   # Backups are created by default
+   # Use --no-backup to skip them
+   lrm update MyKey "value" --no-backup
    ```
 
 2. Check disk space:
@@ -621,18 +492,13 @@ If backups are taking too much space:
    lrm backup prune
    ```
 
-3. Adjust retention policy:
-   ```json
-   {
-     "Backup": {
-       "Policy": "Minimal"
-     }
-   }
+3. Delete specific old versions manually:
+   ```bash
+   lrm backup prune --version 1 --version 2 --version 3
    ```
 
 ---
 
 For more information, see:
-- [Configuration Guide](CONFIGURATION.md)
 - [Commands Reference](COMMANDS.md)
 - [Examples](EXAMPLES.md)

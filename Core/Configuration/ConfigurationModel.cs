@@ -22,11 +22,6 @@ public class ConfigurationModel
     /// Code scanning configuration settings.
     /// </summary>
     public ScanningConfiguration? Scanning { get; set; }
-
-    /// <summary>
-    /// Backup and versioning configuration settings.
-    /// </summary>
-    public BackupConfiguration? Backup { get; set; }
 }
 
 /// <summary>
@@ -339,94 +334,4 @@ public class AzureTranslatorSettings
     /// Default: 100
     /// </summary>
     public int? RateLimitPerMinute { get; set; }
-}
-
-/// <summary>
-/// Configuration settings for backup and versioning feature.
-/// </summary>
-public class BackupConfiguration
-{
-    /// <summary>
-    /// Whether backup system is enabled (default: true).
-    /// </summary>
-    public bool Enabled { get; set; } = true;
-
-    /// <summary>
-    /// Maximum number of backup versions to keep (default: 10).
-    /// </summary>
-    public int MaxVersions { get; set; } = 10;
-
-    /// <summary>
-    /// Rotation policy to use: "simple" or "smart" (default: "smart").
-    /// Simple: Keep only last N versions.
-    /// Smart: Keep hourly/daily/weekly/monthly backups based on retention rules.
-    /// </summary>
-    public string RotationPolicy { get; set; } = "smart";
-
-    /// <summary>
-    /// Custom location for backups (default: ".lrm/backups" relative to resource files).
-    /// </summary>
-    public string? Location { get; set; }
-
-    /// <summary>
-    /// Retention rules for smart rotation policy.
-    /// </summary>
-    public BackupRetentionConfiguration? Retention { get; set; }
-
-    /// <summary>
-    /// Auto-backup settings (when to create automatic backups).
-    /// </summary>
-    public AutoBackupConfiguration? AutoBackup { get; set; }
-}
-
-/// <summary>
-/// Retention rules for smart backup rotation.
-/// </summary>
-public class BackupRetentionConfiguration
-{
-    /// <summary>
-    /// Keep all backups for the last N hours (default: 24).
-    /// </summary>
-    public int KeepAllForHours { get; set; } = 24;
-
-    /// <summary>
-    /// Keep daily backups for the last N days (default: 7).
-    /// </summary>
-    public int KeepDailyForDays { get; set; } = 7;
-
-    /// <summary>
-    /// Keep weekly backups for the last N weeks (default: 4).
-    /// </summary>
-    public int KeepWeeklyForWeeks { get; set; } = 4;
-
-    /// <summary>
-    /// Keep monthly backups for the last N months (default: 6).
-    /// </summary>
-    public int KeepMonthlyForMonths { get; set; } = 6;
-}
-
-/// <summary>
-/// Settings for automatic backup creation.
-/// </summary>
-public class AutoBackupConfiguration
-{
-    /// <summary>
-    /// Create backup before update operations (default: true).
-    /// </summary>
-    public bool BeforeUpdate { get; set; } = true;
-
-    /// <summary>
-    /// Create backup before delete operations (default: true).
-    /// </summary>
-    public bool BeforeDelete { get; set; } = true;
-
-    /// <summary>
-    /// Create backup before import operations (default: true).
-    /// </summary>
-    public bool BeforeImport { get; set; } = true;
-
-    /// <summary>
-    /// Create backup before translate operations (default: true).
-    /// </summary>
-    public bool BeforeTranslate { get; set; } = true;
 }

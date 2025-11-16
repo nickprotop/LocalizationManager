@@ -1780,7 +1780,7 @@ Backup Information: Resources.resx v002
 
 ### backup prune
 
-**Description:** Remove old backups according to the configured retention policy. Uses smart rotation to balance disk space and history preservation.
+**Description:** Remove old backups manually. The system automatically keeps up to 10 recent backup versions per file.
 
 **Arguments:** None
 
@@ -1792,7 +1792,7 @@ Backup Information: Resources.resx v002
 
 **Examples:**
 ```bash
-# Prune old backups (uses configured retention policy)
+# Prune old backups
 lrm backup prune
 
 # Prune specific file
@@ -1808,49 +1808,13 @@ lrm backup prune --yes
 lrm backup prune --yes
 ```
 
-**Retention Policy:**
-
-The default retention policy keeps:
-- **All** backups from the last 24 hours
-- **One daily** backup for 7 days
-- **One weekly** backup for 4 weeks
-- **One monthly** backup for 6 months
-- Maximum of 100 total backups per file
-
-**Example Timeline:**
-```
-Today               : 10 backups (all kept)
-Yesterday           : 5 backups (1 kept, 4 deleted)
-2 days ago          : 8 backups (1 kept, 7 deleted)
-Last week           : 30 backups (1 kept, 29 deleted)
-Last month          : 50 backups (1 kept, 49 deleted)
-```
-
-**Configuration:**
-
-Customize retention policy in `lrm.json`:
-```json
-{
-  "Backup": {
-    "Retention": {
-      "KeepAllForHours": 24,
-      "KeepDailyForDays": 7,
-      "KeepWeeklyForWeeks": 4,
-      "KeepMonthlyForMonths": 6,
-      "MaxTotalBackups": 100
-    }
-  }
-}
-```
-
-**Predefined Policies:**
-- **Minimal:** Less disk space (6h/3d/2w/2m, max 20)
-- **Default:** Balanced (24h/7d/4w/6m, max 100)
-- **Aggressive:** More history (48h/14d/8w/12m, max 200)
+**Behavior:**
+- The system automatically keeps up to 10 recent backup versions per file
+- Older backups are automatically removed when the limit is exceeded
+- Manual pruning can remove specific versions or all old backups
 
 **Safety:**
-- Pruning respects the retention policy
-- Never deletes all backups
+- Never deletes all backups - at least one backup is always preserved
 - Requires confirmation unless `--yes`
 - Use `--dry-run` to preview changes
 
@@ -1870,30 +1834,14 @@ LRM automatically creates backups before any destructive operation:
 
 **Note:** `lrm add-lang` does NOT trigger backups because it creates a new file rather than modifying existing files.
 
-**Configuration:**
+**Disabling Backups:**
 
-Control automatic backup behavior in `lrm.json`:
-```json
-{
-  "Backup": {
-    "AutoBackup": {
-      "Enabled": true,
-      "CreateBeforeUpdate": true,
-      "CreateBeforeDelete": true,
-      "CreateBeforeImport": true,
-      "CreateBeforeTranslate": true,
-      "AutoPrune": false,
-      "MinBackupsBeforePrune": 10
-    }
-  }
-}
+Use the `--no-backup` flag to skip backup creation for any command:
+```bash
+lrm update MyKey "value" --no-backup
+lrm delete OldKey --no-backup
+lrm import data.csv --no-backup
 ```
-
-**Options:**
-- `Enabled` - Enable/disable automatic backups (default: true)
-- `CreateBefore*` - Control which operations trigger backups (default: all true)
-- `AutoPrune` - Automatically prune after each backup (default: false)
-- `MinBackupsBeforePrune` - Minimum backups before auto-pruning (default: 10)
 
 ---
 
