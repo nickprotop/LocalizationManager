@@ -11,6 +11,7 @@ This document provides comprehensive information about configuring LocalizationM
   - [DefaultLanguageCode](#defaultlanguagecode)
   - [Translation](#translation)
   - [Scanning](#scanning)
+  - [Validation](#validation)
 - [Priority System](#priority-system)
 - [Examples](#examples)
 - [Best Practices](#best-practices)
@@ -78,6 +79,10 @@ YourProject/
   "Scanning": {
     "ResourceClassNames": ["Resources", "Strings", "AppResources"],
     "LocalizationMethods": ["GetString", "GetLocalizedString", "Translate", "L", "T"]
+  },
+  "Validation": {
+    "PlaceholderTypes": ["dotnet"],
+    "EnablePlaceholderValidation": true
   }
 }
 ```
@@ -326,6 +331,115 @@ GetString("KeyName")       // NO LONGER detected (not in custom list)
 # Override config file for this scan only
 lrm scan --localization-methods "GetString,T,Localize"
 ```
+
+---
+
+### Validation
+
+**Type:** `object`
+**Purpose:** Configure validation behavior for the `validate` command
+
+```json
+{
+  "Validation": {
+    "PlaceholderTypes": ["dotnet"],
+    "EnablePlaceholderValidation": true
+  }
+}
+```
+
+#### Validation Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `PlaceholderTypes` | string[] | `["dotnet"]` | Placeholder types to validate: `dotnet`, `printf`, `icu`, `template`, or `all` |
+| `EnablePlaceholderValidation` | bool | `true` | Enable or disable placeholder validation |
+
+#### PlaceholderTypes
+
+Defines which placeholder formats should be validated when checking translations.
+
+**Default Behavior (`.resx` files = .NET projects):**
+```json
+{
+  "Validation": {
+    "PlaceholderTypes": ["dotnet"]
+  }
+}
+```
+
+Since LRM is designed for .NET `.resx` files, it defaults to validating only .NET format placeholders (`{0}`, `{1}`, `{name}`). This prevents false positives from other placeholder types that aren't used in .NET projects.
+
+**Supported Placeholder Types:**
+
+| Type | Format | Examples | Use Case |
+|------|--------|----------|----------|
+| `dotnet` | .NET format strings | `{0}`, `{1:N2}`, `{name}`, `{count:D3}` | .NET projects (default) |
+| `printf` | Printf-style | `%s`, `%d`, `%1$s`, `%.2f` | C/C++ projects, gettext |
+| `icu` | ICU MessageFormat | `{count, plural, one {...} other {...}}` | Advanced i18n |
+| `template` | Template literals | `${name}`, `${user.name}` | JavaScript projects |
+| `all` | All types | All of the above | Polyglot projects |
+
+**Common Configurations:**
+
+**.NET Only (Default):**
+```json
+{
+  "Validation": {
+    "PlaceholderTypes": ["dotnet"]
+  }
+}
+```
+
+**Multiple Types (e.g., Blazor with JavaScript):**
+```json
+{
+  "Validation": {
+    "PlaceholderTypes": ["dotnet", "template"]
+  }
+}
+```
+
+**All Types (for testing/debugging):**
+```json
+{
+  "Validation": {
+    "PlaceholderTypes": ["all"]
+  }
+}
+```
+
+**Disable Placeholder Validation:**
+```json
+{
+  "Validation": {
+    "EnablePlaceholderValidation": false
+  }
+}
+```
+
+**CLI Override:**
+```bash
+# Validate specific placeholder types for this run only
+lrm validate --placeholder-types dotnet,printf
+
+# Validate all placeholder types
+lrm validate --placeholder-types all
+
+# Disable placeholder validation entirely
+lrm validate --no-placeholder-validation
+```
+
+**Priority:** CLI arguments override configuration file settings.
+
+**Example:**
+If your `lrm.json` specifies `"PlaceholderTypes": ["dotnet"]`, but you run:
+```bash
+lrm validate --placeholder-types all
+```
+The command will validate all placeholder types, ignoring the configuration file.
+
+**See Also:** [Placeholder Validation Guide](PLACEHOLDERS.md) for detailed information about placeholder detection and validation.
 
 ---
 

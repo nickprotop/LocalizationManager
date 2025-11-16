@@ -58,5 +58,11 @@
       "L",
       "T"
     ]
+  },
+  "validation": {
+    "placeholderTypes": [
+      "dotnet"
+    ],
+    "enablePlaceholderValidation": true
   }
 }

@@ -7,6 +7,7 @@ LocalizationManager automatically validates that placeholders in translations ma
 - [Supported Placeholder Formats](#supported-placeholder-formats)
 - [How It Works](#how-it-works)
 - [Validation Rules](#validation-rules)
+- [Configuration](#configuration)
 - [CLI Usage](#cli-usage)
 - [TUI Usage](#tui-usage)
 - [Common Scenarios](#common-scenarios)
@@ -197,6 +198,89 @@ Source:      "Count: {0}"
 Translation: "Contagem: %d"  ✗
 Error: Missing placeholder: {0}; Extra placeholder not in source: %d
 ```
+
+---
+
+## Configuration
+
+### Default Behavior
+
+By default, LRM validates only **.NET format placeholders** (`{0}`, `{1}`, `{name}`). This is because:
+- LRM is designed for .NET `.resx` files
+- .NET placeholders are used in 99% of .resx projects
+- This prevents false positives from other placeholder types
+
+### Changing Placeholder Types
+
+You can customize which placeholder types to validate using configuration or CLI options.
+
+#### Option 1: Configuration File (`lrm.json`)
+
+Create or update `lrm.json` in your Resources directory:
+
+```json
+{
+  "Validation": {
+    "PlaceholderTypes": ["dotnet"],
+    "EnablePlaceholderValidation": true
+  }
+}
+```
+
+**Available Types:**
+- `"dotnet"` - .NET format strings (default)
+- `"printf"` - Printf-style placeholders
+- `"icu"` - ICU MessageFormat
+- `"template"` - Template literals
+- `"all"` - All types
+
+**Examples:**
+
+**.NET Only (Default):**
+```json
+{
+  "Validation": {
+    "PlaceholderTypes": ["dotnet"]
+  }
+}
+```
+
+**Multiple Types (e.g., Blazor with JavaScript):**
+```json
+{
+  "Validation": {
+    "PlaceholderTypes": ["dotnet", "template"]
+  }
+}
+```
+
+**Disable Placeholder Validation:**
+```json
+{
+  "Validation": {
+    "EnablePlaceholderValidation": false
+  }
+}
+```
+
+#### Option 2: CLI Override
+
+Override configuration for a single command:
+
+```bash
+# Validate specific placeholder types
+lrm validate --placeholder-types dotnet,printf
+
+# Validate all placeholder types
+lrm validate --placeholder-types all
+
+# Disable placeholder validation entirely
+lrm validate --no-placeholder-validation
+```
+
+**Priority:** CLI arguments override configuration file settings.
+
+**See Also:** [Configuration Guide](CONFIGURATION.md#validation) for more details on configuration options.
 
 ---
 
