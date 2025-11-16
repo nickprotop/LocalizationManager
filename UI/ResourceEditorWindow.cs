@@ -22,11 +22,11 @@
 using System.Data;
 using System.Timers;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Backup;
 using LocalizationManager.Core.Configuration;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Core.Translation;
 using LocalizationManager.UI.Filters;
-using LocalizationManager.Utils;
 using Terminal.Gui;
 
 namespace LocalizationManager.UI;
@@ -305,6 +305,7 @@ public class ResourceEditorWindow : Window
             {
                 new MenuItem("_Save", "Save all changes", () => SaveChanges(), null, null, Key.S | Key.CtrlMask),
                 new MenuItem("_Validate", "Run validation", () => ShowValidation(), null, null, Key.F6),
+                new MenuItem("_Backups", "Manage backups", () => ShowBackupManager(), null, null, Key.F7),
                 null!, // separator
                 new MenuItem("_Quit", "Exit editor", () => { if (ConfirmQuit()) Application.RequestStop(); }, null, null, Key.Q | Key.CtrlMask)
             }),
@@ -1484,8 +1485,13 @@ public class ResourceEditorWindow : Window
         {
             if (result == 0)
             {
-                var backupManager = new BackupManager();
-                backupManager.CreateBackups(_resourceFiles.Select(rf => rf.Language.FilePath));
+                var backupManager = new BackupVersionManager(10);
+                var basePath = Path.GetDirectoryName(_resourceFiles.First().Language.FilePath) ?? Environment.CurrentDirectory;
+                foreach (var rf in _resourceFiles)
+                {
+                    backupManager.CreateBackupAsync(rf.Language.FilePath, "tui-save", basePath)
+                        .GetAwaiter().GetResult();
+                }
             }
 
             foreach (var rf in _resourceFiles)
@@ -1516,6 +1522,14 @@ public class ResourceEditorWindow : Window
               $"Empty: {result.EmptyValues.Sum(kv => kv.Value.Count)}";
 
         MessageBox.Query("Validation", message, "OK");
+    }
+
+    private void ShowBackupManager()
+    {
+        var basePath = Path.GetDirectoryName(_resourceFiles.First().Language.FilePath) ?? Environment.CurrentDirectory;
+        var backupWindow = new BackupManagerWindow(basePath, _resourceFiles);
+        Application.Run(backupWindow);
+        backupWindow.Dispose();
     }
 
     private void ShowLanguageList()
@@ -1779,8 +1793,10 @@ public class ResourceEditorWindow : Window
                     // Create backup if requested
                     if (!noBackupCheckbox.Checked)
                     {
-                        var backup = new BackupManager();
-                        backup.CreateBackup(rf.Language.FilePath);
+                        var backup = new BackupVersionManager(10);
+                        var basePath = Path.GetDirectoryName(rf.Language.FilePath) ?? Environment.CurrentDirectory;
+                        backup.CreateBackupAsync(rf.Language.FilePath, "tui-delete-language", basePath)
+                            .GetAwaiter().GetResult();
                     }
 
                     // Delete the file
@@ -1843,6 +1859,7 @@ public class ResourceEditorWindow : Window
                    "File Operations:\n" +
                    "Ctrl+S    - Save changes\n" +
                    "F6        - Run validation\n" +
+                   "F7        - Manage backups\n" +
                    "Ctrl+Q    - Quit editor\n\n" +
                    "Navigation:\n" +
                    "↑/↓       - Move selection\n" +

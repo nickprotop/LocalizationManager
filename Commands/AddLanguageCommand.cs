@@ -5,7 +5,6 @@ using System.ComponentModel;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using LocalizationManager.Core;
-using LocalizationManager.Utils;
 
 namespace LocalizationManager.Commands;
 
@@ -29,10 +28,6 @@ public class AddLanguageCommandSettings : BaseCommandSettings
     [CommandOption("--empty")]
     [Description("Create empty language file with no entries")]
     public bool Empty { get; set; }
-
-    [CommandOption("--no-backup")]
-    [Description("Skip creating backups")]
-    public bool NoBackup { get; set; }
 
     [CommandOption("-y|--yes")]
     [Description("Skip confirmation prompts")]
@@ -157,14 +152,7 @@ public class AddLanguageCommand : Command<AddLanguageCommandSettings>
             // Parse source file if copying
             var sourceFile = sourceLanguage != null ? parser.Parse(sourceLanguage) : null;
 
-            // Step 6: Create backup if source file exists and copying
-            if (!settings.NoBackup && sourceFile != null && !settings.Empty)
-            {
-                var backup = new BackupManager();
-                backup.CreateBackup(sourceLanguage!.FilePath);
-            }
-
-            // Step 7: Create new language file
+            // Step 6: Create new language file
             var copyEntries = !settings.Empty && sourceFile != null;
             var entryCount = sourceFile?.Entries.Count ?? 0;
 

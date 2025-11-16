@@ -20,10 +20,10 @@
 // SOFTWARE.
 
 using LocalizationManager.Core;
+using LocalizationManager.Core.Backup;
 using LocalizationManager.Core.Enums;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Core.Output;
-using LocalizationManager.Utils;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using System.ComponentModel;
@@ -146,12 +146,16 @@ public class ImportCommand : Command<ImportCommandSettings>
                 {
                     AnsiConsole.MarkupLine("[dim]Creating backups...[/]");
                 }
-                var backupManager = new BackupManager();
+                var backupManager = new BackupVersionManager(10);
                 var filePaths = resourceFiles.Select(rf => rf.Language.FilePath).ToList();
 
                 try
                 {
-                    backupManager.CreateBackups(filePaths);
+                    foreach (var filePath in filePaths)
+                    {
+                        backupManager.CreateBackupAsync(filePath, "import", resourcePath)
+                            .GetAwaiter().GetResult();
+                    }
                     if (isTableFormat)
                     {
                         AnsiConsole.MarkupLine("[dim green]✓ Backups created[/]");

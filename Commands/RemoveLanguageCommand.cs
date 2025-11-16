@@ -5,7 +5,7 @@ using System.ComponentModel;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using LocalizationManager.Core;
-using LocalizationManager.Utils;
+using LocalizationManager.Core.Backup;
 
 namespace LocalizationManager.Commands;
 
@@ -136,9 +136,11 @@ public class RemoveLanguageCommand : Command<RemoveLanguageCommandSettings>
             // Step 7: Create backup
             if (!settings.NoBackup)
             {
-                var backup = new BackupManager();
-                var backupPath = backup.CreateBackup(targetLanguage.FilePath);
-                AnsiConsole.MarkupLine($"[green]✓[/] Backup created: {Path.GetFileName(backupPath)}");
+                var backup = new BackupVersionManager(10);
+                var resourcePath = settings.GetResourcePath();
+                var metadata = backup.CreateBackupAsync(targetLanguage.FilePath, "remove-language", resourcePath)
+                    .GetAwaiter().GetResult();
+                AnsiConsole.MarkupLine($"[green]✓[/] Backup created: v{metadata.Version:D3}");
             }
 
             // Step 8: Delete the file

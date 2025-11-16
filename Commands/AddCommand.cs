@@ -20,8 +20,8 @@
 // SOFTWARE.
 
 using LocalizationManager.Core;
+using LocalizationManager.Core.Backup;
 using LocalizationManager.Core.Models;
-using LocalizationManager.Utils;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using System.ComponentModel;
@@ -170,12 +170,16 @@ public class AddCommand : Command<AddCommandSettings>
             if (!settings.NoBackup)
             {
                 AnsiConsole.MarkupLine("[dim]Creating backups...[/]");
-                var backupManager = new BackupManager();
+                var backupManager = new BackupVersionManager(10);
                 var filePaths = resourceFiles.Select(rf => rf.Language.FilePath).ToList();
 
                 try
                 {
-                    backupManager.CreateBackups(filePaths);
+                    foreach (var filePath in filePaths)
+                    {
+                        backupManager.CreateBackupAsync(filePath, "add-key", resourcePath)
+                            .GetAwaiter().GetResult();
+                    }
                     AnsiConsole.MarkupLine("[dim green]✓ Backups created[/]");
                 }
                 catch (Exception ex)

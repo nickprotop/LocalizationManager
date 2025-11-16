@@ -676,7 +676,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
     /// Detects if a pattern contains wildcard characters (* or ?) that should be converted to regex.
     /// Handles backslash escaping for literal wildcard characters.
     /// </summary>
-    internal static bool IsWildcardPattern(string pattern)
+    public static bool IsWildcardPattern(string pattern)
     {
         // Simply check if pattern contains unescaped wildcards
         // The --regex flag takes precedence, so we don't need "smart" detection
@@ -708,7 +708,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
     /// - ? for exactly one character
     /// - \* and \? for literal asterisk and question mark
     /// </summary>
-    internal static string ConvertWildcardToRegex(string wildcardPattern)
+    public static string ConvertWildcardToRegex(string wildcardPattern)
     {
         var result = new System.Text.StringBuilder();
 
@@ -755,7 +755,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
     /// <summary>
     /// Parse and normalize comma-separated culture codes
     /// </summary>
-    internal static List<string> ParseCultureCodes(string? cultureString)
+    public static List<string> ParseCultureCodes(string? cultureString)
     {
         if (string.IsNullOrWhiteSpace(cultureString))
         {
@@ -773,7 +773,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
     /// <summary>
     /// Determine if keys-only mode should be used
     /// </summary>
-    internal static bool IsKeysOnlyMode(Settings settings, List<Core.Models.ResourceFile> resourceFiles)
+    public static bool IsKeysOnlyMode(Settings settings, List<Core.Models.ResourceFile> resourceFiles)
     {
         // Explicit flags
         if (settings.KeysOnly || settings.NoTranslations)
@@ -793,7 +793,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
     /// <summary>
     /// Filter resource files based on culture include/exclude settings
     /// </summary>
-    internal static List<Core.Models.ResourceFile> FilterResourceFiles(
+    public static List<Core.Models.ResourceFile> FilterResourceFiles(
         List<Core.Models.ResourceFile> files,
         Settings settings,
         out List<string> invalidCodes)
@@ -845,7 +845,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
     /// Detect keys that exist in filtered resource files but not in the default file.
     /// This helps identify structural inconsistencies where translation files have extra keys.
     /// </summary>
-    internal static Dictionary<string, List<string>> DetectExtraKeysInFilteredFiles(
+    public static Dictionary<string, List<string>> DetectExtraKeysInFilteredFiles(
         Core.Models.ResourceFile defaultFile,
         List<Core.Models.ResourceFile> filteredResourceFiles)
     {
@@ -874,7 +874,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
     /// <summary>
     /// Find keys matching the pattern based on search scope
     /// </summary>
-    internal static List<string> FindMatchingKeys(
+    public static List<string> FindMatchingKeys(
         ResourceFile defaultFile,
         List<ResourceFile> resourceFiles,
         string pattern,
@@ -1026,7 +1026,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
     /// <summary>
     /// Filter keys by translation status
     /// </summary>
-    internal static List<string> FilterByStatus(
+    public static List<string> FilterByStatus(
         List<string> keys,
         ResourceFile defaultFile,
         List<ResourceFile> resourceFiles,
@@ -1130,7 +1130,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
     /// <summary>
     /// Apply exclusion patterns to filter out matching keys
     /// </summary>
-    internal static List<string> ApplyExclusions(
+    public static List<string> ApplyExclusions(
         List<string> keys,
         string[] notPatternsArray,
         bool caseSensitive = false)

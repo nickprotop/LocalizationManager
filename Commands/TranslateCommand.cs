@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Backup;
 using LocalizationManager.Core.Configuration;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Core.Translation;
@@ -58,6 +59,10 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
         [CommandOption("--batch-size <SIZE>")]
         [Description("Number of translations to process in a batch (default: 10)")]
         public int? BatchSize { get; set; }
+
+        [CommandOption("--no-backup")]
+        [Description("Skip creating backups before translating")]
+        public bool NoBackup { get; set; }
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken = default)
@@ -409,6 +414,14 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
                 }
 
                 completed++;
+            }
+
+            // Create backup before saving
+            if (!settings.DryRun && !settings.NoBackup)
+            {
+                var backupManager = new BackupVersionManager(10);
+                var basePath = System.IO.Path.GetDirectoryName(targetLanguageInfo.FilePath) ?? Environment.CurrentDirectory;
+                await backupManager.CreateBackupAsync(targetLanguageInfo.FilePath, "translate", basePath);
             }
 
             // Save the updated resource file

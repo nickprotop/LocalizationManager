@@ -20,6 +20,7 @@
 // SOFTWARE.
 
 using LocalizationManager.Commands;
+using LocalizationManager.Commands.Backup;
 using LocalizationManager.Commands.Config;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -29,7 +30,7 @@ var app = new CommandApp();
 app.Configure(config =>
 {
     config.SetApplicationName("lrm");
-    config.SetApplicationVersion("0.6.0");
+    config.SetApplicationVersion("0.6.11");
 
     // Propagate exceptions so we can handle them intelligently
     config.PropagateExceptions();
@@ -173,6 +174,48 @@ app.Configure(config =>
         cfg.AddCommand<ListProvidersCommand>("list-providers")
             .WithDescription("List all translation providers and their configuration status")
             .WithExample(new[] { "config", "list-providers" });
+    });
+
+    config.AddBranch("backup", cfg =>
+    {
+        cfg.SetDescription("Backup management commands for resource files");
+
+        cfg.AddCommand<BackupListCommand>("list")
+            .WithDescription("List all backups for resource files")
+            .WithExample(new[] { "backup", "list", "--file", "SharedResource.resx" })
+            .WithExample(new[] { "backup", "list", "--all" })
+            .WithExample(new[] { "backup", "list", "--file", "SharedResource.resx", "--show-details" });
+
+        cfg.AddCommand<BackupCreateCommand>("create")
+            .WithDescription("Manually create a backup of resource files")
+            .WithExample(new[] { "backup", "create", "--file", "SharedResource.resx" })
+            .WithExample(new[] { "backup", "create", "--all" })
+            .WithExample(new[] { "backup", "create", "--file", "SharedResource.resx", "--operation", "pre-release" });
+
+        cfg.AddCommand<BackupRestoreCommand>("restore")
+            .WithDescription("Restore resource files from a backup")
+            .WithExample(new[] { "backup", "restore", "SharedResource.resx", "--version", "3" })
+            .WithExample(new[] { "backup", "restore", "SharedResource.resx", "--version", "3", "--preview" })
+            .WithExample(new[] { "backup", "restore", "SharedResource.resx", "--version", "3", "--keys", "SaveButton,CancelButton" })
+            .WithExample(new[] { "backup", "restore", "SharedResource.resx", "--version", "3", "-y" });
+
+        cfg.AddCommand<BackupDiffCommand>("diff")
+            .WithDescription("Show differences between backup versions")
+            .WithExample(new[] { "backup", "diff", "SharedResource.resx" })
+            .WithExample(new[] { "backup", "diff", "SharedResource.resx", "--from", "2", "--to", "3" })
+            .WithExample(new[] { "backup", "diff", "SharedResource.resx", "--format", "json", "--output", "diff.json" })
+            .WithExample(new[] { "backup", "diff", "SharedResource.resx", "--show-unchanged" });
+
+        cfg.AddCommand<BackupInfoCommand>("info")
+            .WithDescription("Display detailed information about a specific backup")
+            .WithExample(new[] { "backup", "info", "SharedResource.resx", "3" });
+
+        cfg.AddCommand<BackupPruneCommand>("prune")
+            .WithDescription("Remove old backups based on retention policy")
+            .WithExample(new[] { "backup", "prune", "--file", "SharedResource.resx", "--keep", "5" })
+            .WithExample(new[] { "backup", "prune", "--file", "SharedResource.resx", "--older-than", "30" })
+            .WithExample(new[] { "backup", "prune", "--all", "--keep", "10", "--dry-run" })
+            .WithExample(new[] { "backup", "prune", "--file", "SharedResource.resx", "--version", "1", "-y" });
     });
 });
 

@@ -20,7 +20,7 @@
 // SOFTWARE.
 
 using LocalizationManager.Core;
-using LocalizationManager.Utils;
+using LocalizationManager.Core.Backup;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using System.ComponentModel;
@@ -154,9 +154,13 @@ public class DeleteCommand : Command<DeleteCommand.Settings>
             // Create backups
             if (!settings.NoBackup)
             {
-                var backupManager = new BackupManager();
+                var backupManager = new BackupVersionManager(10);
                 var filePaths = languages.Select(l => l.FilePath).ToList();
-                backupManager.CreateBackups(filePaths);
+                foreach (var filePath in filePaths)
+                {
+                    backupManager.CreateBackupAsync(filePath, "delete-key", resourcePath)
+                        .GetAwaiter().GetResult();
+                }
                 AnsiConsole.MarkupLine("[dim]✓ Backups created[/]");
             }
 
