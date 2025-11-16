@@ -19,7 +19,7 @@ _lrm_completions() {
     local global_opts="--path -p --help -h --version -v"
 
     # Command-specific options
-    local validate_opts="--path -p --format --missing-only --help -h"
+    local validate_opts="--path -p --format --missing-only --placeholder-types --no-placeholder-validation --help -h"
     local stats_opts="--path -p --format --help -h"
     local view_opts="--path -p --show-comments --format --regex --sort --no-limit --help -h"
     local add_opts="--path -p --lang -l --comment --no-backup --help -h"
@@ -154,6 +154,11 @@ _lrm_completions() {
         --operation|--keys)
             # No completion for these
             COMPREPLY=()
+            return 0
+            ;;
+        --placeholder-types)
+            # Complete placeholder types (comma-separated)
+            COMPREPLY=( $(compgen -W "dotnet printf icu template all" -- "${cur}") )
             return 0
             ;;
         lrm)

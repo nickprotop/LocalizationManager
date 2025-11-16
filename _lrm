@@ -75,10 +75,25 @@ _lrm() {
                     _arguments \
                         '--format[Output format]:format:->formats' \
                         '--missing-only[Show only missing translations]' \
+                        '--placeholder-types[Placeholder types to validate]:placeholder types:->placeholder_types' \
+                        '--no-placeholder-validation[Disable placeholder validation]' \
                         $global_opts
+
+                    local -a placeholder_type_opts
+                    placeholder_type_opts=(
+                        'dotnet:.NET format strings ({0}, {name})'
+                        'printf:Printf-style (%s, %d, %1$s)'
+                        'icu:ICU MessageFormat ({count, plural, ...})'
+                        'template:Template literals (${name})'
+                        'all:All placeholder types'
+                    )
+
                     case $state in
                         formats)
                             _describe -t formats 'output formats' format_opts
+                            ;;
+                        placeholder_types)
+                            _describe -t placeholder_types 'placeholder types' placeholder_type_opts
                             ;;
                     esac
                     ;;
