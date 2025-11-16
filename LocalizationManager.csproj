@@ -6,15 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <!-- Version and Assembly Information -->
-    <Version>0.6.11</Version>
-    <AssemblyVersion>0.6.11.0</AssemblyVersion>
-    <FileVersion>0.6.11.0</FileVersion>
-    <Authors>Nikolaos Protopapas</Authors>
-    <Company>Nikolaos Protopapas</Company>
-    <Product>Localization Resource Manager (LRM)</Product>
-    <Description>CLI/TUI tool for managing .NET .resx localization files</Description>
-    <Copyright>Copyright © 2025 Nikolaos Protopapas</Copyright>
+    <!-- Disable auto-generated assembly info (using Properties/AssemblyInfo.cs instead) -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 
     <!-- Publishing Configuration -->
     <PublishSingleFile>true</PublishSingleFile>
@@ -36,9 +29,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="LocalizationManager.Shared\LocalizationManager.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="LocalizationManager.Tests/**" />
     <EmbeddedResource Remove="LocalizationManager.Tests/**" />
     <None Remove="LocalizationManager.Tests/**" />
+
+    <Compile Remove="LocalizationManager.Shared/**" />
+    <EmbeddedResource Remove="LocalizationManager.Shared/**" />
+    <None Remove="LocalizationManager.Shared/**" />
   </ItemGroup>
 
 </Project>
