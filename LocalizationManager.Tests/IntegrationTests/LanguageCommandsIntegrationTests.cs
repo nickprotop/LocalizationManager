@@ -264,9 +264,9 @@ public class LanguageCommandsIntegrationTests : IDisposable
         Assert.Equal(0, result);
 
         // Check backup was created
-        var backupDir = Path.Combine(_testDirectory, ".backups");
+        var backupDir = Path.Combine(_testDirectory, ".lrm", "backups", "TestResource.fr.resx");
         Assert.True(Directory.Exists(backupDir));
-        var backupFiles = Directory.GetFiles(backupDir, "TestResource.fr.*.resx");
+        var backupFiles = Directory.GetFiles(backupDir, "v*.resx");
         Assert.NotEmpty(backupFiles);
     }
 
