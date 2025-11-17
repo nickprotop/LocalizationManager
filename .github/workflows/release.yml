@@ -70,6 +70,68 @@ jobs:
           ./build.sh
           echo "✓ Built all platforms"
 
+      - name: Install Debian packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev debhelper devscripts dput-ng
+
+      - name: Build Debian packages (amd64)
+        run: |
+          ./build-deb.sh amd64 both
+          echo "✓ Built amd64 .deb packages"
+
+      - name: Build Debian packages (arm64)
+        run: |
+          ./build-deb.sh arm64 both
+          echo "✓ Built arm64 .deb packages"
+
+      - name: Build source package for PPA
+        run: |
+          ./build-source-package.sh
+          echo "✓ Built source package"
+
+      - name: Import GPG key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
+          echo "✓ GPG key imported"
+
+      - name: Sign source package
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          LAUNCHPAD_EMAIL: ${{ secrets.LAUNCHPAD_EMAIL }}
+        run: |
+          cd publish/source
+          # Configure debsign to use GPG agent with passphrase
+          echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
+          gpg-connect-agent reloadagent /bye
+
+          # Sign the changes file
+          debsign -k "$LAUNCHPAD_EMAIL" --no-re-sign lrm_*_source.changes
+          echo "✓ Source package signed"
+
+      - name: Upload to Launchpad PPA
+        env:
+          LAUNCHPAD_EMAIL: ${{ secrets.LAUNCHPAD_EMAIL }}
+        run: |
+          cd publish/source
+
+          # Configure dput for PPA
+          cat > ~/.dput.cf << EOF
+          [lrm-tool-ppa]
+          fqdn = ppa.launchpad.net
+          method = ftp
+          incoming = ~nickprotop/ubuntu/lrm-tool/
+          login = anonymous
+          allow_unsigned_uploads = 0
+          EOF
+
+          # Upload to PPA
+          dput lrm-tool-ppa lrm_*_source.changes
+          echo "✓ Uploaded to PPA: ppa:nickprotop/lrm-tool"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -82,16 +144,37 @@ jobs:
 
             ## 📦 Downloads
 
+            ### APT/PPA Installation (Recommended for Ubuntu/Debian)
+
+            ```bash
+            sudo add-apt-repository ppa:nickprotop/lrm-tool
+            sudo apt update
+            sudo apt install lrm          # Framework-dependent (~200KB)
+            # OR
+            sudo apt install lrm-standalone  # Self-contained (~72MB)
+            ```
+
+            ### Direct Downloads
+
             Choose the appropriate version for your platform:
 
-            - **Linux (x64):** `lrm-linux-x64.tar.gz`
-            - **Linux (ARM64):** `lrm-linux-arm64.tar.gz` *(Raspberry Pi, etc.)*
-            - **Windows (x64):** `lrm-win-x64.zip`
-            - **Windows (ARM64):** `lrm-win-arm64.zip`
+            **Linux (Direct Download):**
+            - **x64:** `lrm-linux-x64.tar.gz`
+            - **ARM64:** `lrm-linux-arm64.tar.gz` *(Raspberry Pi, etc.)*
+
+            **Linux (.deb packages):**
+            - **x64 Framework-dependent:** `lrm_${{ steps.version.outputs.version }}-1_amd64.deb` (~200KB, requires dotnet-runtime-9.0)
+            - **x64 Self-contained:** `lrm-standalone_${{ steps.version.outputs.version }}-1_amd64.deb` (~72MB)
+            - **ARM64 Framework-dependent:** `lrm_${{ steps.version.outputs.version }}-1_arm64.deb`
+            - **ARM64 Self-contained:** `lrm-standalone_${{ steps.version.outputs.version }}-1_arm64.deb`
+
+            **Windows:**
+            - **x64:** `lrm-win-x64.zip`
+            - **ARM64:** `lrm-win-arm64.zip`
 
             ## 📖 Installation
 
-            See the [Installation Guide](https://github.com/${{ github.repository }}#installation) for detailed instructions.
+            See the [Installation Guide](https://github.com/${{ github.repository }}/blob/main/docs/INSTALLATION.md) for detailed instructions.
 
             ## 🧪 Verified
 
@@ -101,5 +184,9 @@ jobs:
             publish/lrm-linux-arm64.tar.gz
             publish/lrm-win-x64.zip
             publish/lrm-win-arm64.zip
+            publish/deb/lrm_${{ steps.version.outputs.version }}-1_amd64.deb
+            publish/deb/lrm-standalone_${{ steps.version.outputs.version }}-1_amd64.deb
+            publish/deb/lrm_${{ steps.version.outputs.version }}-1_arm64.deb
+            publish/deb/lrm-standalone_${{ steps.version.outputs.version }}-1_arm64.deb
           draft: false
           prerelease: false
