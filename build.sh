@@ -173,13 +173,7 @@ for platform in "${platforms[@]}"; do
         --verbosity quiet
 
     if [ $? -eq 0 ]; then
-        # Rename executable to 'lrm' or 'lrm.exe'
-        if [[ $platform == win-* ]]; then
-            mv "$OUTPUT_DIR/$platform/LocalizationManager.exe" "$OUTPUT_DIR/$platform/$exe_name" 2>/dev/null || true
-        else
-            mv "$OUTPUT_DIR/$platform/LocalizationManager" "$OUTPUT_DIR/$platform/$exe_name" 2>/dev/null || true
-        fi
-
+        # Binary is already named 'lrm' or 'lrm.exe' due to AssemblyName in .csproj
         # Get file size
         size=$(get_size "$OUTPUT_DIR/$platform/$exe_name")
         print_success "Built $platform ($size)"
