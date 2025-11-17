@@ -1,0 +1,395 @@
+.TH LRM 1 "January 2025" "lrm 0.6.12" "User Commands"
+.SH NAME
+lrm \- Linux-native CLI tool for managing .NET .resx localization files
+.SH SYNOPSIS
+.B lrm
+[\fIGLOBAL OPTIONS\fR]
+\fICOMMAND\fR
+[\fICOMMAND OPTIONS\fR]
+.SH DESCRIPTION
+.B LRM
+(Localization Resource Manager) is a powerful, Linux-native command-line tool for managing .NET .resx localization files with an interactive Terminal UI.
+.PP
+Features include:
+.IP \(bu 2
+Interactive Terminal UI for visual editing
+.IP \(bu 2
+Machine translation support (Google, DeepL, OpenAI, Claude, Ollama)
+.IP \(bu 2
+CI/CD automation workflows
+.IP \(bu 2
+Validation and placeholder checking
+.IP \(bu 2
+Code scanning for unused/missing keys
+.IP \(bu 2
+Backup system with diff view
+.IP \(bu 2
+Multi-platform support (Linux x64/ARM64)
+.SH GLOBAL OPTIONS
+.TP
+.BR \-p ", " \-\-path " " \fIPATH\fR
+Path to Resources folder (default: current directory)
+.TP
+.BR \-\-config\-file " " \fIPATH\fR
+Path to configuration file (optional, default: auto-discover lrm.json)
+.TP
+.BR \-h ", " \-\-help
+Show help information
+.SH COMMANDS
+.SS validate
+Validate resource files for missing translations, duplicates, and errors.
+.PP
+.B lrm validate
+[\fB\-\-format\fR \fIFORMAT\fR]
+[\fB\-\-missing\-only\fR]
+[\fB\-\-no\-backup\fR]
+.TP
+.BR \-\-format " " \fIFORMAT\fR
+Output format: table (default), json, simple
+.TP
+.BR \-\-missing\-only
+Show only missing translations
+.TP
+.BR \-\-no\-backup
+Skip automatic backup before validation
+.SS stats
+Display translation statistics and coverage.
+.PP
+.B lrm stats
+[\fB\-\-format\fR \fIFORMAT\fR]
+.TP
+.BR \-\-format " " \fIFORMAT\fR
+Output format: table (default), json, simple
+.SS view
+View details of a specific key or pattern across all languages.
+.PP
+.B lrm view
+\fIKEY_PATTERN\fR
+[\fB\-\-format\fR \fIFORMAT\fR]
+[\fB\-\-cultures\fR \fICULTURES\fR]
+[\fB\-\-search\-in\fR \fISCOPE\fR]
+[\fB\-\-status\fR \fISTATUS\fR]
+[\fB\-\-keys\-only\fR]
+[\fB\-\-count\fR]
+[\fB\-\-sort\fR]
+[\fB\-\-not\fR \fIPATTERN\fR]
+.TP
+.I KEY_PATTERN
+Key name or regex pattern (e.g., "SaveButton", "Error.*", "*.Text")
+.TP
+.BR \-\-search\-in " " \fISCOPE\fR
+Search scope: keys (default), values, comments, both
+.TP
+.BR \-\-cultures " " \fICULTURES\fR
+Comma-separated list of cultures to display
+.TP
+.BR \-\-status " " \fISTATUS\fR
+Filter by translation status: translated, untranslated, all (default)
+.SS add
+Add a new key to all language files.
+.PP
+.B lrm add
+\fIKEY\fR
+[\fB\-i\fR|\fB\-\-interactive\fR]
+[\fB\-\-lang\fR \fICULTURE\fR:\fIVALUE\fR]
+[\fB\-\-no\-backup\fR]
+.TP
+.I KEY
+The key name to add
+.TP
+.BR \-i ", " \-\-interactive
+Interactive mode (prompts for values in all languages)
+.TP
+.BR \-\-lang " " \fICULTURE\fR:\fIVALUE\fR
+Specify value for a specific language (can be repeated)
+.SS update
+Update values for an existing key.
+.PP
+.B lrm update
+\fIKEY\fR
+[\fB\-\-lang\fR \fICULTURE\fR:\fIVALUE\fR]
+[\fB\-\-no\-backup\fR]
+.SS delete
+Delete a key from all language files.
+.PP
+.B lrm delete
+\fIKEY\fR
+[\fB\-y\fR|\fB\-\-yes\fR]
+[\fB\-\-no\-backup\fR]
+.TP
+.BR \-y ", " \-\-yes
+Skip confirmation prompt
+.SS merge\-duplicates
+Merge duplicate key occurrences into a single entry.
+.PP
+.B lrm merge\-duplicates
+\fIKEY\fR
+[\fB\-\-auto\-merge\fR]
+[\fB\-\-keep\fR \fIINDEX\fR]
+[\fB\-\-no\-backup\fR]
+.SS export
+Export translations to CSV, JSON, or text format.
+.PP
+.B lrm export
+[\fB\-o\fR \fIFILE\fR]
+[\fB\-\-format\fR \fIFORMAT\fR]
+.TP
+.BR \-o ", " \-\-output " " \fIFILE\fR
+Output file path (default: Resources.csv)
+.TP
+.BR \-\-format " " \fIFORMAT\fR
+Export format: csv (default), json, text
+.SS import
+Import translations from CSV file.
+.PP
+.B lrm import
+\fIFILE\fR
+[\fB\-\-validate\-after\fR]
+[\fB\-\-no\-backup\fR]
+.TP
+.BR \-\-validate\-after
+Run validation after import
+.SS edit
+Launch interactive Terminal UI editor.
+.PP
+.B lrm edit
+[\fB\-\-no\-backup\fR]
+.PP
+Keyboard shortcuts:
+.IP \(bu 2
+↑/↓ or j/k - Navigate keys
+.IP \(bu 2
+Enter - Edit selected key
+.IP \(bu 2
+Ctrl+N - Add new key
+.IP \(bu 2
+Del - Delete key
+.IP \(bu 2
+Ctrl+T - Translate selected key
+.IP \(bu 2
+F4 - Translate all missing
+.IP \(bu 2
+F5 - Configure providers
+.IP \(bu 2
+F7 - Backup manager
+.IP \(bu 2
+Ctrl+S - Save changes
+.IP \(bu 2
+Ctrl+Q - Quit
+.SS add\-language
+Create a new language file.
+.PP
+.B lrm add\-language
+\fB\-\-culture\fR \fICULTURE\fR
+[\fB\-\-copy\-from\fR \fISOURCE\fR]
+[\fB\-\-no\-backup\fR]
+.TP
+.BR \-\-culture " " \fICULTURE\fR
+Culture code (e.g., fr, de, es)
+.TP
+.BR \-\-copy\-from " " \fISOURCE\fR
+Copy values from source culture (default: default)
+.SS remove\-language
+Delete a language file.
+.PP
+.B lrm remove\-language
+\fB\-\-culture\fR \fICULTURE\fR
+[\fB\-y\fR|\fB\-\-yes\fR]
+[\fB\-\-no\-backup\fR]
+.SS list\-languages
+List all detected language files.
+.PP
+.B lrm list\-languages
+[\fB\-\-format\fR \fIFORMAT\fR]
+.SS backup list
+List all backup versions.
+.PP
+.B lrm backup list
+[\fB\-\-format\fR \fIFORMAT\fR]
+[\fB\-\-limit\fR \fIN\fR]
+.SS backup create
+Create a manual backup.
+.PP
+.B lrm backup create
+[\fB\-\-description\fR \fIDESC\fR]
+.SS backup restore
+Restore from a backup version.
+.PP
+.B lrm backup restore
+\fB\-\-version\fR \fIN\fR
+[\fB\-\-preview\fR]
+[\fB\-\-keys\fR \fIKEYS\fR]
+[\fB\-y\fR|\fB\-\-yes\fR]
+.SS backup diff
+Compare two backup versions or current state.
+.PP
+.B lrm backup diff
+\fB\-\-version\fR \fIN\fR
+[\fB\-\-compare\-to\fR \fIN\fR]
+[\fB\-\-format\fR \fIFORMAT\fR]
+.SS backup info
+View backup metadata and statistics.
+.PP
+.B lrm backup info
+\fB\-\-version\fR \fIN\fR
+.SS backup prune
+Clean up old backup versions.
+.PP
+.B lrm backup prune
+[\fB\-\-keep\fR \fIN\fR]
+[\fB\-\-older\-than\fR \fIDAYS\fR]
+[\fB\-y\fR|\fB\-\-yes\fR]
+.SS scan
+Scan source code for localization key usage.
+.PP
+.B lrm scan
+[\fB\-\-source\-path\fR \fIPATH\fR]
+[\fB\-\-resource\-classes\fR \fICLASSES\fR]
+[\fB\-\-localization\-methods\fR \fIMETHODS\fR]
+[\fB\-\-strict\fR]
+[\fB\-\-show\-unused\fR]
+[\fB\-\-show\-missing\fR]
+[\fB\-\-exclude\fR \fIPATTERN\fR]
+[\fB\-\-format\fR \fIFORMAT\fR]
+.TP
+.BR \-\-source\-path " " \fIPATH\fR
+Path to source code (default: parent directory)
+.TP
+.BR \-\-resource\-classes " " \fICLASSES\fR
+Comma-separated resource class names
+.TP
+.BR \-\-strict
+High-confidence static references only
+.SS translate
+Automatically translate keys using machine translation.
+.PP
+.B lrm translate
+[\fB\-\-provider\fR \fIPROVIDER\fR]
+[\fB\-\-target\-languages\fR \fILANGS\fR]
+[\fB\-\-only\-missing\fR]
+[\fB\-\-keys\fR \fIKEYS\fR]
+[\fB\-\-dry\-run\fR]
+[\fB\-\-no\-backup\fR]
+.TP
+.BR \-\-provider " " \fIPROVIDER\fR
+Translation provider: google, deepl, libretranslate, azure, openai, claude, azureopenai, ollama
+.TP
+.BR \-\-target\-languages " " \fILANGS\fR
+Comma-separated target language codes
+.TP
+.BR \-\-only\-missing
+Translate only missing values
+.SS config
+Manage translation provider configuration.
+.PP
+.B lrm config
+\fISUBCOMMAND\fR
+.PP
+Subcommands:
+.IP \(bu 2
+.B list-providers
+- List available translation providers
+.IP \(bu 2
+.B set-key
+- Set API key for a provider
+.IP \(bu 2
+.B show-config
+- Display current configuration
+.SH FILES
+.TP
+.I lrm.json
+Configuration file (auto-discovered in resource folder)
+.TP
+.I ~/.lrm/
+User configuration directory
+.TP
+.I ~/.lrm/translation-cache.db
+Translation cache database
+.SH ENVIRONMENT
+.TP
+.B LRM_GOOGLE_API_KEY
+Google Cloud Translation API key
+.TP
+.B LRM_DEEPL_API_KEY
+DeepL API key
+.TP
+.B LRM_OPENAI_API_KEY
+OpenAI API key
+.TP
+.B LRM_CLAUDE_API_KEY
+Anthropic Claude API key
+.TP
+.B LRM_AZURE_TRANSLATOR_KEY
+Azure Translator API key
+.TP
+.B LRM_AZURE_OPENAI_API_KEY
+Azure OpenAI API key
+.TP
+.B DOTNET_CLI_TELEMETRY_OPTOUT
+Set to 1 to disable .NET telemetry
+.SH EXAMPLES
+.TP
+Validate all resource files:
+.B lrm validate
+.TP
+View translation statistics:
+.B lrm stats
+.TP
+Launch interactive editor:
+.B lrm edit
+.TP
+View a specific key:
+.B lrm view SaveButton
+.TP
+View keys matching a pattern:
+.B lrm view "Error.*"
+.TP
+Add a new key interactively:
+.B lrm add NewKey \-i
+.TP
+Translate missing values with Google:
+.B lrm translate \-\-only\-missing \-\-provider google \-\-target\-languages fr,de,es
+.TP
+Export to CSV:
+.B lrm export \-o translations.csv
+.TP
+Scan source code for unused keys:
+.B lrm scan \-\-show\-unused
+.TP
+Create a backup:
+.B lrm backup create \-\-description "Before major refactoring"
+.TP
+List backups:
+.B lrm backup list
+.TP
+Restore from backup:
+.B lrm backup restore \-\-version 5 \-\-preview
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+General error
+.TP
+.B 2
+Validation errors found
+.TP
+.B 3
+Missing translations found
+.SH SEE ALSO
+Full documentation: https://github.com/nickprotop/LocalizationManager
+.PP
+Installation guide:
+.I /usr/share/doc/lrm/INSTALLATION.md
+.PP
+Complete command reference:
+.I /usr/share/doc/lrm/COMMANDS.md
+.SH AUTHOR
+Nikolaos Protopapas <nikolaos.protopapas@gmail.com>
+.SH COPYRIGHT
+Copyright \(co 2025 Nikolaos Protopapas
+.PP
+Licensed under the MIT License.
+.SH BUGS
+Report bugs at: https://github.com/nickprotop/LocalizationManager/issues
