@@ -25,6 +25,72 @@ else
     VERSION="unknown"
 fi
 
+# Parse command line arguments
+BUILD_MODE="standard"
+DEB_ARCH="amd64"
+DEB_VARIANT="both"
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --deb)
+            BUILD_MODE="deb"
+            shift
+            ;;
+        --source)
+            BUILD_MODE="source"
+            shift
+            ;;
+        --arch)
+            DEB_ARCH="$2"
+            shift 2
+            ;;
+        --variant)
+            DEB_VARIANT="$2"
+            shift 2
+            ;;
+        --help)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "OPTIONS:"
+            echo "  (no options)        Build standard Linux/Windows binaries (default)"
+            echo "  --deb               Build Debian .deb packages"
+            echo "  --source            Build Debian source package for PPA"
+            echo "  --arch ARCH         Architecture for --deb (amd64|arm64, default: amd64)"
+            echo "  --variant VARIANT   Variant for --deb (lrm|lrm-standalone|both, default: both)"
+            echo "  --help              Show this help message"
+            echo ""
+            echo "EXAMPLES:"
+            echo "  $0                              # Standard build (all platforms)"
+            echo "  $0 --deb                        # Build .deb packages (amd64, both variants)"
+            echo "  $0 --deb --arch arm64           # Build .deb packages for ARM64"
+            echo "  $0 --deb --variant lrm          # Build only framework-dependent .deb"
+            echo "  $0 --source                     # Build source package for PPA"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}"
+            echo "Run '$0 --help' for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+# Handle build modes
+if [ "$BUILD_MODE" = "deb" ]; then
+    echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║      Building Debian Packages - v${VERSION}                    ║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    exec ./build-deb.sh "$DEB_ARCH" "$DEB_VARIANT"
+elif [ "$BUILD_MODE" = "source" ]; then
+    echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║      Building Source Package - v${VERSION}                     ║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    exec ./build-source-package.sh
+fi
+
+# Standard build mode continues below...
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║  Localization Resource Manager (LRM) - Build Script v${VERSION}  ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
