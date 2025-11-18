@@ -19,7 +19,7 @@ _lrm_completions() {
     local global_opts="--path -p --help -h --version -v"
 
     # Command-specific options
-    local validate_opts="--path -p --format --missing-only --placeholder-types --no-placeholder-validation --help -h"
+    local validate_opts="--path -p --format --placeholder-types --no-placeholder-validation --no-scan-code --source-path --help -h"
     local stats_opts="--path -p --format --help -h"
     local view_opts="--path -p --show-comments --format --regex --sort --no-limit --help -h"
     local add_opts="--path -p --lang -l --comment --no-backup --help -h"

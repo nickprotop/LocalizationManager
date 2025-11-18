@@ -25,6 +25,8 @@ using LocalizationManager.Core;
 using LocalizationManager.Core.Backup;
 using LocalizationManager.Core.Configuration;
 using LocalizationManager.Core.Models;
+using LocalizationManager.Core.Scanning;
+using LocalizationManager.Core.Scanning.Models;
 using LocalizationManager.Core.Translation;
 using LocalizationManager.UI.Filters;
 using Terminal.Gui;
@@ -71,6 +73,8 @@ public class ResourceEditorWindow : Window
     private List<CheckBox> _languageCheckboxes = new();
     private CheckBox? _regexCheckBox;
     private bool _showComments = false;
+    private Dictionary<string, DuplicateKeyCodeUsage> _caseInsensitiveDuplicates = new();
+    private string _resourcePath = string.Empty;
 
     public ResourceEditorWindow(List<ResourceFile> resourceFiles, ResourceFileParser parser, string defaultLanguageCode = "default", ConfigurationModel? configuration = null)
     {
@@ -101,6 +105,16 @@ public class ResourceEditorWindow : Window
 
         // Detect extra keys in translation files
         DetectAndMarkExtraKeys();
+
+        // Store resource path for code scanning
+        var firstFile = resourceFiles.FirstOrDefault();
+        if (firstFile != null)
+        {
+            _resourcePath = Path.GetDirectoryName(firstFile.Language.FilePath) ?? string.Empty;
+        }
+
+        // Detect case-insensitive duplicates
+        DetectCaseInsensitiveDuplicates();
 
         InitializeComponents();
     }
@@ -249,8 +263,8 @@ public class ResourceEditorWindow : Window
         var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
         if (defaultFile == null) return;
 
-        // Count occurrences of each key
-        var occurrenceCounts = new Dictionary<string, int>();
+        // Count occurrences of each key (case-insensitive per ResX specification)
+        var occurrenceCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in defaultFile.Entries)
         {
             if (!occurrenceCounts.ContainsKey(entry.Key))
@@ -260,9 +274,15 @@ public class ResourceEditorWindow : Window
             occurrenceCounts[entry.Key]++;
         }
 
-        // Build entry references with occurrence numbers
-        var occurrenceIndices = new Dictionary<string, int>();
-        foreach (var entry in defaultFile.Entries)
+        // Sort entries so case-variants appear together (e.g., Devices, devices)
+        var sortedEntries = defaultFile.Entries
+            .OrderBy(e => e.Key, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(e => e.Key, StringComparer.Ordinal)
+            .ToList();
+
+        // Build entry references with occurrence numbers (case-insensitive)
+        var occurrenceIndices = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in sortedEntries)
         {
             if (!occurrenceIndices.ContainsKey(entry.Key))
             {
@@ -288,7 +308,7 @@ public class ResourceEditorWindow : Window
     /// <returns>The entry, or null if not found</returns>
     private ResourceEntry? GetNthOccurrence(ResourceFile resourceFile, string key, int occurrenceNumber)
     {
-        var occurrences = resourceFile.Entries.Where(e => e.Key == key).ToList();
+        var occurrences = resourceFile.Entries.Where(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).ToList();
         if (occurrenceNumber < 1 || occurrenceNumber > occurrences.Count)
         {
             return null;
@@ -323,7 +343,7 @@ public class ResourceEditorWindow : Window
                     }
                 }, null, null, Key.Enter),
                 new MenuItem("_Delete Key", "Delete selected key", () => DeleteSelectedKey(), null, null, Key.DeleteChar),
-                new MenuItem("_Merge Duplicates", "Merge duplicate keys", () => ShowMergeDuplicatesDialog(), null, null, Key.M | Key.CtrlMask)
+                new MenuItem("_Merge Duplicates", "Merge duplicate keys", () => ShowMergeDuplicatesDialog(), null, null, Key.F8)
             }),
             new MenuBarItem("_Languages", new MenuItem[]
             {
@@ -524,6 +544,16 @@ public class ResourceEditorWindow : Window
             Table = CreateDisplayTable(_dataTable)
         };
 
+        // Intercept F8 for merge duplicates
+        _tableView.KeyPress += (args) =>
+        {
+            if (args.KeyEvent.Key == Key.F8)
+            {
+                ShowMergeDuplicatesDialog();
+                args.Handled = true;
+            }
+        };
+
         _tableView.CellActivated += (args) =>
         {
             // Get the entry reference from the selected row
@@ -621,6 +651,16 @@ public class ResourceEditorWindow : Window
             ConfigureTranslation();
             e.Handled = true;
         }
+        else if (e.KeyEvent.Key == (Key.D | Key.CtrlMask))
+        {
+            ShowDuplicatesDialog();
+            e.Handled = true;
+        }
+        else if (e.KeyEvent.Key == Key.F8)
+        {
+            ShowMergeDuplicatesDialog();
+            e.Handled = true;
+        }
     }
 
     private void FilterKeys()
@@ -715,7 +755,7 @@ public class ResourceEditorWindow : Window
     {
         // Check if this is a duplicate key
         var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
-        var totalOccurrences = defaultFile?.Entries.Count(e => e.Key == key) ?? 0;
+        var totalOccurrences = defaultFile?.Entries.Count(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)) ?? 0;
         var titleSuffix = totalOccurrences > 1 ? $" [{occurrenceNumber}]" : "";
 
         var dialog = new Dialog
@@ -1154,7 +1194,7 @@ public class ResourceEditorWindow : Window
         // Delete all occurrences from all files
         foreach (var rf in _resourceFiles)
         {
-            rf.Entries.RemoveAll(e => e.Key == key);
+            rf.Entries.RemoveAll(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
         }
 
         // Rebuild entry references and table
@@ -1181,6 +1221,309 @@ public class ResourceEditorWindow : Window
         }
 
         FilterKeys();
+    }
+
+    // Case-Insensitive Duplicate Detection
+
+    private void DetectCaseInsensitiveDuplicates()
+    {
+        _caseInsensitiveDuplicates.Clear();
+
+        var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
+        if (defaultFile == null) return;
+
+        // Find duplicates (case-insensitive per ResX specification)
+        var duplicateGroups = defaultFile.Entries
+            .GroupBy(e => e.Key, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .ToList();
+
+        if (!duplicateGroups.Any()) return;
+
+        // For each duplicate group, create usage info
+        foreach (var group in duplicateGroups)
+        {
+            var normalizedKey = group.Key.ToLowerInvariant();
+            var usage = new DuplicateKeyCodeUsage
+            {
+                NormalizedKey = normalizedKey,
+                CodeScanned = false
+            };
+
+            // Find all case variants across all resource files
+            var variants = _resourceFiles
+                .SelectMany(rf => rf.Entries)
+                .Where(e => e.Key.Equals(normalizedKey, StringComparison.OrdinalIgnoreCase))
+                .Select(e => e.Key)
+                .Distinct()
+                .ToList();
+
+            usage.ResourceVariants = variants;
+
+            _caseInsensitiveDuplicates[normalizedKey] = usage;
+        }
+    }
+
+    private void ScanCodeForDuplicateUsage()
+    {
+        if (!_caseInsensitiveDuplicates.Any()) return;
+
+        // Determine source path (parent of resource path)
+        var sourcePath = Directory.GetParent(_resourcePath)?.FullName ?? _resourcePath;
+        if (!Directory.Exists(sourcePath)) return;
+
+        // Create code scanner and scan
+        var codeScanner = new CodeScanner();
+        var scanResult = codeScanner.Scan(sourcePath, _resourceFiles, false);
+
+        // Update each duplicate with code references
+        foreach (var kvp in _caseInsensitiveDuplicates)
+        {
+            var usage = kvp.Value;
+            usage.CodeScanned = true;
+
+            foreach (var variant in usage.ResourceVariants)
+            {
+                var references = scanResult.AllKeyUsages
+                    .Where(ku => ku.Key == variant) // Exact match
+                    .SelectMany(ku => ku.References)
+                    .ToList();
+
+                usage.CodeReferences[variant] = references;
+            }
+        }
+    }
+
+    private void ShowDuplicatesDialog()
+    {
+        if (!_caseInsensitiveDuplicates.Any())
+        {
+            MessageBox.Query("No Duplicates", "No case-insensitive duplicate keys found.", "OK");
+            return;
+        }
+
+        // Scan code if not already scanned
+        if (_caseInsensitiveDuplicates.Values.Any(u => !u.CodeScanned))
+        {
+            ScanCodeForDuplicateUsage();
+        }
+
+        var dialog = new Dialog
+        {
+            Title = "Case-Insensitive Duplicates",
+            Width = 80,
+            Height = 24
+        };
+
+        var infoLabel = new Label
+        {
+            Text = $"Found {_caseInsensitiveDuplicates.Count} duplicate key(s) that differ only by case.\n" +
+                   "MSBuild treats these as duplicates and will discard one at compile time.",
+            X = 1,
+            Y = 1,
+            Width = Dim.Fill() - 2,
+            Height = 2
+        };
+
+        // Create a list view of duplicates
+        var duplicatesList = new ListView
+        {
+            X = 1,
+            Y = 4,
+            Width = Dim.Fill() - 2,
+            Height = 12
+        };
+
+        var listItems = new List<string>();
+        var duplicateKeys = _caseInsensitiveDuplicates.Keys.ToList();
+
+        foreach (var key in duplicateKeys)
+        {
+            var usage = _caseInsensitiveDuplicates[key];
+            var variants = string.Join(" / ", usage.ResourceVariants);
+            var usedCount = usage.UsedVariants.Count;
+            var unusedCount = usage.UnusedVariants.Count;
+
+            var status = "";
+            if (usage.CodeScanned)
+            {
+                if (unusedCount > 0 && usedCount > 0)
+                {
+                    status = $" [{usedCount} used, {unusedCount} unused]";
+                }
+                else if (unusedCount > 0)
+                {
+                    status = $" [all {unusedCount} unused]";
+                }
+                else
+                {
+                    status = $" [all {usedCount} used]";
+                }
+            }
+
+            listItems.Add($"{variants}{status}");
+        }
+
+        duplicatesList.SetSource(listItems);
+
+        // Details label
+        var detailsLabel = new Label
+        {
+            X = 1,
+            Y = 17,
+            Width = Dim.Fill() - 2,
+            Height = 2,
+            Text = "Select a duplicate to see details"
+        };
+
+        duplicatesList.SelectedItemChanged += (args) =>
+        {
+            if (args.Item >= 0 && args.Item < duplicateKeys.Count)
+            {
+                var key = duplicateKeys[args.Item];
+                var usage = _caseInsensitiveDuplicates[key];
+
+                var details = new List<string>();
+                foreach (var variant in usage.ResourceVariants)
+                {
+                    var refs = usage.CodeReferences.GetValueOrDefault(variant, new List<KeyReference>());
+                    if (refs.Any())
+                    {
+                        var locs = string.Join(", ", refs.Take(2).Select(r => $"{Path.GetFileName(r.FilePath)}:{r.Line}"));
+                        if (refs.Count > 2) locs += $" (+{refs.Count - 2})";
+                        details.Add($"✓ \"{variant}\" in code: {locs}");
+                    }
+                    else
+                    {
+                        details.Add($"✗ \"{variant}\" not found in code");
+                    }
+                }
+
+                // Add guidance based on usage
+                if (usage.UsedVariants.Count > 1)
+                {
+                    details.Add("⚠ Multiple variants used! Standardize casing in code first.");
+                }
+                else if (usage.UsedVariants.Count == 1 && usage.UnusedVariants.Any())
+                {
+                    details.Add($"💡 Use F8 to merge and keep \"{usage.UsedVariants.First()}\"");
+                }
+
+                detailsLabel.Text = string.Join("\n", details);
+            }
+        };
+
+        // Check if there are any unused variants to delete
+        var hasUnusedVariants = _caseInsensitiveDuplicates.Values
+            .Any(u => u.CodeScanned && u.UnusedVariants.Any());
+
+        // Check if there are duplicates where all variants are used (problematic)
+        var hasAllUsedDuplicates = _caseInsensitiveDuplicates.Values
+            .Any(u => u.CodeScanned && u.UsedVariants.Count > 1);
+
+        // Buttons
+        var btnDeleteUnused = new Button
+        {
+            Text = "Delete Unused Variants",
+            X = 1,
+            Y = 20,
+            Enabled = hasUnusedVariants
+        };
+
+        var btnClose = new Button
+        {
+            Text = "Close",
+            X = Pos.Right(btnDeleteUnused) + 2,
+            Y = 20
+        };
+
+        // Check if there are simple cases (one variant used, others unused)
+        var hasSimpleCases = _caseInsensitiveDuplicates.Values
+            .Any(u => u.CodeScanned && u.UsedVariants.Count == 1 && u.UnusedVariants.Any());
+
+        // Warning/guidance label for duplicates
+        var warningLabel = new Label
+        {
+            X = 1,
+            Y = 22,
+            Width = Dim.Fill() - 2,
+            Height = 1,
+            Text = hasAllUsedDuplicates
+                ? "⚠ Some duplicates have multiple variants used in code - fix code casing first!"
+                : hasSimpleCases
+                    ? "💡 Use F8 (Merge Duplicates) to resolve simple cases."
+                    : hasUnusedVariants
+                        ? ""
+                        : "No unused variants to delete."
+        };
+
+        btnDeleteUnused.Clicked += () =>
+        {
+            var result = MessageBox.Query(
+                "Delete Unused",
+                "Delete all key variants that are not found in code?\n" +
+                "This will remove entries from all language files.\n\n" +
+                "Note: Variants used in multiple places in code will NOT be deleted.",
+                "Delete", "Cancel");
+
+            if (result == 0)
+            {
+                DeleteUnusedDuplicateVariants();
+                Application.RequestStop();
+            }
+        };
+
+        btnClose.Clicked += () => Application.RequestStop();
+
+        dialog.Add(infoLabel, duplicatesList, detailsLabel, btnDeleteUnused, btnClose, warningLabel);
+        Application.Run(dialog);
+        dialog.Dispose();
+    }
+
+    private void DeleteUnusedDuplicateVariants()
+    {
+        var deletedCount = 0;
+
+        foreach (var kvp in _caseInsensitiveDuplicates)
+        {
+            var usage = kvp.Value;
+            if (!usage.CodeScanned) continue;
+
+            var unusedVariants = usage.UnusedVariants;
+            if (!unusedVariants.Any()) continue;
+
+            // Delete unused variants from all resource files
+            foreach (var rf in _resourceFiles)
+            {
+                foreach (var variant in unusedVariants)
+                {
+                    var removed = rf.Entries.RemoveAll(e => e.Key == variant);
+                    if (removed > 0) deletedCount += removed;
+                }
+            }
+        }
+
+        if (deletedCount > 0)
+        {
+            // Save changes
+            foreach (var rf in _resourceFiles)
+            {
+                _parser.Write(rf);
+            }
+
+            // Rebuild everything
+            BuildEntryReferences();
+            RebuildTable();
+            DetectCaseInsensitiveDuplicates();
+            _hasUnsavedChanges = false;
+            UpdateStatus();
+
+            MessageBox.Query("Deleted", $"Removed {deletedCount} unused variant(s) from resource files.", "OK");
+        }
+        else
+        {
+            MessageBox.Query("No Changes", "No unused variants to delete.", "OK");
+        }
     }
 
     // Merge Duplicates Functionality
@@ -1286,7 +1629,7 @@ public class ResourceEditorWindow : Window
         var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
         if (defaultFile == null) return;
 
-        var occurrences = defaultFile.Entries.Where(e => e.Key == key).ToList();
+        var occurrences = defaultFile.Entries.Where(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).ToList();
         if (occurrences.Count <= 1)
         {
             MessageBox.Query("No Duplicates", $"Key '{key}' has only one occurrence.", "OK");
@@ -1298,7 +1641,7 @@ public class ResourceEditorWindow : Window
 
         foreach (var rf in _resourceFiles)
         {
-            var langOccurrences = rf.Entries.Where(e => e.Key == key).ToList();
+            var langOccurrences = rf.Entries.Where(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).ToList();
 
             if (langOccurrences.Count == 0)
             {
@@ -1848,7 +2191,7 @@ public class ResourceEditorWindow : Window
                    "Enter     - Edit selected key\n" +
                    "Ctrl+N    - Add new key\n" +
                    "Del       - Delete selected key\n" +
-                   "Ctrl+M    - Merge duplicate keys\n\n" +
+                   "F8        - Merge duplicate keys\n\n" +
                    "Language Management:\n" +
                    "Ctrl+L    - List languages\n" +
                    "F2        - Add new language\n" +
@@ -1909,6 +2252,12 @@ public class ResourceEditorWindow : Window
             status += $" | ⚠ Extra: {totalExtraKeys} ({affectedLangs})";
         }
 
+        // Add case-insensitive duplicates warning
+        if (_caseInsensitiveDuplicates.Any())
+        {
+            status += $" | ⚠ Duplicates: {_caseInsensitiveDuplicates.Count} (Ctrl+D)";
+        }
+
         if (_hasUnsavedChanges) status += " [MODIFIED]";
 
         // Add help shortcuts
@@ -1966,7 +2315,7 @@ public class ResourceEditorWindow : Window
 
             foreach (var rf in visibleResourceFiles)
             {
-                var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                 row[rf.Language.Name] = entry?.Value ?? "";
             }
 
@@ -2272,7 +2621,7 @@ public class ResourceEditorWindow : Window
         {
             foreach (var rf in _resourceFiles.Where(r => !r.Language.IsDefault))
             {
-                var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                 if (entry == null || string.IsNullOrWhiteSpace(entry.Value))
                 {
                     if (!keysToTranslate.Contains(key))
@@ -2316,7 +2665,7 @@ public class ResourceEditorWindow : Window
         {
             var key = keysToTranslate[0];
             var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
-            var entry = defaultFile?.Entries.FirstOrDefault(e => e.Key == key);
+            var entry = defaultFile?.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
 
             var contextLabel = new Label("Translation Context:")
             {
@@ -2481,7 +2830,7 @@ public class ResourceEditorWindow : Window
                 foreach (var key in keysToTranslate)
                 {
                     // Get all occurrences of this key in the default file
-                    var sourceEntries = defaultFile.Entries.Where(e => e.Key == key).ToList();
+                    var sourceEntries = defaultFile.Entries.Where(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).ToList();
                     if (sourceEntries.Count == 0)
                         continue;
 
@@ -2491,7 +2840,7 @@ public class ResourceEditorWindow : Window
                         if (targetFile == null) continue;
 
                         // Get all occurrences in target language
-                        var targetEntries = targetFile.Entries.Where(e => e.Key == key).ToList();
+                        var targetEntries = targetFile.Entries.Where(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).ToList();
 
                         // If source has more occurrences than target, we need to add entries
                         // If source has fewer, we only update existing ones

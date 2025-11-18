@@ -116,12 +116,38 @@ lrm validate --config-file ./my-config.json --path ./Resources
 **Options:**
 - `-p, --path <PATH>` - Resource folder path
 - `-f, --format <FORMAT>` - Output format: `table` (default), `json`, or `simple`
+- `--placeholder-types <TYPES>` - Placeholder types to validate (dotnet, printf, icu, template, all). Comma-separated. Default: dotnet
+- `--no-placeholder-validation` - Disable placeholder validation
+- `--no-scan-code` - Disable code scanning when duplicates are found
+- `--source-path <PATH>` - Source code path to scan for duplicate key usage (defaults to parent of resource path)
 
 **What it checks:**
 - Missing keys in translation files
-- Duplicate keys within files
+- Duplicate keys within files (case-insensitive per ResX specification)
 - Empty values
 - Extra keys not in default language
+- Placeholder mismatches between source and translations
+
+**Duplicate Key Detection:**
+
+Resource key names are case-insensitive per the ResX specification. This means `Save` and `save` are considered duplicates by MSBuild and will cause build warnings. When duplicates are found, lrm automatically scans your source code to show which variant is actually used:
+
+```
+Duplicate Keys
+┌──────────┬────────────────┐
+│ Language │ Duplicate Keys │
+├──────────┼────────────────┤
+│ default  │ Devices        │
+└──────────┴────────────────┘
+
+Code Usage for Duplicate Keys:
+
+  • Variants in resources: Devices, devices
+    ✓ "Devices" found in code: MonitoringDevices.razor:31
+    ✗ "devices" not found in code
+```
+
+This helps you identify which variant to keep and which to remove.
 
 **Exit codes:**
 - `0` - No issues found
@@ -140,6 +166,15 @@ lrm validate --format json
 
 # Output as simple text (no colors or formatting)
 lrm validate --format simple
+
+# Skip code scanning for duplicates
+lrm validate --no-scan-code
+
+# Specify custom source path for code scanning
+lrm validate --source-path ./src
+
+# Validate with all placeholder types
+lrm validate --placeholder-types all
 ```
 
 **Output formats:**
@@ -158,7 +193,40 @@ No issues found.
   "missingKeys": {},
   "extraKeys": {},
   "duplicateKeys": {},
-  "emptyValues": {}
+  "duplicateKeyCodeUsages": {},
+  "emptyValues": {},
+  "placeholderMismatches": {}
+}
+```
+
+**JSON with duplicates (showing code usage):**
+```json
+{
+  "isValid": false,
+  "totalIssues": 2,
+  "missingKeys": {},
+  "extraKeys": {},
+  "duplicateKeys": {
+    "default": ["devices", "Devices"]
+  },
+  "duplicateKeyCodeUsages": {
+    "devices": {
+      "normalizedKey": "devices",
+      "resourceVariants": ["devices", "Devices"],
+      "codeScanned": true,
+      "codeReferences": {
+        "devices": [
+          { "file": "src/Services/DeviceService.cs", "line": 42 },
+          { "file": "src/Views/MainView.cs", "line": 128 }
+        ],
+        "Devices": []
+      },
+      "usedVariants": ["devices"],
+      "unusedVariants": ["Devices"]
+    }
+  },
+  "emptyValues": {},
+  "placeholderMismatches": {}
 }
 ```
 

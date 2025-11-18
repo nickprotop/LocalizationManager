@@ -479,7 +479,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
             bool firstRowForKey = true;
             foreach (var rf in resourceFiles)
             {
-                var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                 var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
                 var langName = rf.Language.IsDefault
                     ? $"{rf.Language.Name} [yellow]({defaultCode})[/]"
@@ -548,7 +548,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
             var translations = new Dictionary<string, object?>();
             foreach (var rf in resourceFiles)
             {
-                var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                 var langCode = rf.Language.GetDisplayCode();
 
                 if (showComments && entry != null && !string.IsNullOrWhiteSpace(entry.Comment))
@@ -648,7 +648,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
 
             foreach (var rf in resourceFiles)
             {
-                var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                 var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
                 var langLabel = rf.Language.IsDefault
                     ? $"{rf.Language.Name} ({defaultCode})"
@@ -1044,7 +1044,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
                     // Check if any NON-DEFAULT language has empty/whitespace value
                     includeKey = resourceFiles.Where(rf => !rf.Language.IsDefault).Any(rf =>
                     {
-                        var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                        var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                         return entry == null || string.IsNullOrWhiteSpace(entry.Value);
                     });
                     break;
@@ -1052,17 +1052,17 @@ public class ViewCommand : Command<ViewCommand.Settings>
                 case TranslationStatus.Missing:
                     // Check if key is missing in any NON-DEFAULT language file
                     includeKey = resourceFiles.Where(rf => !rf.Language.IsDefault).Any(rf =>
-                        !rf.Entries.Any(e => e.Key == key));
+                        !rf.Entries.Any(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)));
                     break;
 
                 case TranslationStatus.Untranslated:
                     // Check if any language is missing, empty, or identical to default
-                    var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == key);
+                    var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                     var defaultValue = defaultEntry?.Value ?? "";
 
                     includeKey = resourceFiles.Where(rf => !rf.Language.IsDefault).Any(rf =>
                     {
-                        var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                        var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                         // Missing, empty, or same as default
                         return entry == null ||
                                string.IsNullOrWhiteSpace(entry.Value) ||
@@ -1081,7 +1081,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
                     {
                         includeKey = resourceFiles.All(rf =>
                         {
-                            var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                            var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                             return entry != null && !string.IsNullOrWhiteSpace(entry.Value);
                         });
                     }
@@ -1090,7 +1090,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
                 case TranslationStatus.Partial:
                     // Has some translations but not all (or some are empty)
                     // First verify default entry exists and is non-empty
-                    var defaultPartialEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == key);
+                    var defaultPartialEntry = defaultFile.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                     if (defaultPartialEntry == null || string.IsNullOrWhiteSpace(defaultPartialEntry.Value))
                     {
                         // Default is broken, don't report as partial (should be caught by validate)
@@ -1103,7 +1103,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
 
                     foreach (var rf in resourceFiles.Where(rf => !rf.Language.IsDefault))
                     {
-                        var entry = rf.Entries.FirstOrDefault(e => e.Key == key);
+                        var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                         if (entry != null && !string.IsNullOrWhiteSpace(entry.Value))
                         {
                             hasAnyTranslation = true;

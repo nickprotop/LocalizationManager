@@ -335,8 +335,8 @@ public class BackupVersionManager
             var oldFile = await Task.Run(() => parser.Parse(oldLangInfo));
             var newFile = await Task.Run(() => parser.Parse(newLangInfo));
 
-            var oldKeys = new HashSet<string>(oldFile.Entries.Select(e => e.Key));
-            var newKeys = new HashSet<string>(newFile.Entries.Select(e => e.Key));
+            var oldKeys = new HashSet<string>(oldFile.Entries.Select(e => e.Key), StringComparer.OrdinalIgnoreCase);
+            var newKeys = new HashSet<string>(newFile.Entries.Select(e => e.Key), StringComparer.OrdinalIgnoreCase);
 
             // Count added and deleted keys
             var added = newKeys.Except(oldKeys).Count();
@@ -347,8 +347,8 @@ public class BackupVersionManager
             var modified = 0;
             foreach (var key in commonKeys)
             {
-                var oldEntry = oldFile.Entries.First(e => e.Key == key);
-                var newEntry = newFile.Entries.First(e => e.Key == key);
+                var oldEntry = oldFile.Entries.First(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+                var newEntry = newFile.Entries.First(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                 if (oldEntry.Value != newEntry.Value || oldEntry.Comment != newEntry.Comment)
                 {
                     modified++;

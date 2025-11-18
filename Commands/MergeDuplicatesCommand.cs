@@ -131,7 +131,7 @@ public class MergeDuplicatesCommand : Command<MergeDuplicatesCommand.Settings>
             else
             {
                 // Single key mode
-                var occurrenceCount = defaultFile.Entries.Count(e => e.Key == settings.Key);
+                var occurrenceCount = defaultFile.Entries.Count(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
 
                 if (occurrenceCount == 0)
                 {
@@ -279,7 +279,7 @@ public class MergeDuplicatesCommand : Command<MergeDuplicatesCommand.Settings>
         foreach (var rf in resourceFiles)
         {
             var occurrences = rf.Entries
-                .Where(e => e.Key == key)
+                .Where(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
             if (occurrences.Count == 0)
@@ -343,7 +343,7 @@ public class MergeDuplicatesCommand : Command<MergeDuplicatesCommand.Settings>
                 }
 
                 var occurrenceIndex = selections[rf.Language.Name] - 1;
-                var occurrences = rf.Entries.Where(e => e.Key == key).ToList();
+                var occurrences = rf.Entries.Where(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).ToList();
                 if (occurrenceIndex < occurrences.Count)
                 {
                     var selectedEntry = occurrences[occurrenceIndex];

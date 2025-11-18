@@ -103,9 +103,9 @@ public class ResourceFileParser
                 throw new InvalidOperationException("Invalid XML structure: missing root element");
             }
 
-            // Check if there are duplicate keys in resourceFile.Entries
+            // Check if there are duplicate keys in resourceFile.Entries (case-insensitive per ResX specification)
             var hasDuplicates = resourceFile.Entries
-                .GroupBy(e => e.Key)
+                .GroupBy(e => e.Key, StringComparer.OrdinalIgnoreCase)
                 .Any(g => g.Count() > 1);
 
             if (hasDuplicates)
@@ -134,9 +134,9 @@ public class ResourceFileParser
     /// </summary>
     private void WriteWithUniqueKeys(XElement root, List<ResourceEntry> entries)
     {
-        // Build a dictionary of new entries for quick lookup
-        var newEntries = entries.ToDictionary(e => e.Key);
-        var processedKeys = new HashSet<string>();
+        // Build a dictionary of new entries for quick lookup (case-insensitive per ResX specification)
+        var newEntries = entries.ToDictionary(e => e.Key, StringComparer.OrdinalIgnoreCase);
+        var processedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Update existing data elements in place (preserves original order)
         foreach (var dataElement in root.Elements("data").ToList())
@@ -172,8 +172,8 @@ public class ResourceFileParser
     /// </summary>
     private void WriteWithDuplicates(XElement root, List<ResourceEntry> entries)
     {
-        // Track which entries have been written
-        var entryIndices = new Dictionary<string, int>();
+        // Track which entries have been written (case-insensitive per ResX specification)
+        var entryIndices = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var processedEntryIndices = new HashSet<int>();
 
         // Process existing data elements and match to entries by occurrence order
@@ -193,10 +193,10 @@ public class ResourceFileParser
             var occurrenceNumber = entryIndices.ContainsKey(key) ? entryIndices[key] + 1 : 1;
             entryIndices[key] = occurrenceNumber;
 
-            // Find the corresponding entry
+            // Find the corresponding entry (case-insensitive per ResX specification)
             var matchingEntries = entries
                 .Select((e, i) => (e, i))
-                .Where(x => x.e.Key == key)
+                .Where(x => x.e.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
             if (matchingEntries.Count >= occurrenceNumber)

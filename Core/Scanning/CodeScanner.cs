@@ -57,7 +57,7 @@ public class CodeScanner
         var dynamicReferences = allReferences.Where(r => r.Key == "<dynamic>").ToList();
         var regularReferences = allReferences.Where(r => r.Key != "<dynamic>").ToList();
 
-        // Group regular references by key
+        // Group regular references by key (case-sensitive to preserve exact casing for code reference tracking)
         var keyGroups = regularReferences
             .GroupBy(r => r.Key)
             .ToList();
@@ -104,8 +104,8 @@ public class CodeScanner
             // Don't add dynamic keys to MissingKeys - they're warnings, not errors
         }
 
-        // Track unused keys (in resources, not in code)
-        var usedKeys = new HashSet<string>(keyGroups.Select(g => g.Key));
+        // Track unused keys (in resources, not in code) - case-insensitive
+        var usedKeys = new HashSet<string>(keyGroups.Select(g => g.Key), StringComparer.OrdinalIgnoreCase);
         result.UnusedKeys = resourceKeys.Where(k => !usedKeys.Contains(k)).OrderBy(k => k).ToList();
 
         // Count warnings
@@ -157,9 +157,9 @@ public class CodeScanner
         var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
 
         if (defaultFile == null)
-            return new HashSet<string>();
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        return new HashSet<string>(defaultFile.Entries.Select(e => e.Key));
+        return new HashSet<string>(defaultFile.Entries.Select(e => e.Key), StringComparer.OrdinalIgnoreCase);
     }
 
     private List<string> GetLanguagesForKey(List<ResourceFile> resourceFiles, string key)
@@ -168,7 +168,7 @@ public class CodeScanner
 
         foreach (var file in resourceFiles)
         {
-            if (file.Entries.Any(e => e.Key == key))
+            if (file.Entries.Any(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)))
             {
                 languages.Add(file.Language.GetDisplayCode());
             }

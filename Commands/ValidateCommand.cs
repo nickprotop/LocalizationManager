@@ -21,7 +21,10 @@
 
 using LocalizationManager.Core;
 using LocalizationManager.Core.Enums;
+using LocalizationManager.Core.Models;
 using LocalizationManager.Core.Output;
+using LocalizationManager.Core.Scanning;
+using LocalizationManager.Core.Scanning.Models;
 using LocalizationManager.Core.Validation;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -43,6 +46,15 @@ public class ValidateCommandSettings : BaseFormattableCommandSettings
     [Description("Disable placeholder validation")]
     [DefaultValue(false)]
     public bool NoPlaceholderValidation { get; set; }
+
+    [CommandOption("--no-scan-code")]
+    [Description("Disable code scanning when duplicates are found")]
+    [DefaultValue(false)]
+    public bool NoScanCode { get; set; }
+
+    [CommandOption("--source-path <PATH>")]
+    [Description("Source code path to scan for duplicate key usage (defaults to parent of resource path)")]
+    public string? SourcePath { get; set; }
 
     /// <summary>
     /// Gets the enabled placeholder types based on CLI options and configuration.
@@ -202,6 +214,22 @@ public class ValidateCommand : Command<ValidateCommandSettings>
             var enabledPlaceholderTypes = settings.GetEnabledPlaceholderTypes();
             var validationResult = validator.Validate(resourceFiles, enabledPlaceholderTypes);
 
+            // Scan code for duplicate key usage if duplicates found and scanning not disabled
+            if (validationResult.DuplicateKeys.Any(kv => kv.Value.Any()) && !settings.NoScanCode)
+            {
+                if (isTableFormat)
+                {
+                    AnsiConsole.MarkupLine("[dim]Scanning code for duplicate key usage...[/]");
+                }
+
+                ScanCodeForDuplicates(validationResult, resourceFiles, settings, resourcePath);
+
+                if (isTableFormat)
+                {
+                    AnsiConsole.WriteLine();
+                }
+            }
+
             // Display results based on format
             switch (format)
             {
@@ -332,6 +360,54 @@ public class ValidateCommand : Command<ValidateCommandSettings>
 
             AnsiConsole.Write(table);
             AnsiConsole.WriteLine();
+
+            // Display code usage for duplicates if scanned
+            if (result.DuplicateKeyCodeUsages.Any())
+            {
+                AnsiConsole.MarkupLine("[yellow]Code Usage for Duplicate Keys:[/]");
+                AnsiConsole.WriteLine();
+
+                foreach (var kvp in result.DuplicateKeyCodeUsages)
+                {
+                    var usage = kvp.Value;
+                    var variantsDisplay = string.Join(", ", usage.ResourceVariants.Select(v => $"[white]{v.EscapeMarkup()}[/]"));
+                    AnsiConsole.MarkupLine($"  [yellow]•[/] Variants in resources: {variantsDisplay}");
+
+                    if (usage.CodeScanned)
+                    {
+                        foreach (var variant in usage.ResourceVariants)
+                        {
+                            var refs = usage.CodeReferences.GetValueOrDefault(variant, new List<KeyReference>());
+                            if (refs.Any())
+                            {
+                                var refLocations = refs.Take(3).Select(r => $"{Path.GetFileName(r.FilePath)}:{r.Line}");
+                                var moreCount = refs.Count > 3 ? $" (+{refs.Count - 3} more)" : "";
+                                AnsiConsole.MarkupLine($"    [green]✓[/] \"{variant.EscapeMarkup()}\" found in code: {string.Join(", ", refLocations)}{moreCount}");
+                            }
+                            else
+                            {
+                                AnsiConsole.MarkupLine($"    [red]✗[/] \"{variant.EscapeMarkup()}\" [dim]not found in code[/]");
+                            }
+                        }
+
+                        // Add guidance based on usage
+                        if (usage.UsedVariants.Count > 1)
+                        {
+                            AnsiConsole.MarkupLine($"    [yellow]⚠ Multiple variants used in code! Standardize casing in code first.[/]");
+                        }
+                        else if (usage.UsedVariants.Count == 1 && usage.UnusedVariants.Any())
+                        {
+                            AnsiConsole.MarkupLine($"    [green]💡 Use 'lrm merge-duplicates {usage.UsedVariants.First().EscapeMarkup()}' to keep the used variant.[/]");
+                        }
+                    }
+                    else
+                    {
+                        AnsiConsole.MarkupLine("    [dim]Code scanning disabled[/]");
+                    }
+
+                    AnsiConsole.WriteLine();
+                }
+            }
         }
 
         // Empty values
@@ -415,6 +491,23 @@ public class ValidateCommand : Command<ValidateCommandSettings>
             kvp => kvp.Value
         );
 
+        // Normalize duplicate code usages for JSON output
+        var normalizedDuplicateCodeUsages = result.DuplicateKeyCodeUsages.ToDictionary(
+            kvp => kvp.Key,
+            kvp => new
+            {
+                normalizedKey = kvp.Value.NormalizedKey,
+                resourceVariants = kvp.Value.ResourceVariants,
+                codeScanned = kvp.Value.CodeScanned,
+                codeReferences = kvp.Value.CodeReferences.ToDictionary(
+                    cr => cr.Key,
+                    cr => cr.Value.Select(r => new { file = r.FilePath, line = r.Line }).ToList()
+                ),
+                usedVariants = kvp.Value.UsedVariants,
+                unusedVariants = kvp.Value.UnusedVariants
+            }
+        );
+
         var output = new
         {
             isValid = result.IsValid,
@@ -422,6 +515,7 @@ public class ValidateCommand : Command<ValidateCommandSettings>
             missingKeys = normalizedMissingKeys,
             extraKeys = normalizedExtraKeys,
             duplicateKeys = normalizedDuplicateKeys,
+            duplicateKeyCodeUsages = normalizedDuplicateCodeUsages,
             emptyValues = normalizedEmptyValues,
             placeholderMismatches = normalizedPlaceholderMismatches
         };
@@ -478,6 +572,46 @@ public class ValidateCommand : Command<ValidateCommandSettings>
                 Console.WriteLine($"  {langDisplay}: {string.Join(", ", kvp.Value)}");
             }
             Console.WriteLine();
+
+            // Display code usage for duplicates if scanned
+            if (result.DuplicateKeyCodeUsages.Any())
+            {
+                Console.WriteLine("Code Usage for Duplicate Keys:");
+                foreach (var kvp in result.DuplicateKeyCodeUsages)
+                {
+                    var usage = kvp.Value;
+                    Console.WriteLine($"  Variants: {string.Join(", ", usage.ResourceVariants)}");
+
+                    if (usage.CodeScanned)
+                    {
+                        foreach (var variant in usage.ResourceVariants)
+                        {
+                            var refs = usage.CodeReferences.GetValueOrDefault(variant, new List<KeyReference>());
+                            if (refs.Any())
+                            {
+                                var refLocations = refs.Take(3).Select(r => $"{Path.GetFileName(r.FilePath)}:{r.Line}");
+                                var moreCount = refs.Count > 3 ? $" (+{refs.Count - 3} more)" : "";
+                                Console.WriteLine($"    \"{variant}\" found in: {string.Join(", ", refLocations)}{moreCount}");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"    \"{variant}\" not found in code");
+                            }
+                        }
+
+                        // Add guidance based on usage
+                        if (usage.UsedVariants.Count > 1)
+                        {
+                            Console.WriteLine($"    Warning: Multiple variants used in code! Standardize casing in code first.");
+                        }
+                        else if (usage.UsedVariants.Count == 1 && usage.UnusedVariants.Any())
+                        {
+                            Console.WriteLine($"    Tip: Use 'lrm merge-duplicates {usage.UsedVariants.First()}' to keep the used variant.");
+                        }
+                    }
+                }
+                Console.WriteLine();
+            }
         }
 
         // Empty values
@@ -507,6 +641,76 @@ public class ValidateCommand : Command<ValidateCommandSettings>
                     Console.WriteLine($"    {error.Key}: {error.Value}");
                 }
             }
+        }
+    }
+
+    private void ScanCodeForDuplicates(
+        LocalizationManager.Core.Models.ValidationResult validationResult,
+        List<ResourceFile> resourceFiles,
+        ValidateCommandSettings settings,
+        string resourcePath)
+    {
+        // Collect all unique duplicate keys across all languages
+        var allDuplicateKeys = validationResult.DuplicateKeys
+            .SelectMany(kv => kv.Value)
+            .Select(k => k.ToLowerInvariant())
+            .Distinct()
+            .ToList();
+
+        if (!allDuplicateKeys.Any())
+            return;
+
+        // Determine source path
+        var sourcePath = settings.SourcePath;
+        if (string.IsNullOrEmpty(sourcePath))
+        {
+            // Default to parent directory of resource path
+            sourcePath = Directory.GetParent(resourcePath)?.FullName ?? resourcePath;
+        }
+
+        if (!Directory.Exists(sourcePath))
+            return;
+
+        // Create code scanner
+        var codeScanner = new CodeScanner();
+
+        // Scan the code
+        var scanResult = codeScanner.Scan(
+            sourcePath,
+            resourceFiles,
+            false); // strictMode
+
+        // For each duplicate key, find all case variants in resource files and their code usage
+        foreach (var normalizedKey in allDuplicateKeys)
+        {
+            var usage = new DuplicateKeyCodeUsage
+            {
+                NormalizedKey = normalizedKey,
+                CodeScanned = true
+            };
+
+            // Find all case variants in resource files
+            var variants = resourceFiles
+                .SelectMany(rf => rf.Entries)
+                .Where(e => e.Key.Equals(normalizedKey, StringComparison.OrdinalIgnoreCase))
+                .Select(e => e.Key)
+                .Distinct()
+                .ToList();
+
+            usage.ResourceVariants = variants;
+
+            // Find code references for each variant
+            foreach (var variant in variants)
+            {
+                var references = scanResult.AllKeyUsages
+                    .Where(ku => ku.Key == variant) // Exact match for code references
+                    .SelectMany(ku => ku.References)
+                    .ToList();
+
+                usage.CodeReferences[variant] = references;
+            }
+
+            validationResult.DuplicateKeyCodeUsages[normalizedKey] = usage;
         }
     }
 }

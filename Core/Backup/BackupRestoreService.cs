@@ -149,8 +149,8 @@ public class BackupRestoreService
         var backupFile = await Task.Run(() => _parser.Parse(backupLangInfo));
         var targetFile = await Task.Run(() => _parser.Parse(targetLangInfo));
 
-        // Create a dictionary of backup entries for fast lookup
-        var backupEntries = backupFile.Entries.ToDictionary(e => e.Key);
+        // Create a dictionary of backup entries for fast lookup (case-insensitive)
+        var backupEntries = backupFile.Entries.ToDictionary(e => e.Key, StringComparer.OrdinalIgnoreCase);
 
         var restoredCount = 0;
 
@@ -159,8 +159,8 @@ public class BackupRestoreService
         {
             if (backupEntries.TryGetValue(key, out var backupEntry))
             {
-                // Find or create entry in target file
-                var targetEntry = targetFile.Entries.FirstOrDefault(e => e.Key == key);
+                // Find or create entry in target file (case-insensitive)
+                var targetEntry = targetFile.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                 if (targetEntry != null)
                 {
                     // Update existing entry

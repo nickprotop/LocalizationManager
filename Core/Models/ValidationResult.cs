@@ -57,6 +57,12 @@ public class ValidationResult
     public Dictionary<string, Dictionary<string, string>> PlaceholderMismatches { get; set; } = new();
 
     /// <summary>
+    /// Code usage information for duplicate keys.
+    /// Dictionary: Duplicate Key (lowercase) -> DuplicateKeyCodeUsage
+    /// </summary>
+    public Dictionary<string, DuplicateKeyCodeUsage> DuplicateKeyCodeUsages { get; set; } = new();
+
+    /// <summary>
     /// Indicates if the validation passed without any issues.
     /// </summary>
     public bool IsValid =>

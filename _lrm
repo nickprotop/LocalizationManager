@@ -74,9 +74,10 @@ _lrm() {
                 validate)
                     _arguments \
                         '--format[Output format]:format:->formats' \
-                        '--missing-only[Show only missing translations]' \
                         '--placeholder-types[Placeholder types to validate]:placeholder types:->placeholder_types' \
                         '--no-placeholder-validation[Disable placeholder validation]' \
+                        '--no-scan-code[Disable code scanning when duplicates are found]' \
+                        '--source-path[Source code path to scan for duplicate key usage]:directory:_directories' \
                         $global_opts
 
                     local -a placeholder_type_opts

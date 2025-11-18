@@ -138,9 +138,9 @@ public class BackupDiffService
     {
         var changes = new List<KeyChange>();
 
-        // Create dictionaries for faster lookup
-        var entriesA = fileA.Entries.ToDictionary(e => e.Key);
-        var entriesB = fileB.Entries.ToDictionary(e => e.Key);
+        // Create dictionaries for faster lookup (case-insensitive)
+        var entriesA = fileA.Entries.ToDictionary(e => e.Key, StringComparer.OrdinalIgnoreCase);
+        var entriesB = fileB.Entries.ToDictionary(e => e.Key, StringComparer.OrdinalIgnoreCase);
 
         var allKeys = entriesA.Keys.Union(entriesB.Keys).ToHashSet();
 

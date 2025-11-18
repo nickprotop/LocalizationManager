@@ -61,13 +61,13 @@ public class ResourceValidator
             return result; // No default language found
         }
 
-        var defaultKeys = defaultFile.Entries.Select(e => e.Key).ToHashSet();
+        var defaultKeys = defaultFile.Entries.Select(e => e.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         // Validate each non-default language
         foreach (var resourceFile in resourceFiles.Where(rf => !rf.Language.IsDefault))
         {
             var langCode = resourceFile.Language.Code;
-            var langKeys = resourceFile.Entries.Select(e => e.Key).ToHashSet();
+            var langKeys = resourceFile.Entries.Select(e => e.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             // Find missing keys (in default but not in translation)
             var missingKeys = defaultKeys.Except(langKeys).ToList();
@@ -93,9 +93,9 @@ public class ResourceValidator
                 result.EmptyValues[langCode] = emptyKeys;
             }
 
-            // Find duplicate keys
+            // Find duplicate keys (case-insensitive per ResX specification)
             var duplicateKeys = resourceFile.Entries
-                .GroupBy(e => e.Key)
+                .GroupBy(e => e.Key, StringComparer.OrdinalIgnoreCase)
                 .Where(g => g.Count() > 1)
                 .Select(g => g.Key)
                 .ToList();
@@ -110,7 +110,7 @@ public class ResourceValidator
             {
                 foreach (var entry in resourceFile.Entries)
                 {
-                    var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == entry.Key);
+                    var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key.Equals(entry.Key, StringComparison.OrdinalIgnoreCase));
                     if (defaultEntry != null && !string.IsNullOrEmpty(defaultEntry.Value) && !string.IsNullOrEmpty(entry.Value))
                     {
                         var validationResult = PlaceholderValidator.Validate(defaultEntry.Value, entry.Value, enabledPlaceholderTypes);
@@ -127,9 +127,9 @@ public class ResourceValidator
             }
         }
 
-        // Also check default language for duplicates and empty values
+        // Also check default language for duplicates and empty values (case-insensitive per ResX specification)
         var defaultDuplicates = defaultFile.Entries
-            .GroupBy(e => e.Key)
+            .GroupBy(e => e.Key, StringComparer.OrdinalIgnoreCase)
             .Where(g => g.Count() > 1)
             .Select(g => g.Key)
             .ToList();

@@ -106,7 +106,7 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
                 return 1;
             }
 
-            var existingEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == settings.Key);
+            var existingEntry = defaultFile.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
             if (existingEntry == null)
             {
                 AnsiConsole.MarkupLine($"[red]✗ Key '{settings.Key.EscapeMarkup()}' not found![/]");
@@ -121,7 +121,7 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
 
             foreach (var rf in resourceFiles)
             {
-                var entry = rf.Entries.FirstOrDefault(e => e.Key == settings.Key);
+                var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
                 var value = entry?.Value?.EscapeMarkup() ?? "[dim](empty)[/]";
                 currentTable.AddRow(rf.Language.Name, value);
             }
@@ -140,7 +140,7 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
                 // Interactive mode - prompt for each language
                 foreach (var rf in resourceFiles)
                 {
-                    var entry = rf.Entries.FirstOrDefault(e => e.Key == settings.Key);
+                    var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
                     var currentValue = entry?.Value ?? "";
 
                     var newValue = AnsiConsole.Prompt(
@@ -214,7 +214,7 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
                     var rf = resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
                     if (rf != null)
                     {
-                        var entry = rf.Entries.FirstOrDefault(e => e.Key == settings.Key);
+                        var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
                         var oldValue = entry?.Value?.EscapeMarkup() ?? "[dim](empty)[/]";
                         previewTable.AddRow(rf.Language.Name, oldValue, kvp.Value.EscapeMarkup());
                     }
@@ -255,7 +255,7 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
                 var rf = resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
                 if (rf != null)
                 {
-                    var entry = rf.Entries.FirstOrDefault(e => e.Key == settings.Key);
+                    var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
                     if (entry != null)
                     {
                         entry.Value = kvp.Value;
@@ -269,7 +269,7 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
             {
                 foreach (var rf in resourceFiles)
                 {
-                    var entry = rf.Entries.FirstOrDefault(e => e.Key == settings.Key);
+                    var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
                     if (entry != null)
                     {
                         entry.Comment = settings.Comment;

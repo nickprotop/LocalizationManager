@@ -93,9 +93,9 @@ public class AddCommand : Command<AddCommandSettings>
                 }
             }
 
-            // Check if key already exists
+            // Check if key already exists (case-insensitive per ResX specification)
             var defaultFile = resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
-            if (defaultFile != null && defaultFile.Entries.Any(e => e.Key == settings.Key))
+            if (defaultFile != null && defaultFile.Entries.Any(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase)))
             {
                 AnsiConsole.MarkupLine($"[red]✗ Key '{settings.Key.EscapeMarkup()}' already exists![/]");
                 return 1;

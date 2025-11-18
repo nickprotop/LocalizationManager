@@ -99,7 +99,7 @@ public class DeleteCommand : Command<DeleteCommand.Settings>
             }
 
             // Check if key exists and count occurrences
-            var occurrenceCount = defaultFile.Entries.Count(e => e.Key == settings.Key);
+            var occurrenceCount = defaultFile.Entries.Count(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
 
             if (occurrenceCount == 0)
             {
@@ -122,7 +122,7 @@ public class DeleteCommand : Command<DeleteCommand.Settings>
 
             foreach (var rf in resourceFiles)
             {
-                var entry = rf.Entries.FirstOrDefault(e => e.Key == settings.Key);
+                var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
                 var value = entry?.Value?.EscapeMarkup() ?? "[dim](not found)[/]";
                 table.AddRow(rf.Language.Name, value);
             }
@@ -169,7 +169,7 @@ public class DeleteCommand : Command<DeleteCommand.Settings>
 
             foreach (var rf in resourceFiles)
             {
-                var removed = rf.Entries.RemoveAll(e => e.Key == settings.Key);
+                var removed = rf.Entries.RemoveAll(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
                 if (removed > 0) deletedCount++;
             }
 

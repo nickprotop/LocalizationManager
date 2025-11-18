@@ -409,7 +409,7 @@ Launch with `lrm edit` to get a visual interface:
 - `Enter` - Edit selected key
 - `Ctrl+N` - Add new key
 - `Del` - Delete key (with duplicate handling options)
-- `Ctrl+M` - Merge duplicate keys
+- `F8` - Merge duplicate keys
 - `Ctrl+T` - Translate selected key or auto-translate in edit dialog
 - `F4` - Translate all missing values
 - `F5` - Configure translation providers
