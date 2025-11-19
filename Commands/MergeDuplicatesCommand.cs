@@ -490,7 +490,9 @@ public class MergeDuplicatesCommand : Command<MergeDuplicatesCommand.Settings>
             var selectedIndex = selectedOccurrence - 1;
             if (selectedIndex >= 0 && selectedIndex < occurrences.Count)
             {
-                occurrences[selectedIndex].Entry.Key = standardKeyName;
+                // Use direct list access instead of tuple to ensure modification persists
+                var entryIndex = occurrences[selectedIndex].Index;
+                rf.Entries[entryIndex].Key = standardKeyName;
             }
 
             if (occurrences.Count <= 1)

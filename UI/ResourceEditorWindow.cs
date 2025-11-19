@@ -1702,7 +1702,9 @@ public class ResourceEditorWindow : Window
             var selectedIndex = selectedOccurrence - 1;
             if (selectedIndex >= 0 && selectedIndex < occurrenceList.Count)
             {
-                occurrenceList[selectedIndex].Entry.Key = selectedKeyName;
+                // Use direct list access instead of tuple to ensure modification persists
+                var entryIndex = occurrenceList[selectedIndex].Index;
+                rf.Entries[entryIndex].Key = selectedKeyName;
             }
 
             if (occurrenceList.Count <= 1)
