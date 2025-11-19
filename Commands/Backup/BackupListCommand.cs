@@ -95,20 +95,20 @@ public class BackupListCommand : AsyncCommand<BackupListCommand.Settings>
             return;
         }
 
-        var files = Directory.GetFiles(backupDir, "*.resx", SearchOption.AllDirectories);
-        var fileNames = files.Select(f => Path.GetFileName(f))
-            .Distinct()
+        var directories = Directory.GetDirectories(backupDir);
+        var fileNames = directories
+            .Select(d => Path.GetFileName(d))
             .OrderBy(f => f)
             .ToList();
 
+        if (!fileNames.Any())
+        {
+            AnsiConsole.MarkupLine("[yellow]No backups found.[/]");
+            return;
+        }
+
         foreach (var fileName in fileNames)
         {
-            var baseName = Path.GetFileNameWithoutExtension(fileName);
-            if (baseName.StartsWith("v") && baseName.Contains("_"))
-            {
-                continue; // Skip backup files themselves
-            }
-
             await ListFileBackupsAsync(manager, fileName, basePath, settings);
             AnsiConsole.WriteLine();
         }
