@@ -92,11 +92,14 @@ public class BackupVersionManager
 
         // Calculate changed keys (compare with previous version)
         var changedKeys = 0;
+        List<string>? changedKeyNames = null;
         var previousBackup = manifest.GetLatest();
         if (previousBackup != null)
         {
             var previousBackupPath = Path.Combine(backupDir, previousBackup.FilePath);
-            changedKeys = await CountChangedKeysAsync(previousBackupPath, backupFilePath);
+            var (count, keyNames) = await CountChangedKeysAsync(previousBackupPath, backupFilePath);
+            changedKeys = count;
+            changedKeyNames = keyNames;
         }
 
         // Create metadata
@@ -109,6 +112,7 @@ public class BackupVersionManager
             User = Environment.UserName,
             KeyCount = keyCount,
             ChangedKeys = changedKeys,
+            ChangedKeyNames = changedKeyNames,
             FilePath = backupFileName
         };
 
@@ -323,9 +327,9 @@ public class BackupVersionManager
     }
 
     /// <summary>
-    /// Counts the number of keys that changed between two versions.
+    /// Counts the number of keys that changed between two versions and returns their names.
     /// </summary>
-    private async Task<int> CountChangedKeysAsync(string oldFilePath, string newFilePath)
+    private async Task<(int count, List<string> keyNames)> CountChangedKeysAsync(string oldFilePath, string newFilePath)
     {
         try
         {
@@ -338,28 +342,33 @@ public class BackupVersionManager
             var oldKeys = new HashSet<string>(oldFile.Entries.Select(e => e.Key), StringComparer.OrdinalIgnoreCase);
             var newKeys = new HashSet<string>(newFile.Entries.Select(e => e.Key), StringComparer.OrdinalIgnoreCase);
 
-            // Count added and deleted keys
-            var added = newKeys.Except(oldKeys).Count();
-            var deleted = oldKeys.Except(newKeys).Count();
+            var changedKeyNames = new List<string>();
 
-            // Count modified keys (same key, different value)
+            // Added keys
+            var addedKeys = newKeys.Except(oldKeys).ToList();
+            changedKeyNames.AddRange(addedKeys);
+
+            // Deleted keys
+            var deletedKeys = oldKeys.Except(newKeys).ToList();
+            changedKeyNames.AddRange(deletedKeys);
+
+            // Modified keys (same key, different value or comment)
             var commonKeys = oldKeys.Intersect(newKeys);
-            var modified = 0;
             foreach (var key in commonKeys)
             {
                 var oldEntry = oldFile.Entries.First(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                 var newEntry = newFile.Entries.First(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                 if (oldEntry.Value != newEntry.Value || oldEntry.Comment != newEntry.Comment)
                 {
-                    modified++;
+                    changedKeyNames.Add(key);
                 }
             }
 
-            return added + deleted + modified;
+            return (changedKeyNames.Count, changedKeyNames);
         }
         catch
         {
-            return 0;
+            return (0, new List<string>());
         }
     }
 

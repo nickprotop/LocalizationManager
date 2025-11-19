@@ -62,6 +62,11 @@ public class BackupMetadata
     public int ChangedKeys { get; set; }
 
     /// <summary>
+    /// Names of keys that changed compared to previous version.
+    /// </summary>
+    public List<string>? ChangedKeyNames { get; set; }
+
+    /// <summary>
     /// Relative path to the backup file.
     /// </summary>
     public string FilePath { get; set; } = string.Empty;

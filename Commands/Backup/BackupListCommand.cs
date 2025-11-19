@@ -136,8 +136,7 @@ public class BackupListCommand : AsyncCommand<BackupListCommand.Settings>
 
         if (settings.ShowDetails)
         {
-            table.AddColumn("Hash");
-            table.AddColumn("User");
+            table.AddColumn("Changed Keys");
         }
 
         var displayBackups = settings.Limit > 0
@@ -157,8 +156,19 @@ public class BackupListCommand : AsyncCommand<BackupListCommand.Settings>
 
             if (settings.ShowDetails)
             {
-                row.Add(backup.Hash[..8] + "...");
-                row.Add(backup.User ?? "-");
+                if (backup.ChangedKeyNames != null && backup.ChangedKeyNames.Any())
+                {
+                    var keysList = string.Join(", ", backup.ChangedKeyNames.Take(5));
+                    if (backup.ChangedKeyNames.Count > 5)
+                    {
+                        keysList += $" (+{backup.ChangedKeyNames.Count - 5} more)";
+                    }
+                    row.Add(keysList);
+                }
+                else
+                {
+                    row.Add("-");
+                }
             }
 
             table.AddRow(row.ToArray());
