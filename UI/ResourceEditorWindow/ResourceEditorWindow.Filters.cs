@@ -313,6 +313,12 @@ public partial class ResourceEditorWindow : Window
         var langCount = _resourceFiles.Count;
         var status = $"Keys: {filteredCount}/{totalCount} | Languages: {langCount}";
 
+        // Add selection count if any rows are selected
+        if (_selectedEntries.Any())
+        {
+            status += $" | 📋 Selected: {_selectedEntries.Count}";
+        }
+
         // Add extra keys warning if any found
         if (_extraKeysByLanguage.Any())
         {

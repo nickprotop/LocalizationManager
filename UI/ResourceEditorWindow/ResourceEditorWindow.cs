@@ -85,6 +85,9 @@ public partial class ResourceEditorWindow : Window
     private CheckBox? _filterUnusedCheckBox; // Filter to show only unused in code
     private CheckBox? _filterMissingFromResourcesCheckBox; // Filter to show only missing from .resx
     private OperationHistory _operationHistory = new(); // Undo/redo history
+    private HashSet<int> _selectedRowIndices = new(); // Selected row indices for batch operations
+    private int _selectionAnchor = -1; // Anchor point for Shift+selection
+    private Dictionary<string, EntryReference> _selectedEntries = new(); // Selected entries by DisplayKey for persistence across rebuilds
 
     /// <summary>
     /// Represents the status of a row for color coding purposes

@@ -70,6 +70,11 @@ public partial class ResourceEditorWindow : Window
                 new MenuItem("_Delete Key", "Delete selected key", () => DeleteSelectedKey(), null, null, Key.DeleteChar),
                 new MenuItem("_Merge Duplicates", "Merge duplicate keys", () => ShowMergeDuplicatesDialog(), null, null, Key.F8),
                 null!, // separator
+                new MenuItem("Select _All", "Select all visible keys", () => SelectAll(), null, null, Key.A | Key.CtrlMask),
+                new MenuItem("Clear Se_lection", "Clear all selections", () => ClearSelection(), null, null, Key.Esc),
+                new MenuItem("_Bulk Translate", "Translate selected keys", () => BulkTranslate(), null, null, (Key)0),
+                new MenuItem("Bulk D_elete", "Delete selected keys", () => BulkDelete(), null, null, (Key)0),
+                null!, // separator
                 new MenuItem("_Copy Value", "Copy selected value to clipboard", () => CopySelectedValueToClipboard(), null, null, Key.C | Key.CtrlMask),
                 new MenuItem("_Paste Value", "Paste value from clipboard", () => PasteValueFromClipboard(), null, null, Key.V | Key.CtrlMask)
             }),

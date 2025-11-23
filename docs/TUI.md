@@ -16,6 +16,7 @@ This document provides comprehensive information about LRM's interactive Termina
   - [Undo/Redo](#undoredo)
   - [Context Menus](#context-menus)
   - [Clipboard Operations](#clipboard-operations)
+  - [Batch Operations](#batch-operations)
   - [Duplicate Key Handling](#duplicate-key-handling)
   - [Status Indicators](#status-indicators)
   - [Comments](#comments)
@@ -117,6 +118,15 @@ lrm edit --config-file lrm.json
 | `Ctrl+Y` | Redo last operation |
 | `Ctrl+C` | Copy selected value to clipboard |
 | `Ctrl+V` | Paste value from clipboard |
+
+### Batch Operations
+| Key | Action |
+|-----|--------|
+| `Space` | Toggle selection for current row |
+| `Ctrl+A` | Select all visible keys |
+| `Esc` | Clear all selections (when rows are selected) |
+| `Shift+↑` | Extend selection upward |
+| `Shift+↓` | Extend selection downward |
 
 ### Search and Filter
 | Key | Action |
@@ -374,6 +384,66 @@ The TUI supports clipboard integration for copying and pasting values.
 
 ---
 
+### Batch Operations
+
+The TUI supports multi-selection for performing operations on multiple keys at once.
+
+#### Selecting Multiple Keys
+
+**Keyboard Selection:**
+- `Space` - Toggle selection for current row
+- `Ctrl+A` - Select all visible keys
+- `Esc` - Clear all selections
+- `Shift+↑` / `Shift+↓` - Extend selection upward/downward
+
+**Visual Indication:**
+- Selected rows are marked with a `►` (arrow) indicator before the key name
+- Status bar shows selection count: `📋 Selected: 5`
+
+**Selection Persistence:**
+- Selections persist across table rebuilds (search, filter, etc.)
+- Navigation and filtering won't clear your selection
+- Press `Esc` to explicitly clear selections
+
+#### Bulk Operations
+
+Once you've selected multiple keys, you can perform batch operations:
+
+**Bulk Translate:**
+1. Select keys (using `Space`, `Ctrl+A`, or `Shift+arrows`)
+2. Menu → Edit → Bulk Translate (or use context menu)
+3. Select source and target languages
+4. Choose translation provider
+5. All selected keys are translated in batch
+6. Progress bar shows translation status
+
+**Bulk Delete:**
+1. Select keys to delete
+2. Menu → Edit → Bulk Delete (or use context menu)
+3. Confirm deletion dialog shows count of selected entries
+4. All selected keys are deleted
+5. Automatic backup created before deletion
+
+**Menu Access:**
+- Menu → Edit → Select All (`Ctrl+A`)
+- Menu → Edit → Clear Selection (`Esc`)
+- Menu → Edit → Bulk Translate
+- Menu → Edit → Bulk Delete
+
+**Use Cases:**
+- Translate all error messages at once
+- Delete multiple unused keys after code scan
+- Select keys by pattern (search first) then bulk translate
+- Clean up groups of deprecated keys
+
+**Notes:**
+- Bulk operations respect occurrence numbers for duplicate keys
+- Selection count includes all occurrences if duplicates are selected
+- Bulk delete creates a backup automatically (operation: `tui-bulk-delete`)
+- No selection = operation shows error message
+
+---
+
 ### Duplicate Key Handling
 
 `.resx` files can have multiple entries with the same key name. LRM tracks these as occurrences.
@@ -527,6 +597,36 @@ Each resource entry can have a comment/description.
 5. Review files, line numbers, and patterns
 6. Note any issues or refactoring opportunities
 7. Close dialog (Esc)
+
+### Example 7: Bulk Translating Error Messages
+
+1. Launch TUI: `lrm edit`
+2. Search for error keys: `/Error` → Enter
+3. Status filter → "Missing" (to find untranslated error messages)
+4. Press `Ctrl+A` to select all visible keys
+5. Menu → Edit → Bulk Translate
+6. Select source language: "default (en)"
+7. Select target language: "Greek (el)"
+8. Choose provider: "Google Translate"
+9. Confirm translation
+10. Wait for progress bar to complete
+11. Press `Esc` to clear search and review results
+12. Press `Ctrl+S` to save
+
+### Example 8: Cleaning Up Unused Keys After Scan
+
+1. Launch TUI: `lrm edit --source-path ./src`
+2. Press `F7` to scan source code
+3. Wait for scan to complete
+4. Check "Unused in code" filter checkbox
+5. Review the list of unused keys
+6. Use `Space` to toggle selection for keys you want to delete
+7. Or press `Ctrl+A` to select all if you're confident
+8. Menu → Edit → Bulk Delete
+9. Confirm deletion (shows count of entries to delete)
+10. Keys are deleted and backup is created
+11. Uncheck "Unused in code" filter to see remaining keys
+12. Press `Ctrl+S` to save
 
 ---
 

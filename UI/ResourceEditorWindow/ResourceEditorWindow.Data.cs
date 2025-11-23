@@ -89,14 +89,23 @@ public partial class ResourceEditorWindow : Window
                 row[$"_Comment_{rf.Language.Code}"] = entry?.Comment ?? "";
             }
 
-            // Add status indicator to display key based on row status
+            // Build display key with selection marker and status indicator
             var displayKey = entryRef.DisplayKey;
+
+            // Add selection marker if this entry is selected
+            if (IsEntrySelected(entryRef))
+            {
+                displayKey = $"► {displayKey}";
+            }
+
+            // Add status indicator based on row status
             var status = DetermineRowStatus(row);
             var statusIcon = GetStatusIcon(status);
             if (!string.IsNullOrEmpty(statusIcon))
             {
                 displayKey = $"{statusIcon} {displayKey}";
             }
+
             row["Key"] = displayKey;
 
             dt.Rows.Add(row);
@@ -369,6 +378,9 @@ public partial class ResourceEditorWindow : Window
         }
 
         FilterKeys();
+
+        // Rebuild selection indices to map selected entries to current row indices
+        RebuildSelectionIndices();
     }
 
     // Case-Insensitive Duplicate Detection

@@ -520,12 +520,12 @@
   - [x] Operation descriptions in menu (e.g., "Undo: Edit 'HelloWorld' in en")
   - [x] Max history size: 50 operations (configurable)
 
-- [ ] Batch Operations - **DEFERRED** (complex feature for future release)
-  - [ ] Multi-select rows (Shift+Up/Down, Ctrl+Click)
-  - [ ] Bulk translate selected keys
-  - [ ] Bulk delete selected keys
-  - [ ] Visual indication of selected rows
-  - [ ] "Select All" (Ctrl+A) and "Deselect All"
+- [x] Batch Operations - **COMPLETED** ✅
+  - [x] Multi-select rows (Space, Shift+Up/Down for range selection)
+  - [x] Bulk translate selected keys
+  - [x] Bulk delete selected keys
+  - [x] Visual indication of selected rows (► marker)
+  - [x] "Select All" (Ctrl+A) and "Clear Selection" (Esc)
 
 - [ ] Export Filtered View - **DEFERRED** (CLI export command already exists)
   - [ ] Add "Export Current View" option (Ctrl+E)
@@ -1013,10 +1013,10 @@ None
 - ✅ Undo/Redo system (UI/OperationHistory.cs with Ctrl+Z/Ctrl+Y)
 - ✅ OperationHistoryTests.cs (15 comprehensive unit tests)
 - ✅ All 488 tests passing (100% pass rate)
-- ✅ Comprehensive docs/TUI.md (500+ lines with all features, shortcuts, examples)
+- ✅ Comprehensive docs/TUI.md (600+ lines with all features, shortcuts, examples)
 - ✅ Updated README.md and ROADMAP.md
 - ✅ Code refactoring - COMPLETED (ResourceEditorWindow split into 7 partial classes)
-- ⏭️ Batch operations - DEFERRED (complex feature for future)
+- ✅ Batch operations - COMPLETED (multi-select with Space/Ctrl+A, bulk translate/delete)
 - ⏭️ Export filtered view - DEFERRED (CLI export exists)
 
 **Next Milestone:** Phase 5 - Simple CLI Chaining

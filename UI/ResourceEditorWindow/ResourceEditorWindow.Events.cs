@@ -156,6 +156,31 @@ public partial class ResourceEditorWindow : Window
             PasteValueFromClipboard();
             e.Handled = true;
         }
+        else if (e.KeyEvent.Key == (Key.A | Key.CtrlMask))
+        {
+            SelectAll();
+            e.Handled = true;
+        }
+        else if (e.KeyEvent.Key == Key.Esc && _selectedRowIndices.Any())
+        {
+            ClearSelection();
+            e.Handled = true;
+        }
+        else if (e.KeyEvent.Key == Key.Space)
+        {
+            ToggleCurrentRowSelection();
+            e.Handled = true;
+        }
+        else if (e.KeyEvent.Key == (Key.CursorUp | Key.ShiftMask))
+        {
+            ExtendSelectionUp();
+            e.Handled = true;
+        }
+        else if (e.KeyEvent.Key == (Key.CursorDown | Key.ShiftMask))
+        {
+            ExtendSelectionDown();
+            e.Handled = true;
+        }
     }
 
     /// <summary>
