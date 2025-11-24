@@ -141,6 +141,7 @@ lrm edit --config-file lrm.json
 | Key | Action |
 |-----|--------|
 | `F7` | Scan source code for key usage |
+| `Shift+F7` | View code references for selected key |
 
 ### View
 | Key | Action |
@@ -303,8 +304,10 @@ Use the checkboxes to show only:
 #### Viewing Code References
 For keys that are used in code:
 1. Select the key
-2. Right-click → "View Code References"
+2. Press `Shift+F7` OR Right-click → "View Code References"
 3. See table with file paths, line numbers, patterns, and confidence
+
+**Quick Access:** Use `Shift+F7` to quickly view code references for the selected key without using the mouse.
 
 **Scan Configuration:**
 The scan respects configuration from `lrm.json`:

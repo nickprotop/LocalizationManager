@@ -763,6 +763,24 @@ public partial class ResourceEditorWindow : Window
         ShowTranslateDialog(new List<string> { key });
     }
 
+    private void ViewCodeReferencesForSelectedKey()
+    {
+        if (_tableView == null || _tableView.SelectedRow < 0)
+        {
+            MessageBox.ErrorQuery("Error", "Please select a key to view code references.", "OK");
+            return;
+        }
+
+        // Get the key from the selected row
+        var key = GetKeyFromSelectedRow(_tableView.SelectedRow);
+        if (string.IsNullOrEmpty(key))
+        {
+            return;
+        }
+
+        ShowCodeReferences(key);
+    }
+
     private void TranslateMissing()
     {
         // Find all keys with missing values

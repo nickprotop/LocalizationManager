@@ -141,6 +141,11 @@ public partial class ResourceEditorWindow : Window
             PerformFullCodeScan();
             e.Handled = true;
         }
+        else if (e.KeyEvent.Key == (Key.F7 | Key.ShiftMask))
+        {
+            ViewCodeReferencesForSelectedKey();
+            e.Handled = true;
+        }
         else if (e.KeyEvent.Key == Key.F8)
         {
             ShowMergeDuplicatesDialog();
