@@ -27,6 +27,11 @@ public class ConfigurationModel
     /// Validation configuration settings.
     /// </summary>
     public ValidationConfiguration? Validation { get; set; }
+
+    /// <summary>
+    /// Web server configuration settings.
+    /// </summary>
+    public WebConfiguration? Web { get; set; }
 }
 
 /// <summary>
@@ -359,4 +364,82 @@ public class ValidationConfiguration
     /// Default: true
     /// </summary>
     public bool EnablePlaceholderValidation { get; set; } = true;
+}
+
+/// <summary>
+/// Configuration settings for web server.
+/// </summary>
+public class WebConfiguration
+{
+    /// <summary>
+    /// Port to bind the web server to.
+    /// Environment variable: LRM_WEB_PORT
+    /// Default: 5000
+    /// </summary>
+    public int? Port { get; set; }
+
+    /// <summary>
+    /// Address to bind the web server to (e.g., "localhost", "0.0.0.0", "*").
+    /// Environment variable: LRM_WEB_BIND_ADDRESS
+    /// Default: localhost
+    /// </summary>
+    public string? BindAddress { get; set; }
+
+    /// <summary>
+    /// Whether to automatically open browser on startup.
+    /// Environment variable: LRM_WEB_AUTO_OPEN_BROWSER (true/false)
+    /// Default: true
+    /// </summary>
+    public bool? AutoOpenBrowser { get; set; }
+
+    /// <summary>
+    /// Whether to enable HTTPS.
+    /// Environment variable: LRM_WEB_HTTPS_ENABLED (true/false)
+    /// Default: false
+    /// </summary>
+    public bool? EnableHttps { get; set; }
+
+    /// <summary>
+    /// Path to HTTPS certificate file (.pfx).
+    /// Environment variable: LRM_WEB_HTTPS_CERT_PATH
+    /// Required if EnableHttps is true.
+    /// </summary>
+    public string? HttpsCertificatePath { get; set; }
+
+    /// <summary>
+    /// Password for HTTPS certificate.
+    /// Environment variable: LRM_WEB_HTTPS_CERT_PASSWORD
+    /// Required if EnableHttps is true and certificate is password-protected.
+    /// </summary>
+    public string? HttpsCertificatePassword { get; set; }
+
+    /// <summary>
+    /// CORS configuration for API access.
+    /// </summary>
+    public CorsConfiguration? Cors { get; set; }
+}
+
+/// <summary>
+/// CORS configuration for web server.
+/// </summary>
+public class CorsConfiguration
+{
+    /// <summary>
+    /// Whether to enable CORS.
+    /// Default: false
+    /// </summary>
+    public bool Enabled { get; set; } = false;
+
+    /// <summary>
+    /// Allowed origins for CORS (e.g., ["http://localhost:3000", "https://example.com"]).
+    /// Use ["*"] to allow all origins (not recommended for production).
+    /// Default: empty list
+    /// </summary>
+    public List<string>? AllowedOrigins { get; set; }
+
+    /// <summary>
+    /// Whether to allow credentials in CORS requests.
+    /// Default: false
+    /// </summary>
+    public bool AllowCredentials { get; set; } = false;
 }

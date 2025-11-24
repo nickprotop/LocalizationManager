@@ -112,6 +112,14 @@ app.Configure(config =>
         .WithExample(new[] { "edit", "--path", "../Resources" })
         .WithExample(new[] { "edit", "-p", "./Resources" });
 
+    config.AddCommand<WebCommand>("web")
+        .WithDescription("Start web server hosting API and Blazor WASM UI")
+        .WithExample(new[] { "web" })
+        .WithExample(new[] { "web", "--path", "../Resources" })
+        .WithExample(new[] { "web", "--port", "8080" })
+        .WithExample(new[] { "web", "--bind-address", "0.0.0.0", "--port", "5000" })
+        .WithExample(new[] { "web", "--source-path", "./src" });
+
     config.AddCommand<AddLanguageCommand>("add-language")
         .WithDescription("Create a new language resource file")
         .WithExample(new[] { "add-language", "--culture", "fr" })
