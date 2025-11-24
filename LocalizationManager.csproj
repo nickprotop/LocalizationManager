@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -34,6 +34,7 @@
     <PackageReference Include="Terminal.Gui" Version="1.19.0" />
     <PackageReference Include="DeepL.net" Version="1.11.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -44,10 +45,17 @@
     <Compile Remove="LocalizationManager.Tests/**" />
     <EmbeddedResource Remove="LocalizationManager.Tests/**" />
     <None Remove="LocalizationManager.Tests/**" />
+    <Content Remove="LocalizationManager.Tests/**" />
 
     <Compile Remove="LocalizationManager.Shared/**" />
     <EmbeddedResource Remove="LocalizationManager.Shared/**" />
     <None Remove="LocalizationManager.Shared/**" />
+    <Content Remove="LocalizationManager.Shared/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <RazorGenerate Remove="**\*.cshtml" />
+    <RazorGenerate Remove="**\*.razor" />
   </ItemGroup>
 
 </Project>

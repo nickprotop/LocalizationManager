@@ -42,7 +42,7 @@ public class GetApiKeyCommand : Command<GetApiKeyCommand.Settings>
             }
 
             // Load configuration
-            var (config, _) = ConfigurationManager.LoadConfiguration(null, Directory.GetCurrentDirectory());
+            var (config, _) = Core.Configuration.ConfigurationManager.LoadConfiguration(null, Directory.GetCurrentDirectory());
 
             // Check where the API key is configured
             var source = ApiKeyResolver.GetApiKeySource(settings.Provider, config);

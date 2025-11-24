@@ -62,7 +62,7 @@ public class BaseCommandSettings : CommandSettings
     /// </summary>
     public void LoadConfiguration()
     {
-        var (config, loadedFrom) = ConfigurationManager.LoadConfiguration(
+        var (config, loadedFrom) = Core.Configuration.ConfigurationManager.LoadConfiguration(
             ConfigFilePath,
             GetResourcePath());
 

@@ -23,7 +23,7 @@ public class ListProvidersCommand : Command<ListProvidersCommand.Settings>
         try
         {
             // Load configuration
-            var (config, _) = ConfigurationManager.LoadConfiguration(null, Directory.GetCurrentDirectory());
+            var (config, _) = Core.Configuration.ConfigurationManager.LoadConfiguration(null, Directory.GetCurrentDirectory());
 
             // Create table
             var table = new Table();

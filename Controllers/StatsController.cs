@@ -1,0 +1,78 @@
+// Copyright (c) 2025 Nikolaos Protopapas
+// Licensed under the MIT License
+
+using Microsoft.AspNetCore.Mvc;
+using LocalizationManager.Core;
+
+namespace LocalizationManager.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class StatsController : ControllerBase
+{
+    private readonly string _resourcePath;
+    private readonly ResourceFileParser _parser;
+    private readonly ResourceDiscovery _discovery;
+
+    public StatsController(IConfiguration configuration)
+    {
+        _resourcePath = configuration["ResourcePath"] ?? Directory.GetCurrentDirectory();
+        _parser = new ResourceFileParser();
+        _discovery = new ResourceDiscovery();
+    }
+
+    /// <summary>
+    /// Get translation coverage statistics
+    /// </summary>
+    [HttpGet]
+    public ActionResult<object> GetStats()
+    {
+        try
+        {
+            var languages = _discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+
+            var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
+            if (defaultFile == null)
+            {
+                return StatusCode(500, new { error = "No default language file found" });
+            }
+
+            var totalKeys = defaultFile.Entries.Select(e => e.Key).Distinct().Count();
+
+            var languageStats = resourceFiles.Select(file =>
+            {
+                var translatedCount = file.Entries
+                    .Where(e => !string.IsNullOrWhiteSpace(e.Value))
+                    .Select(e => e.Key)
+                    .Distinct()
+                    .Count();
+
+                var coverage = totalKeys > 0 ? (double)translatedCount / totalKeys * 100 : 0;
+
+                return new
+                {
+                    language = file.Language.Code ?? "default",
+                    isDefault = file.Language.IsDefault,
+                    totalKeys = file.Entries.Select(e => e.Key).Distinct().Count(),
+                    translatedKeys = translatedCount,
+                    missingKeys = totalKeys - translatedCount,
+                    coverage = Math.Round(coverage, 2)
+                };
+            }).ToList();
+
+            return Ok(new
+            {
+                totalKeys,
+                languages = languageStats,
+                overallCoverage = languageStats.Count > 0
+                    ? Math.Round(languageStats.Average(s => s.coverage), 2)
+                    : 0
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
+}

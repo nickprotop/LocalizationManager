@@ -84,7 +84,7 @@ public class WebCommand : Command<WebCommand.Settings>
 
         // Determine web server configuration with precedence: CLI args → env vars → config file → defaults
         var port = settings.Port
-            ?? (int.TryParse(Environment.GetEnvironmentVariable("LRM_WEB_PORT"), out var envPort) ? (int?)envPort : null)
+            ?? (int.TryParse(Environment.GetEnvironmentVariable("LRM_WEB_PORT"), out var envPort) ? envPort : (int?)null)
             ?? settings.LoadedConfiguration?.Web?.Port
             ?? 5000;
 
@@ -119,11 +119,96 @@ public class WebCommand : Command<WebCommand.Settings>
         AnsiConsole.MarkupLine($"[grey]URL:[/] {url}");
         AnsiConsole.WriteLine();
 
-        // TODO: Start Kestrel server with API and Blazor WASM
-        // This will be implemented when LocalizationManager.Api project is created
-        AnsiConsole.MarkupLine("[yellow]⚠ Web server is not yet implemented.[/]");
-        AnsiConsole.MarkupLine("[grey]This command is a placeholder for Phase 6 implementation.[/]");
-        AnsiConsole.MarkupLine("[grey]The full Web API and Blazor WASM UI will be added in future commits.[/]");
+        // Start Kestrel server with API
+        var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder();
+
+        // Add services
+        builder.Services.AddControllers();
+        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddSwaggerGen();
+        builder.Services.AddSignalR();
+
+        // Register ConfigurationService for dynamic config reload
+        builder.Services.AddSingleton(sp => new LocalizationManager.Core.Configuration.ConfigurationService(absoluteResourcePath));
+
+        // Configure CORS if enabled in configuration
+        var corsConfig = settings.LoadedConfiguration?.Web?.Cors;
+        if (corsConfig?.Enabled == true && corsConfig.AllowedOrigins?.Count > 0)
+        {
+            builder.Services.AddCors(options =>
+            {
+                options.AddDefaultPolicy(policy =>
+                {
+                    policy.WithOrigins(corsConfig.AllowedOrigins.ToArray())
+                          .AllowAnyMethod()
+                          .AllowAnyHeader();
+
+                    if (corsConfig.AllowCredentials)
+                    {
+                        policy.AllowCredentials();
+                    }
+                });
+            });
+        }
+
+        // Configure resource path
+        builder.Configuration["ResourcePath"] = absoluteResourcePath;
+        builder.Configuration["SourcePath"] = sourcePath;
+
+        // Configure Kestrel
+        builder.WebHost.UseUrls(url);
+
+        var app = builder.Build();
+
+        // Configure middleware
+        if (corsConfig?.Enabled == true && corsConfig.AllowedOrigins?.Count > 0)
+        {
+            app.UseCors();
+        }
+
+        app.UseSwagger();
+        app.UseSwaggerUI(c =>
+        {
+            c.SwaggerEndpoint("/swagger/v1/swagger.json", "LRM API v1");
+            c.RoutePrefix = "swagger";
+        });
+
+        app.MapControllers();
+
+        // Serve static files from wwwroot if it exists
+        if (Directory.Exists(Path.Combine(AppContext.BaseDirectory, "wwwroot")))
+        {
+            app.UseStaticFiles();
+            app.MapFallbackToFile("index.html");
+        }
+
+        AnsiConsole.MarkupLine("[green]✓ Server started successfully![/]");
+        AnsiConsole.MarkupLine($"[grey]Swagger UI:[/] {url}/swagger");
+        AnsiConsole.MarkupLine("[dim]Press Ctrl+C to stop the server[/]");
+        AnsiConsole.WriteLine();
+
+        // Open browser if requested
+        if (autoOpenBrowser)
+        {
+            try
+            {
+                var browserUrl = Directory.Exists(Path.Combine(AppContext.BaseDirectory, "wwwroot"))
+                    ? url
+                    : $"{url}/swagger";
+
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = browserUrl,
+                    UseShellExecute = true
+                });
+            }
+            catch
+            {
+                // Ignore browser open errors
+            }
+        }
+
+        app.Run();
 
         return 0;
     }
