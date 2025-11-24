@@ -102,7 +102,6 @@
 - [ ] SignalR integration
 
 **Other:**
-- [ ] CLI web command
 - [ ] Responsive design
 - [ ] Component tests (bUnit)
 - [ ] E2E tests
@@ -642,49 +641,120 @@
 **Status:** Not Started
 **Dates:** TBD
 
+**Architecture Overview:**
+The Web UI is **another UI option** (like TUI) with **full feature parity**. The `lrm web` command starts a Kestrel server that:
+- Runs on the same machine as the resource files (has direct filesystem access)
+- Serves both Web API endpoints and Blazor WASM static files on the same port (e.g., localhost:5000)
+- Works on the configured `--path` (resource files) and `--source-path` (code scanning) just like TUI
+- Multiple users can connect from different browsers/machines to collaborate
+- All Core features available: validation, translation, code scanning, backups, editing, etc.
+
+**Web Command Foundation (Prerequisite):**
+Before implementing the full Web API, the `lrm web` command will be created as the foundation for hosting the ASP.NET Core Web API and Blazor WASM UI. This command will:
+- Follow established patterns from `EditCommand` for resource path and source path resolution:
+  - `--path` argument for resource file location (defaults to current directory)
+  - `--source-path` argument for code scanning (defaults to parent directory of resource path)
+  - Source path resolution logic: if not explicitly set, defaults to `Directory.GetParent(resourcePath)` (same as `edit`, `scan`, `check` commands)
+- Implement the established configuration cascade pattern: CLI Arguments → Environment Variables → lrm.json → Built-in Defaults
+- Support web server configuration options:
+  - `--port` (default: 5000) - also via `LRM_WEB_PORT` env var or `lrm.json:Web.Port`
+  - `--bind-address` (default: localhost) - also via `LRM_WEB_BIND_ADDRESS` or `lrm.json:Web.BindAddress`
+  - `--auto-open-browser` (default: true) - also via `LRM_WEB_AUTO_OPEN_BROWSER` or `lrm.json:Web.AutoOpenBrowser`
+  - HTTPS support: `--enable-https`, cert path, password (via env vars or config)
+  - CORS configuration for external API access scenarios
+- Host Kestrel web server serving both API endpoints (`/api/*`, `/hub/*`) and Blazor WASM static files (`/*`) on the same port
+- Register in `Program.cs` and update shell completions/man page
+- Provide foundation for Phase 6 full API implementation
+
+**Implementation Order:**
+1. Web command foundation (above)
+2. LocalizationManager.Api project (below)
+3. Full API controllers and SignalR hubs
+
 - [ ] Create LocalizationManager.Api Project
   - [ ] ASP.NET Core Web API project
   - [ ] Project structure
   - [ ] appsettings.json
   - [ ] Program.cs setup
 
-- [ ] Implement Controllers
+- [ ] Implement Controllers (Full CLI Parity)
   - [ ] ResourcesController.cs
-    - [ ] GET /api/resources (list)
-    - [ ] GET /api/resources/{fileName}
-    - [ ] GET /api/resources/{fileName}/keys
-    - [ ] POST /api/resources
-    - [ ] PUT /api/resources/{fileName}/keys/{keyName}
-    - [ ] DELETE /api/resources/{fileName}/keys/{keyName}
+    - [ ] GET /api/resources (list - equivalent to resource discovery)
+    - [ ] GET /api/resources/{fileName} (get file details)
+    - [ ] GET /api/resources/{fileName}/keys (list all keys - equivalent to `view`)
+    - [ ] GET /api/resources/{fileName}/keys/{keyName} (get key details - equivalent to `view KEY`)
+    - [ ] POST /api/resources/{fileName}/keys (add key - equivalent to `add`)
+    - [ ] PUT /api/resources/{fileName}/keys/{keyName} (update key - equivalent to `update`)
+    - [ ] DELETE /api/resources/{fileName}/keys/{keyName} (delete key - equivalent to `delete`)
+    - [ ] POST /api/resources/{fileName}/merge-duplicates (equivalent to `merge-duplicates`)
   - [ ] ValidationController.cs
-    - [ ] POST /api/validation/validate
-    - [ ] POST /api/validation/placeholders
-    - [ ] GET /api/validation/rules
+    - [ ] POST /api/validation/validate (full validation - equivalent to `validate`)
+    - [ ] GET /api/validation/issues (get current validation issues)
+    - [ ] POST /api/validation/placeholders (placeholder validation - equivalent to `validate` with placeholder checks)
   - [ ] TranslationController.cs
-    - [ ] POST /api/translation/translate
-    - [ ] GET /api/translation/providers
-    - [ ] POST /api/translation/estimate
+    - [ ] POST /api/translation/translate (translate keys - equivalent to `translate`)
+    - [ ] GET /api/translation/providers (list available providers)
+    - [ ] POST /api/translation/batch (batch translation with progress via SignalR)
+    - [ ] GET /api/translation/status/{jobId} (check translation job status)
+  - [ ] ScanController.cs
+    - [ ] POST /api/scan/scan (scan source code - equivalent to `scan`)
+    - [ ] GET /api/scan/results (get scan results)
+    - [ ] GET /api/scan/unused (list unused keys)
+    - [ ] GET /api/scan/missing (list missing keys)
+    - [ ] GET /api/scan/references/{keyName} (get code references for a key)
   - [ ] BackupController.cs
-    - [ ] GET /api/backups/{fileName}
-    - [ ] POST /api/backups/{fileName}/create
-    - [ ] GET /api/backups/{fileName}/diff
-    - [ ] POST /api/backups/{fileName}/restore
+    - [ ] GET /api/backups (list backups - equivalent to `backup list`)
+    - [ ] POST /api/backups/create (create backup - equivalent to `backup create`)
+    - [ ] GET /api/backups/{version} (get backup info - equivalent to `backup info`)
+    - [ ] GET /api/backups/{version}/diff (compare versions - equivalent to `backup diff`)
+    - [ ] POST /api/backups/{version}/restore (restore backup - equivalent to `backup restore`)
+    - [ ] DELETE /api/backups/{version} (delete backup)
+    - [ ] POST /api/backups/prune (prune old backups - equivalent to `backup prune`)
+  - [ ] LanguageController.cs
+    - [ ] GET /api/languages (list languages - equivalent to `list-languages`)
+    - [ ] POST /api/languages (add language - equivalent to `add-language`)
+    - [ ] DELETE /api/languages/{code} (remove language - equivalent to `remove-language`)
   - [ ] StatsController.cs
-    - [ ] GET /api/stats
+    - [ ] GET /api/stats (translation coverage stats - equivalent to `stats`)
+  - [ ] ExportController.cs
+    - [ ] POST /api/export/csv (export to CSV - equivalent to `export`)
+    - [ ] POST /api/export/json (export to JSON - equivalent to `export --format json`)
+  - [ ] ImportController.cs
+    - [ ] POST /api/import/csv (import from CSV - equivalent to `import`)
+  - [ ] ConfigurationController.cs
+    - [ ] GET /api/config (get current lrm.json configuration)
+    - [ ] PUT /api/config (update lrm.json - **requires dynamic config reload**)
+    - [ ] POST /api/config (create lrm.json if doesn't exist)
+    - [ ] GET /api/config/schema (get configuration schema)
 
-- [ ] Implement SignalR Hubs
-  - [ ] TranslationProgressHub.cs
-  - [ ] ValidationHub.cs
+- [ ] Implement SignalR Hubs (Real-time Updates)
+  - [ ] TranslationProgressHub.cs (broadcast translation progress to all connected clients)
+  - [ ] ValidationHub.cs (broadcast validation results)
+  - [ ] ScanProgressHub.cs (broadcast code scan progress)
+  - [ ] FileChangeHub.cs (notify clients when .resx files change)
+
+- [ ] Dynamic Configuration Management
+  - [ ] ConfigurationService.cs (wrapper around ConfigurationManager)
+  - [ ] Support runtime configuration reload when lrm.json is modified via API
+  - [ ] IOptionsSnapshot<ConfigurationModel> for dynamic config updates
+  - [ ] Validate configuration changes before applying
+  - [ ] Broadcast configuration changes to all clients via SignalR
 
 - [ ] Middleware & Configuration
   - [ ] CORS configuration
   - [ ] Exception handling middleware
   - [ ] Logging middleware
   - [ ] Swagger/OpenAPI setup
+  - [ ] Request logging
+  - [ ] Authentication/Authorization (optional - for multi-user scenarios)
 
 - [ ] Service Registration
-  - [ ] Register Core services
-  - [ ] DI configuration
+  - [ ] Register Core services (ResourceFileParser, ResourceValidator, etc.)
+  - [ ] Register Translation services (TranslationProviderFactory, TranslationCache)
+  - [ ] Register Backup services (BackupVersionManager, BackupDiffService, BackupRestoreService)
+  - [ ] Register Scanning services (CodeScanner, SourceFileDiscovery)
+  - [ ] Register Configuration services (ConfigurationManager, ConfigurationService)
+  - [ ] DI configuration for all controllers
 
 - [ ] Testing
   - [ ] Controller tests
@@ -701,73 +771,166 @@
 **Status:** Not Started
 **Dates:** TBD
 
+**UI Framework:** Vanilla Blazor + TailwindCSS
+- **No UI component library** (MudBlazor, Radzen, etc.) - keeping it lightweight
+- **TailwindCSS** for utility-first styling (small bundle size after purge: ~10-50KB)
+- **Custom components** built from scratch for full control
+- **Terminal-inspired aesthetic** matching the developer tool nature of LRM
+- **Zero JavaScript dependencies** - all interactivity handled by Blazor
+
 - [ ] Create LocalizationManager.Web Project
   - [ ] Blazor WebAssembly project
   - [ ] Project structure
   - [ ] Program.cs setup
   - [ ] wwwroot/index.html
+  - [ ] Setup TailwindCSS
+    - [ ] Install Tailwind CLI via npm
+    - [ ] Create tailwind.config.js with LRM theme (terminal colors, monospace fonts)
+    - [ ] Configure PurgeCSS for production builds
+    - [ ] Create custom color palette (terminal-bg, terminal-fg, status colors)
+    - [ ] Add build script to compile Tailwind CSS
 
-- [ ] Implement API Clients
+- [ ] Implement API Clients (Full Feature Parity)
   - [ ] Create Services/ directory
-  - [ ] ResourceApiClient.cs
-  - [ ] ValidationApiClient.cs
-  - [ ] TranslationApiClient.cs
-  - [ ] BackupApiClient.cs
-  - [ ] HttpClient configuration
+  - [ ] ResourceApiClient.cs (list, get, add, update, delete, merge-duplicates)
+  - [ ] ValidationApiClient.cs (validate, get issues, placeholder validation)
+  - [ ] TranslationApiClient.cs (translate, list providers, batch translate, check status)
+  - [ ] ScanApiClient.cs (scan, get results, unused, missing, references)
+  - [ ] BackupApiClient.cs (list, create, info, diff, restore, delete, prune)
+  - [ ] LanguageApiClient.cs (list, add, remove)
+  - [ ] StatsApiClient.cs (get translation coverage stats)
+  - [ ] ExportApiClient.cs (export to CSV/JSON)
+  - [ ] ImportApiClient.cs (import from CSV)
+  - [ ] ConfigurationApiClient.cs (get, update, create, schema)
+  - [ ] HttpClient configuration with base address
 
 - [ ] Implement Core Pages
   - [ ] Index.razor (Dashboard)
-    - [ ] Recent files widget
-    - [ ] Quick stats
-    - [ ] Recent activity
-    - [ ] Quick actions
-  - [ ] Editor.razor (Main editor)
-    - [ ] Multi-column grid
-    - [ ] Inline editing
-    - [ ] Real-time search
-    - [ ] Bulk operations
-    - [ ] Context menu
-    - [ ] Keyboard shortcuts
+    - [ ] Resource file list with quick stats
+    - [ ] Translation coverage overview (charts/graphs)
+    - [ ] Recent validation issues
+    - [ ] Quick actions (validate, scan, translate)
+    - [ ] System status (scan results, backup count)
+  - [ ] Editor.razor (Main editor - TUI feature parity)
+    - [ ] Multi-language side-by-side grid (similar to TUI)
+    - [ ] Inline editing with auto-save
+    - [ ] Real-time search with regex support
+    - [ ] Filter by status (missing, duplicates, unused, etc.)
+    - [ ] Bulk operations (select multiple keys, bulk translate, bulk delete)
+    - [ ] Context menu (right-click actions)
+    - [ ] Keyboard shortcuts (Ctrl+S, Ctrl+F, Delete, etc.)
+    - [ ] Color-coded rows (missing=red, extra=yellow, duplicates=cyan, unused=gray)
+    - [ ] Status indicators (⚠ ⭐ ◆ ∅ ✗)
+    - [ ] Comment display and editing
+    - [ ] Undo/Redo support
 
 - [ ] Implement Feature Pages
   - [ ] Validation.razor
-    - [ ] Validation results display
-    - [ ] Rule filtering
-    - [ ] Fix suggestions
+    - [ ] Real-time validation results display
+    - [ ] Filter by issue type (missing, duplicates, placeholders, etc.)
+    - [ ] Quick fix actions
+    - [ ] Export validation report
   - [ ] Translation.razor
-    - [ ] Provider selection
-    - [ ] Language picker
-    - [ ] Progress tracking (SignalR)
-    - [ ] Cost estimation
+    - [ ] Provider selection dropdown
+    - [ ] Language picker (source → target)
+    - [ ] Translate all missing / selected keys
+    - [ ] Real-time progress tracking (SignalR)
+    - [ ] Translation preview before applying
+    - [ ] Cost estimation (for paid providers)
+  - [ ] Scan.razor (Code Scanning)
+    - [ ] Trigger code scan
+    - [ ] Display scan results (unused keys, missing keys)
+    - [ ] Show code references for each key (file, line, pattern)
+    - [ ] Filter by usage status
+    - [ ] Export scan report
   - [ ] BackupHistory.razor
-    - [ ] Timeline visualization
-    - [ ] Diff viewer
-    - [ ] Restore wizard
-  - [ ] Settings.razor
-    - [ ] API keys
-    - [ ] Default settings
-    - [ ] Theme selection
+    - [ ] Backup timeline visualization
+    - [ ] Visual diff viewer (side-by-side comparison)
+    - [ ] Restore wizard with preview
+    - [ ] Create backup on demand
+    - [ ] Delete/prune old backups
+  - [ ] Languages.razor
+    - [ ] List all languages in project
+    - [ ] Add new language
+    - [ ] Remove language
+    - [ ] Language statistics
+  - [ ] Import.razor
+    - [ ] Upload CSV file
+    - [ ] Preview import changes
+    - [ ] Import with validation
+  - [ ] Export.razor
+    - [ ] Export to CSV/JSON
+    - [ ] Select languages to export
+    - [ ] Filter keys to export
+  - [ ] Settings.razor (Configuration Management)
+    - [ ] View/edit lrm.json configuration
+    - [ ] API keys management (with secure input)
+    - [ ] Translation provider defaults
+    - [ ] Validation settings (placeholder types)
+    - [ ] Scanning settings (resource class names, localization methods)
+    - [ ] Create lrm.json if doesn't exist
+    - [ ] Real-time configuration validation
+    - [ ] Save configuration (triggers dynamic reload on server)
 
 - [ ] Implement Shared Components
-  - [ ] Components/ResourceGrid.razor
-  - [ ] Components/KeyEditor.razor
-  - [ ] Components/SearchBar.razor
-  - [ ] Components/LanguagePicker.razor
-  - [ ] Components/ProgressIndicator.razor
-  - [ ] Components/DiffViewer.razor
-  - [ ] Components/Timeline.razor
+  - [ ] Components/ResourceGrid.razor (multi-language grid with inline editing)
+  - [ ] Components/KeyEditor.razor (modal dialog for editing key/value/comment)
+  - [ ] Components/SearchBar.razor (search with regex, wildcard, scope filters)
+  - [ ] Components/LanguagePicker.razor (dropdown for language selection)
+  - [ ] Components/ProgressIndicator.razor (progress bar for long operations)
+  - [ ] Components/DiffViewer.razor (side-by-side diff visualization)
+  - [ ] Components/Timeline.razor (backup timeline visualization)
+  - [ ] Components/ValidationPanel.razor (validation results display)
+  - [ ] Components/StatusIndicator.razor (⚠ ⭐ ◆ ∅ ✗ icons)
+  - [ ] Components/ContextMenu.razor (right-click context menu)
+  - [ ] Components/ConfirmDialog.razor (confirmation dialogs)
+  - [ ] Components/NotificationToast.razor (toast notifications for user feedback)
 
-- [ ] SignalR Integration
-  - [ ] HubConnection setup
-  - [ ] Real-time updates
-  - [ ] Auto-reconnect
+- [ ] SignalR Integration (Real-time Multi-user Collaboration)
+  - [ ] HubConnection setup in Program.cs
+  - [ ] TranslationProgressHub client
+    - [ ] Subscribe to translation progress updates
+    - [ ] Update UI in real-time as translations complete
+    - [ ] Show which user is translating what
+  - [ ] ValidationHub client
+    - [ ] Receive validation results as they're computed
+    - [ ] Update validation panel in real-time
+  - [ ] ScanProgressHub client
+    - [ ] Real-time scan progress updates
+    - [ ] Update UI as scan results arrive
+  - [ ] FileChangeHub client
+    - [ ] Notify when .resx files change on server
+    - [ ] Prompt user to reload data
+    - [ ] Show which user made changes (multi-user awareness)
+  - [ ] Auto-reconnect logic
+  - [ ] Connection status indicator in UI
 
-- [ ] Styling & UX
-  - [ ] CSS/SCSS styling
-  - [ ] Responsive design
+- [ ] Styling & UX (TailwindCSS)
+  - [ ] Terminal-inspired color scheme
+    - [ ] Dark theme by default (terminal-bg: #1e1e1e, terminal-fg: #d4d4d4)
+    - [ ] Status colors matching TUI (red, yellow, cyan, gray for validation states)
+    - [ ] Monospace fonts for code/key display
+  - [ ] Responsive design (mobile, tablet, desktop)
+    - [ ] Mobile: single column, collapsible sections
+    - [ ] Tablet: 2-column layout
+    - [ ] Desktop: full multi-column grid
   - [ ] Loading states
+    - [ ] Skeleton loaders with Tailwind animations
+    - [ ] Spinners for long operations
+    - [ ] Progress bars for batch operations
   - [ ] Error handling
-  - [ ] Accessibility
+    - [ ] Toast notifications with auto-dismiss
+    - [ ] Inline validation errors
+    - [ ] Error boundaries for component failures
+  - [ ] Accessibility (WCAG 2.1 AA)
+    - [ ] Keyboard navigation (Tab, Enter, Escape)
+    - [ ] ARIA labels and roles
+    - [ ] Focus indicators
+    - [ ] Screen reader support
+  - [ ] Animations (Tailwind transitions)
+    - [ ] Smooth transitions for modals, toasts
+    - [ ] Hover effects on buttons and rows
+    - [ ] Fade-in for dynamic content
 
 - [ ] Testing
   - [ ] Component tests (bUnit)
@@ -775,20 +938,26 @@
 
 - [ ] Documentation
   - [ ] Create docs/WEB-UI.md
-  - [ ] User guide
-  - [ ] Screenshots
+  - [ ] Create docs/WEB-API.md (API reference)
+  - [ ] User guide for Web UI
+  - [ ] Multi-user collaboration guide
+  - [ ] Screenshots and screencasts
+  - [ ] Configuration management guide
+
+**Feature Parity Summary:**
+The Web UI will have **full feature parity** with CLI and TUI:
+- ✅ All CLI commands available via API endpoints
+- ✅ All TUI features available in Blazor UI (editing, validation, translation, scanning, backups, etc.)
+- ✅ Real-time updates via SignalR for multi-user collaboration
+- ✅ Dynamic configuration management (create/edit lrm.json via UI)
+- ✅ Server has direct filesystem access to resource and source paths
+- ✅ Multiple users can connect from different machines to collaborate
 
 ---
 
 ### Phase 8: Integration & Polish (Week 13)
 **Status:** Not Started
 **Dates:** TBD
-
-- [ ] CLI web Command
-  - [ ] Create Commands/WebCommand.cs
-  - [ ] Start API server
-  - [ ] Serve Blazor WASM
-  - [ ] Configuration options (port, bind, etc.)
 
 - [ ] End-to-End Testing
   - [ ] Full workflow tests
@@ -878,7 +1047,9 @@
 
 ### Architecture
 - **API Backend:** ASP.NET Core Web API (RESTful + SignalR)
-- **Frontend:** Blazor WebAssembly (C# full-stack)
+- **Frontend:** Blazor WebAssembly (C# full-stack) + TailwindCSS
+- **UI Framework:** Vanilla Blazor (no component library) with TailwindCSS for styling
+- **Hosting:** Single Kestrel server serving both API and WASM on same port
 - **Backup Storage:** File-based with JSON manifests
 - **Flow Execution:** In-memory pipeline
 
@@ -886,6 +1057,13 @@
 - ✅ Microsoft.AspNetCore.SignalR.Client (real-time)
 - ✅ Swashbuckle.AspNetCore (Swagger)
 - ✅ bUnit (Blazor testing)
+- ✅ TailwindCSS (utility-first CSS framework, ~10-50KB after purge)
+
+### UI/UX Decisions
+- **No component library** (MudBlazor, Radzen, Blazorise) - custom components for full control
+- **TailwindCSS over Bootstrap** - smaller bundle, no JS dependencies, better customization
+- **Terminal-inspired design** - dark theme, monospace fonts, status colors matching TUI
+- **Zero JavaScript** - all interactivity handled by Blazor C# code
 
 ### Future Considerations
 - 🔮 Plugin system (multi-format support) - deferred to v0.8.0+
@@ -927,12 +1105,16 @@ None
 
 ### Important Decisions Made
 1. Diff view integrated with backup system (not git-based)
-2. Web UI will be Blazor WASM + ASP.NET Core API
-3. Simple CLI chaining for command automation (lightweight alternative to complex flow system)
-4. Plugin system deferred to future release (v0.8.0+)
-5. Full flow system deferred to future release (v0.8.0+ if user demand exists)
-6. Debian packaging with dual variants: framework-dependent (200KB) and self-contained (72MB)
-7. Distribution via both GitHub Releases (.deb downloads) and Launchpad PPA (apt repository)
+2. Web UI will be Blazor WASM + ASP.NET Core API with full feature parity
+3. Vanilla Blazor + TailwindCSS (no component library like MudBlazor/Radzen) for lightweight, custom UI
+4. Single Kestrel server hosting both API and WASM on same port (no CORS issues)
+5. Web UI is another UI option (like TUI) - server has filesystem access, supports multi-user collaboration
+6. Dynamic configuration management - API can create/edit lrm.json with runtime reload
+7. Simple CLI chaining for command automation (lightweight alternative to complex flow system)
+8. Plugin system deferred to future release (v0.8.0+)
+9. Full flow system deferred to future release (v0.8.0+ if user demand exists)
+10. Debian packaging with dual variants: framework-dependent (200KB) and self-contained (72MB)
+11. Distribution via both GitHub Releases (.deb downloads) and Launchpad PPA (apt repository)
 
 ### Questions to Resolve
 None
