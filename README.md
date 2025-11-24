@@ -131,6 +131,11 @@ LRM solves this by providing:
 - **🎯 Regex Pattern Matching** - View and explore multiple keys with powerful regex patterns
 - **⚙️ Configuration File Support** - Auto-load settings from `lrm.json` or specify custom config
 - **🔄 Batch Operations** - Add, update, delete keys across all languages
+- **⛓️ Command Chaining** - Execute multiple commands sequentially in a single invocation
+  - Simple separator syntax: `lrm chain "validate -- translate --only-missing -- export"`
+  - Error handling modes: stop-on-error (default) or continue-on-error
+  - Dry-run mode to preview execution
+  - Perfect for automation workflows and complex operations
 - **📋 Multiple Output Formats** - Table, JSON, and simple text formats for all commands
 - **💻 Multi-platform** - Linux (x64/ARM64), Windows (x64/ARM64)
 - **📦 Self-contained** - No .NET runtime required
@@ -285,6 +290,18 @@ lrm export
 # Export to JSON format
 lrm export --format json
 
+# Chain multiple commands together
+lrm chain "validate -- scan --strict"
+
+# Translation workflow
+lrm chain "validate -- translate --only-missing -- export -o output.csv"
+
+# Preview chain execution (dry-run)
+lrm chain "validate -- translate --only-missing" --dry-run
+
+# Continue on error for diagnostic workflows
+lrm chain "validate -- scan -- stats" --continue-on-error
+
 # Get help
 lrm --help
 ```
@@ -311,6 +328,7 @@ See [EXAMPLES.md](docs/EXAMPLES.md) for detailed usage scenarios and workflows.
 | `list-languages` | List all detected language files | Table, JSON, Simple |
 | `translate` 🆕 | Automatically translate keys using Google/DeepL/LibreTranslate | Table, JSON, Simple |
 | `config` 🆕 | Manage translation provider API keys and configuration | N/A |
+| `chain` 🆕 | Execute multiple commands sequentially in a single invocation | N/A |
 
 See [COMMANDS.md](docs/COMMANDS.md) for complete command reference with all options and examples.
 
@@ -420,6 +438,7 @@ Launch with `lrm edit` to get a visual interface:
 - `Ctrl+Z` / `Ctrl+Y` - Undo/Redo
 - `Ctrl+C` / `Ctrl+V` - Copy/Paste value
 - `F7` - Scan source code for key usage
+- `Shift+F7` - View code references for selected key
 - `F8` - Merge duplicate keys
 - `F4` - Translate all missing values
 - `F5` - Configure translation providers
@@ -507,9 +526,7 @@ dotnet run -- --help
 - **Code Scanning** - Find unused keys and missing references in source code (C#, Razor, XAML)
 - **Configuration File** - Complete lrm.json support for project-wide defaults
 - **TUI Visual & Workflow Enhancements** - Code scanning integration, undo/redo, context menus, clipboard, progress bars, enhanced search
-
-### 🚧 In Progress
-- **Simple CLI Chaining** - Run multiple LRM commands sequentially in one invocation
+- **Simple CLI Chaining** - Run multiple LRM commands sequentially in one invocation with `chain` command
 
 ### 📋 Planned Features
 - **Diff View** - Compare translations between versions

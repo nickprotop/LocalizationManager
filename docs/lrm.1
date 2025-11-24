@@ -313,6 +313,36 @@ Subcommands:
 .IP \(bu 2
 .B show-config
 - Display current configuration
+.SS chain
+Execute multiple LRM commands sequentially in a single invocation.
+.PP
+.B lrm chain
+\fICOMMANDS\fR
+[\fB\-\-continue\-on\-error\fR]
+[\fB\-\-dry\-run\fR]
+.TP
+.I COMMANDS
+Commands to execute, separated by ' -- ' (space-dash-dash-space)
+.TP
+.BR \-\-continue\-on\-error
+Continue executing commands even if one fails (default: stop on first error)
+.TP
+.BR \-\-dry\-run
+Show what commands would be executed without running them
+.PP
+Examples:
+.TP
+Translation workflow:
+.B lrm chain validate --format json -- translate --only-missing -- export -o output.csv
+.TP
+Validation and scanning:
+.B lrm chain validate -- scan --strict
+.TP
+Backup before update:
+.B lrm chain backup create -- update SaveButton --lang default:"Save" -- validate
+.TP
+Dry run to preview:
+.B lrm chain validate -- translate --only-missing --dry-run
 .SH FILES
 .TP
 .I lrm.json

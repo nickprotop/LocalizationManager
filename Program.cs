@@ -153,6 +153,13 @@ app.Configure(config =>
         .WithExample(new[] { "check", "--strict" })
         .WithExample(new[] { "check", "--format", "json" });
 
+    config.AddCommand<ChainCommand>("chain")
+        .WithDescription("Execute multiple commands sequentially in a single invocation")
+        .WithExample(new[] { "chain", "validate --format json -- translate --only-missing -- export -o output.csv" })
+        .WithExample(new[] { "chain", "validate -- scan" })
+        .WithExample(new[] { "chain", "import file.csv -- validate -- translate --provider google", "--continue-on-error" })
+        .WithExample(new[] { "chain", "validate -- translate --only-missing", "--dry-run" });
+
     config.AddBranch("config", cfg =>
     {
         cfg.SetDescription("Configuration commands for API keys and settings");

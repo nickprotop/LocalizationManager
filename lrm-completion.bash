@@ -13,7 +13,7 @@ _lrm_completions() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands
-    local commands="validate stats view add update delete merge-duplicates export import edit translate config scan check list-languages add-language remove-language backup"
+    local commands="validate stats view add update delete merge-duplicates export import edit translate config scan check chain list-languages add-language remove-language backup"
 
     # Global options
     local global_opts="--path -p --help -h --version -v"
@@ -33,6 +33,7 @@ _lrm_completions() {
     local config_opts="set-api-key get-api-key delete-api-key list-providers --help -h"
     local scan_opts="--path -p --source-path --exclude --strict --show-unused --show-missing --show-references --resource-classes --localization-methods --format --help -h"
     local check_opts="--path -p --source-path --exclude --strict --format --help -h"
+    local chain_opts="--continue-on-error --dry-run --help -h"
     local list_languages_opts="--path -p --format --help -h"
     local add_language_opts="--path -p --culture -c --base-name --copy-from --empty --yes -y --help -h"
     local remove_language_opts="--path -p --culture -c --base-name --yes -y --no-backup --help -h"
@@ -254,6 +255,9 @@ _lrm_completions() {
             ;;
         check)
             COMPREPLY=( $(compgen -W "${check_opts}" -- "${cur}") )
+            ;;
+        chain)
+            COMPREPLY=( $(compgen -W "${chain_opts}" -- "${cur}") )
             ;;
         list-languages)
             COMPREPLY=( $(compgen -W "${list_languages_opts}" -- "${cur}") )

@@ -24,6 +24,7 @@ _lrm() {
         'translate:Translate missing keys using AI translation providers'
         'scan:Scan source code for localization key references'
         'check:Run validation and scan together'
+        'chain:Execute multiple commands sequentially in a single invocation'
         'list-languages:List all available language resource files'
         'add-language:Add a new language resource file'
         'remove-language:Remove a language resource file'
@@ -267,6 +268,14 @@ _lrm() {
                             _describe -t formats 'output formats' format_opts
                             ;;
                     esac
+                    ;;
+                chain)
+                    _arguments \
+                        '1:command chain' \
+                        '--continue-on-error[Continue executing commands even if one fails]' \
+                        '--dry-run[Show commands without executing them]' \
+                        '--help[Show help information]' \
+                        '-h[Show help information]'
                     ;;
                 list-languages)
                     _arguments \

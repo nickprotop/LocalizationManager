@@ -29,6 +29,7 @@ This document provides detailed information about all LRM commands, their option
 - [scan](#scan) - Scan source code for key references
 - [translate](#translate) - Automatic translation (documented below)
 - [config](#config) - Configuration management (documented below)
+- [chain](#chain) - Execute multiple commands sequentially
 
 ---
 
@@ -2783,6 +2784,202 @@ Create or update `lrm.json`:
 ```
 
 See [docs/TRANSLATION.md](docs/TRANSLATION.md) for complete translation documentation.
+
+---
+
+## chain
+
+**Description:** Execute multiple LRM commands sequentially in a single invocation. Chains commands together with a simple separator syntax, enabling powerful automation workflows without writing scripts.
+
+**Arguments:**
+- `<COMMANDS>` - Commands to execute, separated by ' -- ' (space-dash-dash-space) (required)
+
+**Options:**
+- `--continue-on-error` - Continue executing commands even if one fails (default: stop on first error)
+- `--dry-run` - Show what commands would be executed without running them
+- `-h, --help` - Show help information
+
+**Command Separation:**
+Commands are separated by ` -- ` (space-dash-dash-space). Each command is a complete LRM command with all its arguments and options:
+
+```bash
+lrm chain "validate -- translate --only-missing -- export"
+```
+
+**Behavior:**
+- **Sequential execution** - Commands run in the order specified
+- **Exit code propagation** - Returns 0 if all commands succeed, 1 if any fails
+- **Error handling modes:**
+  - **Default (stop-on-error)**: Stops at first failure and returns its exit code
+  - **Continue-on-error**: Executes all commands regardless of failures, returns 1 if any failed
+
+**Quoting and Arguments:**
+- Commands can include quoted arguments with spaces:
+  ```bash
+  lrm chain "add \"New Key\" --lang \"default:New Value\" -- validate"
+  ```
+- Escape quotes within quoted strings using backslash:
+  ```bash
+  lrm chain "add Key --lang \"default:Value with \\\"quotes\\\"\" -- validate"
+  ```
+- Global options (`--path`, `--config-file`) must be specified per command, not at the chain level
+
+**Examples:**
+
+**Translation workflow:**
+```bash
+# Validate, translate missing keys, export to CSV
+lrm chain "validate --format json -- translate --only-missing -- export -o output.csv"
+```
+
+**Validation and scanning:**
+```bash
+# Run both validation and code scanning
+lrm chain "validate -- scan --strict"
+
+# Check with specific source path
+lrm chain "validate -- scan --source-path ./src --show-unused"
+```
+
+**Backup before operations:**
+```bash
+# Create backup before updating a key
+lrm chain "backup create --operation before-update -- update SaveButton --lang default:Save -- validate"
+
+# Backup, translate, validate
+lrm chain "backup create -- translate --only-missing -- validate"
+```
+
+**Import and validation pipeline:**
+```bash
+# Import CSV, validate, run scan
+lrm chain "import translations.csv -- validate -- scan"
+
+# Import with continue-on-error to see all issues
+lrm chain "import translations.csv -- validate -- scan" --continue-on-error
+```
+
+**Multi-language operations:**
+```bash
+# Add French, copy from default, translate
+lrm chain "add-language -c fr --copy-from default -- translate --target-languages fr --only-missing"
+
+# Remove old language, add new one
+lrm chain "remove-language -c fr-CA -y -- add-language -c fr -y"
+```
+
+**Dry run to preview:**
+```bash
+# See what would be executed
+lrm chain "validate -- translate --only-missing" --dry-run
+
+# Output:
+# Execution Plan:
+#
+# ═══ Step 1/2 ═══
+# validate
+#
+# ═══ Step 2/2 ═══
+# translate --only-missing
+```
+
+**Complex workflows:**
+```bash
+# Complete translation workflow with error handling
+lrm chain "validate --format json -- translate --only-missing --provider deepl -- validate --format json -- export -o output.csv" --continue-on-error
+
+# Multi-step key management
+lrm chain "view \"Error.*\" --keys-only -- add NewError --lang default:\"New Error\" -- merge-duplicates --all --auto-first"
+
+# Backup, update multiple keys, validate
+lrm chain "backup create --operation batch-update -- update Key1 --lang default:Value1 -- update Key2 --lang default:Value2 -- validate"
+```
+
+**CI/CD integration:**
+```bash
+# Validation pipeline (fail on any error)
+lrm chain "validate --format json -- scan --strict --format json"
+
+# Translation pipeline with continue-on-error
+lrm chain "translate --only-missing -- validate" --continue-on-error
+
+# Full quality check
+lrm chain "validate --format json -- scan --strict --format json -- stats --format json"
+```
+
+**Exit codes:**
+- `0` - All commands succeeded
+- `1` - One or more commands failed (or empty chain, invalid syntax)
+
+**Error Handling Examples:**
+
+**Stop on first error (default):**
+```bash
+$ lrm chain "validate -- scan --invalid-option -- export"
+# validate runs
+# scan fails with unknown option
+# export DOES NOT run
+# Returns: exit code 1
+```
+
+**Continue on error:**
+```bash
+$ lrm chain "validate -- scan --invalid-option -- export" --continue-on-error
+# validate runs
+# scan fails with unknown option (recorded)
+# export STILL runs
+# Returns: exit code 1 (because scan failed)
+```
+
+**Use Cases:**
+
+**Development Workflow:**
+- Check quality before commit: `lrm chain "validate -- scan"`
+- Update and verify: `lrm chain "update Key --lang default:Value -- validate"`
+- Safe translation: `lrm chain "backup create -- translate --only-missing -- validate"`
+
+**Automation:**
+- Nightly translation job: `lrm chain "translate --only-missing -- export -o daily.csv"`
+- Import from external system: `lrm chain "import external.csv -- validate -- scan"`
+- Multi-language setup: `lrm chain "add-language -c fr -y -- add-language -c de -y -- add-language -c es -y"`
+
+**Maintenance:**
+- Cleanup workflow: `lrm chain "merge-duplicates --all --auto-first -- scan --show-unused"`
+- Backup rotation: `lrm chain "backup create --operation weekly -- backup prune --keep 10 -y"`
+
+**Tips:**
+
+1. **Use dry-run** to preview complex chains before executing:
+   ```bash
+   lrm chain "command1 -- command2 -- command3" --dry-run
+   ```
+
+2. **Quote the entire command chain** to prevent shell interpretation:
+   ```bash
+   lrm chain "validate -- scan"  # Good
+   lrm chain validate -- scan     # May fail due to shell parsing
+   ```
+
+3. **Use continue-on-error** for reporting/diagnostic workflows:
+   ```bash
+   lrm chain "validate -- scan -- stats" --continue-on-error
+   ```
+
+4. **Combine with format options** for CI/CD:
+   ```bash
+   lrm chain "validate --format json -- scan --format json"
+   ```
+
+5. **Create named backup points** before risky operations:
+   ```bash
+   lrm chain "backup create --operation before-refactor -- update Key1 ... -- update Key2 ..."
+   ```
+
+**Limitations:**
+- Commands within chain cannot use interactive prompts (use `-y` flags)
+- Each command executes in a new context (no shared state between commands)
+- Global options must be specified per command, not inherited
+- The TUI (`edit`) command cannot be used in chains (requires interactive terminal)
 
 ---
 
