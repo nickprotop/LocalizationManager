@@ -1,7 +1,5 @@
-lrm (0.6.15-1) noble; urgency=medium
+lrm (0.6.16-1) noble; urgency=medium
 
-  * Fixed: Fix PPA upload: change distribution from unstable to noble\n
-  * Added: Add Shift+F7 keyboard shortcut to view code references in TUI\n
-  * Changed: Implement Phase 5: Simple CLI Chaining\n- Update man page and completion files for batch operations\n
+  * Fixed: Fix PPA distribution: change unstable to noble in release.sh\n
 
- -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Mon, 24 Nov 2025 17:12:55 +0200
+ -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Mon, 24 Nov 2025 17:22:11 +0200
