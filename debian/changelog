@@ -1,4 +1,4 @@
-lrm (0.6.14-1) unstable; urgency=medium
+lrm (0.6.14-1) noble; urgency=medium
 
   * Fixed: Fix GPG signing in GitHub Actions workflow\n
 
