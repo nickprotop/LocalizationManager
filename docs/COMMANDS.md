@@ -30,6 +30,7 @@ This document provides detailed information about all LRM commands, their option
 - [translate](#translate) - Automatic translation (documented below)
 - [config](#config) - Configuration management (documented below)
 - [chain](#chain) - Execute multiple commands sequentially
+- [web](#web) - Start web server with REST API and browser UI
 
 ---
 
@@ -2983,9 +2984,102 @@ $ lrm chain "validate -- scan --invalid-option -- export" --continue-on-error
 
 ---
 
+## web
+
+Start a web server with REST API and browser-based UI for managing localization resources.
+
+**Usage:**
+```bash
+lrm web [OPTIONS]
+```
+
+**Options:**
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-p, --path <PATH>` | Path to Resources folder | Current directory |
+| `--source-path <PATH>` | Path to source code for scanning | Parent of resource path |
+| `--port <PORT>` | Port to bind the web server to | 5000 |
+| `--bind-address <ADDRESS>` | Address to bind to (localhost, 0.0.0.0, *) | localhost |
+| `--no-open-browser` | Don't automatically open browser on startup | false |
+| `--enable-https` | Enable HTTPS | false |
+| `--cert-path <PATH>` | Path to HTTPS certificate file (.pfx) | - |
+| `--cert-password <PASSWORD>` | Password for HTTPS certificate | - |
+
+**Examples:**
+
+```bash
+# Start web server on default port (localhost:5000)
+lrm web
+
+# Start with custom path
+lrm web --path /path/to/resources
+
+# Custom port and bind to all interfaces
+lrm web --port 8080 --bind-address 0.0.0.0
+
+# With HTTPS
+lrm web --enable-https --cert-path ./cert.pfx --cert-password mypassword
+
+# Don't auto-open browser (useful for remote/headless)
+lrm web --no-open-browser
+```
+
+**Web UI Features:**
+
+The web server provides a browser-based UI with:
+
+- **Dashboard** - Overview with statistics and quick actions
+- **Resource Editor** - Browse, search, and manage all keys
+- **Key Editor** - Edit individual keys with inline translation
+- **Validation** - Run validation checks
+- **Code Scanner** - Find unused/missing keys
+- **Translation** - Batch translate missing values
+- **Backups** - Manage backup versions
+- **Settings** - Language management and configuration
+- **Export/Import** - Export to JSON/CSV formats
+
+**REST API:**
+
+All operations are also available via REST API:
+
+- **Base URL:** `http://localhost:5000/api`
+- **Swagger UI:** `http://localhost:5000/swagger`
+
+For complete API documentation, see [API.md](API.md).
+
+For complete Web UI documentation, see [WEBUI.md](WEBUI.md).
+
+**Configuration:**
+
+Web server settings can also be configured in `lrm.json`:
+
+```json
+{
+  "web": {
+    "port": 5000,
+    "bindAddress": "localhost",
+    "autoOpenBrowser": true,
+    "enableHttps": false
+  }
+}
+```
+
+**Environment Variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `LRM_WEB_PORT` | Override default port |
+| `LRM_WEB_BIND_ADDRESS` | Override bind address |
+| `LRM_WEB_AUTO_OPEN_BROWSER` | Enable/disable auto browser open |
+
+---
+
 For more information:
 - [Installation Guide](INSTALLATION.md)
 - [Usage Examples](EXAMPLES.md)
-- [Translation Guide](docs/TRANSLATION.md)
-- [CI/CD Integration](CI-CD.md)
+- [Translation Guide](TRANSLATION.md)
+- [Web UI Guide](WEBUI.md)
+- [REST API Reference](API.md)
+- [CI/CD Integration](CICD.md)
 - [Contributing](../CONTRIBUTING.md)
