@@ -97,6 +97,25 @@
                     Refresh
                 </button>
             </div>
+
+            <!-- Bulk Actions Toolbar (shown when items are selected) -->
+            @if (selectedKeys.Count > 0)
+            {
+                <div class="lrm-editor-toolbar lrm-bulk-actions">
+                    <span class="lrm-toolbar-info">
+                        <strong>@selectedKeys.Count</strong> @(selectedKeys.Count == 1 ? "key" : "keys") selected
+                    </span>
+                    <button class="lrm-button" @onclick="BulkTranslate" title="Translate selected keys">
+                        Translate Selected
+                    </button>
+                    <button class="lrm-button lrm-button-danger" @onclick="BulkDelete" title="Delete selected keys">
+                        Delete Selected
+                    </button>
+                    <button class="lrm-button" @onclick="ClearSelection" title="Clear selection">
+                        Clear Selection
+                    </button>
+                </div>
+            }
         </div>
 
         <!-- Filter Panel -->
@@ -173,6 +192,12 @@
                 <table class="lrm-table">
                     <thead>
                         <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox"
+                                       checked="@IsAllVisibleSelected()"
+                                       @onchange="ToggleSelectAll"
+                                       title="Select/deselect all visible keys" />
+                            </th>
                             <th>Status</th>
                             <th>Key</th>
                             @foreach (var lang in languages.Where(l => visibleLanguages.Contains(l.Code ?? "default")))
@@ -186,7 +211,15 @@
                         @foreach (var key in filteredKeys.Take(pageSize))
                         {
                             var status = GetKeyStatus(key);
-                            <tr class="@status.RowClass">
+                            var isSelected = selectedKeys.Contains(key.Key);
+                            var rowClass = isSelected ? $"{status.RowClass} lrm-row-selected" : status.RowClass;
+                            <tr class="@rowClass">
+                                <td>
+                                    <input type="checkbox"
+                                           checked="@isSelected"
+                                           @onchange="() => ToggleKeySelection(key.Key)"
+                                           title="Select this key" />
+                                </td>
                                 <td>
                                     @foreach (var icon in status.Icons)
                                     {
@@ -270,6 +303,31 @@
                 <div class="lrm-modal-footer">
                     <button class="lrm-button" @onclick="CancelDelete">Cancel</button>
                     <button class="lrm-button lrm-button-danger" @onclick="ConfirmDelete">Delete</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Bulk Delete Confirmation Modal -->
+    @if (showBulkDeleteConfirm)
+    {
+        <div class="lrm-modal-overlay" @onclick="CancelBulkDelete">
+            <div class="lrm-modal" @onclick:stopPropagation="true">
+                <div class="lrm-modal-header">
+                    <h3 class="lrm-modal-title">Confirm Bulk Delete</h3>
+                    <button class="lrm-modal-close" @onclick="CancelBulkDelete">x</button>
+                </div>
+                <p>Are you sure you want to delete <strong>@selectedKeys.Count</strong> selected @(selectedKeys.Count == 1 ? "key" : "keys")?</p>
+                <p class="lrm-text-muted">This will remove the keys from all language files.</p>
+                @if (isDeletingBulk)
+                {
+                    <div class="lrm-progress-indicator">
+                        <p>Deleting @bulkDeleteProgress / @selectedKeys.Count keys...</p>
+                    </div>
+                }
+                <div class="lrm-modal-footer">
+                    <button class="lrm-button" @onclick="CancelBulkDelete" disabled="@isDeletingBulk">Cancel</button>
+                    <button class="lrm-button lrm-button-danger" @onclick="ConfirmBulkDelete" disabled="@isDeletingBulk">Delete All</button>
                 </div>
             </div>
         </div>
@@ -396,6 +454,14 @@
     // Delete modal
     private bool showDeleteConfirm = false;
     private string? keyToDelete;
+
+    // Bulk delete modal
+    private bool showBulkDeleteConfirm = false;
+    private bool isDeletingBulk = false;
+    private int bulkDeleteProgress = 0;
+
+    // Multi-select state
+    private HashSet<string> selectedKeys = new();
 
     // Default language code (for display)
     private string? defaultLanguageCode;
@@ -763,6 +829,106 @@
         if (string.IsNullOrEmpty(filePath)) return filePath;
         var lastSlash = filePath.LastIndexOfAny(new[] { '/', '\\' });
         return lastSlash >= 0 ? filePath.Substring(lastSlash + 1) : filePath;
+    }
+
+    // Multi-select methods
+    private void ToggleKeySelection(string key)
+    {
+        if (selectedKeys.Contains(key))
+        {
+            selectedKeys.Remove(key);
+        }
+        else
+        {
+            selectedKeys.Add(key);
+        }
+    }
+
+    private bool IsAllVisibleSelected()
+    {
+        if (!filteredKeys.Any()) return false;
+        var visibleKeys = filteredKeys.Take(pageSize).Select(k => k.Key).ToList();
+        return visibleKeys.All(k => selectedKeys.Contains(k));
+    }
+
+    private void ToggleSelectAll(ChangeEventArgs e)
+    {
+        var isChecked = (bool)(e.Value ?? false);
+        if (isChecked)
+        {
+            // Select all visible keys
+            foreach (var key in filteredKeys.Take(pageSize))
+            {
+                selectedKeys.Add(key.Key);
+            }
+        }
+        else
+        {
+            // Deselect all visible keys
+            var visibleKeys = filteredKeys.Take(pageSize).Select(k => k.Key).ToHashSet();
+            selectedKeys.RemoveWhere(k => visibleKeys.Contains(k));
+        }
+    }
+
+    private void ClearSelection()
+    {
+        selectedKeys.Clear();
+    }
+
+    // Bulk operations
+    private void BulkTranslate()
+    {
+        if (!selectedKeys.Any()) return;
+
+        // Navigate to translation page with selected keys
+        var keysParam = string.Join(",", selectedKeys.Select(Uri.EscapeDataString));
+        Navigation.NavigateTo($"/translation?keys={keysParam}");
+    }
+
+    private void BulkDelete()
+    {
+        if (!selectedKeys.Any()) return;
+        showBulkDeleteConfirm = true;
+    }
+
+    private void CancelBulkDelete()
+    {
+        showBulkDeleteConfirm = false;
+        bulkDeleteProgress = 0;
+    }
+
+    private async Task ConfirmBulkDelete()
+    {
+        if (!selectedKeys.Any()) return;
+
+        isDeletingBulk = true;
+        bulkDeleteProgress = 0;
+        var keysToDelete = selectedKeys.ToList();
+
+        try
+        {
+            foreach (var key in keysToDelete)
+            {
+                await ResourceApi.DeleteKeyAsync(key);
+                bulkDeleteProgress++;
+                StateHasChanged(); // Update progress
+            }
+
+            // Clear selection and reload
+            selectedKeys.Clear();
+            showBulkDeleteConfirm = false;
+            await LoadResources();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to delete some keys: {ex.Message}";
+            showBulkDeleteConfirm = false;
+        }
+        finally
+        {
+            isDeletingBulk = false;
+            bulkDeleteProgress = 0;
+        }
     }
 
     // Helper classes

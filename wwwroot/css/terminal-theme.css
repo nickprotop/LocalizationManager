@@ -748,6 +748,28 @@ ul, ol {
     background-color: rgba(244, 71, 71, 0.1) !important;
 }
 
+.lrm-row-selected {
+    background-color: rgba(78, 201, 176, 0.15) !important;
+    border-left: 3px solid var(--terminal-green);
+}
+
+/* ========================================
+   Multi-Select & Bulk Actions
+   ======================================== */
+
+.lrm-bulk-actions {
+    background-color: rgba(78, 201, 176, 0.1);
+    border: 1px solid var(--terminal-green);
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin-top: var(--spacing-sm);
+}
+
+.lrm-progress-indicator {
+    padding: var(--spacing-md);
+    text-align: center;
+    color: var(--terminal-cyan);
+}
+
 /* ========================================
    Small Buttons
    ======================================== */
