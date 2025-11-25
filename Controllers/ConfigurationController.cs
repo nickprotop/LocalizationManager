@@ -4,6 +4,7 @@
 using Microsoft.AspNetCore.Mvc;
 using LocalizationManager.Core.Configuration;
 using LocalizationManager.Models.Api;
+using LocalizationManager.Services;
 
 namespace LocalizationManager.Controllers;
 
@@ -12,10 +13,12 @@ namespace LocalizationManager.Controllers;
 public class ConfigurationController : ControllerBase
 {
     private readonly ConfigurationService _configService;
+    private readonly ConfigurationSchemaService _schemaService;
 
-    public ConfigurationController(ConfigurationService configService)
+    public ConfigurationController(ConfigurationService configService, ConfigurationSchemaService schemaService)
     {
         _configService = configService;
+        _schemaService = schemaService;
     }
 
     /// <summary>
@@ -246,5 +249,29 @@ public class ConfigurationController : ControllerBase
                 }
             }
         });
+    }
+
+    /// <summary>
+    /// Get schema-enriched configuration with inline documentation
+    /// Returns a formatted JSON string with all available options and current values
+    /// </summary>
+    [HttpGet("enriched")]
+    public ActionResult<SchemaEnrichedConfigResponse> GetSchemaEnrichedConfig()
+    {
+        try
+        {
+            var config = _configService.GetConfiguration();
+            var enrichedJson = _schemaService.GenerateSchemaEnrichedConfig(config);
+
+            return Ok(new SchemaEnrichedConfigResponse
+            {
+                EnrichedJson = enrichedJson,
+                Message = "Schema-enriched configuration generated successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new ErrorResponse { Error = ex.Message });
+        }
     }
 }

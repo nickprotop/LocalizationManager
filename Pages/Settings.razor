@@ -134,10 +134,34 @@
                     <div class="lrm-form">
                         <div class="lrm-form-group">
                             <label>Configuration JSON</label>
+                            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <button class="lrm-button-small"
+                                        @onclick="() => ToggleSchemaView(false)"
+                                        style="@(showSchemaView ? "" : "background: var(--color-primary); color: var(--color-bg);")">
+                                    Current Values
+                                </button>
+                                <button class="lrm-button-small"
+                                        @onclick="() => ToggleSchemaView(true)"
+                                        style="@(showSchemaView ? "background: var(--color-primary); color: var(--color-bg);" : "")">
+                                    With Schema (All Options)
+                                </button>
+                            </div>
                             <textarea class="lrm-textarea"
-                                      rows="20"
+                                      rows="25"
+                                      style="font-family: 'Courier New', Courier, monospace; font-size: 0.9rem;"
                                       @bind="editedConfigJson"></textarea>
-                            <small class="lrm-text-muted">Edit the JSON configuration directly. Be careful with syntax!</small>
+                            @if (showSchemaView)
+                            {
+                                <small class="lrm-text-muted">
+                                    📘 Showing all available configuration options with inline documentation.
+                                    Lines starting with // are commented out and won't be saved.
+                                    Uncomment and modify values as needed.
+                                </small>
+                            }
+                            else
+                            {
+                                <small class="lrm-text-muted">Edit the JSON configuration directly. Be careful with syntax!</small>
+                            }
                         </div>
 
                         <div class="lrm-actions">
@@ -199,16 +223,20 @@
     private LanguagesResponse? languages;
     private ConfigurationResponse? config;
     private ConfigValidationResponse? configValidation;
+    private SchemaEnrichedConfigResponse? schemaEnrichedConfig;
     private bool isLoading = true;
     private bool isAddingLanguage = false;
     private bool showAddLanguageForm = false;
     private bool isEditingConfig = false;
     private bool isSavingConfig = false;
+    private bool showSchemaView = true;
     private string? errorMessage;
     private string? successMessage;
     private string newLanguageCode = "";
     private bool createEmpty = false;
     private string editedConfigJson = string.Empty;
+    private string currentValuesJson = string.Empty;
+    private string schemaEnrichedJson = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -335,18 +363,43 @@
         }
     }
 
-    private void StartEditingConfig()
+    private async Task StartEditingConfig()
     {
         if (config?.Configuration != null)
         {
-            editedConfigJson = System.Text.Json.JsonSerializer.Serialize(
+            // Prepare current values JSON
+            currentValuesJson = System.Text.Json.JsonSerializer.Serialize(
                 config.Configuration,
                 new System.Text.Json.JsonSerializerOptions { WriteIndented = true }
             );
+
+            // Load schema-enriched JSON
+            try
+            {
+                schemaEnrichedConfig = await ConfigApi.GetSchemaEnrichedConfigAsync();
+                schemaEnrichedJson = schemaEnrichedConfig?.EnrichedJson ?? currentValuesJson;
+            }
+            catch (Exception)
+            {
+                // Fallback to current values if schema service fails
+                schemaEnrichedJson = currentValuesJson;
+            }
+
+            // Set the editor to show schema view by default
+            showSchemaView = true;
+            editedConfigJson = schemaEnrichedJson;
+
             isEditingConfig = true;
             errorMessage = null;
             successMessage = null;
         }
+    }
+
+    private void ToggleSchemaView(bool showSchema)
+    {
+        showSchemaView = showSchema;
+        // Switch the textarea content but preserve any edits if going back
+        editedConfigJson = showSchema ? schemaEnrichedJson : currentValuesJson;
     }
 
     private void CancelEditingConfig()
@@ -363,9 +416,12 @@
 
         try
         {
+            // Strip comments from JSON if present (for schema-enriched view)
+            var cleanedJson = StripJsonComments(editedConfigJson);
+
             // Parse the JSON to validate it
             var configModel = System.Text.Json.JsonSerializer.Deserialize<LocalizationManager.Core.Configuration.ConfigurationModel>(
-                editedConfigJson,
+                cleanedJson,
                 new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }
             );
 
@@ -396,5 +452,47 @@
         {
             isSavingConfig = false;
         }
+    }
+
+    /// <summary>
+    /// Removes single-line (//) and multi-line (/* */) comments from JSON.
+    /// This allows users to use the schema-enriched view which includes comments.
+    /// </summary>
+    private string StripJsonComments(string jsonWithComments)
+    {
+        if (string.IsNullOrWhiteSpace(jsonWithComments))
+            return jsonWithComments;
+
+        var lines = jsonWithComments.Split('\n');
+        var cleanedLines = new System.Collections.Generic.List<string>();
+
+        foreach (var line in lines)
+        {
+            var trimmedLine = line.TrimStart();
+
+            // Skip lines that are entirely comments
+            if (trimmedLine.StartsWith("//"))
+                continue;
+
+            // Remove inline comments (e.g., "value": "foo"  // comment)
+            var commentIndex = line.IndexOf("//");
+            if (commentIndex > 0)
+            {
+                // Only remove comment if it's not inside a string
+                var beforeComment = line.Substring(0, commentIndex);
+                var quoteCount = beforeComment.Count(c => c == '"');
+
+                // If even number of quotes, the // is outside a string
+                if (quoteCount % 2 == 0)
+                {
+                    cleanedLines.Add(beforeComment.TrimEnd());
+                    continue;
+                }
+            }
+
+            cleanedLines.Add(line);
+        }
+
+        return string.Join('\n', cleanedLines);
     }
 }

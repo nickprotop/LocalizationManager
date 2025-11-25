@@ -61,4 +61,12 @@ public class ConfigurationApiClient
     {
         return await _httpClient.GetFromJsonAsync<object>("/api/configuration/schema");
     }
+
+    /// <summary>
+    /// Get schema-enriched configuration with inline documentation.
+    /// </summary>
+    public async Task<SchemaEnrichedConfigResponse?> GetSchemaEnrichedConfigAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<SchemaEnrichedConfigResponse>("/api/configuration/enriched");
+    }
 }

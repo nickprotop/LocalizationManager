@@ -19,3 +19,9 @@ public class ConfigSchemaResponse
 {
     public object? Schema { get; set; }
 }
+
+public class SchemaEnrichedConfigResponse
+{
+    public string? EnrichedJson { get; set; }
+    public string? Message { get; set; }
+}

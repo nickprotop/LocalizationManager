@@ -174,6 +174,9 @@ public class WebCommand : Command<WebCommand.Settings>
         // Register ConfigurationService for dynamic config reload
         builder.Services.AddSingleton(sp => new LocalizationManager.Core.Configuration.ConfigurationService(absoluteResourcePath));
 
+        // Register ConfigurationSchemaService for schema-enriched config display
+        builder.Services.AddSingleton<LocalizationManager.Services.ConfigurationSchemaService>();
+
         // Configure CORS if enabled in configuration
         var corsConfig = settings.LoadedConfiguration?.Web?.Cors;
         if (corsConfig?.Enabled == true && corsConfig.AllowedOrigins?.Count > 0)
