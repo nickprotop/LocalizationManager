@@ -1,0 +1,451 @@
+@page "/scan"
+@using LocalizationManager.Services
+@using LocalizationManager.Models.Api
+@inject ScanApiClient ScanApi
+@inject ScanCacheService ScanCache
+
+<PageTitle>Code Scanner - Localization Manager</PageTitle>
+
+<div class="lrm-page">
+    <h1 class="lrm-page-title">Code Scanner</h1>
+
+    <div class="lrm-card">
+        <h2>Scan Source Code</h2>
+        <p>Scan your codebase to find localization key usage and detect unused or missing keys.</p>
+
+        <div class="lrm-form">
+            <div class="lrm-actions">
+                <button class="lrm-button lrm-button-primary"
+                        @onclick="RunScan"
+                        disabled="@isScanning">
+                    @if (isScanning)
+                    {
+                        <text>Scanning...</text>
+                    }
+                    else
+                    {
+                        <text>Run Scan</text>
+                    }
+                </button>
+                <button class="lrm-button" @onclick="LoadUnusedKeys">Show Unused Keys</button>
+                <button class="lrm-button" @onclick="LoadMissingKeys">Show Missing Keys</button>
+                @if (ScanCache.HasCachedScan)
+                {
+                    <button class="lrm-button" @onclick="ClearCache">Clear Cache</button>
+                }
+            </div>
+            @if (ScanCache.HasCachedScan && ScanCache.ScanTimestamp.HasValue)
+            {
+                <p class="lrm-text-muted mt-sm">
+                    Last scan: @ScanCache.ScanTimestamp.Value.ToString("HH:mm:ss")
+                </p>
+            }
+        </div>
+    </div>
+
+    @if (errorMessage != null)
+    {
+        <div class="lrm-card lrm-error">
+            <h3>Error</h3>
+            <p>@errorMessage</p>
+        </div>
+    }
+
+    @if (scanResult != null)
+    {
+        <div class="lrm-card @(scanResult.Unused.Any() || scanResult.Missing.Any() ? "lrm-warning" : "lrm-success")">
+            <h3>Scan Results</h3>
+            <p>
+                <strong>Files Scanned:</strong> @scanResult.ScannedFiles<br />
+                <strong>Total References:</strong> @scanResult.TotalReferences<br />
+                <strong>Unused Keys:</strong> @scanResult.UnusedKeysCount<br />
+                <strong>Missing Keys:</strong> @scanResult.MissingKeysCount
+            </p>
+
+            @if (scanResult.Unused.Any())
+            {
+                <details class="lrm-details">
+                    <summary class="lrm-warning">Unused Keys (@scanResult.Unused.Count)</summary>
+                    <p>These keys exist in resource files but are not referenced in code:</p>
+                    <table class="lrm-table">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var key in scanResult.Unused.Take(50))
+                            {
+                                <tr>
+                                    <td><code>@key</code></td>
+                                    <td class="lrm-inline-actions">
+                                        <a href="/editor/key/@Uri.EscapeDataString(key)" class="lrm-button-small">Edit</a>
+                                        <button class="lrm-button-small" @onclick="() => ShowReferences(key)">Refs</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    @if (scanResult.Unused.Count > 50)
+                    {
+                        <p class="lrm-text-muted">Showing first 50 of @scanResult.Unused.Count keys</p>
+                    }
+                </details>
+            }
+
+            @if (scanResult.Missing.Any())
+            {
+                <details class="lrm-details">
+                    <summary class="lrm-error">Missing Keys (@scanResult.Missing.Count)</summary>
+                    <p>These keys are referenced in code but don't exist in resource files:</p>
+                    <table class="lrm-table">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var key in scanResult.Missing.Take(50))
+                            {
+                                <tr>
+                                    <td><code>@key</code></td>
+                                    <td class="lrm-inline-actions">
+                                        <button class="lrm-button-small" @onclick="() => ShowReferences(key)">Refs</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    @if (scanResult.Missing.Count > 50)
+                    {
+                        <p class="lrm-text-muted">Showing first 50 of @scanResult.Missing.Count keys</p>
+                    }
+                </details>
+            }
+
+            @if (scanResult.References?.Any() == true)
+            {
+                <details class="lrm-details">
+                    <summary>Key Usage Details (@scanResult.References.Count keys)</summary>
+                    <table class="lrm-table">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>References</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var refInfo in scanResult.References.OrderByDescending(x => x.ReferenceCount).Take(50))
+                            {
+                                <tr>
+                                    <td><code>@refInfo.Key</code></td>
+                                    <td>@refInfo.ReferenceCount</td>
+                                    <td class="lrm-inline-actions">
+                                        <a href="/editor/key/@Uri.EscapeDataString(refInfo.Key)" class="lrm-button-small">Edit</a>
+                                        <button class="lrm-button-small" @onclick="@(() => ShowReferences(refInfo.Key))">
+                                            Refs
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    @if (scanResult.References.Count > 50)
+                    {
+                        <p class="lrm-text-muted">Showing top 50 of @scanResult.References.Count keys</p>
+                    }
+                </details>
+            }
+        </div>
+    }
+
+    @if (unusedKeys != null)
+    {
+        <div class="lrm-card lrm-warning">
+            <h3>Unused Keys (@unusedKeys.Count)</h3>
+            <p>These keys exist in resource files but are not referenced in code:</p>
+            <table class="lrm-table">
+                <thead>
+                    <tr>
+                        <th>Key</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var key in unusedKeys.Take(100))
+                    {
+                        <tr>
+                            <td><code>@key</code></td>
+                            <td class="lrm-inline-actions">
+                                <a href="/editor/key/@Uri.EscapeDataString(key)" class="lrm-button-small">Edit</a>
+                                <button class="lrm-button-small" @onclick="() => ShowReferences(key)">Refs</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            @if (unusedKeys.Count > 100)
+            {
+                <p class="lrm-text-muted">Showing first 100 of @unusedKeys.Count keys</p>
+            }
+        </div>
+    }
+
+    @if (missingKeys != null)
+    {
+        <div class="lrm-card lrm-error">
+            <h3>Missing Keys (@missingKeys.Count)</h3>
+            <p>These keys are referenced in code but don't exist in resource files:</p>
+            <table class="lrm-table">
+                <thead>
+                    <tr>
+                        <th>Key</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var key in missingKeys.Take(100))
+                    {
+                        <tr>
+                            <td><code>@key</code></td>
+                            <td class="lrm-inline-actions">
+                                <button class="lrm-button-small" @onclick="() => ShowReferences(key)">Refs</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            @if (missingKeys.Count > 100)
+            {
+                <p class="lrm-text-muted">Showing first 100 of @missingKeys.Count keys</p>
+            }
+        </div>
+    }
+
+    <!-- References Modal -->
+    @if (showReferencesModal)
+    {
+        <div class="lrm-modal-overlay" @onclick="ClearReferences">
+            <div class="lrm-modal" style="max-width: 800px;" @onclick:stopPropagation="true">
+                <div class="lrm-modal-header">
+                    <h3 class="lrm-modal-title">Code References: <code>@selectedKeyName</code></h3>
+                    <button class="lrm-modal-close" @onclick="ClearReferences">x</button>
+                </div>
+
+                @if (isLoadingReferences)
+                {
+                    <p>Loading references...</p>
+                }
+                else if (selectedKeyReferences != null)
+                {
+                    @if (selectedKeyReferences.Count == 0)
+                    {
+                        <p class="lrm-text-muted">
+                            <span class="lrm-status-icon lrm-status-unused">∅</span>
+                            No references found in source code. This key may be unused.
+                        </p>
+                    }
+                    else
+                    {
+                        <p>Found @selectedKeyReferences.Count reference(s):</p>
+                        <table class="lrm-table">
+                            <thead>
+                                <tr>
+                                    <th>File</th>
+                                    <th>Line</th>
+                                    <th>Pattern</th>
+                                    <th>Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var reference in selectedKeyReferences)
+                                {
+                                    <tr>
+                                        <td><code title="@reference.File">@GetFileName(reference.File)</code></td>
+                                        <td>@reference.Line</td>
+                                        <td><code>@reference.Pattern</code></td>
+                                        <td>
+                                            @if (reference.Confidence == "High")
+                                            {
+                                                <span class="lrm-badge lrm-badge-success">@reference.Confidence</span>
+                                            }
+                                            else if (reference.Confidence == "Medium")
+                                            {
+                                                <span class="lrm-badge lrm-badge-warning">@reference.Confidence</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="lrm-badge lrm-badge-info">@reference.Confidence</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                }
+
+                <div class="lrm-modal-footer">
+                    <button class="lrm-button" @onclick="ClearReferences">Close</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private ScanResponse? scanResult;
+    private List<string>? unusedKeys;
+    private List<string>? missingKeys;
+    private List<CodeReference>? selectedKeyReferences;
+    private string? selectedKeyName;
+    private bool isScanning = false;
+    private bool isLoadingReferences = false;
+    private bool showReferencesModal = false;
+    private string? errorMessage;
+
+    protected override void OnInitialized()
+    {
+        // Load from cache if available
+        if (ScanCache.HasCachedScan)
+        {
+            scanResult = ScanCache.ScanResult;
+        }
+    }
+
+    private async Task RunScan()
+    {
+        isScanning = true;
+        errorMessage = null;
+        scanResult = null;
+        unusedKeys = null;
+        missingKeys = null;
+        selectedKeyReferences = null;
+
+        try
+        {
+            scanResult = await ScanApi.ScanAsync();
+            if (scanResult != null)
+            {
+                // Cache the result
+                ScanCache.CacheScanResult(scanResult);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Scan failed: {ex.Message}";
+        }
+        finally
+        {
+            isScanning = false;
+        }
+    }
+
+    private async Task LoadUnusedKeys()
+    {
+        errorMessage = null;
+        unusedKeys = null;
+        missingKeys = null;
+        scanResult = null;
+        selectedKeyReferences = null;
+
+        try
+        {
+            // Try cache first
+            if (ScanCache.HasCachedScan)
+            {
+                unusedKeys = ScanCache.GetUnusedKeys();
+            }
+            else
+            {
+                unusedKeys = await ScanApi.GetUnusedKeysAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load unused keys: {ex.Message}";
+        }
+    }
+
+    private async Task LoadMissingKeys()
+    {
+        errorMessage = null;
+        unusedKeys = null;
+        missingKeys = null;
+        scanResult = null;
+        selectedKeyReferences = null;
+
+        try
+        {
+            // Try cache first
+            if (ScanCache.HasCachedScan)
+            {
+                missingKeys = ScanCache.GetMissingKeys();
+            }
+            else
+            {
+                missingKeys = await ScanApi.GetMissingKeysAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load missing keys: {ex.Message}";
+        }
+    }
+
+    private async Task ShowReferences(string keyName)
+    {
+        selectedKeyName = keyName;
+        selectedKeyReferences = null;
+        showReferencesModal = true;
+        isLoadingReferences = true;
+        errorMessage = null;
+
+        try
+        {
+            // Try cache first
+            if (ScanCache.TryGetReferences(keyName, out var cached))
+            {
+                selectedKeyReferences = cached ?? new List<CodeReference>();
+            }
+            else
+            {
+                selectedKeyReferences = await ScanApi.GetReferencesAsync(keyName) ?? new List<CodeReference>();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load references: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingReferences = false;
+        }
+    }
+
+    private void ClearReferences()
+    {
+        showReferencesModal = false;
+        selectedKeyReferences = null;
+        selectedKeyName = null;
+    }
+
+    private void ClearCache()
+    {
+        ScanCache.Clear();
+        scanResult = null;
+        unusedKeys = null;
+        missingKeys = null;
+        selectedKeyReferences = null;
+    }
+
+    private string GetFileName(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath)) return filePath;
+        var lastSlash = filePath.LastIndexOfAny(new[] { '/', '\\' });
+        return lastSlash >= 0 ? filePath.Substring(lastSlash + 1) : filePath;
+    }
+}

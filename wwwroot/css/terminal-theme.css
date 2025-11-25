@@ -1,0 +1,1003 @@
+/* ========================================
+   LRM Terminal Theme
+   Dark terminal-inspired design for Blazor Server UI
+   ======================================== */
+
+/* CSS Variables - Terminal Color Palette */
+:root {
+    /* Terminal Background & Foreground */
+    --terminal-bg: #1e1e1e;
+    --terminal-fg: #d4d4d4;
+    --terminal-bg-light: #252526;
+    --terminal-bg-lighter: #2d2d30;
+
+    /* Terminal Colors (matching TUI) */
+    --terminal-red: #f44747;
+    --terminal-yellow: #ffcc00;
+    --terminal-green: #4ec9b0;
+    --terminal-cyan: #4fc1ff;
+    --terminal-blue: #569cd6;
+    --terminal-magenta: #c586c0;
+    --terminal-white: #cccccc;
+    --terminal-gray: #6a6a6a;
+
+    /* Status Colors */
+    --status-error: var(--terminal-red);
+    --status-warning: var(--terminal-yellow);
+    --status-success: var(--terminal-green);
+    --status-info: var(--terminal-cyan);
+
+    /* UI Colors */
+    --border-color: #3e3e42;
+    --hover-bg: #37373d;
+    --active-bg: #094771;
+    --focus-outline: var(--terminal-blue);
+
+    /* Fonts */
+    --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+
+    /* Spacing */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+
+    /* Borders */
+    --border-radius: 4px;
+    --border-width: 1px;
+}
+
+/* ========================================
+   Base Styles
+   ======================================== */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    height: 100%;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    background-color: var(--terminal-bg);
+    color: var(--terminal-fg);
+    line-height: 1.6;
+}
+
+body {
+    overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: var(--spacing-md);
+    color: var(--terminal-white);
+}
+
+h1 { font-size: 2rem; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.25rem; }
+
+p {
+    margin-bottom: var(--spacing-md);
+}
+
+a {
+    color: var(--terminal-blue);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+a:hover {
+    color: var(--terminal-cyan);
+    text-decoration: underline;
+}
+
+code, pre {
+    font-family: var(--font-mono);
+    background-color: var(--terminal-bg-lighter);
+    padding: 0.2rem 0.4rem;
+    border-radius: var(--border-radius);
+}
+
+ul, ol {
+    margin-left: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+}
+
+/* ========================================
+   Layout - Main Container
+   ======================================== */
+
+.lrm-container {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* ========================================
+   Navigation Sidebar
+   ======================================== */
+
+.lrm-nav {
+    width: 250px;
+    background-color: var(--terminal-bg-light);
+    border-right: var(--border-width) solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.lrm-nav-header {
+    padding: var(--spacing-lg);
+    border-bottom: var(--border-width) solid var(--border-color);
+}
+
+.lrm-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--terminal-green);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.lrm-icon {
+    font-size: 1.5rem;
+}
+
+.lrm-nav-menu {
+    list-style: none;
+    margin: 0;
+    padding: var(--spacing-md) 0;
+    flex: 1;
+}
+
+.lrm-nav-menu li {
+    margin: 0;
+}
+
+.lrm-nav-link {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    color: var(--terminal-fg);
+    text-decoration: none;
+    transition: background-color 0.2s, color 0.2s;
+    border-left: 3px solid transparent;
+}
+
+.lrm-nav-link:hover {
+    background-color: var(--hover-bg);
+    color: var(--terminal-white);
+    text-decoration: none;
+}
+
+.lrm-nav-link.active {
+    background-color: var(--active-bg);
+    color: var(--terminal-white);
+    border-left-color: var(--terminal-blue);
+    font-weight: 600;
+}
+
+.lrm-nav-icon {
+    font-size: 1.1rem;
+    width: 1.5rem;
+    text-align: center;
+}
+
+.lrm-nav-footer {
+    padding: var(--spacing-md);
+    border-top: var(--border-width) solid var(--border-color);
+}
+
+.lrm-nav-link-small {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.9rem;
+    color: var(--terminal-gray);
+}
+
+.lrm-nav-link-small:hover {
+    color: var(--terminal-white);
+}
+
+/* ========================================
+   Main Content Area
+   ======================================== */
+
+.lrm-main {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-xl);
+}
+
+.lrm-page {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.lrm-page-title {
+    font-size: 2rem;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 2px solid var(--border-color);
+    color: var(--terminal-green);
+}
+
+/* ========================================
+   Cards
+   ======================================== */
+
+.lrm-card {
+    background-color: var(--terminal-bg-light);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.lrm-card h2, .lrm-card h3 {
+    color: var(--terminal-cyan);
+}
+
+/* ========================================
+   Statistics Cards
+   ======================================== */
+
+.lrm-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+    margin: var(--spacing-lg) 0;
+}
+
+.lrm-stat-card {
+    background-color: var(--terminal-bg-lighter);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    text-align: center;
+}
+
+.lrm-stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--terminal-green);
+    font-family: var(--font-mono);
+}
+
+.lrm-stat-label {
+    font-size: 0.9rem;
+    color: var(--terminal-gray);
+    margin-top: var(--spacing-sm);
+}
+
+/* ========================================
+   Buttons
+   ======================================== */
+
+.lrm-button {
+    display: inline-block;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    font-size: 1rem;
+    font-weight: 500;
+    text-align: center;
+    text-decoration: none;
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius);
+    background-color: var(--terminal-bg-lighter);
+    color: var(--terminal-fg);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.lrm-button:hover {
+    background-color: var(--hover-bg);
+    border-color: var(--terminal-blue);
+    color: var(--terminal-white);
+    text-decoration: none;
+}
+
+.lrm-button:active {
+    background-color: var(--active-bg);
+}
+
+.lrm-button:focus {
+    outline: 2px solid var(--focus-outline);
+    outline-offset: 2px;
+}
+
+.lrm-button-primary {
+    background-color: var(--terminal-blue);
+    border-color: var(--terminal-blue);
+    color: #ffffff;
+}
+
+.lrm-button-primary:hover {
+    background-color: #6ba6dd;
+    border-color: #6ba6dd;
+}
+
+.lrm-button-success {
+    background-color: var(--terminal-green);
+    border-color: var(--terminal-green);
+    color: #1e1e1e;
+}
+
+.lrm-button-success:hover {
+    background-color: #5ed4b7;
+    border-color: #5ed4b7;
+}
+
+.lrm-button-danger {
+    background-color: var(--terminal-red);
+    border-color: var(--terminal-red);
+    color: #ffffff;
+}
+
+.lrm-button-danger:hover {
+    background-color: #f55f5f;
+    border-color: #f55f5f;
+}
+
+.lrm-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+    margin-top: var(--spacing-lg);
+}
+
+/* ========================================
+   Forms & Inputs
+   ======================================== */
+
+.lrm-form-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.lrm-label {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    font-weight: 500;
+    color: var(--terminal-white);
+}
+
+.lrm-input,
+.lrm-textarea,
+.lrm-select {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 1rem;
+    font-family: var(--font-mono);
+    background-color: var(--terminal-bg);
+    color: var(--terminal-fg);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius);
+    transition: border-color 0.2s;
+}
+
+.lrm-input:focus,
+.lrm-textarea:focus,
+.lrm-select:focus {
+    outline: none;
+    border-color: var(--terminal-blue);
+}
+
+.lrm-textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+/* ========================================
+   Tables
+   ======================================== */
+
+.lrm-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+}
+
+.lrm-table thead {
+    background-color: var(--terminal-bg-lighter);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.lrm-table th {
+    padding: var(--spacing-md);
+    text-align: left;
+    font-weight: 600;
+    color: var(--terminal-white);
+}
+
+.lrm-table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: var(--border-width) solid var(--border-color);
+}
+
+.lrm-table tbody tr:hover {
+    background-color: var(--hover-bg);
+}
+
+/* Status Row Colors */
+.lrm-table tr.status-error {
+    background-color: rgba(244, 71, 71, 0.1);
+}
+
+.lrm-table tr.status-warning {
+    background-color: rgba(255, 204, 0, 0.1);
+}
+
+.lrm-table tr.status-success {
+    background-color: rgba(78, 201, 176, 0.1);
+}
+
+/* ========================================
+   Status Badges
+   ======================================== */
+
+.lrm-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 12px;
+    font-family: var(--font-mono);
+}
+
+.lrm-badge-error {
+    background-color: var(--status-error);
+    color: #ffffff;
+}
+
+.lrm-badge-warning {
+    background-color: var(--status-warning);
+    color: #1e1e1e;
+}
+
+.lrm-badge-success {
+    background-color: var(--status-success);
+    color: #1e1e1e;
+}
+
+.lrm-badge-info {
+    background-color: var(--status-info);
+    color: #1e1e1e;
+}
+
+/* ========================================
+   Lists
+   ======================================== */
+
+.lrm-link-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.lrm-link-list li {
+    margin-bottom: var(--spacing-sm);
+}
+
+.lrm-link-list a {
+    display: block;
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius);
+    transition: background-color 0.2s;
+}
+
+.lrm-link-list a:hover {
+    background-color: var(--hover-bg);
+}
+
+/* ========================================
+   404 Page
+   ======================================== */
+
+.not-found {
+    text-align: center;
+    padding: var(--spacing-xl);
+}
+
+.not-found h1 {
+    color: var(--terminal-red);
+    font-size: 3rem;
+}
+
+/* ========================================
+   Blazor Error UI
+   ======================================== */
+
+#blazor-error-ui {
+    background: var(--terminal-red);
+    color: #ffffff;
+    padding: var(--spacing-md);
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    padding: 0 var(--spacing-md);
+    font-size: 1.5rem;
+}
+
+/* ========================================
+   Responsive Design
+   ======================================== */
+
+@media (max-width: 768px) {
+    .lrm-container {
+        flex-direction: column;
+    }
+
+    .lrm-nav {
+        width: 100%;
+        border-right: none;
+        border-bottom: var(--border-width) solid var(--border-color);
+        max-height: 50vh;
+    }
+
+    .lrm-main {
+        padding: var(--spacing-md);
+    }
+
+    .lrm-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .lrm-actions {
+        flex-direction: column;
+    }
+
+    .lrm-button {
+        width: 100%;
+    }
+}
+
+/* ========================================
+   Utility Classes
+   ======================================== */
+
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-muted { color: var(--terminal-gray); }
+.text-error { color: var(--status-error); }
+.text-warning { color: var(--status-warning); }
+.text-success { color: var(--status-success); }
+.text-info { color: var(--status-info); }
+
+.mt-sm { margin-top: var(--spacing-sm); }
+.mt-md { margin-top: var(--spacing-md); }
+.mt-lg { margin-top: var(--spacing-lg); }
+.mb-sm { margin-bottom: var(--spacing-sm); }
+.mb-md { margin-bottom: var(--spacing-md); }
+.mb-lg { margin-bottom: var(--spacing-lg); }
+
+.p-sm { padding: var(--spacing-sm); }
+.p-md { padding: var(--spacing-md); }
+.p-lg { padding: var(--spacing-lg); }
+
+/* ========================================
+   Editor Toolbar & Search
+   ======================================== */
+
+.lrm-editor-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.lrm-search-container {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+    flex: 1;
+    min-width: 300px;
+}
+
+.lrm-search-input {
+    flex: 1;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 1rem;
+    font-family: var(--font-mono);
+    background-color: var(--terminal-bg);
+    color: var(--terminal-fg);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius);
+}
+
+.lrm-search-input:focus {
+    outline: none;
+    border-color: var(--terminal-blue);
+}
+
+.lrm-search-clear {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: transparent;
+    border: none;
+    color: var(--terminal-gray);
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+.lrm-search-clear:hover {
+    color: var(--terminal-white);
+}
+
+.lrm-toolbar-info {
+    color: var(--terminal-gray);
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+/* ========================================
+   Filter Panel
+   ======================================== */
+
+.lrm-filter-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background-color: var(--terminal-bg-lighter);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-md);
+}
+
+.lrm-filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    align-items: center;
+}
+
+.lrm-filter-label {
+    font-weight: 500;
+    color: var(--terminal-gray);
+    margin-right: var(--spacing-sm);
+}
+
+.lrm-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    cursor: pointer;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--border-radius);
+    transition: background-color 0.2s;
+}
+
+.lrm-checkbox-label:hover {
+    background-color: var(--hover-bg);
+}
+
+.lrm-checkbox-label input[type="checkbox"] {
+    accent-color: var(--terminal-blue);
+    width: 16px;
+    height: 16px;
+}
+
+/* ========================================
+   Status Indicators (TUI Parity)
+   ======================================== */
+
+.lrm-status-icon {
+    display: inline-block;
+    width: 1.2em;
+    text-align: center;
+    font-weight: bold;
+}
+
+.lrm-status-missing {
+    color: var(--terminal-yellow);
+}
+
+.lrm-status-extra {
+    color: var(--terminal-cyan);
+}
+
+.lrm-status-duplicate {
+    color: var(--terminal-magenta);
+}
+
+.lrm-status-unused {
+    color: var(--terminal-gray);
+}
+
+.lrm-status-missing-code {
+    color: var(--terminal-red);
+}
+
+/* Row status backgrounds */
+.lrm-row-missing {
+    background-color: rgba(255, 204, 0, 0.1) !important;
+}
+
+.lrm-row-extra {
+    background-color: rgba(79, 193, 255, 0.1) !important;
+}
+
+.lrm-row-duplicate {
+    background-color: rgba(197, 134, 192, 0.1) !important;
+}
+
+.lrm-row-unused {
+    background-color: rgba(106, 106, 106, 0.1) !important;
+}
+
+.lrm-row-missing-code {
+    background-color: rgba(244, 71, 71, 0.1) !important;
+}
+
+/* ========================================
+   Small Buttons
+   ======================================== */
+
+.lrm-button-small {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-align: center;
+    text-decoration: none;
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius);
+    background-color: var(--terminal-bg-lighter);
+    color: var(--terminal-fg);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.lrm-button-small:hover {
+    background-color: var(--hover-bg);
+    border-color: var(--terminal-blue);
+    color: var(--terminal-white);
+    text-decoration: none;
+}
+
+.lrm-button-small:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ========================================
+   Details/Summary (Collapsible)
+   ======================================== */
+
+.lrm-details {
+    margin: var(--spacing-md) 0;
+}
+
+.lrm-details summary {
+    cursor: pointer;
+    padding: var(--spacing-sm);
+    background-color: var(--terminal-bg-lighter);
+    border-radius: var(--border-radius);
+    font-weight: 500;
+}
+
+.lrm-details summary:hover {
+    background-color: var(--hover-bg);
+}
+
+.lrm-details[open] summary {
+    margin-bottom: var(--spacing-sm);
+}
+
+/* ========================================
+   Progress Bar
+   ======================================== */
+
+.lrm-progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: var(--terminal-bg);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: var(--spacing-xs);
+}
+
+.lrm-progress-fill {
+    height: 100%;
+    background-color: var(--terminal-green);
+    transition: width 0.3s ease;
+}
+
+/* ========================================
+   Modal/Dialog
+   ======================================== */
+
+.lrm-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.lrm-modal {
+    background-color: var(--terminal-bg-light);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.lrm-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: var(--border-width) solid var(--border-color);
+}
+
+.lrm-modal-title {
+    margin: 0;
+    color: var(--terminal-cyan);
+}
+
+.lrm-modal-close {
+    background: transparent;
+    border: none;
+    color: var(--terminal-gray);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.lrm-modal-close:hover {
+    color: var(--terminal-white);
+}
+
+.lrm-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-md);
+    border-top: var(--border-width) solid var(--border-color);
+}
+
+/* ========================================
+   Cell States
+   ======================================== */
+
+.lrm-cell-empty {
+    color: var(--terminal-gray);
+    font-style: italic;
+}
+
+.lrm-text-muted {
+    color: var(--terminal-gray);
+}
+
+/* ========================================
+   Code Block
+   ======================================== */
+
+.lrm-code {
+    background-color: var(--terminal-bg);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+}
+
+/* ========================================
+   Status Cards (Success, Warning, Error)
+   ======================================== */
+
+.lrm-success {
+    border-color: var(--terminal-green);
+    background-color: rgba(78, 201, 176, 0.1);
+}
+
+.lrm-warning {
+    border-color: var(--terminal-yellow);
+    background-color: rgba(255, 204, 0, 0.1);
+}
+
+.lrm-error {
+    border-color: var(--terminal-red);
+    background-color: rgba(244, 71, 71, 0.1);
+}
+
+/* ========================================
+   Back Link
+   ======================================== */
+
+.lrm-back-link {
+    font-size: 0.9rem;
+    color: var(--terminal-gray);
+    margin-right: var(--spacing-md);
+}
+
+.lrm-back-link:hover {
+    color: var(--terminal-white);
+}
+
+/* ========================================
+   Editor Grid
+   ======================================== */
+
+.lrm-editor-grid {
+    overflow-x: auto;
+}
+
+/* ========================================
+   Duplicate Merge UI
+   ======================================== */
+
+.lrm-merge-option {
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+    background-color: var(--terminal-bg);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.lrm-merge-option:hover {
+    border-color: var(--terminal-blue);
+    background-color: var(--hover-bg);
+}
+
+.lrm-merge-option.selected {
+    border-color: var(--terminal-green);
+    background-color: rgba(78, 201, 176, 0.15);
+}
+
+.lrm-merge-value {
+    font-family: var(--font-mono);
+    word-break: break-word;
+}
+
+.lrm-merge-meta {
+    font-size: 0.85rem;
+    color: var(--terminal-gray);
+    margin-top: var(--spacing-xs);
+}
+
+/* ========================================
+   Inline Actions
+   ======================================== */
+
+.lrm-inline-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+    white-space: nowrap;
+}

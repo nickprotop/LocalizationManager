@@ -1,0 +1,175 @@
+@page "/import"
+@using LocalizationManager.Services
+@using LocalizationManager.Models.Api
+@inject ImportApiClient ImportApi
+
+<PageTitle>Import - Localization Manager</PageTitle>
+
+<div class="lrm-page">
+    <h1 class="lrm-page-title">Import Resources</h1>
+
+    <div class="lrm-card">
+        <h2>Import from CSV</h2>
+        <p>Import resource keys and translations from CSV format. CSV should have columns: Key, [language codes], and optionally Comment.</p>
+
+        <div class="lrm-form">
+            <div class="lrm-form-group">
+                <label>CSV Data</label>
+                <textarea class="lrm-textarea"
+                          rows="15"
+                          placeholder="Paste CSV content here&#10;Example:&#10;Key,en,fr,Comment&#10;Hello,Hello,Bonjour,Greeting message&#10;Goodbye,Goodbye,Au revoir,"
+                          @bind="csvData"></textarea>
+            </div>
+
+            <div class="lrm-form-group">
+                <label class="lrm-checkbox-label">
+                    <input type="checkbox" @bind="updateExisting" />
+                    Update existing keys
+                </label>
+                <small class="lrm-text-muted">If unchecked, only new keys will be added</small>
+            </div>
+
+            <div class="lrm-form-group">
+                <label class="lrm-checkbox-label">
+                    <input type="checkbox" @bind="dryRun" />
+                    Dry run (preview without saving)
+                </label>
+            </div>
+
+            <div class="lrm-actions">
+                <button class="lrm-button lrm-button-primary"
+                        @onclick="ImportCsv"
+                        disabled="@(isImporting || string.IsNullOrWhiteSpace(csvData))">
+                    @if (isImporting)
+                    {
+                        <text>Importing...</text>
+                    }
+                    else
+                    {
+                        <text>Import CSV</text>
+                    }
+                </button>
+                <button class="lrm-button" @onclick="ClearForm">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    @if (errorMessage != null)
+    {
+        <div class="lrm-card lrm-error">
+            <h3>Error</h3>
+            <p>@errorMessage</p>
+        </div>
+    }
+
+    @if (importResult != null)
+    {
+        <div class="lrm-card @(importResult.Success ? "lrm-success" : "lrm-warning")">
+            <h3>Import Results</h3>
+            <p>
+                <strong>Added:</strong> @importResult.AddedCount keys<br />
+                <strong>Updated:</strong> @importResult.UpdatedCount keys<br />
+                <strong>Skipped:</strong> @importResult.SkippedCount keys<br />
+                <strong>Errors:</strong> @importResult.ErrorCount<br />
+                @if (importResult.DryRun)
+                {
+                    <em>(Dry run - no changes saved)</em>
+                }
+            </p>
+
+            @if (importResult.AddedKeys?.Any() == true)
+            {
+                <details class="lrm-details">
+                    <summary>Added keys (@importResult.AddedKeys.Count)</summary>
+                    <ul>
+                        @foreach (var key in importResult.AddedKeys.Take(50))
+                        {
+                            <li><code>@key</code></li>
+                        }
+                    </ul>
+                    @if (importResult.AddedKeys.Count > 50)
+                    {
+                        <p class="lrm-text-muted">Showing first 50 of @importResult.AddedKeys.Count keys</p>
+                    }
+                </details>
+            }
+
+            @if (importResult.UpdatedKeys?.Any() == true)
+            {
+                <details class="lrm-details">
+                    <summary>Updated keys (@importResult.UpdatedKeys.Count)</summary>
+                    <ul>
+                        @foreach (var key in importResult.UpdatedKeys.Take(50))
+                        {
+                            <li><code>@key</code></li>
+                        }
+                    </ul>
+                    @if (importResult.UpdatedKeys.Count > 50)
+                    {
+                        <p class="lrm-text-muted">Showing first 50 of @importResult.UpdatedKeys.Count keys</p>
+                    }
+                </details>
+            }
+
+            @if (importResult.Errors?.Any() == true)
+            {
+                <details class="lrm-details">
+                    <summary class="lrm-error">Import errors (@importResult.Errors.Count)</summary>
+                    <ul>
+                        @foreach (var error in importResult.Errors.Take(20))
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                    @if (importResult.Errors.Count > 20)
+                    {
+                        <p class="lrm-text-muted">Showing first 20 of @importResult.Errors.Count errors</p>
+                    }
+                </details>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private string csvData = string.Empty;
+    private bool updateExisting = true;
+    private bool dryRun = false;
+    private bool isImporting = false;
+    private string? errorMessage;
+    private ImportResult? importResult;
+
+    private async Task ImportCsv()
+    {
+        isImporting = true;
+        errorMessage = null;
+        importResult = null;
+
+        try
+        {
+            var request = new ImportCsvRequest
+            {
+                CsvData = csvData,
+                UpdateExisting = updateExisting,
+                DryRun = dryRun
+            };
+
+            importResult = await ImportApi.ImportFromCsvAsync(request);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Import failed: {ex.Message}";
+        }
+        finally
+        {
+            isImporting = false;
+        }
+    }
+
+    private void ClearForm()
+    {
+        csvData = string.Empty;
+        importResult = null;
+        errorMessage = null;
+    }
+}

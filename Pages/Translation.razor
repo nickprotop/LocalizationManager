@@ -1,0 +1,253 @@
+@page "/translation"
+@using LocalizationManager.Services
+@using LocalizationManager.Models.Api
+@inject TranslationApiClient TranslationApi
+@inject LanguageApiClient LanguageApi
+
+<PageTitle>Translation - Localization Manager</PageTitle>
+
+<div class="lrm-page">
+    <h1 class="lrm-page-title">Translation</h1>
+
+    @if (isLoading)
+    {
+        <div class="lrm-card">
+            <p>Loading translation options...</p>
+        </div>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="lrm-card lrm-error">
+            <h3>Error</h3>
+            <p>@errorMessage</p>
+        </div>
+    }
+    else
+    {
+        <div class="lrm-card">
+            <h2>Translate Missing Keys</h2>
+            <p>Automatically translate missing translations using machine translation providers.</p>
+
+            <div class="lrm-form">
+                <div class="lrm-form-group">
+                    <label>Provider</label>
+                    <select class="lrm-select" @bind="selectedProvider">
+                        @if (providers != null)
+                        {
+                            @foreach (var provider in providers.Providers)
+                            {
+                                <option value="@provider.Name">
+                                    @provider.DisplayName
+                                    @if (provider.RequiresApiKey)
+                                    {
+                                        <text>(requires API key)</text>
+                                    }
+                                </option>
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="lrm-form-group">
+                    <label>Source Language</label>
+                    <select class="lrm-select" @bind="selectedSourceLanguage">
+                        @if (languages != null)
+                        {
+                            @foreach (var lang in languages.Languages.Where(l => l.IsDefault))
+                            {
+                                <option value="@(lang.Code ?? "default")">@(lang.DisplayName ?? lang.Code ?? "Default")</option>
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="lrm-form-group">
+                    <label>Target Languages</label>
+                    @if (languages != null)
+                    {
+                        @foreach (var lang in languages.Languages.Where(l => !l.IsDefault))
+                        {
+                            var langCode = lang.Code ?? "default";
+                            <label class="lrm-checkbox-label">
+                                <input type="checkbox"
+                                       checked="@targetLanguages.Contains(langCode)"
+                                       @onchange="e => ToggleTargetLanguage(langCode, (bool)e.Value!)" />
+                                @lang.DisplayName (@lang.Coverage%)
+                            </label>
+                        }
+                    }
+                </div>
+
+                <div class="lrm-form-group">
+                    <label class="lrm-checkbox-label">
+                        <input type="checkbox" @bind="onlyMissing" />
+                        Only translate missing values
+                    </label>
+                </div>
+
+                <div class="lrm-form-group">
+                    <label class="lrm-checkbox-label">
+                        <input type="checkbox" @bind="dryRun" />
+                        Dry run (preview without saving)
+                    </label>
+                </div>
+
+                <div class="lrm-actions">
+                    <button class="lrm-button lrm-button-primary"
+                            @onclick="StartTranslation"
+                            disabled="@(isTranslating || !targetLanguages.Any())">
+                        @if (isTranslating)
+                        {
+                            <text>Translating...</text>
+                        }
+                        else
+                        {
+                            <text>Start Translation</text>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        @if (translationResult != null)
+        {
+            <div class="lrm-card @(translationResult.Success ? "lrm-success" : "lrm-warning")">
+                <h3>Translation Results</h3>
+                <p>
+                    <strong>Translated:</strong> @translationResult.TranslatedCount keys<br />
+                    <strong>Errors:</strong> @translationResult.ErrorCount<br />
+                    @if (translationResult.DryRun)
+                    {
+                        <em>(Dry run - no changes saved)</em>
+                    }
+                </p>
+
+                @if (translationResult.Results.Any())
+                {
+                    <details class="lrm-details">
+                        <summary>View translated keys (@translationResult.Results.Count)</summary>
+                        <table class="lrm-table">
+                            <thead>
+                                <tr>
+                                    <th>Key</th>
+                                    <th>Language</th>
+                                    <th>Translated Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var result in translationResult.Results.Take(50))
+                                {
+                                    <tr>
+                                        <td><code>@result.Key</code></td>
+                                        <td>@result.Language</td>
+                                        <td>@result.TranslatedValue</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        @if (translationResult.Results.Count > 50)
+                        {
+                            <p class="lrm-text-muted">Showing first 50 of @translationResult.Results.Count results</p>
+                        }
+                    </details>
+                }
+
+                @if (translationResult.Errors.Any())
+                {
+                    <details class="lrm-details">
+                        <summary class="lrm-error">Translation errors (@translationResult.Errors.Count)</summary>
+                        <ul>
+                            @foreach (var error in translationResult.Errors.Take(20))
+                            {
+                                <li><code>@error.Key</code> (@error.Language): @error.Error</li>
+                            }
+                        </ul>
+                    </details>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private TranslationProvidersResponse? providers;
+    private LanguagesResponse? languages;
+    private bool isLoading = true;
+    private bool isTranslating = false;
+    private string? errorMessage;
+    private string selectedProvider = "google";
+    private string selectedSourceLanguage = "default";
+    private HashSet<string> targetLanguages = new();
+    private bool onlyMissing = true;
+    private bool dryRun = false;
+    private Models.Api.TranslationResponse? translationResult;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        try
+        {
+            providers = await TranslationApi.GetProvidersAsync();
+            languages = await LanguageApi.GetLanguagesAsync();
+
+            // Pre-select all non-default languages
+            if (languages != null)
+            {
+                foreach (var lang in languages.Languages.Where(l => !l.IsDefault))
+                {
+                    targetLanguages.Add(lang.Code ?? "default");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load translation options: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ToggleTargetLanguage(string languageCode, bool isChecked)
+    {
+        if (isChecked)
+        {
+            targetLanguages.Add(languageCode);
+        }
+        else
+        {
+            targetLanguages.Remove(languageCode);
+        }
+    }
+
+    private async Task StartTranslation()
+    {
+        isTranslating = true;
+        errorMessage = null;
+        translationResult = null;
+
+        try
+        {
+            var request = new TranslateRequest
+            {
+                Provider = selectedProvider,
+                SourceLanguage = selectedSourceLanguage,
+                TargetLanguages = targetLanguages.ToList(),
+                OnlyMissing = onlyMissing,
+                DryRun = dryRun
+            };
+
+            translationResult = await TranslationApi.TranslateAsync(request);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Translation failed: {ex.Message}";
+        }
+        finally
+        {
+            isTranslating = false;
+        }
+    }
+}

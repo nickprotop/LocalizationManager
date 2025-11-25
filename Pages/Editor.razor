@@ -1,0 +1,788 @@
+@page "/editor"
+@using LocalizationManager.Services
+@using LocalizationManager.Models.Api
+@inject ResourceApiClient ResourceApi
+@inject MergeDuplicatesApiClient MergeDuplicatesApi
+@inject ValidationApiClient ValidationApi
+@inject ScanApiClient ScanApi
+@inject ScanCacheService ScanCache
+@inject SearchApiClient SearchApi
+@inject NavigationManager Navigation
+
+<PageTitle>Editor - Localization Manager</PageTitle>
+
+<div class="lrm-page">
+    <h1 class="lrm-page-title">Resource Editor</h1>
+
+    @if (isLoading)
+    {
+        <div class="lrm-card">
+            <p>Loading resources...</p>
+        </div>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="lrm-card lrm-error">
+            <h3>Error</h3>
+            <p>@errorMessage</p>
+            <button class="lrm-button" @onclick="LoadResources">Retry</button>
+        </div>
+    }
+    else if (keys != null && languages != null)
+    {
+        <!-- Toolbar -->
+        <div class="lrm-card">
+            <div class="lrm-editor-toolbar">
+                <div class="lrm-search-container">
+                    <input type="text"
+                           class="lrm-search-input"
+                           placeholder="@GetSearchPlaceholder()"
+                           @bind="searchFilter"
+                           @bind:event="oninput"
+                           @onkeyup="OnSearchKeyUp" />
+                    @if (!string.IsNullOrEmpty(searchFilter))
+                    {
+                        <button class="lrm-search-clear" @onclick="ClearSearch" title="Clear search">x</button>
+                    }
+                </div>
+
+                <label class="lrm-checkbox-label" title="Use wildcards (* and ?) for search">
+                    <input type="checkbox" @bind="useWildcard" @bind:after="OnFilterModeChanged" />
+                    Wildcard
+                </label>
+
+                <label class="lrm-checkbox-label" title="Use regular expression for search">
+                    <input type="checkbox" @bind="useRegex" @bind:after="OnFilterModeChanged" />
+                    Regex
+                </label>
+
+                <label class="lrm-checkbox-label" title="Case sensitive search">
+                    <input type="checkbox" @bind="caseSensitive" @bind:after="OnFilterModeChanged" />
+                    Match Case
+                </label>
+
+                <span class="lrm-toolbar-info">
+                    @filteredKeys.Count / @keys.Count keys
+                    @if (scanResult != null)
+                    {
+                        <text> | Scanned</text>
+                    }
+                </span>
+            </div>
+
+            <!-- Actions Toolbar -->
+            <div class="lrm-editor-toolbar">
+                <a href="/editor/add" class="lrm-button lrm-button-primary">+ Add Key</a>
+
+                @if (duplicateCount > 0)
+                {
+                    <a href="/editor/merge-duplicates" class="lrm-button">
+                        <span class="lrm-status-icon lrm-status-duplicate">◆</span>
+                        Merge Duplicates (@duplicateCount)
+                    </a>
+                }
+
+                @if (!isScanning)
+                {
+                    <button class="lrm-button" @onclick="RunCodeScan" title="Scan source code for key usage">
+                        Scan Code
+                    </button>
+                }
+                else
+                {
+                    <button class="lrm-button" disabled>Scanning...</button>
+                }
+
+                <button class="lrm-button" @onclick="LoadResources" title="Refresh data">
+                    Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Filter Panel -->
+        <div class="lrm-filter-panel">
+            <div class="lrm-filter-group">
+                <span class="lrm-filter-label">Status:</span>
+
+                <label class="lrm-checkbox-label" title="Keys missing translations in non-default languages">
+                    <input type="checkbox" @bind="filterMissing" @bind:after="OnFilterModeChanged" />
+                    <span class="lrm-status-icon lrm-status-missing">!</span> Missing (@missingCount)
+                </label>
+
+                <label class="lrm-checkbox-label" title="Keys present in non-default but not in default language">
+                    <input type="checkbox" @bind="filterExtra" @bind:after="OnFilterModeChanged" />
+                    <span class="lrm-status-icon lrm-status-extra">*</span> Extra (@extraCount)
+                </label>
+
+                <label class="lrm-checkbox-label" title="Keys with duplicate entries">
+                    <input type="checkbox" @bind="filterDuplicates" @bind:after="OnFilterModeChanged" />
+                    <span class="lrm-status-icon lrm-status-duplicate">◆</span> Duplicates (@duplicateCount)
+                </label>
+
+                @if (scanResult != null)
+                {
+                    <label class="lrm-checkbox-label" title="Keys not referenced in source code">
+                        <input type="checkbox" @bind="filterUnused" @bind:after="ApplyLocalFilters" />
+                        <span class="lrm-status-icon lrm-status-unused">∅</span> Unused (@unusedKeys.Count)
+                    </label>
+
+                    <label class="lrm-checkbox-label" title="Keys used in code but not in resources">
+                        <input type="checkbox" @bind="filterMissingFromCode" @bind:after="ApplyLocalFilters" />
+                        <span class="lrm-status-icon lrm-status-missing-code">✗</span> Missing in Resources (@missingFromResources.Count)
+                    </label>
+                }
+            </div>
+
+            <div class="lrm-filter-group">
+                <span class="lrm-filter-label">Languages:</span>
+                @foreach (var lang in languages)
+                {
+                    var langCode = lang.Code ?? "default";
+                    <label class="lrm-checkbox-label">
+                        <input type="checkbox"
+                               checked="@visibleLanguages.Contains(langCode)"
+                               @onchange="(e) => ToggleLanguage(langCode, (bool)e.Value!)" />
+                        @langCode
+                    </label>
+                }
+            </div>
+        </div>
+
+        <!-- Missing from Resources (keys found in code but not in .resx) -->
+        @if (filterMissingFromCode && missingFromResources.Count > 0)
+        {
+            <div class="lrm-card lrm-warning">
+                <h3><span class="lrm-status-icon lrm-status-missing-code">✗</span> Keys Found in Code but Missing from Resources</h3>
+                <p>These keys are referenced in source code but don't exist in your resource files:</p>
+                <ul>
+                    @foreach (var key in missingFromResources.Take(20))
+                    {
+                        <li><code>@key</code></li>
+                    }
+                    @if (missingFromResources.Count > 20)
+                    {
+                        <li><em>...and @(missingFromResources.Count - 20) more</em></li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <!-- Data Table -->
+        <div class="lrm-card">
+            <div class="lrm-editor-grid">
+                <table class="lrm-table">
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Key</th>
+                            @foreach (var lang in languages.Where(l => visibleLanguages.Contains(l.Code ?? "default")))
+                            {
+                                <th>@(lang.Code ?? "default")</th>
+                            }
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var key in filteredKeys.Take(pageSize))
+                        {
+                            var status = GetKeyStatus(key);
+                            <tr class="@status.RowClass">
+                                <td>
+                                    @foreach (var icon in status.Icons)
+                                    {
+                                        <span class="lrm-status-icon @icon.CssClass" title="@icon.Title">@icon.Symbol</span>
+                                    }
+                                </td>
+                                <td>
+                                    <strong>@key.Key</strong>
+                                    @if (key.HasDuplicates)
+                                    {
+                                        <span class="lrm-badge lrm-badge-warning">x@key.OccurrenceCount</span>
+                                    }
+                                </td>
+                                @foreach (var lang in languages.Where(l => visibleLanguages.Contains(l.Code ?? "default")))
+                                {
+                                    var langCode = lang.Code ?? "default";
+                                    var value = key.Values.ContainsKey(langCode) ? key.Values[langCode] : null;
+                                    var isEmpty = string.IsNullOrWhiteSpace(value);
+
+                                    <td class="@(isEmpty ? "lrm-cell-empty" : "")">
+                                        @if (isEmpty)
+                                        {
+                                            <em class="lrm-text-muted">(empty)</em>
+                                        }
+                                        else if (value!.Length > 50)
+                                        {
+                                            <span title="@value">@value.Substring(0, 47)...</span>
+                                        }
+                                        else
+                                        {
+                                            <span>@value</span>
+                                        }
+                                    </td>
+                                }
+                                <td class="lrm-inline-actions">
+                                    <a href="/editor/key/@Uri.EscapeDataString(key.Key)" class="lrm-button-small" title="Edit and translate">Edit</a>
+                                    <button class="lrm-button-small"
+                                            @onclick="() => ViewReferences(key.Key)"
+                                            title="View code references">
+                                        Refs
+                                    </button>
+                                    <button class="lrm-button-small"
+                                            @onclick="() => DeleteKey(key.Key)"
+                                            title="Delete this key">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                @if (filteredKeys.Count > pageSize)
+                {
+                    <div class="mt-md">
+                        <p class="lrm-text-muted">
+                            Showing first @pageSize of @filteredKeys.Count keys.
+                            <button class="lrm-button-small" @onclick="ShowMore">Show More</button>
+                        </p>
+                    </div>
+                }
+                else if (filteredKeys.Count == 0)
+                {
+                    <p class="lrm-text-muted p-md">No keys match the current filters.</p>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Delete Confirmation Modal -->
+    @if (showDeleteConfirm)
+    {
+        <div class="lrm-modal-overlay" @onclick="CancelDelete">
+            <div class="lrm-modal" @onclick:stopPropagation="true">
+                <div class="lrm-modal-header">
+                    <h3 class="lrm-modal-title">Confirm Delete</h3>
+                    <button class="lrm-modal-close" @onclick="CancelDelete">x</button>
+                </div>
+                <p>Are you sure you want to delete the key <strong>@keyToDelete</strong>?</p>
+                <p class="lrm-text-muted">This will remove the key from all language files.</p>
+                <div class="lrm-modal-footer">
+                    <button class="lrm-button" @onclick="CancelDelete">Cancel</button>
+                    <button class="lrm-button lrm-button-danger" @onclick="ConfirmDelete">Delete</button>
+                </div>
+            </div>
+        </div>
+    }
+
+
+    <!-- References Modal -->
+    @if (showReferencesModal)
+    {
+        <div class="lrm-modal-overlay" @onclick="CloseReferencesModal">
+            <div class="lrm-modal" style="max-width: 800px;" @onclick:stopPropagation="true">
+                <div class="lrm-modal-header">
+                    <h3 class="lrm-modal-title">Code References: @keyToViewReferences</h3>
+                    <button class="lrm-modal-close" @onclick="CloseReferencesModal">x</button>
+                </div>
+
+                @if (isLoadingReferences)
+                {
+                    <p>Scanning source code...</p>
+                }
+                else if (referencesError != null)
+                {
+                    <div class="lrm-error p-sm">@referencesError</div>
+                }
+                else if (currentReferences != null)
+                {
+                    @if (currentReferences.Count == 0)
+                    {
+                        <p class="lrm-text-muted">
+                            <span class="lrm-status-icon lrm-status-unused">∅</span>
+                            No references found in source code. This key may be unused.
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="text-success">Found @currentReferences.Count reference(s):</p>
+                        <table class="lrm-table">
+                            <thead>
+                                <tr>
+                                    <th>File</th>
+                                    <th>Line</th>
+                                    <th>Pattern</th>
+                                    <th>Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var reference in currentReferences)
+                                {
+                                    <tr>
+                                        <td><code title="@reference.File">@GetFileName(reference.File)</code></td>
+                                        <td>@reference.Line</td>
+                                        <td><code>@reference.Pattern</code></td>
+                                        <td>
+                                            @if (reference.Confidence == "High")
+                                            {
+                                                <span class="lrm-badge lrm-badge-success">@reference.Confidence</span>
+                                            }
+                                            else if (reference.Confidence == "Medium")
+                                            {
+                                                <span class="lrm-badge lrm-badge-warning">@reference.Confidence</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="lrm-badge lrm-badge-info">@reference.Confidence</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                }
+
+                <div class="lrm-modal-footer">
+                    <button class="lrm-button" @onclick="CloseReferencesModal">Close</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // Data
+    private List<ResourceKeyInfo>? keys;
+    private List<ResourceFileInfo>? languages;
+    private List<ResourceKeyInfo> filteredKeys = new();
+    private ScanResponse? scanResult;
+    private ValidationResponse? validationResult;
+
+    // Computed status sets
+    private HashSet<string> missingTranslationKeys = new();
+    private HashSet<string> extraKeys = new();
+    private HashSet<string> unusedKeys = new();
+    private HashSet<string> missingFromResources = new();
+
+    // Counts
+    private int missingCount = 0;
+    private int extraCount = 0;
+    private int duplicateCount = 0;
+
+    // UI State
+    private bool isLoading = true;
+    private bool isScanning = false;
+    private bool isLoadingReferences = false;
+    private string? errorMessage;
+    private int pageSize = 100;
+
+    // Search & Filters
+    private string searchFilter = "";
+    private bool useWildcard = false;
+    private bool useRegex = false;
+    private bool caseSensitive = false;
+    private bool filterMissing = false;
+    private bool filterExtra = false;
+    private bool filterDuplicates = false;
+    private bool filterUnused = false;
+    private bool filterMissingFromCode = false;
+    private HashSet<string> visibleLanguages = new();
+
+    // Debounce for search
+    private CancellationTokenSource? _searchDebounceToken;
+    private const int SearchDebounceMs = 300;
+
+    // Delete modal
+    private bool showDeleteConfirm = false;
+    private string? keyToDelete;
+
+    // Default language code (for display)
+    private string? defaultLanguageCode;
+
+    // References modal
+    private bool showReferencesModal = false;
+    private string? keyToViewReferences;
+    private List<CodeReference>? currentReferences;
+    private string? referencesError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load scan results from cache if available
+        if (ScanCache.HasCachedScan && ScanCache.ScanResult != null)
+        {
+            scanResult = ScanCache.ScanResult;
+            unusedKeys = scanResult.Unused?.ToHashSet() ?? new HashSet<string>();
+            missingFromResources = scanResult.Missing?.ToHashSet() ?? new HashSet<string>();
+        }
+
+        await LoadResources();
+    }
+
+    private async Task LoadResources()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            // Load languages
+            languages = (await ResourceApi.GetResourceFilesAsync())?.ToList();
+
+            // Initialize visible languages and find default language
+            if (languages != null)
+            {
+                var defaultLang = languages.FirstOrDefault(l => l.IsDefault);
+                defaultLanguageCode = defaultLang?.Code ?? "default";
+
+                if (visibleLanguages.Count == 0)
+                {
+                    foreach (var lang in languages)
+                    {
+                        visibleLanguages.Add(lang.Code ?? "default");
+                    }
+                }
+            }
+
+            // Load all keys
+            keys = (await ResourceApi.GetAllKeysAsync())?.ToList();
+
+            // Load validation results for missing/extra detection
+            try
+            {
+                validationResult = await ValidationApi.ValidateAsync();
+                ComputeValidationStatus();
+            }
+            catch { /* Validation errors don't block editor */ }
+
+            // Initial search (no filters)
+            await PerformSearchAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load resources: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ComputeValidationStatus()
+    {
+        missingTranslationKeys.Clear();
+        extraKeys.Clear();
+        missingCount = 0;
+        extraCount = 0;
+        duplicateCount = 0;
+
+        if (validationResult != null)
+        {
+            // Missing translations
+            foreach (var kvp in validationResult.MissingKeys)
+            {
+                foreach (var key in kvp.Value)
+                {
+                    missingTranslationKeys.Add(key);
+                }
+            }
+            missingCount = missingTranslationKeys.Count;
+
+            // Extra keys
+            foreach (var kvp in validationResult.ExtraKeys)
+            {
+                foreach (var key in kvp.Value)
+                {
+                    extraKeys.Add(key);
+                }
+            }
+            extraCount = extraKeys.Count;
+        }
+
+        // Duplicates
+        if (keys != null)
+        {
+            duplicateCount = keys.Count(k => k.HasDuplicates);
+        }
+    }
+
+    private async Task RunCodeScan()
+    {
+        isScanning = true;
+        try
+        {
+            scanResult = await ScanApi.ScanAsync();
+            if (scanResult != null)
+            {
+                unusedKeys = scanResult.Unused?.ToHashSet() ?? new HashSet<string>();
+                missingFromResources = scanResult.Missing?.ToHashSet() ?? new HashSet<string>();
+
+                // Cache the scan results for use across pages
+                ScanCache.CacheScanResult(scanResult);
+            }
+            await PerformSearchAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Scan failed: {ex.Message}";
+        }
+        finally
+        {
+            isScanning = false;
+        }
+    }
+
+    private void OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        // Debounce search to avoid overwhelming API on every keystroke
+        _searchDebounceToken?.Cancel();
+        _searchDebounceToken = new CancellationTokenSource();
+
+        _ = DebounceSearchAsync(_searchDebounceToken.Token);
+    }
+
+    private async Task DebounceSearchAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(SearchDebounceMs, cancellationToken);
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                await PerformSearchAsync();
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // Search was cancelled by new input - expected behavior
+        }
+    }
+
+    private void ClearSearch()
+    {
+        searchFilter = "";
+        _searchDebounceToken?.Cancel();
+        _ = PerformSearchAsync();
+    }
+
+    private void OnFilterModeChanged()
+    {
+        // Immediate search on filter mode change (no debounce needed)
+        _searchDebounceToken?.Cancel();
+        _ = PerformSearchAsync();
+    }
+
+    private async Task PerformSearchAsync()
+    {
+        if (keys == null) return;
+
+        // Build status filters list
+        var statusFilters = new List<string>();
+        if (filterMissing) statusFilters.Add("missing");
+        if (filterExtra) statusFilters.Add("extra");
+        if (filterDuplicates) statusFilters.Add("duplicates");
+
+        // Determine filter mode
+        string filterMode = "substring";
+        if (useRegex) filterMode = "regex";
+        else if (useWildcard) filterMode = "wildcard";
+
+        try
+        {
+            var request = new SearchRequest
+            {
+                Pattern = searchFilter,
+                FilterMode = filterMode,
+                CaseSensitive = caseSensitive,
+                StatusFilters = statusFilters.Any() ? statusFilters : null
+            };
+
+            var response = await SearchApi.SearchAsync(request);
+            if (response != null)
+            {
+                filteredKeys = response.Results;
+
+                // Apply local filters for scan results (unused keys are not in API yet)
+                ApplyLocalFilters();
+            }
+        }
+        catch
+        {
+            // On API error, fall back to showing all keys
+            filteredKeys = keys.OrderBy(k => k.Key).ToList();
+        }
+
+        pageSize = 100; // Reset page size on filter change
+        StateHasChanged();
+    }
+
+    private void ApplyLocalFilters()
+    {
+        // Apply additional local-only filters (unused from code scan)
+        if (filterUnused && unusedKeys.Any())
+        {
+            filteredKeys = filteredKeys.Where(k => unusedKeys.Contains(k.Key)).ToList();
+        }
+
+        // Note: filterMissingFromCode shows a separate section, doesn't filter the main list
+    }
+
+    private string GetSearchPlaceholder()
+    {
+        if (useRegex) return "Search (regex)...";
+        if (useWildcard) return "Search (wildcards * ?)...";
+        return "Search keys and values...";
+    }
+
+    private void ToggleLanguage(string langCode, bool visible)
+    {
+        if (visible)
+        {
+            visibleLanguages.Add(langCode);
+        }
+        else
+        {
+            visibleLanguages.Remove(langCode);
+        }
+    }
+
+    private void ShowMore()
+    {
+        pageSize += 100;
+    }
+
+    // Status computation for a key
+    private KeyStatus GetKeyStatus(ResourceKeyInfo key)
+    {
+        var status = new KeyStatus();
+
+        if (key.HasDuplicates)
+        {
+            status.Icons.Add(new StatusIcon("◆", "lrm-status-duplicate", "Duplicate key"));
+            status.RowClass = "lrm-row-duplicate";
+        }
+
+        if (missingTranslationKeys.Contains(key.Key))
+        {
+            status.Icons.Add(new StatusIcon("!", "lrm-status-missing", "Missing translations"));
+            if (string.IsNullOrEmpty(status.RowClass))
+                status.RowClass = "lrm-row-missing";
+        }
+
+        if (extraKeys.Contains(key.Key))
+        {
+            status.Icons.Add(new StatusIcon("*", "lrm-status-extra", "Extra key (not in default language)"));
+            if (string.IsNullOrEmpty(status.RowClass))
+                status.RowClass = "lrm-row-extra";
+        }
+
+        if (unusedKeys.Contains(key.Key))
+        {
+            status.Icons.Add(new StatusIcon("∅", "lrm-status-unused", "Unused in code"));
+            if (string.IsNullOrEmpty(status.RowClass))
+                status.RowClass = "lrm-row-unused";
+        }
+
+        return status;
+    }
+
+    // Delete key
+    private void DeleteKey(string key)
+    {
+        keyToDelete = key;
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+        keyToDelete = null;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (string.IsNullOrEmpty(keyToDelete)) return;
+
+        try
+        {
+            await ResourceApi.DeleteKeyAsync(keyToDelete);
+            showDeleteConfirm = false;
+            keyToDelete = null;
+            await LoadResources();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to delete key: {ex.Message}";
+            showDeleteConfirm = false;
+        }
+    }
+
+    // View References - uses cache if available
+    private async Task ViewReferences(string key)
+    {
+        keyToViewReferences = key;
+        currentReferences = null;
+        referencesError = null;
+        showReferencesModal = true;
+
+        // Check cache first
+        if (ScanCache.TryGetReferences(key, out var cachedRefs))
+        {
+            currentReferences = cachedRefs ?? new List<CodeReference>();
+            isLoadingReferences = false;
+            return;
+        }
+
+        // No cache, need to scan
+        isLoadingReferences = true;
+
+        try
+        {
+            currentReferences = await ScanApi.GetReferencesAsync(key) ?? new List<CodeReference>();
+        }
+        catch (Exception ex)
+        {
+            referencesError = $"Failed to scan for references: {ex.Message}";
+            currentReferences = new List<CodeReference>();
+        }
+        finally
+        {
+            isLoadingReferences = false;
+        }
+    }
+
+    private void CloseReferencesModal()
+    {
+        showReferencesModal = false;
+        keyToViewReferences = null;
+        currentReferences = null;
+        referencesError = null;
+    }
+
+    private string GetFileName(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath)) return filePath;
+        var lastSlash = filePath.LastIndexOfAny(new[] { '/', '\\' });
+        return lastSlash >= 0 ? filePath.Substring(lastSlash + 1) : filePath;
+    }
+
+    // Helper classes
+    private class KeyStatus
+    {
+        public List<StatusIcon> Icons { get; set; } = new();
+        public string RowClass { get; set; } = "";
+    }
+
+    private class StatusIcon
+    {
+        public string Symbol { get; set; }
+        public string CssClass { get; set; }
+        public string Title { get; set; }
+
+        public StatusIcon(string symbol, string cssClass, string title)
+        {
+            Symbol = symbol;
+            CssClass = cssClass;
+            Title = title;
+        }
+    }
+}

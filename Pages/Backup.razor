@@ -1,0 +1,273 @@
+@page "/backup"
+@using LocalizationManager.Services
+@using LocalizationManager.Models.Api
+@inject BackupApiClient BackupApi
+
+<PageTitle>Backups - Localization Manager</PageTitle>
+
+<div class="lrm-page">
+    <h1 class="lrm-page-title">Backup Management</h1>
+
+    @if (isLoading)
+    {
+        <div class="lrm-card">
+            <p>Loading backups...</p>
+        </div>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="lrm-card lrm-error">
+            <h3>Error</h3>
+            <p>@errorMessage</p>
+        </div>
+    }
+    else
+    {
+        <div class="lrm-card">
+            <div class="lrm-actions">
+                <button class="lrm-button lrm-button-primary" @onclick="CreateBackup" disabled="@isCreatingBackup">
+                    @if (isCreatingBackup)
+                    {
+                        <text>Creating...</text>
+                    }
+                    else
+                    {
+                        <text>Create Backup</text>
+                    }
+                </button>
+                <button class="lrm-button" @onclick="LoadBackups">Refresh</button>
+            </div>
+        </div>
+
+        @if (backups != null && backups.Backups.Any())
+        {
+            <div class="lrm-card">
+                <h2>Available Backups (@backups.Backups.Count)</h2>
+                <table class="lrm-table">
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Version</th>
+                            <th>Timestamp</th>
+                            <th>Size</th>
+                            <th>Changes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var backup in backups.Backups.OrderByDescending(b => b.Timestamp))
+                        {
+                            <tr>
+                                <td><code>@backup.FileName</code></td>
+                                <td>v@backup.Version</td>
+                                <td>@backup.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td>@(backup.KeyCount) keys</td>
+                                <td>
+                                    <small>@(backup.ChangedKeys) changed</small>
+                                </td>
+                                <td>
+                                    <button class="lrm-button-small" @onclick="() => ShowRestorePreview(backup)">Preview</button>
+                                    <button class="lrm-button-small" @onclick="() => RestoreBackup(backup)">Restore</button>
+                                    <button class="lrm-button-small" @onclick="() => DeleteBackup(backup)">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="lrm-card">
+                <p>No backups found.</p>
+            </div>
+        }
+
+        @if (restorePreview != null)
+        {
+            <div class="lrm-card lrm-warning">
+                <h3>Restore Preview</h3>
+                <p>
+                    <strong>File:</strong> @selectedBackup?.FileName (v@selectedBackup?.Version)<br />
+                    <strong>Changes:</strong>
+                    @if (restorePreview.AddedCount > 0) { <span>+@restorePreview.AddedCount added </span> }
+                    @if (restorePreview.ModifiedCount > 0) { <span>~@restorePreview.ModifiedCount modified </span> }
+                    @if (restorePreview.RemovedCount > 0) { <span>-@restorePreview.RemovedCount removed</span> }
+                </p>
+
+                @if (restorePreview.Changes != null)
+                {
+                    @if (restorePreview.Changes.Added?.Any() == true)
+                    {
+                        <details class="lrm-details">
+                            <summary>Added keys (@restorePreview.Changes.Added.Count)</summary>
+                            <ul>
+                                @foreach (var key in restorePreview.Changes.Added.Take(20))
+                                {
+                                    <li><code>@key</code></li>
+                                }
+                            </ul>
+                        </details>
+                    }
+
+                    @if (restorePreview.Changes.Modified?.Any() == true)
+                    {
+                        <details class="lrm-details">
+                            <summary>Modified keys (@restorePreview.Changes.Modified.Count)</summary>
+                            <ul>
+                                @foreach (var mod in restorePreview.Changes.Modified.Take(20))
+                                {
+                                    <li>
+                                        <code>@mod.Key</code>:
+                                        <del>@mod.CurrentValue</del> → <ins>@mod.BackupValue</ins>
+                                    </li>
+                                }
+                            </ul>
+                        </details>
+                    }
+
+                    @if (restorePreview.Changes.Removed?.Any() == true)
+                    {
+                        <details class="lrm-details">
+                            <summary>Removed keys (@restorePreview.Changes.Removed.Count)</summary>
+                            <ul>
+                                @foreach (var key in restorePreview.Changes.Removed.Take(20))
+                                {
+                                    <li><code>@key</code></li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                }
+
+                <div class="lrm-actions">
+                    <button class="lrm-button lrm-button-primary" @onclick="ConfirmRestore">Confirm Restore</button>
+                    <button class="lrm-button" @onclick="CancelRestore">Cancel</button>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private BackupListResponse? backups;
+    private RestoreBackupResponse? restorePreview;
+    private BackupInfo? selectedBackup;
+    private bool isLoading = true;
+    private bool isCreatingBackup = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBackups();
+    }
+
+    private async Task LoadBackups()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            backups = await BackupApi.ListBackupsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load backups: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateBackup()
+    {
+        isCreatingBackup = true;
+        errorMessage = null;
+
+        try
+        {
+            await BackupApi.CreateBackupAsync();
+            await LoadBackups();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to create backup: {ex.Message}";
+        }
+        finally
+        {
+            isCreatingBackup = false;
+        }
+    }
+
+    private async Task ShowRestorePreview(BackupInfo backup)
+    {
+        selectedBackup = backup;
+        errorMessage = null;
+
+        try
+        {
+            restorePreview = await BackupApi.RestoreBackupAsync(backup.FileName, backup.Version, preview: true);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load restore preview: {ex.Message}";
+        }
+    }
+
+    private async Task ConfirmRestore()
+    {
+        if (selectedBackup == null) return;
+
+        errorMessage = null;
+
+        try
+        {
+            await BackupApi.RestoreBackupAsync(selectedBackup.FileName, selectedBackup.Version, preview: false);
+            restorePreview = null;
+            selectedBackup = null;
+            await LoadBackups();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to restore backup: {ex.Message}";
+        }
+    }
+
+    private void CancelRestore()
+    {
+        restorePreview = null;
+        selectedBackup = null;
+    }
+
+    private async Task RestoreBackup(BackupInfo backup)
+    {
+        errorMessage = null;
+
+        try
+        {
+            await BackupApi.RestoreBackupAsync(backup.FileName, backup.Version, preview: false);
+            await LoadBackups();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to restore backup: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteBackup(BackupInfo backup)
+    {
+        errorMessage = null;
+
+        try
+        {
+            await BackupApi.DeleteBackupAsync(backup.FileName, backup.Version);
+            await LoadBackups();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to delete backup: {ex.Message}";
+        }
+    }
+}

@@ -1,0 +1,178 @@
+@page "/validation"
+@using LocalizationManager.Services
+@using LocalizationManager.Models.Api
+@inject ValidationApiClient ValidationApi
+
+<PageTitle>Validation - Localization Manager</PageTitle>
+
+<div class="lrm-page">
+    <h1 class="lrm-page-title">Resource Validation</h1>
+
+    @if (isLoading)
+    {
+        <div class="lrm-card">
+            <p>Running validation...</p>
+        </div>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="lrm-card lrm-error">
+            <h3>Error</h3>
+            <p>@errorMessage</p>
+        </div>
+    }
+    else if (result != null)
+    {
+        @if (result.IsValid)
+        {
+            <div class="lrm-card lrm-success">
+                <h2>✓ All Validations Passed</h2>
+                <p>No issues found in resource files.</p>
+            </div>
+        }
+        else
+        {
+            <div class="lrm-card lrm-warning">
+                <h2>⚠️ Validation Issues Found</h2>
+                <p><strong>@result.Summary?.TotalIssues</strong> total issue(s) detected</p>
+            </div>
+
+            @if (result.MissingKeys.Any())
+            {
+                <div class="lrm-card">
+                    <h3>Missing Translations (@result.Summary?.MissingCount)</h3>
+                    <p>Keys that are missing in some language files:</p>
+                    @foreach (var langGroup in result.MissingKeys.OrderBy(kv => kv.Key))
+                    {
+                        <details class="lrm-details">
+                            <summary><strong>@langGroup.Key</strong> - @langGroup.Value.Count missing key(s)</summary>
+                            <ul>
+                                @foreach (var key in langGroup.Value.OrderBy(k => k))
+                                {
+                                    <li><code>@key</code></li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                </div>
+            }
+
+            @if (result.DuplicateKeys.Any())
+            {
+                <div class="lrm-card">
+                    <h3>Duplicate Keys (@result.Summary?.DuplicatesCount)</h3>
+                    <p>Keys that appear multiple times in the same file:</p>
+                    @foreach (var langGroup in result.DuplicateKeys.OrderBy(kv => kv.Key))
+                    {
+                        <details class="lrm-details">
+                            <summary><strong>@langGroup.Key</strong> - @langGroup.Value.Count duplicate(s)</summary>
+                            <ul>
+                                @foreach (var key in langGroup.Value.OrderBy(k => k))
+                                {
+                                    <li><code>@key</code></li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                </div>
+            }
+
+            @if (result.EmptyValues.Any())
+            {
+                <div class="lrm-card">
+                    <h3>Empty Values (@result.Summary?.EmptyCount)</h3>
+                    <p>Keys that have empty or whitespace-only values:</p>
+                    @foreach (var langGroup in result.EmptyValues.OrderBy(kv => kv.Key))
+                    {
+                        <details class="lrm-details">
+                            <summary><strong>@langGroup.Key</strong> - @langGroup.Value.Count empty value(s)</summary>
+                            <ul>
+                                @foreach (var key in langGroup.Value.OrderBy(k => k))
+                                {
+                                    <li><code>@key</code></li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                </div>
+            }
+
+            @if (result.ExtraKeys.Any())
+            {
+                <div class="lrm-card">
+                    <h3>Extra Keys (@result.Summary?.ExtraCount)</h3>
+                    <p>Keys that exist in translation files but not in the default language:</p>
+                    @foreach (var langGroup in result.ExtraKeys.OrderBy(kv => kv.Key))
+                    {
+                        <details class="lrm-details">
+                            <summary><strong>@langGroup.Key</strong> - @langGroup.Value.Count extra key(s)</summary>
+                            <ul>
+                                @foreach (var key in langGroup.Value.OrderBy(k => k))
+                                {
+                                    <li><code>@key</code></li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                </div>
+            }
+
+            @if (result.PlaceholderMismatches.Any())
+            {
+                <div class="lrm-card">
+                    <h3>Placeholder Mismatches (@result.Summary?.PlaceholderCount)</h3>
+                    <p>Keys where placeholder patterns don't match between languages:</p>
+                    @foreach (var keyGroup in result.PlaceholderMismatches.OrderBy(kv => kv.Key))
+                    {
+                        <details class="lrm-details">
+                            <summary><code>@keyGroup.Key</code> - @keyGroup.Value.Count language(s) with mismatches</summary>
+                            <ul>
+                                @foreach (var lang in keyGroup.Value.OrderBy(l => l))
+                                {
+                                    <li>@lang</li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                </div>
+            }
+        }
+
+        <div class="lrm-actions">
+            <button class="lrm-button lrm-button-primary" @onclick="RunValidation">
+                ↻ Re-run Validation
+            </button>
+            <a href="/" class="lrm-button">← Back to Dashboard</a>
+        </div>
+    }
+</div>
+
+@code {
+    private ValidationResponse? result;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RunValidation();
+    }
+
+    private async Task RunValidation()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            result = await ValidationApi.ValidateAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to run validation: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

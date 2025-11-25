@@ -1,0 +1,179 @@
+@page "/"
+@using LocalizationManager.Services
+@using LocalizationManager.Models.Api
+@inject StatsApiClient StatsApi
+@inject ValidationApiClient ValidationApi
+
+<PageTitle>Dashboard - Localization Manager</PageTitle>
+
+<div class="lrm-page">
+    <h1 class="lrm-page-title">Dashboard</h1>
+
+    @if (isLoading)
+    {
+        <div class="lrm-card">
+            <p>Loading dashboard...</p>
+        </div>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="lrm-card lrm-error">
+            <h3>Error</h3>
+            <p>@errorMessage</p>
+        </div>
+    }
+    else if (stats != null)
+    {
+        <div class="lrm-card">
+            <h2>Welcome to Localization Manager</h2>
+            <p>A powerful CLI/TUI/Web tool for managing .NET .resx localization files.</p>
+
+            <div class="lrm-stats">
+                <div class="lrm-stat-card">
+                    <div class="lrm-stat-value">@stats.Languages.Count</div>
+                    <div class="lrm-stat-label">Resource Files</div>
+                </div>
+                <div class="lrm-stat-card">
+                    <div class="lrm-stat-value">@stats.TotalKeys</div>
+                    <div class="lrm-stat-label">Total Keys</div>
+                </div>
+                <div class="lrm-stat-card">
+                    <div class="lrm-stat-value">@stats.Languages.Count(l => !l.IsDefault)</div>
+                    <div class="lrm-stat-label">Languages</div>
+                </div>
+                <div class="lrm-stat-card">
+                    <div class="lrm-stat-value">@stats.OverallCoverage%</div>
+                    <div class="lrm-stat-label">Translation Coverage</div>
+                </div>
+            </div>
+
+            <div class="lrm-actions">
+                <a href="/editor" class="lrm-button lrm-button-primary">
+                    ✏️ Open Editor
+                </a>
+                <a href="/validation" class="lrm-button">
+                    ✓ Validate Resources
+                </a>
+                <a href="/translation" class="lrm-button">
+                    🌐 Translate Missing
+                </a>
+            </div>
+        </div>
+
+        @if (validationSummary != null && validationSummary.HasIssues)
+        {
+            <div class="lrm-card lrm-warning">
+                <h3>⚠️ Validation Issues Found</h3>
+                <p>@validationSummary.TotalIssues total issue(s) detected:</p>
+                <ul>
+                    @if (validationSummary.MissingCount > 0)
+                    {
+                        <li>Missing translations: @validationSummary.MissingCount</li>
+                    }
+                    @if (validationSummary.DuplicatesCount > 0)
+                    {
+                        <li>Duplicate keys: @validationSummary.DuplicatesCount</li>
+                    }
+                    @if (validationSummary.EmptyCount > 0)
+                    {
+                        <li>Empty values: @validationSummary.EmptyCount</li>
+                    }
+                    @if (validationSummary.ExtraCount > 0)
+                    {
+                        <li>Extra keys: @validationSummary.ExtraCount</li>
+                    }
+                    @if (validationSummary.PlaceholderCount > 0)
+                    {
+                        <li>Placeholder mismatches: @validationSummary.PlaceholderCount</li>
+                    }
+                </ul>
+                <a href="/validation" class="lrm-button">View Details</a>
+            </div>
+        }
+        else if (validationSummary != null)
+        {
+            <div class="lrm-card lrm-success">
+                <h3>✓ All Validations Passed</h3>
+                <p>No issues found in resource files.</p>
+            </div>
+        }
+
+        <div class="lrm-card">
+            <h3>Language Coverage</h3>
+            @if (stats.Languages.Any())
+            {
+                <table class="lrm-table">
+                    <thead>
+                        <tr>
+                            <th>Language</th>
+                            <th>File</th>
+                            <th>Progress</th>
+                            <th>Coverage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var lang in stats.Languages.OrderByDescending(l => l.IsDefault).ThenBy(l => l.LanguageCode))
+                        {
+                            <tr>
+                                <td>
+                                    @lang.LanguageCode
+                                    @if (lang.IsDefault)
+                                    {
+                                        <span class="lrm-badge">Default</span>
+                                    }
+                                </td>
+                                <td>@Path.GetFileName(lang.FilePath)</td>
+                                <td>
+                                    <div class="lrm-progress-bar">
+                                        <div class="lrm-progress-fill" style="width: @lang.Coverage%"></div>
+                                    </div>
+                                    <small>@lang.TranslatedCount / @lang.TotalCount keys</small>
+                                </td>
+                                <td>@lang.Coverage%</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p>No resource files found.</p>
+            }
+        </div>
+    }
+
+    <div class="lrm-card">
+        <h3>Quick Links</h3>
+        <ul class="lrm-link-list">
+            <li><a href="/swagger" target="_blank">API Documentation (Swagger UI)</a></li>
+            <li><a href="https://github.com/nickprotop/LocalizationManager" target="_blank">GitHub Repository</a></li>
+        </ul>
+    </div>
+</div>
+
+@code {
+    private StatsResponse? stats;
+    private Models.Api.ValidationSummary? validationSummary;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Load stats
+            stats = await StatsApi.GetStatsAsync();
+
+            // Load validation summary
+            validationSummary = await ValidationApi.GetIssuesAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load dashboard data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

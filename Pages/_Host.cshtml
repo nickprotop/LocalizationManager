@@ -1,0 +1,8 @@
+@page "/"
+@using LocalizationManager
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    Layout = "_Layout";
+}
+
+<component type="typeof(LocalizationManager.App)" render-mode="ServerPrerendered" />

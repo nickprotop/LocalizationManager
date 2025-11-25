@@ -1,0 +1,400 @@
+@page "/settings"
+@using LocalizationManager.Services
+@using LocalizationManager.Models.Api
+@inject ConfigurationApiClient ConfigApi
+@inject LanguageApiClient LanguageApi
+
+<PageTitle>Settings - Localization Manager</PageTitle>
+
+<div class="lrm-page">
+    <h1 class="lrm-page-title">Settings</h1>
+
+    @if (isLoading)
+    {
+        <div class="lrm-card">
+            <p>Loading settings...</p>
+        </div>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="lrm-card lrm-error">
+            <h3>Error</h3>
+            <p>@errorMessage</p>
+        </div>
+    }
+    else
+    {
+        <div class="lrm-card">
+            <h2>Language Management</h2>
+
+            @if (languages != null)
+            {
+                <table class="lrm-table">
+                    <thead>
+                        <tr>
+                            <th>Language</th>
+                            <th>Code</th>
+                            <th>File</th>
+                            <th>Keys</th>
+                            <th>Coverage</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var lang in languages.Languages.OrderByDescending(l => l.IsDefault))
+                        {
+                            <tr>
+                                <td>
+                                    @lang.DisplayName
+                                    @if (lang.IsDefault)
+                                    {
+                                        <span class="lrm-badge">Default</span>
+                                    }
+                                </td>
+                                <td><code>@(lang.Code ?? "default")</code></td>
+                                <td><small>@Path.GetFileName(lang.FilePath)</small></td>
+                                <td>@lang.TranslatedKeys / @lang.TotalKeys</td>
+                                <td>@lang.Coverage%</td>
+                                <td>
+                                    @if (!lang.IsDefault)
+                                    {
+                                        <button class="lrm-button-small" @onclick="() => RemoveLanguage(lang.Code!)">Remove</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <div class="lrm-actions">
+                    <button class="lrm-button" @onclick="ShowAddLanguageForm">Add Language</button>
+                </div>
+            }
+        </div>
+
+        @if (showAddLanguageForm)
+        {
+            <div class="lrm-card">
+                <h3>Add New Language</h3>
+                <div class="lrm-form">
+                    <div class="lrm-form-group">
+                        <label>Culture Code (e.g., fr, de, es, zh-CN)</label>
+                        <input type="text"
+                               class="lrm-input"
+                               placeholder="Culture code"
+                               @bind="newLanguageCode" />
+                    </div>
+
+                    <div class="lrm-form-group">
+                        <label class="lrm-checkbox-label">
+                            <input type="checkbox" @bind="createEmpty" />
+                            Create empty language file (no pre-filled keys)
+                        </label>
+                    </div>
+
+                    <div class="lrm-actions">
+                        <button class="lrm-button lrm-button-primary"
+                                @onclick="AddLanguage"
+                                disabled="@(isAddingLanguage || string.IsNullOrWhiteSpace(newLanguageCode))">
+                            @if (isAddingLanguage)
+                            {
+                                <text>Adding...</text>
+                            }
+                            else
+                            {
+                                <text>Add Language</text>
+                            }
+                        </button>
+                        <button class="lrm-button" @onclick="CancelAddLanguage">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="lrm-card">
+            <h2>Configuration</h2>
+            <p>View and manage lrm.json configuration file.</p>
+
+            @if (config != null && config.Configuration != null)
+            {
+                @if (!isEditingConfig)
+                {
+                    <details class="lrm-details">
+                        <summary>View Configuration</summary>
+                        <pre class="lrm-code">@System.Text.Json.JsonSerializer.Serialize(config.Configuration, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
+                    </details>
+
+                    <div class="lrm-actions">
+                        <button class="lrm-button" @onclick="ValidateConfiguration">Validate Configuration</button>
+                        <button class="lrm-button" @onclick="StartEditingConfig">Edit Configuration</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="lrm-form">
+                        <div class="lrm-form-group">
+                            <label>Configuration JSON</label>
+                            <textarea class="lrm-textarea"
+                                      rows="20"
+                                      @bind="editedConfigJson"></textarea>
+                            <small class="lrm-text-muted">Edit the JSON configuration directly. Be careful with syntax!</small>
+                        </div>
+
+                        <div class="lrm-actions">
+                            <button class="lrm-button lrm-button-primary"
+                                    @onclick="SaveConfiguration"
+                                    disabled="@isSavingConfig">
+                                @if (isSavingConfig)
+                                {
+                                    <text>Saving...</text>
+                                }
+                                else
+                                {
+                                    <text>Save Configuration</text>
+                                }
+                            </button>
+                            <button class="lrm-button" @onclick="CancelEditingConfig">Cancel</button>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <p class="lrm-text-muted">No configuration file found.</p>
+                <button class="lrm-button" @onclick="CreateDefaultConfig">Create Default Configuration</button>
+            }
+        </div>
+
+        @if (configValidation != null)
+        {
+            <div class="lrm-card @(configValidation.IsValid ? "lrm-success" : "lrm-error")">
+                <h3>Configuration Validation</h3>
+                @if (configValidation.IsValid)
+                {
+                    <p>Configuration is valid.</p>
+                }
+                else
+                {
+                    <p>Configuration has errors:</p>
+                    <ul>
+                        @foreach (var error in configValidation.Errors ?? new List<string>())
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+
+        @if (successMessage != null)
+        {
+            <div class="lrm-card lrm-success">
+                <p>@successMessage</p>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private LanguagesResponse? languages;
+    private ConfigurationResponse? config;
+    private ConfigValidationResponse? configValidation;
+    private bool isLoading = true;
+    private bool isAddingLanguage = false;
+    private bool showAddLanguageForm = false;
+    private bool isEditingConfig = false;
+    private bool isSavingConfig = false;
+    private string? errorMessage;
+    private string? successMessage;
+    private string newLanguageCode = "";
+    private bool createEmpty = false;
+    private string editedConfigJson = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            languages = await LanguageApi.GetLanguagesAsync();
+            config = await ConfigApi.GetConfigurationAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load settings: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowAddLanguageForm()
+    {
+        showAddLanguageForm = true;
+        newLanguageCode = "";
+        createEmpty = false;
+    }
+
+    private void CancelAddLanguage()
+    {
+        showAddLanguageForm = false;
+    }
+
+    private async Task AddLanguage()
+    {
+        isAddingLanguage = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var request = new AddLanguageRequest
+            {
+                CultureCode = newLanguageCode.Trim(),
+                Empty = createEmpty
+            };
+
+            var result = await LanguageApi.AddLanguageAsync(request);
+            if (result?.Success == true)
+            {
+                successMessage = $"Added language: {result.DisplayName}";
+                showAddLanguageForm = false;
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to add language: {ex.Message}";
+        }
+        finally
+        {
+            isAddingLanguage = false;
+        }
+    }
+
+    private async Task RemoveLanguage(string cultureCode)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await LanguageApi.RemoveLanguageAsync(cultureCode);
+            if (result?.Success == true)
+            {
+                successMessage = result.Message;
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to remove language: {ex.Message}";
+        }
+    }
+
+    private async Task ValidateConfiguration()
+    {
+        errorMessage = null;
+        configValidation = null;
+
+        try
+        {
+            configValidation = await ConfigApi.ValidateConfigurationAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to validate configuration: {ex.Message}";
+        }
+    }
+
+    private async Task CreateDefaultConfig()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await ConfigApi.CreateConfigurationAsync();
+            if (result?.Success == true)
+            {
+                successMessage = result.Message ?? "Created default configuration file";
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to create configuration: {ex.Message}";
+        }
+    }
+
+    private void StartEditingConfig()
+    {
+        if (config?.Configuration != null)
+        {
+            editedConfigJson = System.Text.Json.JsonSerializer.Serialize(
+                config.Configuration,
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true }
+            );
+            isEditingConfig = true;
+            errorMessage = null;
+            successMessage = null;
+        }
+    }
+
+    private void CancelEditingConfig()
+    {
+        isEditingConfig = false;
+        editedConfigJson = string.Empty;
+    }
+
+    private async Task SaveConfiguration()
+    {
+        isSavingConfig = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            // Parse the JSON to validate it
+            var configModel = System.Text.Json.JsonSerializer.Deserialize<LocalizationManager.Core.Configuration.ConfigurationModel>(
+                editedConfigJson,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            );
+
+            if (configModel == null)
+            {
+                errorMessage = "Failed to parse configuration JSON";
+                return;
+            }
+
+            // Update configuration
+            var result = await ConfigApi.UpdateConfigurationAsync(configModel);
+            if (result?.Success == true)
+            {
+                successMessage = result.Message ?? "Configuration updated successfully";
+                isEditingConfig = false;
+                await LoadData();
+            }
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            errorMessage = $"Invalid JSON: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to save configuration: {ex.Message}";
+        }
+        finally
+        {
+            isSavingConfig = false;
+        }
+    }
+}

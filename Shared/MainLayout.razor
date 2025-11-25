@@ -1,0 +1,67 @@
+@inherits LayoutComponentBase
+
+<div class="lrm-container">
+    <nav class="lrm-nav">
+        <div class="lrm-nav-header">
+            <h1 class="lrm-title">
+                <span class="lrm-icon">⚙</span> Localization Manager
+            </h1>
+        </div>
+        <ul class="lrm-nav-menu">
+            <li>
+                <NavLink class="lrm-nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="lrm-nav-icon">📊</span> Dashboard
+                </NavLink>
+            </li>
+            <li>
+                <NavLink class="lrm-nav-link" href="editor">
+                    <span class="lrm-nav-icon">✏️</span> Editor
+                </NavLink>
+            </li>
+            <li>
+                <NavLink class="lrm-nav-link" href="validation">
+                    <span class="lrm-nav-icon">✓</span> Validation
+                </NavLink>
+            </li>
+            <li>
+                <NavLink class="lrm-nav-link" href="translation">
+                    <span class="lrm-nav-icon">🌐</span> Translation
+                </NavLink>
+            </li>
+            <li>
+                <NavLink class="lrm-nav-link" href="scan">
+                    <span class="lrm-nav-icon">🔍</span> Code Scanner
+                </NavLink>
+            </li>
+            <li>
+                <NavLink class="lrm-nav-link" href="backup">
+                    <span class="lrm-nav-icon">💾</span> Backups
+                </NavLink>
+            </li>
+            <li>
+                <NavLink class="lrm-nav-link" href="export">
+                    <span class="lrm-nav-icon">📤</span> Export
+                </NavLink>
+            </li>
+            <li>
+                <NavLink class="lrm-nav-link" href="import">
+                    <span class="lrm-nav-icon">📥</span> Import
+                </NavLink>
+            </li>
+            <li>
+                <NavLink class="lrm-nav-link" href="settings">
+                    <span class="lrm-nav-icon">⚙</span> Settings
+                </NavLink>
+            </li>
+        </ul>
+        <div class="lrm-nav-footer">
+            <a href="/swagger" target="_blank" class="lrm-nav-link-small">
+                <span class="lrm-nav-icon">📖</span> API Docs
+            </a>
+        </div>
+    </nav>
+
+    <main class="lrm-main">
+        @Body
+    </main>
+</div>
