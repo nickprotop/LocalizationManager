@@ -119,7 +119,10 @@
 - [ ] Create initial file structure (within existing repo):
   ```
   LocalizationManager/                    # Existing repo root
-  ├── LocalizationManager/                # Existing .NET CLI project
+  ├── Controllers/                        # Existing API controllers
+  ├── Commands/                           # Existing CLI commands
+  ├── Core/                               # Existing business logic
+  ├── LocalizationManager.csproj          # Existing .NET project file
   ├── LocalizationManager.Tests/          # Existing tests
   ├── vscode-extension/                   # NEW: VS Code extension
   │   ├── src/
@@ -307,23 +310,40 @@ getBaseUrl(): string {
 - [ ] Translation API (`/api/translation`)
   - [ ] `POST /api/translation/translate` - Translate keys
 - [ ] Scanning API (`/api/scan`)
-  - [ ] `POST /api/scan/scan` - Scan code
+  - [ ] `POST /api/scan` - Scan code
+  - [ ] `GET /api/scan/unused` - Get unused keys
+  - [ ] `GET /api/scan/missing` - Get missing keys
   - [ ] `GET /api/scan/references/{keyName}` - Get references
 - [ ] Stats API (`/api/stats`)
   - [ ] `GET /api/stats` - Get statistics
 - [ ] Backup API (`/api/backup`)
-  - [ ] `GET /api/backup/list` - List backups
-  - [ ] `POST /api/backup/create` - Create backup
-  - [ ] `POST /api/backup/restore` - Restore backup
+  - [ ] `GET /api/backup` - List backups
+  - [ ] `POST /api/backup` - Create backup
+  - [ ] `POST /api/backup/{fileName}/{version}/restore` - Restore backup
+  - [ ] `DELETE /api/backup/{fileName}/{version}` - Delete backup
+  - [ ] `GET /api/backup/{fileName}/{version}` - Get backup info
   - [ ] `POST /api/backup/diff` - Compare versions
 - [ ] Language API (`/api/language`)
-  - [ ] `GET /api/language/list` - List languages
-  - [ ] `POST /api/language/add` - Add language
-  - [ ] `DELETE /api/language/{culture}` - Remove language
+  - [ ] `GET /api/language` - List languages with coverage stats
+  - [ ] `POST /api/language` - Add language
+  - [ ] `DELETE /api/language/{cultureCode}` - Remove language
 - [ ] Configuration API (`/api/configuration`)
   - [ ] `GET /api/configuration` - Get config
   - [ ] `PUT /api/configuration` - Update config
-  - [ ] `GET /api/configuration/schema` - Get schema
+  - [ ] `POST /api/configuration` - Create new config
+  - [ ] `POST /api/configuration/validate` - Validate without saving
+  - [ ] `GET /api/configuration/schema` - Get config schema
+  - [ ] `GET /api/configuration/enriched` - Schema-enriched config
+- [ ] Search API (`/api/search`)
+  - [ ] `POST /api/search` - Search and filter keys (pattern, filterMode, statusFilters)
+- [ ] Merge Duplicates API (`/api/mergeduplicates`)
+  - [ ] `GET /api/mergeduplicates/list` - List duplicate keys
+  - [ ] `POST /api/mergeduplicates/merge` - Merge duplicates
+- [ ] Import API (`/api/import`)
+  - [ ] `POST /api/import/csv` - Import from CSV
+- [ ] Export API (`/api/export`)
+  - [ ] `GET /api/export/json` - Export to JSON
+  - [ ] `GET /api/export/csv` - Export to CSV
 
 **Acceptance Criteria**:
 - ✓ TypeScript types generated from Swagger
@@ -354,7 +374,12 @@ class CliRunner {
   - [ ] async validate(resourcePath: string): Promise<ValidationResult>
   - [ ] async translate(options: TranslateOptions): Promise<TranslationResult>
   - [ ] async scan(sourcePath: string): Promise<ScanResult>
-  - [ ] async backup(action: 'list' | 'create' | 'restore', options?: any): Promise<any>
+  - [ ] async check(options: CheckOptions): Promise<CheckResult>  // Combined validate + scan
+  - [ ] async backup(action: 'list' | 'create' | 'restore' | 'info' | 'prune', options?: any): Promise<any>
+  - [ ] async mergeDuplicates(key?: string, all?: boolean): Promise<MergeResult>
+  - [ ] async chain(commands: string): Promise<ChainResult>
+  - [ ] async configListProviders(): Promise<ProviderStatus[]>
+  - [ ] async configApiKey(action: 'set' | 'get' | 'delete', provider: string, key?: string): Promise<any>
 }
 ```
 
@@ -363,9 +388,18 @@ class CliRunner {
 - [ ] `lrm stats --format json`
 - [ ] `lrm translate --dry-run --format json`
 - [ ] `lrm scan --format json`
+- [ ] `lrm check --format json` - Combined validation + scan
 - [ ] `lrm backup list --format json`
 - [ ] `lrm backup create`
 - [ ] `lrm backup restore`
+- [ ] `lrm backup info <file> <version>` - Backup details
+- [ ] `lrm backup prune` - Cleanup old backups
+- [ ] `lrm merge-duplicates [key]` - Merge duplicate keys
+- [ ] `lrm chain "<cmd1> -- <cmd2>"` - Sequential command execution
+- [ ] `lrm config list-providers` - List translation providers
+- [ ] `lrm config set-api-key` - Store API key securely
+- [ ] `lrm config get-api-key` - Check API key source
+- [ ] `lrm config delete-api-key` - Remove API key
 
 **Acceptance Criteria**:
 - ✓ CLI commands execute successfully
@@ -455,8 +489,78 @@ class CliRunner {
         },
         "lrm.translation.defaultProvider": {
           "type": "string",
-          "enum": ["google", "deepL", "openAI", "claude", ...],
-          "default": "google"
+          "enum": ["google", "deepl", "libretranslate", "ollama", "openai", "claude", "azureopenai", "azuretranslator", "lingva", "mymemory"],
+          "default": "google",
+          "description": "Default translation provider (10 providers available, including free options: Lingva, MyMemory)"
+        },
+        "lrm.translation.batchSize": {
+          "type": "number",
+          "default": 10,
+          "description": "Number of keys to translate in a single batch"
+        },
+        "lrm.translation.maxRetries": {
+          "type": "number",
+          "default": 3,
+          "description": "Maximum retry attempts for failed translation requests"
+        },
+        "lrm.translation.timeoutSeconds": {
+          "type": "number",
+          "default": 30,
+          "description": "Timeout in seconds for translation API requests"
+        },
+        "lrm.validation.enablePlaceholderValidation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable placeholder validation in translations"
+        },
+        "lrm.validation.placeholderTypes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["dotnet"],
+          "description": "Placeholder types to validate: dotnet, printf, icu, template, all"
+        },
+        "lrm.scanning.resourceClassNames": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["Resources", "Strings", "AppResources"],
+          "description": "Resource class names to detect in code (e.g., Resources.KeyName)"
+        },
+        "lrm.scanning.localizationMethods": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["GetString", "GetLocalizedString", "Translate", "L", "T"],
+          "description": "Localization method names to detect (e.g., GetString(\"KeyName\"))"
+        },
+        "lrm.translation.providers.lingva.instanceUrl": {
+          "type": "string",
+          "default": "https://lingva.ml",
+          "description": "Lingva instance URL (free Google Translate proxy)"
+        },
+        "lrm.translation.providers.lingva.rateLimitPerMinute": {
+          "type": "number",
+          "default": 30,
+          "description": "Lingva rate limit in requests per minute"
+        },
+        "lrm.translation.providers.myMemory.rateLimitPerMinute": {
+          "type": "number",
+          "default": 20,
+          "description": "MyMemory rate limit in requests per minute (free tier: 5,000 chars/day)"
+        },
+        "lrm.web.cors.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable CORS for the embedded LRM web server"
+        },
+        "lrm.web.cors.allowedOrigins": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Allowed origins for CORS (e.g., ['http://localhost:3000'])"
+        },
+        "lrm.web.cors.allowCredentials": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow credentials in CORS requests"
         }
         // Note: No port setting needed - extension uses random available port
         // to avoid conflicts with ASP.NET Core and other dev servers
@@ -901,16 +1005,19 @@ class KeyEditorPanel {
 
 **UI Flow**:
 ```
-Step 1: Select Translation Provider
+Step 1: Select Translation Provider (10 available)
 ┌─────────────────────────────────────┐
 │ Translation Provider:               │
 │ ◉ Google Cloud Translation          │
-│ ○ DeepL                              │
-│ ○ OpenAI GPT-4                       │
-│ ○ Claude                             │
-│ ○ Ollama (Local)                     │
-│ ○ Azure Translator                   │
-│ ... (10 providers)                   │
+│ ○ DeepL                             │
+│ ○ LibreTranslate                    │
+│ ○ Ollama (Local)                    │
+│ ○ OpenAI GPT                        │
+│ ○ Claude                            │
+│ ○ Azure OpenAI                      │
+│ ○ Azure Translator                  │
+│ ○ Lingva (Free - no API key)        │
+│ ○ MyMemory (Free - no API key)      │
 └─────────────────────────────────────┘
 
 Step 2: Select Target Languages
@@ -1121,7 +1228,7 @@ L("WelcomeMessage")
 
 - [ ] Implement Timeline provider
   - [ ] Show backup history for .resx files
-  - [ ] Call `GET /api/backup/list`
+  - [ ] Call `GET /api/backup`
   - [ ] Create timeline items for each backup
   - [ ] Support restore from timeline
 
@@ -1225,7 +1332,7 @@ Removed Keys (2)
 
 **Workflow**:
 1. User runs "Scan for Unused Keys"
-2. Extension calls `POST /api/scan/scan`
+2. Extension calls `POST /api/scan`
 3. Results shown in WebView panel
 4. User can delete unused keys
 
@@ -1475,19 +1582,29 @@ Conflicts: 5 keys already exist
 ┌────────────────────────────────────────────┐
 │  LRM Settings                              │
 ├────────────────────────────────────────────┤
-│  Translation Providers                     │
+│  Translation Providers (10 available)      │
 │  ┌──────────────────────────────────────┐  │
 │  │ Default Provider: [Google ▼]         │  │
 │  │                                       │  │
-│  │ API Keys:                             │  │
-│  │ Google: [••••••••••••] [Edit] [Test] │  │
-│  │ DeepL:  [Not set]      [Set]         │  │
-│  │ OpenAI: [••••••••••••] [Edit] [Test] │  │
+│  │ API Keys (8 providers need keys):     │  │
+│  │ Google:     [••••••••••••] [Edit] [Test] │
+│  │ DeepL:      [Not set]      [Set]         │
+│  │ LibreTranslate: [Not set]  [Set]         │
+│  │ OpenAI:     [••••••••••••] [Edit] [Test] │
+│  │ Claude:     [Not set]      [Set]         │
+│  │ Azure OpenAI: [Not set]    [Set]         │
+│  │ Azure Translator: [Not set] [Set]        │
+│  │ Ollama:     [localhost:11434] [Edit]     │
+│  │                                       │  │
+│  │ Free providers (no API key needed):   │  │
+│  │ Lingva:   ✅ Ready                    │  │
+│  │ MyMemory: ✅ Ready                    │  │
 │  │                                       │  │
 │  │ Advanced Settings:                    │  │
 │  │ ☑ Use secure credential store        │  │
 │  │ Max retries: [3]                      │  │
 │  │ Timeout: [30] seconds                 │  │
+│  │ Batch size: [10]                      │  │
 │  └──────────────────────────────────────┘  │
 ├────────────────────────────────────────────┤
 │  Validation                                │
@@ -1624,7 +1741,7 @@ describe('Validation Workflow', () => {
 - [ ] Test on Linux
 - [ ] Test with large .resx files (1000+ keys)
 - [ ] Test with multiple languages (10+)
-- [ ] Test all 10 translation providers
+- [ ] Test all 10 translation providers (Google, DeepL, LibreTranslate, Ollama, OpenAI, Claude, Azure OpenAI, Azure Translator, Lingva, MyMemory)
 - [ ] Test error scenarios (network failures, quota limits)
 - [ ] Test performance (validation, scanning, translation)
 - [ ] Test accessibility (keyboard navigation, screen readers)
@@ -1823,27 +1940,27 @@ jobs:
         run: |
           mkdir -p vscode-extension/bin/{win32-x64,linux-x64,linux-arm64,darwin-x64,darwin-arm64}
 
-          dotnet publish LocalizationManager/LocalizationManager.csproj \
+          dotnet publish LocalizationManager.csproj \
             -c Release -r win-x64 --self-contained -p:PublishSingleFile=true \
             -o vscode-extension/bin/win32-x64
           mv vscode-extension/bin/win32-x64/LocalizationManager.exe vscode-extension/bin/win32-x64/lrm.exe
 
-          dotnet publish LocalizationManager/LocalizationManager.csproj \
+          dotnet publish LocalizationManager.csproj \
             -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true \
             -o vscode-extension/bin/linux-x64
           mv vscode-extension/bin/linux-x64/LocalizationManager vscode-extension/bin/linux-x64/lrm
 
-          dotnet publish LocalizationManager/LocalizationManager.csproj \
+          dotnet publish LocalizationManager.csproj \
             -c Release -r linux-arm64 --self-contained -p:PublishSingleFile=true \
             -o vscode-extension/bin/linux-arm64
           mv vscode-extension/bin/linux-arm64/LocalizationManager vscode-extension/bin/linux-arm64/lrm
 
-          dotnet publish LocalizationManager/LocalizationManager.csproj \
+          dotnet publish LocalizationManager.csproj \
             -c Release -r osx-x64 --self-contained -p:PublishSingleFile=true \
             -o vscode-extension/bin/darwin-x64
           mv vscode-extension/bin/darwin-x64/LocalizationManager vscode-extension/bin/darwin-x64/lrm
 
-          dotnet publish LocalizationManager/LocalizationManager.csproj \
+          dotnet publish LocalizationManager.csproj \
             -c Release -r osx-arm64 --self-contained -p:PublishSingleFile=true \
             -o vscode-extension/bin/darwin-arm64
           mv vscode-extension/bin/darwin-arm64/LocalizationManager vscode-extension/bin/darwin-arm64/lrm
@@ -1919,7 +2036,7 @@ jobs:
               osx-arm64) dir="darwin-arm64"; ext="" ;;
             esac
 
-            dotnet publish LocalizationManager/LocalizationManager.csproj \
+            dotnet publish LocalizationManager.csproj \
               -c Release -r $runtime --self-contained -p:PublishSingleFile=true \
               -o vscode-extension/bin/$dir
 
@@ -2100,9 +2217,18 @@ LocalizationManager/                    # EXISTING REPO ROOT
 │       ├── release.yml                 # Main LRM release
 │       ├── vscode-extension.yml        # NEW: Extension CI pipeline
 │       └── vscode-release.yml          # NEW: Extension release
-├── LocalizationManager/                # Existing .NET CLI project
-├── LocalizationManager.Tests/          # Existing tests
-├── docs/                               # Existing docs
+├── Controllers/                        # API controllers
+├── Commands/                           # CLI command implementations
+├── Core/                               # Business logic
+├── Models/                             # Data models
+├── Services/                           # Application services
+├── UI/                                 # TUI components
+├── Pages/                              # Blazor pages
+├── wwwroot/                            # Static web assets
+├── LocalizationManager.csproj          # Main project file
+├── Program.cs                          # Entry point
+├── LocalizationManager.Tests/          # Test project
+├── docs/                               # Documentation
 │
 ├── vscode-extension/                   # NEW: VS Code extension subdirectory
 │   ├── .vscode/
@@ -2307,7 +2433,7 @@ LocalizationManager/                    # EXISTING REPO ROOT
 **Title**: Localization Resource Manager
 
 **Short Description**:
-"Manage .NET .resx localization files with translation, validation, and code scanning. Supports 10 translation providers including OpenAI, Claude, Google, and DeepL."
+"Manage .NET .resx localization files with translation, validation, and code scanning. Supports 10 translation providers including Google, DeepL, OpenAI, Claude, Azure, and free options (Lingva, MyMemory)."
 
 **Categories**:
 - Programming Languages
