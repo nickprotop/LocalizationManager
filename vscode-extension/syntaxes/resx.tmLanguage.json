@@ -1,0 +1,148 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Resource File",
+  "scopeName": "text.xml.resx",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#data-element" },
+    { "include": "#xml-tags" },
+    { "include": "#strings" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.xml.resx",
+          "begin": "<!--",
+          "end": "-->"
+        }
+      ]
+    },
+    "data-element": {
+      "patterns": [
+        {
+          "name": "meta.tag.data.resx",
+          "begin": "(<)(data)\\s+(name)(=)(\"[^\"]*\")",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.tag.begin.xml" },
+            "2": { "name": "entity.name.tag.xml.resx" },
+            "3": { "name": "entity.other.attribute-name.xml" },
+            "4": { "name": "punctuation.separator.key-value.xml" },
+            "5": { "name": "string.quoted.double.xml.resx entity.name.resource.resx" }
+          },
+          "end": "(</)(data)(>)",
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.tag.end.xml" },
+            "2": { "name": "entity.name.tag.xml.resx" },
+            "3": { "name": "punctuation.definition.tag.end.xml" }
+          },
+          "patterns": [
+            { "include": "#value-element" },
+            { "include": "#comment-element" },
+            { "include": "#attributes" }
+          ]
+        }
+      ]
+    },
+    "value-element": {
+      "patterns": [
+        {
+          "name": "meta.tag.value.resx",
+          "begin": "(<)(value)(>)",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.tag.begin.xml" },
+            "2": { "name": "entity.name.tag.xml.resx" },
+            "3": { "name": "punctuation.definition.tag.end.xml" }
+          },
+          "end": "(</)(value)(>)",
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.tag.end.xml" },
+            "2": { "name": "entity.name.tag.xml.resx" },
+            "3": { "name": "punctuation.definition.tag.end.xml" }
+          },
+          "contentName": "string.unquoted.cdata.xml.resx",
+          "patterns": [
+            { "include": "#placeholders" }
+          ]
+        }
+      ]
+    },
+    "comment-element": {
+      "patterns": [
+        {
+          "name": "meta.tag.comment.resx",
+          "begin": "(<)(comment)(>)",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.tag.begin.xml" },
+            "2": { "name": "entity.name.tag.xml.resx" },
+            "3": { "name": "punctuation.definition.tag.end.xml" }
+          },
+          "end": "(</)(comment)(>)",
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.tag.end.xml" },
+            "2": { "name": "entity.name.tag.xml.resx" },
+            "3": { "name": "punctuation.definition.tag.end.xml" }
+          },
+          "contentName": "comment.line.resx"
+        }
+      ]
+    },
+    "placeholders": {
+      "patterns": [
+        {
+          "name": "constant.other.placeholder.resx",
+          "match": "\\{\\d+(?::[^}]+)?\\}"
+        },
+        {
+          "name": "constant.other.placeholder.named.resx",
+          "match": "\\{[a-zA-Z_][a-zA-Z0-9_]*(?::[^}]+)?\\}"
+        }
+      ]
+    },
+    "xml-tags": {
+      "patterns": [
+        {
+          "name": "meta.tag.xml.resx",
+          "begin": "(</?)(\\w+)",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.tag.xml" },
+            "2": { "name": "entity.name.tag.xml" }
+          },
+          "end": "(/?>)",
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.tag.xml" }
+          },
+          "patterns": [
+            { "include": "#attributes" }
+          ]
+        }
+      ]
+    },
+    "attributes": {
+      "patterns": [
+        {
+          "match": "(\\w+)(=)(\"[^\"]*\")",
+          "captures": {
+            "1": { "name": "entity.other.attribute-name.xml" },
+            "2": { "name": "punctuation.separator.key-value.xml" },
+            "3": { "name": "string.quoted.double.xml" }
+          }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.xml",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.xml",
+          "begin": "'",
+          "end": "'"
+        }
+      ]
+    }
+  }
+}

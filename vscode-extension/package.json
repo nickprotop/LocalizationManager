@@ -1,0 +1,472 @@
+{
+  "name": "lrm-vscode",
+  "displayName": "Localization Resource Manager",
+  "description": "VS Code extension for managing .NET .resx localization files with LRM (Localization Resource Manager)",
+  "version": "0.1.0",
+  "publisher": "nickprotop",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nickprotop/LocalizationManager"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Formatters",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "localization",
+    "resx",
+    "i18n",
+    "translation",
+    ".NET",
+    "resources"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/*.resx",
+    "onLanguage:xml"
+  ],
+  "main": "./out/extension.js",
+  "icon": "media/icon.png",
+  "contributes": {
+    "commands": [
+      {
+        "command": "lrm.refresh",
+        "title": "Refresh",
+        "category": "LRM",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "lrm.validate",
+        "title": "Validate Resources",
+        "category": "LRM",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "lrm.validateFile",
+        "title": "Validate This File",
+        "category": "LRM"
+      },
+      {
+        "command": "lrm.translate",
+        "title": "Translate Resources",
+        "category": "LRM",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "lrm.translateKey",
+        "title": "Translate Key",
+        "category": "LRM"
+      },
+      {
+        "command": "lrm.scan",
+        "title": "Scan for Missing/Unused Keys",
+        "category": "LRM",
+        "icon": "$(search)"
+      },
+      {
+        "command": "lrm.addKey",
+        "title": "Add New Key",
+        "category": "LRM",
+        "icon": "$(add)"
+      },
+      {
+        "command": "lrm.deleteKey",
+        "title": "Delete Key",
+        "category": "LRM",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "lrm.editKey",
+        "title": "Edit Key",
+        "category": "LRM",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "lrm.copyKey",
+        "title": "Copy Key Name",
+        "category": "LRM"
+      },
+      {
+        "command": "lrm.copyValue",
+        "title": "Copy Value",
+        "category": "LRM"
+      },
+      {
+        "command": "lrm.exportCsv",
+        "title": "Export to CSV",
+        "category": "LRM",
+        "icon": "$(export)"
+      },
+      {
+        "command": "lrm.exportJson",
+        "title": "Export to JSON",
+        "category": "LRM"
+      },
+      {
+        "command": "lrm.importCsv",
+        "title": "Import from CSV",
+        "category": "LRM",
+        "icon": "$(import)"
+      },
+      {
+        "command": "lrm.findReferences",
+        "title": "Find Code References",
+        "category": "LRM",
+        "icon": "$(references)"
+      },
+      {
+        "command": "lrm.openSettings",
+        "title": "Open LRM Settings",
+        "category": "LRM",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "lrm.createConfig",
+        "title": "Create lrm.json Configuration",
+        "category": "LRM"
+      },
+      {
+        "command": "lrm.openInEditor",
+        "title": "Open in Resource Editor",
+        "category": "LRM"
+      },
+      {
+        "command": "lrm.showStats",
+        "title": "Show Translation Statistics",
+        "category": "LRM",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "lrm.addLanguage",
+        "title": "Add Language",
+        "category": "LRM",
+        "icon": "$(add)"
+      },
+      {
+        "command": "lrm.backup",
+        "title": "Create Backup",
+        "category": "LRM",
+        "icon": "$(save)"
+      },
+      {
+        "command": "lrm.restoreBackup",
+        "title": "Restore from Backup",
+        "category": "LRM"
+      },
+      {
+        "command": "lrm.goToKey",
+        "title": "Go to Key in File",
+        "category": "LRM"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "lrm-explorer",
+          "title": "Localization Manager",
+          "icon": "media/localization.svg"
+        }
+      ]
+    },
+    "views": {
+      "lrm-explorer": [
+        {
+          "id": "lrmResources",
+          "name": "Resources",
+          "icon": "$(file-code)",
+          "contextualTitle": "Resource Files"
+        },
+        {
+          "id": "lrmValidation",
+          "name": "Validation Issues",
+          "icon": "$(warning)",
+          "contextualTitle": "Validation"
+        },
+        {
+          "id": "lrmStats",
+          "name": "Statistics",
+          "icon": "$(graph)",
+          "contextualTitle": "Translation Statistics"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "lrmResources",
+        "contents": "No .resx files found in this workspace.\n[Scan Workspace](command:lrm.refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "lrm.refresh",
+          "when": "view == lrmResources",
+          "group": "navigation"
+        },
+        {
+          "command": "lrm.addKey",
+          "when": "view == lrmResources",
+          "group": "navigation"
+        },
+        {
+          "command": "lrm.validate",
+          "when": "view == lrmResources",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "lrm.openInEditor",
+          "when": "view == lrmResources && viewItem == resourceFile",
+          "group": "inline"
+        },
+        {
+          "command": "lrm.validateFile",
+          "when": "view == lrmResources && viewItem == resourceFile",
+          "group": "1_actions"
+        },
+        {
+          "command": "lrm.translate",
+          "when": "view == lrmResources && viewItem == resourceFile",
+          "group": "1_actions"
+        },
+        {
+          "command": "lrm.exportCsv",
+          "when": "view == lrmResources && viewItem == resourceFile",
+          "group": "2_export"
+        },
+        {
+          "command": "lrm.exportJson",
+          "when": "view == lrmResources && viewItem == resourceFile",
+          "group": "2_export"
+        },
+        {
+          "command": "lrm.addLanguage",
+          "when": "view == lrmResources && viewItem == resourceGroup",
+          "group": "1_actions"
+        },
+        {
+          "command": "lrm.editKey",
+          "when": "view == lrmResources && viewItem == resourceKey",
+          "group": "inline"
+        },
+        {
+          "command": "lrm.translateKey",
+          "when": "view == lrmResources && viewItem == resourceKey",
+          "group": "1_actions"
+        },
+        {
+          "command": "lrm.deleteKey",
+          "when": "view == lrmResources && viewItem == resourceKey",
+          "group": "2_delete"
+        },
+        {
+          "command": "lrm.copyKey",
+          "when": "view == lrmResources && viewItem == resourceKey",
+          "group": "3_copy"
+        },
+        {
+          "command": "lrm.copyValue",
+          "when": "view == lrmResources && viewItem == resourceKey",
+          "group": "3_copy"
+        },
+        {
+          "command": "lrm.findReferences",
+          "when": "view == lrmResources && viewItem == resourceKey",
+          "group": "4_references"
+        },
+        {
+          "command": "lrm.goToKey",
+          "when": "view == lrmValidation && viewItem == validationIssue",
+          "group": "inline"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "lrm.openInEditor",
+          "when": "resourceExtname == .resx",
+          "group": "navigation"
+        },
+        {
+          "command": "lrm.validateFile",
+          "when": "resourceExtname == .resx",
+          "group": "7_modification"
+        },
+        {
+          "command": "lrm.translate",
+          "when": "resourceExtname == .resx",
+          "group": "7_modification"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "lrm.translateKey",
+          "when": "resourceExtname == .resx",
+          "group": "1_modification"
+        },
+        {
+          "command": "lrm.findReferences",
+          "when": "resourceExtname == .resx",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "lrm.validateFile",
+          "when": "resourceExtname == .resx"
+        },
+        {
+          "command": "lrm.translateKey",
+          "when": "resourceExtname == .resx"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Localization Resource Manager",
+      "properties": {
+        "lrm.lrmPath": {
+          "type": "string",
+          "default": "lrm",
+          "description": "Path to the LRM executable. Use 'lrm' if installed globally, or provide full path."
+        },
+        "lrm.defaultLanguage": {
+          "type": "string",
+          "default": "en",
+          "description": "Default/base language code for resources"
+        },
+        "lrm.translationProvider": {
+          "type": "string",
+          "enum": [
+            "google",
+            "deepl",
+            "azure",
+            "openai",
+            "claude",
+            "ollama",
+            "libretranslate",
+            "lingva",
+            "mymemory"
+          ],
+          "default": "google",
+          "description": "Default translation provider"
+        },
+        "lrm.autoValidateOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically validate .resx files on save"
+        },
+        "lrm.showInlineTranslations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline translation hints in .resx files"
+        },
+        "lrm.scanOnStartup": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically scan for .resx files when workspace opens"
+        },
+        "lrm.excludePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/bin/**",
+            "**/obj/**",
+            "**/node_modules/**"
+          ],
+          "description": "Glob patterns to exclude from .resx file scanning"
+        },
+        "lrm.webServerPort": {
+          "type": "number",
+          "default": 5000,
+          "description": "Port for the LRM web server (used for API communication)"
+        },
+        "lrm.useWebApi": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use LRM Web API instead of CLI commands (requires running 'lrm web' server)"
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "resx",
+        "extensions": [
+          ".resx"
+        ],
+        "aliases": [
+          "Resource File",
+          "resx"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "resx",
+        "scopeName": "text.xml.resx",
+        "path": "./syntaxes/resx.tmLanguage.json"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "lrm.resxEditor",
+        "displayName": "Resource Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.resx"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "lrm.translate",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t",
+        "when": "resourceExtname == .resx"
+      },
+      {
+        "command": "lrm.validate",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "resourceExtname == .resx"
+      },
+      {
+        "command": "lrm.addKey",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a",
+        "when": "resourceExtname == .resx"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "@vscode/test-electron": "^2.3.8",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.2",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {
+    "xml2js": "^0.6.2"
+  }
+}
