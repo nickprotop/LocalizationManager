@@ -50,3 +50,12 @@ public class KeyReferencesResponse
     public int ReferenceCount { get; set; }
     public List<CodeReference> References { get; set; } = new();
 }
+
+// Single file scan request
+public class FileScanRequest
+{
+    public string FilePath { get; set; } = string.Empty;
+}
+
+// Note: Single file scan uses the same ScanResponse as full codebase scan
+// This allows for consistent output format and easy wildcard support in the future

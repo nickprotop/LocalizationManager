@@ -51,6 +51,10 @@ public class ScanCommand : Command<ScanCommand.Settings>
         [CommandOption("--localization-methods <NAMES>")]
         [Description("Localization method names to detect (comma-separated). Default: GetString,GetLocalizedString,Translate,L,T")]
         public string? LocalizationMethods { get; set; }
+
+        [CommandOption("--file <PATH>")]
+        [Description("Scan a single file instead of the entire codebase")]
+        public string? FilePath { get; set; }
     }
 
     public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken = default)
@@ -155,6 +159,14 @@ public class ScanCommand : Command<ScanCommand.Settings>
 
             // Scan code
             var scanner = new CodeScanner();
+
+            // Check if scanning a single file
+            if (settings.FilePath != null)
+            {
+                return ExecuteSingleFileScan(scanner, settings, resourceFiles, resourceClassNames, localizationMethods, format, isTableFormat);
+            }
+
+            // Full codebase scan
             ScanResult result;
 
             if (isTableFormat)
@@ -203,6 +215,73 @@ public class ScanCommand : Command<ScanCommand.Settings>
             }
             return 1;
         }
+    }
+
+    private int ExecuteSingleFileScan(
+        CodeScanner scanner,
+        Settings settings,
+        List<ResourceFile> resourceFiles,
+        List<string>? resourceClassNames,
+        List<string>? localizationMethods,
+        OutputFormat format,
+        bool isTableFormat)
+    {
+        var filePath = Path.GetFullPath(settings.FilePath!);
+
+        if (!File.Exists(filePath))
+        {
+            if (isTableFormat)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ File not found:[/] {filePath}");
+            }
+            else
+            {
+                Console.Error.WriteLine($"File not found: {filePath}");
+            }
+            return 1;
+        }
+
+        if (isTableFormat)
+        {
+            AnsiConsole.MarkupLine($"[blue]Scanning file:[/] {filePath}");
+            AnsiConsole.WriteLine();
+        }
+
+        // Scan the single file
+        ScanResult result;
+
+        if (isTableFormat)
+        {
+            result = AnsiConsole.Status()
+                .Start("Scanning file...", ctx =>
+                {
+                    ctx.Spinner(Spinner.Known.Dots);
+                    return scanner.ScanSingleFile(filePath, resourceFiles, settings.StrictMode,
+                        resourceClassNames, localizationMethods);
+                });
+        }
+        else
+        {
+            result = scanner.ScanSingleFile(filePath, resourceFiles, settings.StrictMode,
+                resourceClassNames, localizationMethods);
+        }
+
+        // Display results using existing display methods
+        switch (format)
+        {
+            case OutputFormat.Json:
+                DisplayJson(result, settings);
+                break;
+            case OutputFormat.Simple:
+                DisplaySimple(result, settings);
+                break;
+            case OutputFormat.Table:
+            default:
+                DisplayTable(result, settings);
+                break;
+        }
+
+        return result.HasIssues ? 1 : 0;
     }
 
     private void DisplayTable(ScanResult result, Settings settings)

@@ -88,6 +88,72 @@ public class ScanController : ControllerBase
     }
 
     /// <summary>
+    /// Scan a single source code file for localization key references
+    /// </summary>
+    /// <remarks>
+    /// Returns the same response format as full codebase scan, but with FilesScanned=1.
+    /// This allows for consistent output and easy wildcard support in the future.
+    /// </remarks>
+    [HttpPost("file")]
+    public ActionResult<ScanResponse> ScanFile([FromBody] FileScanRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(request.FilePath))
+            {
+                return BadRequest(new ErrorResponse { Error = "FilePath is required" });
+            }
+
+            var filePath = Path.GetFullPath(request.FilePath);
+
+            if (!System.IO.File.Exists(filePath))
+            {
+                return NotFound(new ErrorResponse { Error = $"File not found: {filePath}" });
+            }
+
+            var languages = _discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+
+            var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
+            if (defaultFile == null)
+            {
+                return StatusCode(500, new ErrorResponse { Error = "No default language file found" });
+            }
+
+            // Scan the single file (returns same ScanResult as full scan, but with FilesScanned=1)
+            var result = _scanner.ScanSingleFile(filePath, resourceFiles, false, null, null);
+
+            // Return same response format as full scan
+            return Ok(new ScanResponse
+            {
+                ScannedFiles = result.FilesScanned,
+                TotalReferences = result.TotalReferences,
+                UniqueKeysFound = result.UniqueKeysFound,
+                UnusedKeysCount = result.UnusedKeys.Count,
+                MissingKeysCount = result.MissingKeys.Count,
+                Unused = result.UnusedKeys,
+                Missing = result.MissingKeys.Select(k => k.Key).ToList(),
+                References = result.AllKeyUsages.Select(k => new KeyReferenceInfo
+                {
+                    Key = k.Key,
+                    ReferenceCount = k.References.Count,
+                    References = k.References.Select(r => new CodeReference
+                    {
+                        File = r.FilePath,
+                        Line = r.Line,
+                        Pattern = r.Pattern,
+                        Confidence = r.Confidence.ToString()
+                    }).ToList()
+                }).ToList()
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new ErrorResponse { Error = $"An error occurred while processing your request: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
     /// Get unused keys
     /// </summary>
     [HttpGet("unused")]

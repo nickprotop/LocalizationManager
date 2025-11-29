@@ -7,6 +7,11 @@
 
 **Last Updated**: 2025-11-29
 
+**Recent Updates**:
+- ✅ **Single-File Scan API Implemented** - Backend now supports scanning individual files via `POST /api/scan/file` endpoint
+- ✅ **CLI Single-File Scan** - Added `--file` option to `lrm scan` command for per-file validation
+- ✅ Ready for VS Code extension integration with real-time diagnostics
+
 ---
 
 ## Table of Contents
@@ -309,11 +314,12 @@ getBaseUrl(): string {
   - [ ] `POST /api/validation/validate` - Validate files
 - [ ] Translation API (`/api/translation`)
   - [ ] `POST /api/translation/translate` - Translate keys
-- [ ] Scanning API (`/api/scan`)
-  - [ ] `POST /api/scan` - Scan code
-  - [ ] `GET /api/scan/unused` - Get unused keys
-  - [ ] `GET /api/scan/missing` - Get missing keys
-  - [ ] `GET /api/scan/references/{keyName}` - Get references
+- [x] Scanning API (`/api/scan`)
+  - [x] `POST /api/scan` - Scan entire codebase
+  - [x] `POST /api/scan/file` - **Scan single file** (NEW - implemented!)
+  - [x] `GET /api/scan/unused` - Get unused keys
+  - [x] `GET /api/scan/missing` - Get missing keys
+  - [x] `GET /api/scan/references/{keyName}` - Get references
 - [ ] Stats API (`/api/stats`)
   - [ ] `GET /api/stats` - Get statistics
 - [ ] Backup API (`/api/backup`)

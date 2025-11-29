@@ -355,6 +355,74 @@ Get source code locations where a key is used.
 }
 ```
 
+#### Scan Single File
+```
+POST /api/scan/file
+```
+Scan a single source code file for localization key references. Useful for editor integrations and real-time validation.
+
+**Request:**
+```json
+{
+  "filePath": "/path/to/Controllers/HomeController.cs"
+}
+```
+
+**Response:**
+Returns the same format as full codebase scan (`ScanResponse`), but with `scannedFiles: 1` and empty `unused` array (unused keys require full codebase scan).
+
+```json
+{
+  "scannedFiles": 1,
+  "totalReferences": 5,
+  "uniqueKeysFound": 3,
+  "unusedKeysCount": 0,
+  "missingKeysCount": 2,
+  "unused": [],
+  "missing": ["NewKey", "AnotherMissingKey"],
+  "references": [
+    {
+      "key": "WelcomeMessage",
+      "referenceCount": 2,
+      "references": [
+        {
+          "file": "/path/to/Controllers/HomeController.cs",
+          "line": 23,
+          "pattern": "Resources.WelcomeMessage",
+          "confidence": "High"
+        },
+        {
+          "file": "/path/to/Controllers/HomeController.cs",
+          "line": 67,
+          "pattern": "Resources.WelcomeMessage",
+          "confidence": "High"
+        }
+      ]
+    },
+    {
+      "key": "NewKey",
+      "referenceCount": 1,
+      "references": [
+        {
+          "file": "/path/to/Controllers/HomeController.cs",
+          "line": 45,
+          "pattern": "Resources.NewKey",
+          "confidence": "High"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Notes:**
+- The `filePath` should be an absolute path to a supported file type (.cs, .razor, .xaml, .cshtml)
+- Only supported file extensions will be scanned
+- Response format is identical to full codebase scan for consistency
+- `scannedFiles` will always be `1` for single-file scans
+- `unused` will always be empty (unused keys can only be determined by scanning entire codebase)
+- This consistent format makes it easy to add wildcard file support in the future
+
 ---
 
 ### Statistics

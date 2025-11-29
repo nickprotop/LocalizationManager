@@ -242,6 +242,7 @@ _lrm() {
                 scan)
                     _arguments \
                         '--source-path[Path to source code directory]:directory:_directories' \
+                        '--file[Scan a single file instead of entire codebase]:file:_files -g "*.@(cs|razor|xaml|cshtml)"' \
                         '--exclude[Glob patterns to exclude (comma-separated)]:patterns' \
                         '--strict[Strict mode - only high-confidence references]' \
                         '--show-unused[Show only unused keys]' \

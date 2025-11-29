@@ -138,7 +138,7 @@ LRM solves this by providing:
   - Full [backup documentation →](docs/BACKUP.md)
 - **📊 Statistics** - Translation coverage with progress bars
 - **🔎 Code Scanning** - Find unused keys and missing references in source code
-  - Scan C#, Razor, and XAML files for localization key usage
+  - Scan C#, Razor, and XAML files for localization key usage (full codebase or single file)
   - Detect unused keys (in .resx but not in code)
   - Detect missing keys (in code but not in .resx)
   - Configurable resource class names and localization methods
@@ -274,6 +274,9 @@ lrm view "*" --not "Test.*" --not "Debug.*"
 
 # Scan source code for key usage
 lrm scan
+
+# Scan a single file (useful for editor integrations)
+lrm scan --file ./Controllers/HomeController.cs
 
 # Find unused keys (in .resx but not in code)
 lrm scan --show-unused

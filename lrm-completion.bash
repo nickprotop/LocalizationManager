@@ -31,7 +31,7 @@ _lrm_completions() {
     local edit_opts="--path -p --source-path --no-backup --help -h"
     local translate_opts="--path -p --provider --target-languages --batch-size --only-missing --overwrite --dry-run --no-cache --no-backup --source-language --format --config-file --help -h"
     local config_opts="set-api-key get-api-key delete-api-key list-providers --help -h"
-    local scan_opts="--path -p --source-path --exclude --strict --show-unused --show-missing --show-references --resource-classes --localization-methods --format --help -h"
+    local scan_opts="--path -p --source-path --file --exclude --strict --show-unused --show-missing --show-references --resource-classes --localization-methods --format --help -h"
     local check_opts="--path -p --source-path --exclude --strict --format --help -h"
     local chain_opts="--continue-on-error --dry-run --help -h"
     local list_languages_opts="--path -p --format --help -h"
@@ -151,8 +151,14 @@ _lrm_completions() {
             return 0
             ;;
         --file)
-            # Complete .resx files
-            COMPREPLY=( $(compgen -f -X '!*.resx' -- "${cur}") )
+            # Complete based on command: .resx files for backup, source files for scan
+            if [[ "${command}" == "scan" ]]; then
+                # Complete source files (.cs, .razor, .xaml)
+                COMPREPLY=( $(compgen -f -X '!*.@(cs|razor|xaml|cshtml)' -- "${cur}") )
+            else
+                # Complete .resx files for backup commands
+                COMPREPLY=( $(compgen -f -X '!*.resx' -- "${cur}") )
+            fi
             return 0
             ;;
         --version|--from|--to)

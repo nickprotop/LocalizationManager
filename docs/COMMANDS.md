@@ -2049,6 +2049,7 @@ Access the Backup Manager in the interactive TUI by pressing **F7**:
 **Options:**
 - `-p, --path <PATH>` - Path to Resources folder (default: current directory)
 - `--source-path <PATH>` - Path to source code directory to scan (default: parent directory of resource path)
+- `--file <PATH>` - Scan a single file instead of the entire codebase
 - `--exclude <PATTERNS>` - Comma-separated glob patterns to exclude from scan (e.g., `**/*.g.cs,**/bin/**,**/obj/**`)
 - `--strict` - Strict mode: only detect high-confidence static references, ignore dynamic patterns
 - `--show-unused` - Show only unused keys (in .resx but not found in code)
@@ -2140,6 +2141,18 @@ lrm scan --source-path ./MyApp
 
 # Scan with specific resource path
 lrm scan --path ./Resources --source-path ./src
+```
+
+**Single file scan:**
+```bash
+# Scan a single file for resource key references
+lrm scan --file ./Controllers/HomeController.cs
+
+# Scan a single file with JSON output
+lrm scan --file ./Views/Home/Index.cshtml --format json
+
+# Useful for editor integrations and real-time validation
+lrm scan --file ./Services/UserService.cs --format simple
 ```
 
 **Filter results:**
