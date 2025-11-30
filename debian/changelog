@@ -1,6 +1,6 @@
-lrm (0.6.23-1) noble; urgency=medium
+lrm (0.6.24-1) noble; urgency=medium
 
-  * Fixed: Fix VS Code extension comment handling and translate dialog\n
-  * Added: Add unit tests for ResourcesController UpdateKey\n- Add per-language comment support to UpdateKey API\n- Add VS Code extension status bar Quick Actions and config listener\n
+  * Added: Add CodeLens provider for localization keys\n
+  * Changed: Update VS Code extension plan with CodeLens implementation\n
 
- -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Sun, 30 Nov 2025 20:30:00 +0200
+ -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Sun, 30 Nov 2025 23:13:24 +0200
