@@ -89,6 +89,26 @@
       {
         "command": "lrm.openSettings",
         "title": "LRM: Open Settings"
+      },
+      {
+        "command": "lrm.showKeyReferences",
+        "title": "LRM: Show Key References"
+      },
+      {
+        "command": "lrm.showMissingLanguages",
+        "title": "LRM: Show Missing Languages"
+      },
+      {
+        "command": "lrm.translateKeyFromLens",
+        "title": "LRM: Translate Key"
+      },
+      {
+        "command": "lrm.editKeyFromLens",
+        "title": "LRM: Edit Key"
+      },
+      {
+        "command": "lrm.deleteUnusedKey",
+        "title": "LRM: Delete Unused Key"
       }
     ],
     "configuration": {
@@ -121,7 +141,7 @@
             "lingva",
             "mymemory"
           ],
-          "default": "lingva",
+          "default": "mymemory",
           "description": "Default translation provider"
         },
         "lrm.autoOpenBrowser": {
@@ -164,6 +184,31 @@
           "type": "boolean",
           "default": true,
           "description": "Enable validation of placeholders in resource strings"
+        },
+        "lrm.enableCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show CodeLens for localization keys in .resx and code files"
+        },
+        "lrm.codeLens.showReferences": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show reference count in CodeLens (e.g., '12 references')"
+        },
+        "lrm.codeLens.showCoverage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show language coverage in CodeLens (e.g., '3/5 languages')"
+        },
+        "lrm.codeLens.showTranslate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show 'Translate' action in CodeLens"
+        },
+        "lrm.codeLens.showValue": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show key value in CodeLens for code files"
         }
       }
     },

@@ -268,38 +268,44 @@ export class SettingsPanel {
 
             const vscodeConfig = vscode.workspace.getConfiguration('lrm');
 
+            // Support both camelCase (new) and PascalCase (legacy) property names
+            const translation = lrmConfig?.translation || lrmConfig?.Translation;
+            const scanning = lrmConfig?.scanning || lrmConfig?.Scanning;
+            const validation = lrmConfig?.validation || lrmConfig?.Validation;
+            const aiProviders = translation?.aiProviders || translation?.AIProviders;
+
             const settings = {
                 // General
-                defaultLanguageCode: lrmConfig?.DefaultLanguageCode || lrmConfig?.defaultLanguageCode || '',
+                defaultLanguageCode: lrmConfig?.defaultLanguageCode || lrmConfig?.DefaultLanguageCode || '',
                 // Translation
-                translationProvider: lrmConfig?.Translation?.DefaultProvider || vscodeConfig.get('translationProvider', 'lingva'),
-                maxRetries: lrmConfig?.Translation?.MaxRetries ?? 3,
-                timeoutSeconds: lrmConfig?.Translation?.TimeoutSeconds ?? 30,
-                batchSize: lrmConfig?.Translation?.BatchSize ?? 10,
+                translationProvider: translation?.defaultProvider || translation?.DefaultProvider || vscodeConfig.get('translationProvider', 'mymemory'),
+                maxRetries: translation?.maxRetries ?? translation?.MaxRetries ?? 3,
+                timeoutSeconds: translation?.timeoutSeconds ?? translation?.TimeoutSeconds ?? 30,
+                batchSize: translation?.batchSize ?? translation?.BatchSize ?? 10,
                 // Secure credential store
-                useSecureCredentialStore: credentialInfo.useSecureCredentialStore || lrmConfig?.Translation?.UseSecureCredentialStore || false,
+                useSecureCredentialStore: credentialInfo.useSecureCredentialStore || translation?.useSecureCredentialStore || translation?.UseSecureCredentialStore || false,
                 credentialSources: credentialSources,
                 // Scanning
-                resourceClasses: lrmConfig?.Scanning?.ResourceClassNames || vscodeConfig.get('resourceClasses', ['Resources', 'Strings', 'AppResources']),
-                localizationMethods: lrmConfig?.Scanning?.LocalizationMethods || vscodeConfig.get('localizationMethods', ['GetString', 'GetLocalizedString', 'Translate', 'L', 'T']),
+                resourceClasses: scanning?.resourceClassNames || scanning?.ResourceClassNames || vscodeConfig.get('resourceClasses', ['Resources', 'Strings', 'AppResources']),
+                localizationMethods: scanning?.localizationMethods || scanning?.LocalizationMethods || vscodeConfig.get('localizationMethods', ['GetString', 'GetLocalizedString', 'Translate', 'L', 'T']),
                 // Validation
-                enablePlaceholderValidation: lrmConfig?.Validation?.EnablePlaceholderValidation ?? vscodeConfig.get('enablePlaceholderValidation', true),
-                placeholderTypes: lrmConfig?.Validation?.PlaceholderTypes || ['dotnet'],
+                enablePlaceholderValidation: validation?.enablePlaceholderValidation ?? validation?.EnablePlaceholderValidation ?? vscodeConfig.get('enablePlaceholderValidation', true),
+                placeholderTypes: validation?.placeholderTypes || validation?.PlaceholderTypes || ['dotnet'],
                 // VS Code specific
                 scanCSharp: vscodeConfig.get('scanCSharp', true),
                 scanRazor: vscodeConfig.get('scanRazor', true),
                 scanXaml: vscodeConfig.get('scanXaml', true),
                 // API Keys (from config file - may be overridden by secure store)
-                apiKeys: lrmConfig?.Translation?.ApiKeys || {},
+                apiKeys: translation?.apiKeys || translation?.ApiKeys || {},
                 // AI Provider Settings
                 aiProviders: {
-                    ollama: lrmConfig?.Translation?.AIProviders?.Ollama || {},
-                    openai: lrmConfig?.Translation?.AIProviders?.OpenAI || {},
-                    claude: lrmConfig?.Translation?.AIProviders?.Claude || {},
-                    azureOpenAI: lrmConfig?.Translation?.AIProviders?.AzureOpenAI || {},
-                    azureTranslator: lrmConfig?.Translation?.AIProviders?.AzureTranslator || {},
-                    lingva: lrmConfig?.Translation?.AIProviders?.Lingva || {},
-                    myMemory: lrmConfig?.Translation?.AIProviders?.MyMemory || {}
+                    ollama: aiProviders?.ollama || aiProviders?.Ollama || {},
+                    openai: aiProviders?.openai || aiProviders?.OpenAI || {},
+                    claude: aiProviders?.claude || aiProviders?.Claude || {},
+                    azureOpenAI: aiProviders?.azureOpenAI || aiProviders?.AzureOpenAI || {},
+                    azureTranslator: aiProviders?.azureTranslator || aiProviders?.AzureTranslator || {},
+                    lingva: aiProviders?.lingva || aiProviders?.Lingva || {},
+                    myMemory: aiProviders?.myMemory || aiProviders?.MyMemory || {}
                 }
             };
 

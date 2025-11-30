@@ -1,14 +1,16 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ApiClient } from '../backend/apiClient';
+import { CacheService } from '../backend/cacheService';
 
 export class ResourceEditorPanel {
     public static currentPanel: ResourceEditorPanel | undefined;
     private readonly _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
     private apiClient: ApiClient;
+    private cacheService: CacheService;
 
-    public static createOrShow(extensionUri: vscode.Uri, apiClient: ApiClient) {
+    public static createOrShow(extensionUri: vscode.Uri, apiClient: ApiClient, cacheService: CacheService, options?: { selectKey?: string; openTranslate?: boolean }) {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
@@ -16,6 +18,10 @@ export class ResourceEditorPanel {
         // If we already have a panel, show it
         if (ResourceEditorPanel.currentPanel) {
             ResourceEditorPanel.currentPanel._panel.reveal(column);
+            // If options provided, send message to select key
+            if (options?.selectKey) {
+                ResourceEditorPanel.currentPanel.selectKeyAndTranslate(options.selectKey, options.openTranslate);
+            }
             return;
         }
 
@@ -31,12 +37,31 @@ export class ResourceEditorPanel {
             }
         );
 
-        ResourceEditorPanel.currentPanel = new ResourceEditorPanel(panel, extensionUri, apiClient);
+        ResourceEditorPanel.currentPanel = new ResourceEditorPanel(panel, extensionUri, apiClient, cacheService, options);
     }
 
-    private constructor(panel: vscode.WebviewPanel, _extensionUri: vscode.Uri, apiClient: ApiClient) {
+    /**
+     * Select a key in the editor and optionally open translate dialog
+     */
+    public selectKeyAndTranslate(keyName: string, openTranslate?: boolean) {
+        this._panel.webview.postMessage({
+            command: 'selectKeyAndTranslate',
+            key: keyName,
+            openTranslate: openTranslate ?? false
+        });
+    }
+
+    private _pendingKeySelection?: { key: string; openTranslate: boolean };
+
+    private constructor(panel: vscode.WebviewPanel, _extensionUri: vscode.Uri, apiClient: ApiClient, cacheService: CacheService, options?: { selectKey?: string; openTranslate?: boolean }) {
         this._panel = panel;
         this.apiClient = apiClient;
+        this.cacheService = cacheService;
+
+        // Store pending key selection to apply after resources load
+        if (options?.selectKey) {
+            this._pendingKeySelection = { key: options.selectKey, openTranslate: options.openTranslate ?? false };
+        }
 
         // Set the webview's initial html content
         this._update();
@@ -106,14 +131,35 @@ export class ResourceEditorPanel {
 
     private async handleLoadResources() {
         try {
-            console.log('Loading resources from API...');
-            const keys = await this.apiClient.getKeys();
-            console.log(`Loaded ${keys.length} keys`);
+            console.log('Loading resources from cache...');
+            const keys = await this.cacheService.getKeys();
+            console.log(`Loaded ${keys.length} keys from cache`);
 
             this._panel.webview.postMessage({
                 command: 'resourcesLoaded',
                 data: keys
             });
+
+            // Check if we have cached scan results and send them to populate reference counts
+            const cachedScanResults = this.cacheService.getCachedScanResults();
+            if (cachedScanResults) {
+                console.log('Sending cached scan results to webview');
+                this._panel.webview.postMessage({
+                    command: 'scanCodeComplete',
+                    data: cachedScanResults
+                });
+            }
+
+            // If there's a pending key selection, apply it now
+            if (this._pendingKeySelection) {
+                // Small delay to ensure webview has processed the resources
+                setTimeout(() => {
+                    if (this._pendingKeySelection) {
+                        this.selectKeyAndTranslate(this._pendingKeySelection.key, this._pendingKeySelection.openTranslate);
+                        this._pendingKeySelection = undefined;
+                    }
+                }, 100);
+            }
         } catch (error: any) {
             console.error('Failed to load resources:', error);
             this._panel.webview.postMessage({
@@ -133,6 +179,9 @@ export class ResourceEditorPanel {
                     [langCode]: { value, comment: comment ?? undefined }
                 }
             });
+
+            // Invalidate cache for this key
+            this.cacheService.invalidateKey(key);
 
             this._panel.webview.postMessage({
                 command: 'updateSuccess',
@@ -165,6 +214,9 @@ export class ResourceEditorPanel {
             }
             await this.apiClient.updateKey(key, { values: resourceValues });
 
+            // Invalidate cache for this key
+            this.cacheService.invalidateKey(key);
+
             this._panel.webview.postMessage({
                 command: 'updateSuccess',
                 key
@@ -185,6 +237,9 @@ export class ResourceEditorPanel {
         try {
             await this.apiClient.addKey({ key, values });
 
+            // Invalidate entire cache since new key affects key list
+            this.cacheService.invalidate();
+
             this._panel.webview.postMessage({
                 command: 'addSuccess',
                 key
@@ -202,6 +257,9 @@ export class ResourceEditorPanel {
     private async handleDeleteKey(key: string) {
         try {
             await this.apiClient.deleteKey(key);
+
+            // Invalidate entire cache since deleted key affects key list
+            this.cacheService.invalidate();
 
             this._panel.webview.postMessage({
                 command: 'deleteSuccess',
@@ -257,7 +315,7 @@ export class ResourceEditorPanel {
 
     private async handleGetKeyDetails(keyName: string) {
         try {
-            const keyDetails = await this.apiClient.getKeyDetails(keyName);
+            const keyDetails = await this.cacheService.getKeyDetails(keyName);
             this._panel.webview.postMessage({
                 command: 'keyDetailsLoaded',
                 data: keyDetails
@@ -272,8 +330,8 @@ export class ResourceEditorPanel {
 
     private async handleTranslateAll(provider: string, languages: string[], onlyMissing: boolean = true) {
         try {
-            // Get all keys first
-            const keys = await this.apiClient.getKeys();
+            // Get all keys first (use cache)
+            const keys = await this.cacheService.getKeys();
 
             // Filter keys based on onlyMissing
             const keysToTranslate = onlyMissing
@@ -319,6 +377,9 @@ export class ResourceEditorPanel {
                     // Continue with other keys even if one fails
                 }
             }
+
+            // Invalidate entire cache after batch translation
+            this.cacheService.invalidate();
 
             this._panel.webview.postMessage({
                 command: 'translateAllSuccess'
@@ -368,9 +429,9 @@ export class ResourceEditorPanel {
 
     private async handleScanCode() {
         try {
-            console.log('Starting code scan...');
-            const scanResult = await this.apiClient.scanCode();
-            console.log('Scan complete:', scanResult);
+            console.log('Starting code scan (using cache)...');
+            const scanResult = await this.cacheService.getScanResults();
+            console.log('Scan complete (from cache):', scanResult);
 
             this._panel.webview.postMessage({
                 command: 'scanCodeComplete',
@@ -455,7 +516,7 @@ export class ResourceEditorPanel {
 
     private async handleGetKeyReferences(keyName: string) {
         try {
-            const keyUsage = await this.apiClient.getKeyReferences(keyName);
+            const keyUsage = await this.cacheService.getKeyReferences(keyName);
             this._panel.webview.postMessage({
                 command: 'keyReferencesLoaded',
                 data: keyUsage
@@ -941,6 +1002,7 @@ export class ResourceEditorPanel {
     <script>
         const vscode = acquireVsCodeApi();
         let resources = [];
+        let allResources = [];  // Store unfiltered list for client-side filtering
         let languages = [];
         let providers = [];
         let scanResultsCache = null;
@@ -959,7 +1021,8 @@ export class ResourceEditorPanel {
             switch (message.command) {
                 case 'resourcesLoaded':
                     console.log('Received resourcesLoaded:', message.data?.length || 0, 'keys');
-                    resources = Array.isArray(message.data) ? message.data : [];
+                    allResources = Array.isArray(message.data) ? message.data : [];
+                    resources = allResources;
                     console.log('Resources array:', resources.length);
                     renderTable();
                     updateStats();
@@ -984,8 +1047,9 @@ export class ResourceEditorPanel {
                     setStatus('Translation complete!', 3000);
                     break;
                 case 'searchResults':
-                    resources = message.data;
+                    resources = Array.isArray(message.data) ? message.data : [];
                     renderTable();
+                    updateStats();
                     break;
                 case 'scanCodeComplete':
                     console.log('Received scan results:', message.data);
@@ -1009,6 +1073,22 @@ export class ResourceEditorPanel {
                     populateTranslationsToEditModal(message.data);
                     closeTranslateModal();
                     setStatus('Translation complete! Review and save changes.');
+                    break;
+                case 'selectKeyAndTranslate':
+                    // Select and scroll to key, open edit dialog
+                    if (message.key) {
+                        // Set search to find the key
+                        const searchInput = document.getElementById('searchInput');
+                        if (searchInput) {
+                            searchInput.value = message.key;
+                        }
+                        // Trigger search to filter to this key
+                        filterResources();
+                        // Open the edit modal for the key
+                        setTimeout(() => {
+                            translateKey(message.key);
+                        }, 200);
+                    }
                     break;
                 case 'error':
                     setStatus('Error: ' + message.message, 5000);
@@ -1852,7 +1932,7 @@ export class ResourceEditorPanel {
             }
         }
 
-        // Enhanced search functionality
+        // Enhanced search functionality - client-side for substring, server-side for wildcard/regex
         let searchTimeout;
         function performSearch() {
             clearTimeout(searchTimeout);
@@ -1862,7 +1942,39 @@ export class ResourceEditorPanel {
                 const caseSensitive = document.getElementById('caseSensitive').checked;
                 const scope = document.getElementById('searchScope').value;
 
-                if (pattern) {
+                if (!pattern) {
+                    // No filter - show all resources
+                    resources = allResources;
+                    renderTable();
+                    updateStats();
+                    return;
+                }
+
+                if (mode === 'substring') {
+                    // Client-side filtering for substring (fast)
+                    const searchPattern = caseSensitive ? pattern : pattern.toLowerCase();
+
+                    resources = allResources.filter(r => {
+                        const key = caseSensitive ? r.key : r.key.toLowerCase();
+
+                        if (scope === 'keys' || scope === 'keysAndValues') {
+                            if (key.includes(searchPattern)) return true;
+                        }
+
+                        if (scope === 'values' || scope === 'keysAndValues' || scope === 'all') {
+                            for (const val of Object.values(r.values)) {
+                                const value = caseSensitive ? (val || '') : (val || '').toLowerCase();
+                                if (value.includes(searchPattern)) return true;
+                            }
+                        }
+
+                        return false;
+                    });
+
+                    renderTable();
+                    updateStats();
+                } else {
+                    // Server-side for wildcard/regex (needs backend processing)
                     vscode.postMessage({
                         command: 'searchEnhanced',
                         pattern: pattern,
@@ -1870,10 +1982,22 @@ export class ResourceEditorPanel {
                         caseSensitive: caseSensitive,
                         searchScope: scope
                     });
-                } else {
-                    loadResources();
                 }
             }, 300);
+        }
+
+        // Simple filter for CodeLens quick-select (always substring, keys only)
+        function filterResources() {
+            const pattern = document.getElementById('searchInput').value.trim().toLowerCase();
+
+            if (!pattern) {
+                resources = allResources;
+                renderTable();
+                return;
+            }
+
+            resources = allResources.filter(r => r.key.toLowerCase().includes(pattern));
+            renderTable();
         }
 
         // Bind search input event

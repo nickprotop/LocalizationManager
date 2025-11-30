@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { LrmService } from './backend/lrmService';
 import { ApiClient } from './backend/apiClient';
+import { CacheService } from './backend/cacheService';
 import { CodeDiagnosticProvider } from './providers/codeDiagnostics';
 import { ResxDiagnosticProvider } from './providers/resxDiagnostics';
 import { ResourceTreeView } from './views/resourceTreeView';
@@ -10,14 +11,17 @@ import { ResourceEditorPanel } from './views/resourceEditor';
 import { StatusBarManager } from './views/statusBar';
 import { DashboardPanel } from './views/dashboard';
 import { SettingsPanel } from './views/settingsPanel';
+import { LrmCodeLensProvider } from './providers/codeLens';
 
 let lrmService: LrmService;
 let apiClient: ApiClient;
+let cacheService: CacheService;
 let statusBarManager: StatusBarManager;
 let codeDiagnostics: CodeDiagnosticProvider;
 let resxDiagnostics: ResxDiagnosticProvider;
 let resourceTreeView: ResourceTreeView;
 let completionProvider: LocalizationCompletionProvider;
+let codeLensProvider: LrmCodeLensProvider;
 let outputChannel: vscode.OutputChannel;
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -38,6 +42,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
         // Initialize API client
         apiClient = new ApiClient(lrmService.getBaseUrl());
+
+        // Initialize shared cache service
+        cacheService = new CacheService(apiClient);
 
         // Initialize diagnostic providers
         codeDiagnostics = new CodeDiagnosticProvider(apiClient, outputChannel);
@@ -79,6 +86,33 @@ export async function activate(context: vscode.ExtensionContext) {
             )
         );
         outputChannel.appendLine('Completion provider registered');
+
+        // Register CodeLens provider for localization keys
+        codeLensProvider = new LrmCodeLensProvider(cacheService);
+        context.subscriptions.push(
+            // For .resx files (XML-based)
+            vscode.languages.registerCodeLensProvider(
+                [
+                    { language: 'xml', pattern: '**/*.resx' },
+                    { pattern: '**/*.resx' }
+                ],
+                codeLensProvider
+            ),
+            // For code files
+            vscode.languages.registerCodeLensProvider(
+                [
+                    { language: 'csharp', scheme: 'file' },
+                    { language: 'razor', scheme: 'file' },
+                    { language: 'aspnetcorerazor', scheme: 'file' },
+                    { pattern: '**/*.cs' },
+                    { pattern: '**/*.razor' },
+                    { pattern: '**/*.cshtml' },
+                    { pattern: '**/*.xaml' }
+                ],
+                codeLensProvider
+            )
+        );
+        outputChannel.appendLine('CodeLens provider registered');
 
         // Enable diagnostic providers based on settings
         const config = vscode.workspace.getConfiguration('lrm');
@@ -122,8 +156,9 @@ export async function activate(context: vscode.ExtensionContext) {
                             outputChannel.appendLine(`Resource path changed in settings: ${newPath}`);
                             await lrmService.setResourcePath(newPath);
 
-                            // Recreate API client with new port
+                            // Recreate API client and cache service with new port
                             apiClient = new ApiClient(lrmService.getBaseUrl());
+                            cacheService = new CacheService(apiClient);
 
                             // Refresh views
                             await resourceTreeView.loadResources();
@@ -228,26 +263,47 @@ function setupEventListeners(context: vscode.ExtensionContext, enableRealtimeSca
     const resxWatcher = vscode.workspace.createFileSystemWatcher('**/*.resx');
 
     resxWatcher.onDidChange(async () => {
+        // Invalidate shared cache first
+        if (cacheService) {
+            cacheService.invalidate();
+        }
         await resxDiagnostics.validateAllResources();
         await resourceTreeView.loadResources();
         if (completionProvider) {
             completionProvider.invalidateCache();
+        }
+        if (codeLensProvider) {
+            codeLensProvider.refresh();
         }
     });
 
     resxWatcher.onDidCreate(async () => {
+        // Invalidate shared cache first
+        if (cacheService) {
+            cacheService.invalidate();
+        }
         await resxDiagnostics.validateAllResources();
         await resourceTreeView.loadResources();
         if (completionProvider) {
             completionProvider.invalidateCache();
         }
+        if (codeLensProvider) {
+            codeLensProvider.refresh();
+        }
     });
 
     resxWatcher.onDidDelete(async () => {
+        // Invalidate shared cache first
+        if (cacheService) {
+            cacheService.invalidate();
+        }
         await resxDiagnostics.validateAllResources();
         await resourceTreeView.loadResources();
         if (completionProvider) {
             completionProvider.invalidateCache();
+        }
+        if (codeLensProvider) {
+            codeLensProvider.refresh();
         }
     });
 
@@ -352,7 +408,7 @@ function registerCommands(context: vscode.ExtensionContext) {
     // Open Resource Editor
     context.subscriptions.push(
         vscode.commands.registerCommand('lrm.openResourceEditor', async () => {
-            ResourceEditorPanel.createOrShow(context.extensionUri, apiClient);
+            ResourceEditorPanel.createOrShow(context.extensionUri, apiClient, cacheService);
         })
     );
 
@@ -567,7 +623,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('lrm.translateKeyQuickFix', async (keyName: string) => {
             try {
                 const config = vscode.workspace.getConfiguration('lrm');
-                const provider = config.get<string>('translationProvider', 'lingva');
+                const provider = config.get<string>('translationProvider', 'mymemory');
 
                 const languages = await apiClient.getLanguages();
                 const targetLanguages = languages.filter(l => !l.isDefault).map(l => l.code);
@@ -750,8 +806,9 @@ function registerCommands(context: vscode.ExtensionContext) {
             try {
                 await lrmService.restart();
 
-                // Recreate API client
+                // Recreate API client and cache service
                 apiClient = new ApiClient(lrmService.getBaseUrl());
+                cacheService = new CacheService(apiClient);
 
                 // Update status bar
                 if (statusBarManager) {
@@ -875,6 +932,176 @@ function registerCommands(context: vscode.ExtensionContext) {
             }
         })
     );
+
+    // CodeLens Commands
+
+    // Show Key References
+    context.subscriptions.push(
+        vscode.commands.registerCommand('lrm.showKeyReferences', async (keyName: string) => {
+            try {
+                const usage = await cacheService.getKeyReferences(keyName);
+
+                if (usage.referenceCount === 0) {
+                    vscode.window.showInformationMessage(`Key '${keyName}' has no references in code.`);
+                    return;
+                }
+
+                // Create output channel to show references
+                const channel = vscode.window.createOutputChannel('LRM Key References');
+                channel.clear();
+                channel.appendLine(`=== References for '${keyName}' ===\n`);
+                channel.appendLine(`Total: ${usage.referenceCount} references\n`);
+
+                for (const ref of usage.references) {
+                    channel.appendLine(`${ref.file}:${ref.line}`);
+                    channel.appendLine(`  Pattern: ${ref.pattern}`);
+                    channel.appendLine(`  Confidence: ${ref.confidence}`);
+                    if (ref.warning) {
+                        channel.appendLine(`  Warning: ${ref.warning}`);
+                    }
+                    channel.appendLine('');
+                }
+
+                channel.show();
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`Failed to get references: ${error.message}`);
+            }
+        })
+    );
+
+    // Show Missing Languages
+    context.subscriptions.push(
+        vscode.commands.registerCommand('lrm.showMissingLanguages', async (keyName: string) => {
+            try {
+                const details = await cacheService.getKeyDetails(keyName);
+
+                const filled: string[] = [];
+                const missing: string[] = [];
+
+                for (const [lang, data] of Object.entries(details.values)) {
+                    if (data.value && data.value.trim() !== '') {
+                        filled.push(lang || 'default');
+                    } else {
+                        missing.push(lang || 'default');
+                    }
+                }
+
+                let message = `Key: ${keyName}\n\nFilled: ${filled.join(', ')}`;
+                if (missing.length > 0) {
+                    message += `\nMissing: ${missing.join(', ')}`;
+                }
+
+                const choice = await vscode.window.showInformationMessage(
+                    message,
+                    { modal: false },
+                    'Translate Missing'
+                );
+
+                if (choice === 'Translate Missing') {
+                    vscode.commands.executeCommand('lrm.translateKeyFromLens', keyName);
+                }
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`Failed to get key details: ${error.message}`);
+            }
+        })
+    );
+
+    // Translate Key from CodeLens
+    context.subscriptions.push(
+        vscode.commands.registerCommand('lrm.translateKeyFromLens', async (keyName: string) => {
+            try {
+                const config = vscode.workspace.getConfiguration('lrm');
+                const provider = config.get<string>('translationProvider', 'mymemory');
+
+                const languages = await apiClient.getLanguages();
+                const targetLanguages = languages.filter(l => !l.isDefault).map(l => l.code);
+
+                if (targetLanguages.length === 0) {
+                    vscode.window.showWarningMessage('No target languages found');
+                    return;
+                }
+
+                await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: `Translating '${keyName}'...`,
+                    cancellable: false
+                }, async () => {
+                    await apiClient.translate({
+                        keys: [keyName],
+                        provider,
+                        targetLanguages,
+                        onlyMissing: true
+                    });
+                });
+
+                vscode.window.showInformationMessage(`Translated '${keyName}'`);
+
+                // Invalidate cache and refresh
+                cacheService.invalidateKey(keyName);
+                if (codeLensProvider) {
+                    codeLensProvider.refresh();
+                }
+                await resxDiagnostics.validateAllResources();
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`Translation failed: ${error.message}`);
+            }
+        })
+    );
+
+    // Edit Key from CodeLens - opens Resource Editor with key selected and translate dialog
+    context.subscriptions.push(
+        vscode.commands.registerCommand('lrm.editKeyFromLens', async (keyName: string) => {
+            // Open Resource Editor with this key selected and translate dialog open
+            ResourceEditorPanel.createOrShow(context.extensionUri, apiClient, cacheService, {
+                selectKey: keyName,
+                openTranslate: true
+            });
+        })
+    );
+
+    // Delete Unused Key from CodeLens
+    context.subscriptions.push(
+        vscode.commands.registerCommand('lrm.deleteUnusedKey', async (keyName: string) => {
+            const confirm = await vscode.window.showWarningMessage(
+                `Delete unused key '${keyName}'?`,
+                { modal: true },
+                'Delete'
+            );
+
+            if (confirm !== 'Delete') {
+                return;
+            }
+
+            try {
+                await apiClient.deleteKey(keyName);
+                vscode.window.showInformationMessage(`Deleted '${keyName}'`);
+
+                // Invalidate cache and refresh
+                cacheService.invalidate();
+                if (codeLensProvider) {
+                    codeLensProvider.refresh();
+                }
+                await resourceTreeView.loadResources();
+                await resxDiagnostics.validateAllResources();
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`Failed to delete key: ${error.message}`);
+            }
+        })
+    );
+}
+
+/**
+ * Get the shared cache service instance (for use by providers)
+ */
+export function getCacheService(): CacheService | undefined {
+    return cacheService;
+}
+
+/**
+ * Get the API client instance (for use by providers)
+ */
+export function getApiClient(): ApiClient | undefined {
+    return apiClient;
 }
 
 export function deactivate() {

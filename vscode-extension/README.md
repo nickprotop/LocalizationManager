@@ -29,6 +29,20 @@ Find missing and unused keys across your codebase.
 
 ![Code Scan](https://raw.githubusercontent.com/nickprotop/LocalizationManager/main/vscode-extension/images/code-scan.png)
 
+### CodeLens
+Get inline information and actions directly in your code.
+
+**In .resx files** (above each key):
+- Reference count (e.g., "12 references") - click to see all usages
+- Language coverage (e.g., "3/5 languages") - click to see missing translations
+- Quick translate action
+- Warnings for unused or duplicate keys
+
+**In code files** (.cs, .razor, .xaml, .cshtml):
+- Key value preview (e.g., "Welcome to our app")
+- Missing language warnings - click to translate
+- Click to open the key in Resource Editor
+
 ### Key References
 See exactly where each key is used in your code.
 
@@ -70,9 +84,14 @@ Translate missing values using free or paid providers.
 | Setting | Description | Default |
 |---------|-------------|---------|
 | `lrm.resourcePath` | Path to .resx folder | Auto-detected |
-| `lrm.translationProvider` | Default provider | `lingva` |
+| `lrm.translationProvider` | Default provider | `mymemory` |
 | `lrm.enableRealtimeScan` | Live diagnostics | `true` |
 | `lrm.scanOnSave` | Scan on file save | `true` |
+| `lrm.enableCodeLens` | Show CodeLens annotations | `true` |
+| `lrm.codeLens.showReferences` | Show reference count | `true` |
+| `lrm.codeLens.showCoverage` | Show language coverage | `true` |
+| `lrm.codeLens.showTranslate` | Show translate action | `true` |
+| `lrm.codeLens.showValue` | Show key value in code | `true` |
 
 ## Configuration & API Keys
 
