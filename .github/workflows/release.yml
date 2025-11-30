@@ -77,13 +77,13 @@ jobs:
 
       - name: Build Debian packages (amd64)
         run: |
-          ./build-deb.sh amd64 both
-          echo "✓ Built amd64 .deb packages"
+          ./build-deb.sh amd64
+          echo "✓ Built amd64 .deb package (standalone)"
 
       - name: Build Debian packages (arm64)
         run: |
-          ./build-deb.sh arm64 both
-          echo "✓ Built arm64 .deb packages"
+          ./build-deb.sh arm64
+          echo "✓ Built arm64 .deb package (standalone)"
 
       - name: Build source package for PPA
         run: |
@@ -160,8 +160,6 @@ jobs:
             ```bash
             sudo add-apt-repository ppa:nickprotop/lrm-tool
             sudo apt update
-            sudo apt install lrm          # Framework-dependent (~200KB)
-            # OR
             sudo apt install lrm-standalone  # Self-contained (~72MB)
             ```
 
@@ -174,10 +172,12 @@ jobs:
             - **ARM64:** `lrm-linux-arm64.tar.gz` *(Raspberry Pi, etc.)*
 
             **Linux (.deb packages):**
-            - **x64 Framework-dependent:** `lrm_${{ steps.version.outputs.version }}-1_amd64.deb` (~200KB, requires dotnet-runtime-9.0)
-            - **x64 Self-contained:** `lrm-standalone_${{ steps.version.outputs.version }}-1_amd64.deb` (~72MB)
-            - **ARM64 Framework-dependent:** `lrm_${{ steps.version.outputs.version }}-1_arm64.deb`
-            - **ARM64 Self-contained:** `lrm-standalone_${{ steps.version.outputs.version }}-1_arm64.deb`
+            - **x64:** `lrm-standalone_${{ steps.version.outputs.version }}-1_amd64.deb` (~72MB)
+            - **ARM64:** `lrm-standalone_${{ steps.version.outputs.version }}-1_arm64.deb` (~72MB)
+
+            **macOS:**
+            - **x64 (Intel):** `lrm-osx-x64.tar.gz`
+            - **ARM64 (Apple Silicon):** `lrm-osx-arm64.tar.gz`
 
             **Windows:**
             - **x64:** `lrm-win-x64.zip`
@@ -193,11 +193,11 @@ jobs:
           files: |
             publish/lrm-linux-x64.tar.gz
             publish/lrm-linux-arm64.tar.gz
+            publish/lrm-osx-x64.tar.gz
+            publish/lrm-osx-arm64.tar.gz
             publish/lrm-win-x64.zip
             publish/lrm-win-arm64.zip
-            publish/deb/lrm_${{ steps.version.outputs.version }}-1_amd64.deb
             publish/deb/lrm-standalone_${{ steps.version.outputs.version }}-1_amd64.deb
-            publish/deb/lrm_${{ steps.version.outputs.version }}-1_arm64.deb
             publish/deb/lrm-standalone_${{ steps.version.outputs.version }}-1_arm64.deb
           draft: false
           prerelease: false

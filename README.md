@@ -155,7 +155,7 @@ LRM solves this by providing:
   - Dry-run mode to preview execution
   - Perfect for automation workflows and complex operations
 - **📋 Multiple Output Formats** - Table, JSON, and simple text formats for all commands
-- **💻 Multi-platform** - Linux (x64/ARM64), Windows (x64/ARM64)
+- **💻 Multi-platform** - Linux (x64/ARM64), macOS (Intel/Apple Silicon), Windows (x64/ARM64)
 - **📦 Self-contained** - No .NET runtime required
 - **⌨️ Shell Completion** - Bash and Zsh support
 
@@ -163,30 +163,49 @@ LRM solves this by providing:
 
 ## Quick Start
 
-### Installation (Linux)
+### Installation
 
 **PPA Installation (Ubuntu/Debian) - Recommended:**
 ```bash
 sudo add-apt-repository ppa:nickprotop/lrm-tool
 sudo apt update
-sudo apt install lrm  # Framework-dependent (~200KB)
-# OR
 sudo apt install lrm-standalone  # Self-contained (~72MB)
 ```
 
-**One-line install script:**
+**One-line install script (Linux):**
 ```bash
 curl -sSL https://raw.githubusercontent.com/nickprotop/LocalizationManager/main/install-lrm.sh | bash
 ```
 
 **Or download manually:**
+
+Linux:
 ```bash
+# Intel/AMD (x64)
 wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-linux-x64.tar.gz
 tar -xzf lrm-linux-x64.tar.gz
 sudo cp linux-x64/lrm /usr/local/bin/
+
+# ARM64 (Raspberry Pi, etc.)
+wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-linux-arm64.tar.gz
+tar -xzf lrm-linux-arm64.tar.gz
+sudo cp linux-arm64/lrm /usr/local/bin/
 ```
 
-See [INSTALLATION.md](docs/INSTALLATION.md) for .deb packages, Windows, ARM64, and detailed installation options.
+macOS:
+```bash
+# Intel Mac
+wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-osx-x64.tar.gz
+tar -xzf lrm-osx-x64.tar.gz
+sudo cp osx-x64/lrm /usr/local/bin/
+
+# Apple Silicon (M1/M2/M3)
+wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-osx-arm64.tar.gz
+tar -xzf lrm-osx-arm64.tar.gz
+sudo cp osx-arm64/lrm /usr/local/bin/
+```
+
+See [INSTALLATION.md](docs/INSTALLATION.md) for .deb packages, Windows, and detailed installation options.
 
 ### Basic Usage
 

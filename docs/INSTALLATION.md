@@ -36,6 +36,8 @@ This script will:
 **Choose your platform for manual installation:**
 - [Linux (x64)](#linux-x64) - Intel/AMD processors
 - [Linux (ARM64)](#linux-arm64) - Raspberry Pi, ARM servers
+- [macOS (Intel)](#macos-intel) - Intel-based Macs
+- [macOS (Apple Silicon)](#macos-apple-silicon) - M1/M2/M3/M4 Macs
 - [Windows (x64)](#windows-x64) - Intel/AMD processors
 - [Windows (ARM64)](#windows-arm64) - ARM-based Windows devices
 - [Build from Source](#building-from-source) - Any platform with .NET 9 SDK
@@ -57,29 +59,17 @@ Get automatic updates through the package manager:
 sudo add-apt-repository ppa:nickprotop/lrm-tool
 sudo apt update
 
-# Install framework-dependent version (~200KB, requires dotnet-runtime-9.0)
-sudo apt install lrm
-
-# OR install self-contained version (~72MB, no dependencies)
+# Install self-contained version (~72MB, no dependencies)
 sudo apt install lrm-standalone
 ```
 
-**Package Comparison:**
-
-| Package | Size | Dependencies | Best For |
-|---------|------|--------------|----------|
-| `lrm` | ~200KB | Requires `dotnet-runtime-9.0` | Systems with .NET already installed, minimal disk usage |
-| `lrm-standalone` | ~72MB | None | Servers without .NET, isolated environments |
-
 **To update:**
 ```bash
-sudo apt update && sudo apt upgrade lrm
+sudo apt update && sudo apt upgrade lrm-standalone
 ```
 
 **To remove:**
 ```bash
-sudo apt remove lrm
-# OR
 sudo apt remove lrm-standalone
 ```
 
@@ -89,20 +79,13 @@ Install a specific version without adding the PPA:
 
 ```bash
 # Download the .deb file (replace VERSION with desired version, e.g., 0.6.12)
-wget https://github.com/nickprotop/LocalizationManager/releases/download/vVERSION/lrm_VERSION-1_amd64.deb
-
-# Install the package
-sudo apt install ./lrm_VERSION-1_amd64.deb
-
-# OR for self-contained version
+# For x64 (Intel/AMD)
 wget https://github.com/nickprotop/LocalizationManager/releases/download/vVERSION/lrm-standalone_VERSION-1_amd64.deb
 sudo apt install ./lrm-standalone_VERSION-1_amd64.deb
-```
 
-**For ARM64 systems (Raspberry Pi, etc.):**
-```bash
-wget https://github.com/nickprotop/LocalizationManager/releases/download/vVERSION/lrm_VERSION-1_arm64.deb
-sudo apt install ./lrm_VERSION-1_arm64.deb
+# For ARM64 (Raspberry Pi, etc.)
+wget https://github.com/nickprotop/LocalizationManager/releases/download/vVERSION/lrm-standalone_VERSION-1_arm64.deb
+sudo apt install ./lrm-standalone_VERSION-1_arm64.deb
 ```
 
 ---
@@ -251,22 +234,74 @@ Follow the same steps as Windows x64, but download:
 
 ## macOS Installation
 
-> **Note:** Pre-built binaries for macOS are not currently available. Please [build from source](#building-from-source).
+### macOS (Intel)
 
-If you want to create macOS binaries, you can build them:
+**For Intel-based Macs (x64)**
+
+#### System-wide Installation (Recommended)
 
 ```bash
-# Build for Intel Mac
-dotnet publish -c Release -r osx-x64 --self-contained
+# Download the latest release
+cd /tmp
+wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-osx-x64.tar.gz
 
-# Build for Apple Silicon (M1/M2/M3)
-dotnet publish -c Release -r osx-arm64 --self-contained
+# Extract the archive
+tar -xzf lrm-osx-x64.tar.gz
+
+# Install to system binary directory
+sudo cp osx-x64/lrm /usr/local/bin/
+sudo chmod +x /usr/local/bin/lrm
+
+# Verify installation
+lrm --version
+
+# Clean up
+rm lrm-osx-x64.tar.gz
 ```
 
-Then install to `/usr/local/bin/`:
+#### User-local Installation
+
 ```bash
-sudo cp bin/Release/net9.0/osx-arm64/publish/LocalizationManager /usr/local/bin/lrm
+# Download and extract
+cd /tmp
+wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-osx-x64.tar.gz
+tar -xzf lrm-osx-x64.tar.gz
+
+# Create user binary directory if it doesn't exist
+mkdir -p ~/.local/bin
+
+# Install to user binary directory
+cp osx-x64/lrm ~/.local/bin/
+chmod +x ~/.local/bin/lrm
+
+# Add to PATH (if not already in PATH)
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# Verify installation
+lrm --version
+
+# Clean up
+rm lrm-osx-x64.tar.gz
+```
+
+### macOS (Apple Silicon)
+
+**For Apple Silicon Macs (M1/M2/M3/M4)**
+
+Follow the same steps as Intel, but use the ARM64 archive:
+
+```bash
+# Download ARM64 version
+wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-osx-arm64.tar.gz
+
+# Extract and install (same steps as Intel)
+tar -xzf lrm-osx-arm64.tar.gz
+sudo cp osx-arm64/lrm /usr/local/bin/
 sudo chmod +x /usr/local/bin/lrm
+
+# Verify
+lrm --version
 ```
 
 ---
@@ -298,7 +333,7 @@ cd LocalizationManager
 
 This will:
 - Run all 21 unit tests (must pass)
-- Build for 4 platforms (Linux x64/ARM64, Windows x64/ARM64)
+- Build for 6 platforms (Linux x64/ARM64, macOS x64/ARM64, Windows x64/ARM64)
 - Create distribution archives
 - Show build summary
 
@@ -307,10 +342,14 @@ This will:
 publish/
 ├── linux-x64/lrm
 ├── linux-arm64/lrm
+├── osx-x64/lrm
+├── osx-arm64/lrm
 ├── win-x64/lrm.exe
 ├── win-arm64/lrm.exe
 ├── lrm-linux-x64.tar.gz
 ├── lrm-linux-arm64.tar.gz
+├── lrm-osx-x64.tar.gz
+├── lrm-osx-arm64.tar.gz
 ├── lrm-win-x64.zip
 └── lrm-win-arm64.zip
 ```

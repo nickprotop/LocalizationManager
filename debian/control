@@ -10,11 +10,10 @@ Vcs-Browser: https://github.com/nickprotop/LocalizationManager
 Vcs-Git: https://github.com/nickprotop/LocalizationManager.git
 Rules-Requires-Root: no
 
-Package: lrm
+Package: lrm-standalone
 Architecture: amd64 arm64
 Depends: ${shlibs:Depends},
-         ${misc:Depends},
-         dotnet-runtime-9.0
+         ${misc:Depends}
 Description: Linux-native CLI tool for managing .NET .resx localization files
  LRM (Localization Resource Manager) is a powerful, Linux-native command-line
  tool for managing .NET .resx localization files with an interactive Terminal UI.
@@ -28,26 +27,5 @@ Description: Linux-native CLI tool for managing .NET .resx localization files
   - Backup system with diff view
   - Multi-platform support (Linux x64/ARM64)
  .
- This is the framework-dependent package (~200KB) that requires dotnet-runtime-9.0.
- For a self-contained package with no dependencies, install lrm-standalone instead.
-
-Package: lrm-standalone
-Architecture: amd64 arm64
-Depends: ${shlibs:Depends},
-         ${misc:Depends}
-Description: Self-contained LRM package (no .NET runtime required)
- LRM (Localization Resource Manager) is a powerful, Linux-native command-line
- tool for managing .NET .resx localization files with an interactive Terminal UI.
- .
- Features:
-  - Interactive Terminal UI for visual editing
-  - Machine translation support (Google, DeepL, OpenAI, Claude, Ollama)
-  - CI/CD automation workflows
-  - Validation and placeholder checking
-  - Code scanning for unused/missing keys
-  - Backup system with diff view
-  - Multi-platform support (Linux x64/ARM64)
- .
- This is the self-contained package (~72MB) with the .NET runtime bundled.
- No additional dependencies required. For a smaller package that uses the
- system .NET runtime, install lrm instead.
+ This is a self-contained package (~72MB) with the .NET runtime bundled.
+ No additional dependencies required.

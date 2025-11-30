@@ -80,6 +80,8 @@ chmod +x linux-x64/lrm
 **Available platforms:**
 - `lrm-linux-x64.tar.gz` - Intel/AMD Linux
 - `lrm-linux-arm64.tar.gz` - ARM Linux (Raspberry Pi, AWS Graviton)
+- `lrm-osx-x64.tar.gz` - Intel macOS
+- `lrm-osx-arm64.tar.gz` - Apple Silicon macOS (M1/M2/M3/M4)
 - `lrm-win-x64.zip` - Intel/AMD Windows
 - `lrm-win-arm64.zip` - ARM Windows
 

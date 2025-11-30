@@ -10,7 +10,7 @@ To build all platform targets with a single command:
 
 This will:
 1. Run all tests (must pass before building)
-2. Build for 4 platforms (Linux x64/ARM64, Windows x64/ARM64)
+2. Build for 6 platforms (Linux x64/ARM64, macOS x64/ARM64, Windows x64/ARM64)
 3. Create distribution archives
 4. Display build summary
 
@@ -26,6 +26,12 @@ publish/
 ├── linux-arm64/
 │   ├── lrm              # ARM Linux executable
 │   └── README.txt
+├── osx-x64/
+│   ├── lrm              # macOS Intel executable
+│   └── README.txt
+├── osx-arm64/
+│   ├── lrm              # macOS Apple Silicon executable
+│   └── README.txt
 ├── win-x64/
 │   ├── lrm.exe          # Windows executable
 │   └── README.txt
@@ -34,6 +40,8 @@ publish/
 │   └── README.txt
 ├── lrm-linux-x64.tar.gz
 ├── lrm-linux-arm64.tar.gz
+├── lrm-osx-x64.tar.gz
+├── lrm-osx-arm64.tar.gz
 ├── lrm-win-x64.zip
 └── lrm-win-arm64.zip
 ```

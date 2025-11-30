@@ -1,5 +1,5 @@
 #!/usr/bin/make -f
-# debian/rules for lrm
+# debian/rules for lrm-standalone
 
 export DH_VERBOSE=1
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
@@ -18,43 +18,28 @@ endif
 	dh $@
 
 override_dh_auto_build:
-	# Build framework-dependent version (for lrm package)
-	dotnet publish -c Release -r $(DOTNET_RID) \
-		--self-contained false \
-		-p:PublishSingleFile=true \
-		-o $(CURDIR)/debian/build/lrm
-
-	# Build self-contained version (for lrm-standalone package)
+	# Build self-contained version (standalone only)
 	dotnet publish -c Release -r $(DOTNET_RID) \
 		--self-contained true \
 		-p:PublishSingleFile=true \
 		-p:PublishTrimmed=false \
+		-p:IncludeNativeLibrariesForSelfExtract=true \
 		-o $(CURDIR)/debian/build/lrm-standalone
 
 override_dh_auto_install:
-	# Install framework-dependent binary
-	install -D -m 0755 $(CURDIR)/debian/build/lrm/lrm \
-		$(CURDIR)/debian/lrm/usr/bin/lrm
-
 	# Install self-contained binary
 	install -D -m 0755 $(CURDIR)/debian/build/lrm-standalone/lrm \
 		$(CURDIR)/debian/lrm-standalone/usr/bin/lrm
 
-	# Install man page (both packages)
-	install -D -m 0644 $(CURDIR)/docs/lrm.1 \
-		$(CURDIR)/debian/lrm/usr/share/man/man1/lrm.1
+	# Install man page
 	install -D -m 0644 $(CURDIR)/docs/lrm.1 \
 		$(CURDIR)/debian/lrm-standalone/usr/share/man/man1/lrm.1
 
-	# Install bash completion (both packages)
-	install -D -m 0644 $(CURDIR)/lrm-completion.bash \
-		$(CURDIR)/debian/lrm/usr/share/bash-completion/completions/lrm
+	# Install bash completion
 	install -D -m 0644 $(CURDIR)/lrm-completion.bash \
 		$(CURDIR)/debian/lrm-standalone/usr/share/bash-completion/completions/lrm
 
-	# Install zsh completion (both packages)
-	install -D -m 0644 $(CURDIR)/_lrm \
-		$(CURDIR)/debian/lrm/usr/share/zsh/site-functions/_lrm
+	# Install zsh completion
 	install -D -m 0644 $(CURDIR)/_lrm \
 		$(CURDIR)/debian/lrm-standalone/usr/share/zsh/site-functions/_lrm
 

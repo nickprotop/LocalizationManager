@@ -4,6 +4,10 @@
 #
 # Bundle LRM binaries for VS Code extension
 # Copies platform-specific binaries into vscode-extension/bin/
+#
+# Usage:
+#   ./bundle-extension-binaries.sh                    # Bundle all platforms
+#   ./bundle-extension-binaries.sh --target linux-x64 # Bundle only linux-x64
 
 set -e
 
@@ -13,6 +17,23 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
+
+# Parse arguments
+TARGET_PLATFORM=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --target)
+            TARGET_PLATFORM="$2"
+            shift 2
+            ;;
+        *)
+            echo -e "${RED}Error: Unknown argument: $1${NC}"
+            echo "Usage: $0 [--target <platform>]"
+            echo "Platforms: win32-x64, win32-arm64, linux-x64, linux-arm64, darwin-x64, darwin-arm64"
+            exit 1
+            ;;
+    esac
+done
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║      Bundling LRM Binaries for VS Code Extension              ║${NC}"
@@ -29,13 +50,18 @@ if [ ! -d "$PUBLISH_DIR" ]; then
     exit 1
 fi
 
-# Create extension bin directory
-echo -e "${YELLOW}►${NC} Creating extension bin directory..."
-rm -rf "$EXTENSION_BIN_DIR"
-mkdir -p "$EXTENSION_BIN_DIR"
+# Platform mappings (VS Code platform name -> publish dir name)
+declare -A vscode_to_publish=(
+    ["win32-x64"]="win-x64"
+    ["win32-arm64"]="win-arm64"
+    ["linux-x64"]="linux-x64"
+    ["linux-arm64"]="linux-arm64"
+    ["darwin-x64"]="osx-x64"
+    ["darwin-arm64"]="osx-arm64"
+)
 
-# Platform mappings (publish dir name -> extension bin name)
-declare -A platforms=(
+# Reverse mapping (publish dir name -> VS Code platform name)
+declare -A publish_to_vscode=(
     ["linux-x64"]="linux-x64"
     ["linux-arm64"]="linux-arm64"
     ["win-x64"]="win32-x64"
@@ -44,9 +70,33 @@ declare -A platforms=(
     ["osx-arm64"]="darwin-arm64"
 )
 
+# Determine platforms to bundle
+if [ -n "$TARGET_PLATFORM" ]; then
+    # Validate target platform
+    if [ -z "${vscode_to_publish[$TARGET_PLATFORM]}" ]; then
+        echo -e "${RED}Error: Invalid target platform: $TARGET_PLATFORM${NC}"
+        echo "Valid platforms: ${!vscode_to_publish[@]}"
+        exit 1
+    fi
+
+    echo -e "${YELLOW}►${NC} Bundling single platform: $TARGET_PLATFORM"
+    PLATFORMS_TO_BUNDLE=("$TARGET_PLATFORM")
+
+    # Clean entire bin directory for single-platform builds
+    rm -rf "$EXTENSION_BIN_DIR"
+    mkdir -p "$EXTENSION_BIN_DIR"
+else
+    echo -e "${YELLOW}►${NC} Bundling all platforms..."
+    PLATFORMS_TO_BUNDLE=("${!vscode_to_publish[@]}")
+
+    # Clean entire bin directory
+    rm -rf "$EXTENSION_BIN_DIR"
+    mkdir -p "$EXTENSION_BIN_DIR"
+fi
+
 # Copy binaries
-for pub_platform in "${!platforms[@]}"; do
-    ext_platform="${platforms[$pub_platform]}"
+for ext_platform in "${PLATFORMS_TO_BUNDLE[@]}"; do
+    pub_platform="${vscode_to_publish[$ext_platform]}"
 
     # Determine executable name
     if [[ $pub_platform == win-* ]]; then

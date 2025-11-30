@@ -69,16 +69,15 @@ See the main README for detailed GPG setup instructions.
 
 ---
 
-## Package Variants
+## Package Overview
 
-LRM provides two package variants:
+LRM provides a single self-contained package:
 
-| Package | Size | Dependencies | Use Case |
+| Package | Size | Dependencies | Benefits |
 |---------|------|--------------|----------|
-| **lrm** | ~200KB | `dotnet-runtime-9.0` | Systems with .NET already installed |
-| **lrm-standalone** | ~72MB | None (includes .NET runtime) | Servers, isolated environments |
+| **lrm-standalone** | ~72MB | None (includes .NET runtime) | Works everywhere, no runtime dependencies |
 
-Both packages install to `/usr/bin/lrm` (cannot be installed simultaneously).
+The package installs to `/usr/bin/lrm`.
 
 ---
 
@@ -88,40 +87,27 @@ Both packages install to `/usr/bin/lrm` (cannot be installed simultaneously).
 
 Build Debian packages for local testing or GitHub Releases:
 
-```bash
-# Build for amd64 (both variants)
-./build-deb.sh amd64 both
-
-# Build for arm64 (both variants)
-./build-deb.sh arm64 both
-
-# Build only framework-dependent
-./build-deb.sh amd64 lrm
-
-# Build only self-contained
-./build-deb.sh amd64 lrm-standalone
-
-# Output: publish/deb/lrm_VERSION-1_ARCH.deb
-```
-
-**Using main build script:**
+**Prerequisites:**
+- Run `./build.sh` first to build the platform binaries (required)
+- The `build-deb.sh` script reuses pre-built binaries from `publish/linux-{x64|arm64}/lrm`
 
 ```bash
-# Equivalent to ./build-deb.sh amd64 both
-./build.sh --deb
+# Build for amd64 (standalone only)
+./build-deb.sh amd64
 
-# Build for ARM64
-./build.sh --deb --arch arm64
+# Build for arm64 (standalone only)
+./build-deb.sh arm64
 
-# Build specific variant
-./build.sh --deb --variant lrm
+# Output: publish/deb/lrm-standalone_VERSION-1_ARCH.deb
 ```
+
+**Note:** The script will fail with a clear error message if pre-built binaries are not found. Always run `./build.sh` first.
 
 ### Test Locally
 
 ```bash
 # Install the package
-sudo apt install ./publish/deb/lrm_0.6.12-1_amd64.deb
+sudo apt install ./publish/deb/lrm-standalone_0.6.12-1_amd64.deb
 
 # Test the binary
 lrm --version
@@ -134,7 +120,7 @@ man lrm
 lrm <Tab><Tab>
 
 # Remove the package
-sudo apt remove lrm
+sudo apt remove lrm-standalone
 ```
 
 ---
@@ -231,30 +217,31 @@ After upload, Launchpad builds packages for all Ubuntu releases:
 If not using automated GitHub Actions:
 
 ```bash
-# 1. Build and test binary packages
-./build.sh --deb
-sudo apt install ./publish/deb/lrm_*_amd64.deb
+# 1. Build all platform binaries
+./build.sh
+
+# 2. Build and test binary packages
+./build-deb.sh amd64
+./build-deb.sh arm64
+sudo apt install ./publish/deb/lrm-standalone_*_amd64.deb
 lrm --version
-sudo apt remove lrm
+sudo apt remove lrm-standalone
 
-# 2. Build source package
-./build.sh --source
+# 3. Build source package
+./build-source-package.sh
 
-# 3. Sign source package
+# 4. Sign source package
 cd publish/source
 debsign -k nikolaos.protopapas@gmail.com lrm_*_source.changes
 
-# 4. Upload to PPA
+# 5. Upload to PPA
 dput lrm-tool-ppa lrm_*_source.changes
 
-# 5. Create Git tag
+# 6. Create Git tag
 git tag -a v0.6.12 -m "Release v0.6.12"
 git push origin v0.6.12
 
-# 6. Build standard releases for GitHub
-./build.sh
-
-# 7. Create GitHub Release manually with .deb files
+# 7. Create GitHub Release manually with all binaries and .deb files
 ```
 
 ### Automated Release (GitHub Actions)
@@ -268,13 +255,13 @@ git push origin v0.6.12
 
 The GitHub Actions workflow will:
 1. ✅ Run tests
-2. ✅ Build all platforms (Linux, Windows, x64, ARM64)
-3. ✅ Build .deb packages (amd64 + arm64)
+2. ✅ Build all platforms (Linux x64/ARM64, macOS x64/ARM64, Windows x64/ARM64)
+3. ✅ Build standalone .deb packages (amd64 + arm64)
 4. ✅ Build source package
 5. ✅ Sign source package with GPG key from secrets
 6. ✅ Upload to PPA
 7. ✅ Create GitHub Release
-8. ✅ Upload all binaries and .deb files
+8. ✅ Upload all binaries (6 tar.gz/zip files + 2 .deb files)
 
 ---
 
@@ -285,12 +272,12 @@ The GitHub Actions workflow will:
 **On clean Ubuntu VM or container:**
 
 ```bash
-# Test framework-dependent package
-wget https://github.com/nickprotop/LocalizationManager/releases/download/v0.6.12/lrm_0.6.12-1_amd64.deb
-sudo apt install ./lrm_0.6.12-1_amd64.deb
+# Download standalone package
+wget https://github.com/nickprotop/LocalizationManager/releases/download/v0.6.12/lrm-standalone_0.6.12-1_amd64.deb
+sudo apt install ./lrm-standalone_0.6.12-1_amd64.deb
 
-# Should install dotnet-runtime-9.0 as dependency
-dpkg -l | grep dotnet-runtime-9.0
+# Verify no .NET runtime dependencies needed
+dpkg -l | grep dotnet  # Should show no .NET packages
 
 # Test the binary
 lrm --version
@@ -301,20 +288,7 @@ man lrm
 
 # Test shell completion
 complete -p lrm
-
-# Remove
-sudo apt remove lrm
-```
-
-**Test self-contained package:**
-
-```bash
-# On system WITHOUT .NET runtime
-wget https://github.com/nickprotop/LocalizationManager/releases/download/v0.6.12/lrm-standalone_0.6.12-1_amd64.deb
-sudo apt install ./lrm-standalone_0.6.12-1_amd64.deb
-
-# Should NOT require dotnet-runtime
-lrm --version
+lrm <Tab><Tab>
 
 # Remove
 sudo apt remove lrm-standalone
@@ -330,10 +304,10 @@ sudo add-apt-repository ppa:nickprotop/lrm-tool
 sudo apt update
 
 # Check available versions
-apt-cache policy lrm
+apt-cache policy lrm-standalone
 
 # Install
-sudo apt install lrm
+sudo apt install lrm-standalone
 
 # Test
 lrm --version
@@ -342,7 +316,7 @@ lrm --version
 sudo apt update && sudo apt upgrade
 
 # Remove
-sudo apt remove lrm
+sudo apt remove lrm-standalone
 sudo add-apt-repository --remove ppa:nickprotop/lrm-tool
 ```
 
@@ -351,11 +325,14 @@ sudo add-apt-repository --remove ppa:nickprotop/lrm-tool
 If you have ARM64 hardware (Raspberry Pi, ARM server):
 
 ```bash
-# Build for ARM64
-./build.sh --deb --arch arm64
+# Build binaries first
+./build.sh
+
+# Build ARM64 .deb package
+./build-deb.sh arm64
 
 # Install and test
-sudo apt install ./publish/deb/lrm_*_arm64.deb
+sudo apt install ./publish/deb/lrm-standalone_*_arm64.deb
 lrm --version
 ```
 
@@ -415,19 +392,11 @@ debsign -k nikolaos.protopapas@gmail.com lrm_*_source.changes
 
 ### Package Installation Errors
 
-**Error: "Dependency is not satisfiable: dotnet-runtime-9.0"**
+**Error: "Package not found: lrm-standalone"**
 
-- The Ubuntu version doesn't have .NET 9.0 in repos
-- Install .NET manually or use `lrm-standalone` package
-
-**Error: "lrm conflicts with lrm-standalone"**
-
-- Both packages provide `/usr/bin/lrm`
-- Remove one before installing the other:
-  ```bash
-  sudo apt remove lrm
-  sudo apt install lrm-standalone
-  ```
+- Make sure you added the PPA: `sudo add-apt-repository ppa:nickprotop/lrm-tool`
+- Update package list: `sudo apt update`
+- Or download directly from GitHub Releases
 
 ---
 
@@ -442,8 +411,6 @@ debian/
 ├── control            # Package metadata and dependencies
 ├── copyright          # License information (MIT)
 ├── rules              # Build script (executable makefile)
-├── lrm.install        # File mappings for lrm package
-├── lrm-standalone.install  # File mappings for lrm-standalone
 ├── source/
 │   └── format         # Source package format (3.0 quilt)
 └── .gitignore         # Ignore build artifacts
@@ -452,15 +419,13 @@ debian/
 ### Key Files
 
 **debian/control:**
-- Defines two binary packages: `lrm` and `lrm-standalone`
-- `lrm` depends on `dotnet-runtime-9.0`
-- `lrm-standalone` has no dependencies
+- Defines one binary package: `lrm-standalone`
+- No .NET runtime dependencies
 
 **debian/rules:**
-- Builds both variants using `dotnet publish`
-- Framework-dependent: `--self-contained false`
-- Self-contained: `--self-contained true`
-- Installs binary, man page, completions
+- Builds self-contained variant using `dotnet publish`
+- Uses `--self-contained true` to bundle .NET runtime
+- Installs binary, man page, and shell completions
 
 **debian/changelog:**
 - Must be updated for each release
@@ -469,16 +434,12 @@ debian/
 
 ### File Mappings
 
-**lrm package installs:**
-- `/usr/bin/lrm` - Main binary (framework-dependent)
+**lrm-standalone package installs:**
+- `/usr/bin/lrm` - Main binary (self-contained with .NET runtime)
 - `/usr/share/man/man1/lrm.1.gz` - Man page
 - `/usr/share/bash-completion/completions/lrm` - Bash completion
 - `/usr/share/zsh/site-functions/_lrm` - Zsh completion
 - `/usr/share/doc/lrm/` - Documentation
-
-**lrm-standalone package installs:**
-- `/usr/bin/lrm` - Main binary (self-contained with .NET runtime)
-- Same man page and completions as above
 
 ---
 

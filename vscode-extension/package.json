@@ -4,7 +4,6 @@
   "description": "Manage .NET .resx localization files with real-time validation, translation, and code scanning",
   "version": "0.1.0",
   "publisher": "localization-manager",
-  "icon": "icon.png",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -181,7 +180,14 @@
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
     "package": "vsce package",
-    "bundle-binaries": "bash ../scripts/bundle-extension-binaries.sh"
+    "bundle-binaries": "bash ../scripts/bundle-extension-binaries.sh",
+    "package:win32-x64": "bash ../scripts/package-extension.sh win32-x64",
+    "package:win32-arm64": "bash ../scripts/package-extension.sh win32-arm64",
+    "package:linux-x64": "bash ../scripts/package-extension.sh linux-x64",
+    "package:linux-arm64": "bash ../scripts/package-extension.sh linux-arm64",
+    "package:darwin-x64": "bash ../scripts/package-extension.sh darwin-x64",
+    "package:darwin-arm64": "bash ../scripts/package-extension.sh darwin-arm64",
+    "package:all": "bash ../scripts/package-all-platforms.sh"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
