@@ -2,7 +2,7 @@
   "name": "localization-manager",
   "displayName": "Localization Manager",
   "description": "Manage .NET .resx localization files with real-time validation, translation, and code scanning",
-  "version": "0.6.17",
+  "version": "0.6.18",
   "icon": "images/icon.png",
   "publisher": "nickprotop",
   "repository": {
