@@ -22,7 +22,7 @@ echo ""
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
@@ -55,7 +55,7 @@ for platform in "${PLATFORMS[@]}"; do
     echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
     echo ""
 
-    if ./scripts/package-extension.sh "$platform"; then
+    if ./vscode-extension/scripts/package.sh "$platform"; then
         SUCCESSFUL+=("$platform")
         echo -e "${GREEN}✓${NC} $platform packaged successfully"
     else

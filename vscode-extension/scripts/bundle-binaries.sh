@@ -6,10 +6,14 @@
 # Copies platform-specific binaries into vscode-extension/bin/
 #
 # Usage:
-#   ./bundle-extension-binaries.sh                    # Bundle all platforms
-#   ./bundle-extension-binaries.sh --target linux-x64 # Bundle only linux-x64
+#   ./bundle-binaries.sh                    # Bundle all platforms
+#   ./bundle-binaries.sh --target linux-x64 # Bundle only linux-x64
 
 set -e
+
+# Get script directory (works even when called via symlink or from other directory)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -40,8 +44,8 @@ echo -e "${BLUE}║      Bundling LRM Binaries for VS Code Extension            
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-PUBLISH_DIR="publish"
-EXTENSION_BIN_DIR="vscode-extension/bin"
+PUBLISH_DIR="$PROJECT_ROOT/publish"
+EXTENSION_BIN_DIR="$PROJECT_ROOT/vscode-extension/bin"
 
 # Check if publish directory exists
 if [ ! -d "$PUBLISH_DIR" ]; then

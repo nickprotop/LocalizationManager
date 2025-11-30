@@ -86,10 +86,8 @@ jobs:
 
       - name: Build platform-specific extensions
         run: |
-          # Compile TypeScript
           cd vscode-extension
           npm run compile
-          cd ..
 
           # Package for each platform (each gets its own binary bundled)
           for platform in win32-x64 win32-arm64 linux-x64 linux-arm64 darwin-x64 darwin-arm64; do
@@ -97,18 +95,16 @@ jobs:
             echo "Packaging for $platform"
             echo "══════════════════════════════════════════════════════"
 
-            # Bundle only this platform's binary (run from project root)
-            ./scripts/bundle-extension-binaries.sh --target $platform
+            # Bundle only this platform's binary
+            ./scripts/bundle-binaries.sh --target $platform
 
             # Package with platform target
-            cd vscode-extension
             npx vsce package --target $platform
-            cd ..
           done
 
           echo ""
           echo "Generated VSIX files:"
-          ls -la vscode-extension/*.vsix
+          ls -la *.vsix
 
       - name: Publish to VS Code Marketplace
         env:

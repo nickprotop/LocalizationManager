@@ -34,7 +34,7 @@ echo ""
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
@@ -80,7 +80,7 @@ fi
 # Step 2: Bundle the platform-specific binary
 echo ""
 echo -e "${YELLOW}►${NC} Bundling binary for $PLATFORM..."
-./scripts/bundle-extension-binaries.sh --target $PLATFORM
+./vscode-extension/scripts/bundle-binaries.sh --target $PLATFORM
 
 # Step 3: Compile TypeScript
 echo ""
