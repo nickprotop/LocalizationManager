@@ -1,0 +1,24 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "compile",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$tsc",
+      "label": "npm: compile",
+      "detail": "tsc -p ./"
+    },
+    {
+      "type": "npm",
+      "script": "watch",
+      "problemMatcher": "$tsc-watch",
+      "isBackground": true,
+      "label": "npm: watch",
+      "detail": "tsc -watch -p ./"
+    }
+  ]
+}
