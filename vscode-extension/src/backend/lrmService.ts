@@ -168,6 +168,8 @@ export class LrmService {
             // Windows
             if (arch === 'x64') {
                 binaryName = 'win32-x64/lrm.exe';
+            } else if (arch === 'arm64') {
+                binaryName = 'win32-arm64/lrm.exe';
             } else {
                 throw new Error(`Unsupported Windows architecture: ${arch}`);
             }
