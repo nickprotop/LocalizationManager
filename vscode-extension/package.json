@@ -128,6 +128,42 @@
           "type": "boolean",
           "default": false,
           "description": "Auto-open browser when starting web UI"
+        },
+        "lrm.scanCSharp": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include C# files (.cs) in code scanning"
+        },
+        "lrm.scanRazor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include Razor files (.razor, .cshtml) in code scanning"
+        },
+        "lrm.scanXaml": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include XAML files (.xaml) in code scanning"
+        },
+        "lrm.resourceClasses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["Resources", "Strings", "Labels", "Messages"],
+          "description": "Resource class names to detect in code"
+        },
+        "lrm.localizationMethods": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["GetString", "GetLocalizedString", "Translate", "L", "T"],
+          "description": "Localization method names to detect in code"
+        },
+        "lrm.enablePlaceholderValidation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable validation of placeholders in resource strings"
         }
       }
     },
