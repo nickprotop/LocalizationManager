@@ -1,0 +1,199 @@
+{
+  "name": "localization-manager",
+  "displayName": "Localization Manager",
+  "description": "Manage .NET .resx localization files with real-time validation, translation, and code scanning",
+  "version": "0.1.0",
+  "publisher": "localization-manager",
+  "icon": "icon.png",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "localization",
+    "resx",
+    "i18n",
+    "translation",
+    "dotnet",
+    "csharp"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/*.resx"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "lrm.scanCode",
+        "title": "LRM: Scan Code for Localization Keys"
+      },
+      {
+        "command": "lrm.validateResources",
+        "title": "LRM: Validate Resources"
+      },
+      {
+        "command": "lrm.openResourceEditor",
+        "title": "LRM: Open Resource Editor"
+      },
+      {
+        "command": "lrm.addKey",
+        "title": "LRM: Add Key"
+      },
+      {
+        "command": "lrm.translateMissing",
+        "title": "LRM: Translate Missing Values"
+      },
+      {
+        "command": "lrm.refreshResourceTree",
+        "title": "LRM: Refresh Resource Tree"
+      },
+      {
+        "command": "lrm.setResourcePath",
+        "title": "LRM: Set Resource Path"
+      },
+      {
+        "command": "lrm.restartBackend",
+        "title": "LRM: Restart Backend"
+      },
+      {
+        "command": "lrm.findUnusedKeys",
+        "title": "LRM: Find Unused Keys"
+      },
+      {
+        "command": "lrm.exportResources",
+        "title": "LRM: Export Resources"
+      },
+      {
+        "command": "lrm.importResources",
+        "title": "LRM: Import Resources"
+      },
+      {
+        "command": "lrm.showLogs",
+        "title": "LRM: Show Backend Logs"
+      },
+      {
+        "command": "lrm.openDashboard",
+        "title": "LRM: Open Dashboard"
+      },
+      {
+        "command": "lrm.openSettings",
+        "title": "LRM: Open Settings"
+      }
+    ],
+    "configuration": {
+      "title": "Localization Manager",
+      "properties": {
+        "lrm.resourcePath": {
+          "type": "string",
+          "default": null,
+          "description": "Path to .resx resources folder (auto-detected if not set)"
+        },
+        "lrm.enableRealtimeScan": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable real-time code scanning as you type (debounced 500ms)"
+        },
+        "lrm.scanOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scan code files for missing localization keys on save"
+        },
+        "lrm.translationProvider": {
+          "type": "string",
+          "enum": [
+            "google",
+            "azure",
+            "aws",
+            "deepl",
+            "openai",
+            "anthropic",
+            "lingva",
+            "mymemory"
+          ],
+          "default": "lingva",
+          "description": "Default translation provider"
+        },
+        "lrm.autoOpenBrowser": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-open browser when starting web UI"
+        }
+      }
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "lrmResourceTree",
+          "name": "Localization Resources",
+          "when": "lrm.hasResources"
+        }
+      ]
+    },
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "lrm.addKey",
+          "when": "view == lrmResourceTree"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "lrm.scanCode"
+        },
+        {
+          "command": "lrm.validateResources"
+        },
+        {
+          "command": "lrm.openResourceEditor"
+        },
+        {
+          "command": "lrm.addKey"
+        },
+        {
+          "command": "lrm.translateMissing"
+        },
+        {
+          "command": "lrm.setResourcePath"
+        },
+        {
+          "command": "lrm.restartBackend"
+        },
+        {
+          "command": "lrm.findUnusedKeys"
+        },
+        {
+          "command": "lrm.exportResources"
+        },
+        {
+          "command": "lrm.importResources"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "bundle-binaries": "bash ../scripts/bundle-extension-binaries.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vscode/test-electron": "^2.3.0",
+    "eslint": "^8.40.0",
+    "typescript": "^5.0.0",
+    "@vscode/vsce": "^2.20.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}
