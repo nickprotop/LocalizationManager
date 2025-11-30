@@ -28,6 +28,7 @@ export async function activate(context: vscode.ExtensionContext) {
     lrmService = new LrmService({
         extensionPath: context.extensionPath
     });
+    context.subscriptions.push(lrmService);  // Register for automatic disposal
 
     try {
         // Start backend
@@ -173,7 +174,6 @@ function setupEventListeners(context: vscode.ExtensionContext, enableRealtimeSca
     );
 
     outputChannel.appendLine('=== Extension activation complete ===');
-    outputChannel.show(); // Auto-show the output panel
 
     // Listen for .resx file changes
     const resxWatcher = vscode.workspace.createFileSystemWatcher('**/*.resx');
@@ -736,7 +736,7 @@ function registerCommands(context: vscode.ExtensionContext) {
     );
 }
 
-export async function deactivate() {
+export function deactivate() {
     // Clean up diagnostic providers
     if (codeDiagnostics) {
         codeDiagnostics.dispose();
@@ -746,8 +746,8 @@ export async function deactivate() {
         resxDiagnostics.dispose();
     }
 
-    // Stop backend service
+    // Synchronous kill - VS Code doesn't wait for async deactivate
     if (lrmService) {
-        await lrmService.stop();
+        lrmService.dispose();
     }
 }

@@ -10,7 +10,7 @@ export interface LrmServiceConfig {
     resourcePath?: string;
 }
 
-export class LrmService {
+export class LrmService implements vscode.Disposable {
     private process: ChildProcess | null = null;
     private port: number = 0;
     private extensionPath: string;
@@ -151,6 +151,19 @@ export class LrmService {
     public async restart(): Promise<void> {
         await this.stop();
         await this.start();
+    }
+
+    // Synchronous dispose for VS Code's disposal mechanism
+    // Used when VS Code closes and doesn't wait for async deactivate
+    public dispose(): void {
+        if (this.process && !this.process.killed) {
+            this.process.kill('SIGKILL');
+        }
+        if (this.healthCheckInterval) {
+            clearInterval(this.healthCheckInterval);
+            this.healthCheckInterval = null;
+        }
+        this.cleanup();
     }
 
     private cleanup(): void {
