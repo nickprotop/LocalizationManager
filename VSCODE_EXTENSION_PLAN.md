@@ -5,12 +5,14 @@
 
 **Estimated Timeline**: 8 weeks (solo) / 4 weeks (team of 2)
 
-**Last Updated**: 2025-11-29
+**Last Updated**: 2025-11-30
 
 **Recent Updates**:
-- ✅ **Single-File Scan API Implemented** - Backend now supports scanning individual files via `POST /api/scan/file` endpoint
+- ✅ **Content-Based Scanning Implemented** - Backend now supports scanning in-memory content via optional `content` parameter in `POST /api/scan/file`
+- ✅ **Live Diagnostics Working** - VS Code extension now scans unsaved file changes in real-time (500ms debounce)
+- ✅ **Single-File Scan API Implemented** - Backend supports scanning individual files via `POST /api/scan/file` endpoint
 - ✅ **CLI Single-File Scan** - Added `--file` option to `lrm scan` command for per-file validation
-- ✅ Ready for VS Code extension integration with real-time diagnostics
+- ✅ **PatternMatcher Refactored** - All scanners (C#, Razor, XAML) now support both file and content-based scanning
 
 ---
 
@@ -81,10 +83,10 @@
 
 | Phase | Duration | Status | Focus Area |
 |-------|----------|--------|------------|
-| [Phase 1](#phase-1-foundation-week-1-2) | Week 1-2 | ⬜ Not Started | Foundation & Backend Integration |
-| [Phase 2](#phase-2-core-features-week-3-4) | Week 3-4 | ⬜ Not Started | Core Features & Language Support |
-| [Phase 3](#phase-3-advanced-features-week-5-6) | Week 5-6 | ⬜ Not Started | Advanced Features |
-| [Phase 4](#phase-4-polish--release-week-7-8) | Week 7-8 | ⬜ Not Started | Polish & Release |
+| [Phase 1](#phase-1-foundation-week-1-2) | Week 1-2 | ✅ Completed | Foundation & Backend Integration |
+| [Phase 2](#phase-2-core-features-week-3-4) | Week 3-4 | 🔄 In Progress | Core Features & Language Support |
+| [Phase 3](#phase-3-advanced-features-week-5-6) | Week 5-6 | 🔄 In Progress | Advanced Features |
+| [Phase 4](#phase-4-polish--release-week-7-8) | Week 7-8 | 🔄 In Progress | Polish & Release |
 
 **Legend**: ⬜ Not Started | 🔄 In Progress | ✅ Completed | ⚠️ Blocked | ❌ Cancelled
 
@@ -160,7 +162,7 @@
 ---
 
 ### 1.2 Backend Integration - LRM Service Manager
-**Status**: ⬜ Not Started | **Estimated**: 8 hours
+**Status**: ✅ Completed | **Estimated**: 8 hours
 
 **File**: `src/backend/lrmService.ts`
 
@@ -274,7 +276,7 @@ getBaseUrl(): string {
 ---
 
 ### 1.3 API Client Generation
-**Status**: ⬜ Not Started | **Estimated**: 6 hours
+**Status**: ✅ Completed | **Estimated**: 6 hours
 
 **File**: `src/backend/apiClient.ts`
 
@@ -606,9 +608,9 @@ class CliRunner {
 **Goal**: Implement diagnostics, validation, and basic editing
 
 ### 2.1 Diagnostics Provider - Inline Validation
-**Status**: ⬜ Not Started | **Estimated**: 10 hours
+**Status**: ✅ Completed | **Estimated**: 10 hours
 
-**File**: `src/providers/diagnostics.ts`
+**File**: `src/providers/codeDiagnostics.ts`, `src/providers/resxDiagnostics.ts`
 
 - [ ] Implement `DiagnosticProvider`
   - [ ] Register for `.resx` files
@@ -843,9 +845,9 @@ class ResourceExplorer implements TreeDataProvider<ResourceNode> {
 ---
 
 ### 2.6 Key Editor WebView Panel
-**Status**: ⬜ Not Started | **Estimated**: 16 hours
+**Status**: ✅ Completed | **Estimated**: 16 hours
 
-**File**: `src/views/editorPanel.ts`, `src/webview/editor.html`
+**File**: `src/views/resourceEditor.ts`
 
 - [ ] Create WebView panel for editing keys
   - [ ] Multi-language editor (all languages side-by-side)
