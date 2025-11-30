@@ -106,9 +106,15 @@ public class ScanController : ControllerBase
 
             var filePath = Path.GetFullPath(request.FilePath);
 
-            if (!System.IO.File.Exists(filePath))
+            // If content is provided, use it; otherwise read from disk
+            string? fileContent = request.Content;
+
+            if (fileContent == null)
             {
-                return NotFound(new ErrorResponse { Error = $"File not found: {filePath}" });
+                if (!System.IO.File.Exists(filePath))
+                {
+                    return NotFound(new ErrorResponse { Error = $"File not found: {filePath}" });
+                }
             }
 
             var languages = _discovery.DiscoverLanguages(_resourcePath);
@@ -120,8 +126,10 @@ public class ScanController : ControllerBase
                 return StatusCode(500, new ErrorResponse { Error = "No default language file found" });
             }
 
-            // Scan the single file (returns same ScanResult as full scan, but with FilesScanned=1)
-            var result = _scanner.ScanSingleFile(filePath, resourceFiles, false, null, null);
+            // Scan the single file with optional content override
+            var result = fileContent != null
+                ? _scanner.ScanSingleFileContent(filePath, fileContent, resourceFiles, false, null, null)
+                : _scanner.ScanSingleFile(filePath, resourceFiles, false, null, null);
 
             // Return same response format as full scan
             return Ok(new ScanResponse

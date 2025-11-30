@@ -28,32 +28,44 @@ public class CSharpScanner : PatternMatcher
         List<string>? resourceClassNames = null,
         List<string>? localizationMethods = null)
     {
-        var references = new List<KeyReference>();
         var originalContent = ReadFileContent(filePath);
+        return ScanContent(filePath, originalContent, strictMode, resourceClassNames, localizationMethods);
+    }
 
-        if (string.IsNullOrEmpty(originalContent))
+    public override List<KeyReference> ScanContent(
+        string filePath,
+        string content,
+        bool strictMode = false,
+        List<string>? resourceClassNames = null,
+        List<string>? localizationMethods = null)
+    {
+        var references = new List<KeyReference>();
+
+        if (string.IsNullOrEmpty(content))
             return references;
 
+        var originalContent = content;
+
         // Remove comments to avoid false positives
-        var content = RemoveComments(originalContent);
+        var cleanedContent = RemoveComments(originalContent);
 
         // Use provided configuration or defaults
         var classNames = resourceClassNames ?? DefaultResourceClassNames.ToList();
         var methodNames = localizationMethods ?? DefaultLocalizationMethods.ToList();
 
         // Scan for property access patterns (e.g., Resources.SaveButton)
-        ScanPropertyAccess(content, originalContent, filePath, references, classNames);
+        ScanPropertyAccess(cleanedContent, originalContent, filePath, references, classNames);
 
         // Scan for GetString patterns
-        ScanGetStringCalls(content, originalContent, filePath, references, methodNames);
+        ScanGetStringCalls(cleanedContent, originalContent, filePath, references, methodNames);
 
         // Scan for indexer patterns
-        ScanIndexerAccess(content, originalContent, filePath, references);
+        ScanIndexerAccess(cleanedContent, originalContent, filePath, references);
 
         // Scan for dynamic patterns (unless strict mode)
         if (!strictMode)
         {
-            ScanDynamicPatterns(content, originalContent, filePath, references, methodNames);
+            ScanDynamicPatterns(cleanedContent, originalContent, filePath, references, methodNames);
         }
 
         return references;

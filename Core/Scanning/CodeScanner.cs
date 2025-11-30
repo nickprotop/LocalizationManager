@@ -220,6 +220,114 @@ public class CodeScanner
         return result;
     }
 
+    /// <summary>
+    /// Scan file content (string) for localization key references
+    /// </summary>
+    /// <param name="filePath">Path to the file (used for extension detection and KeyReference.FilePath)</param>
+    /// <param name="content">The file content to scan</param>
+    /// <param name="resourceFiles">Resource files to compare against</param>
+    /// <param name="strictMode">If true, only include high-confidence matches</param>
+    /// <param name="resourceClassNames">Custom resource class names to detect</param>
+    /// <param name="localizationMethods">Custom localization method names to detect</param>
+    /// <returns>Scan result (same format as full scan, but for single file)</returns>
+    public ScanResult ScanSingleFileContent(
+        string filePath,
+        string content,
+        List<ResourceFile> resourceFiles,
+        bool strictMode = false,
+        List<string>? resourceClassNames = null,
+        List<string>? localizationMethods = null)
+    {
+        var result = new ScanResult
+        {
+            SourcePath = Path.GetDirectoryName(filePath) ?? string.Empty,
+            ResourcePath = Path.GetDirectoryName(resourceFiles.First().Language.FilePath) ?? string.Empty,
+            FilesScanned = 1
+        };
+
+        // Get all keys from resource files
+        var resourceKeys = GetAllResourceKeys(resourceFiles);
+
+        // Detect file type and get appropriate scanner
+        var extension = Path.GetExtension(filePath);
+        var scanner = _scanners.FirstOrDefault(s => s.SupportedExtensions.Contains(extension));
+
+        if (scanner == null)
+        {
+            // Unsupported file type - return empty result
+            return result;
+        }
+
+        try
+        {
+            // Scan the content
+            var allReferences = scanner.ScanContent(filePath, content, strictMode, resourceClassNames, localizationMethods);
+            result.TotalReferences = allReferences.Count;
+
+            // Separate dynamic keys from regular keys
+            var dynamicReferences = allReferences.Where(r => r.Key == "<dynamic>").ToList();
+            var regularReferences = allReferences.Where(r => r.Key != "<dynamic>").ToList();
+
+            // Group regular references by key
+            var keyGroups = regularReferences
+                .GroupBy(r => r.Key)
+                .ToList();
+
+            result.UniqueKeysFound = keyGroups.Count;
+
+            // Create key usage information for regular keys
+            foreach (var group in keyGroups)
+            {
+                var key = group.Key;
+                var references = group.ToList();
+
+                var usage = new KeyUsage
+                {
+                    Key = key,
+                    ReferenceCount = references.Count,
+                    References = references,
+                    ExistsInResources = resourceKeys.Contains(key),
+                    DefinedInLanguages = GetLanguagesForKey(resourceFiles, key)
+                };
+
+                result.AllKeyUsages.Add(usage);
+
+                // Track missing keys (in code, not in resources)
+                if (!usage.ExistsInResources)
+                {
+                    result.MissingKeys.Add(usage);
+                }
+            }
+
+            // Add dynamic keys as a single group if any exist
+            if (dynamicReferences.Any())
+            {
+                var dynamicUsage = new KeyUsage
+                {
+                    Key = "<dynamic>",
+                    ReferenceCount = dynamicReferences.Count,
+                    References = dynamicReferences,
+                    ExistsInResources = false,
+                    DefinedInLanguages = new List<string>()
+                };
+
+                result.AllKeyUsages.Add(dynamicUsage);
+            }
+
+            // For single file scan, we don't calculate unused keys (would need full codebase scan)
+            result.UnusedKeys = new List<string>();
+
+            // Count warnings
+            result.WarningCount = allReferences.Count(r => r.Confidence == ConfidenceLevel.Low);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Error scanning {filePath}: {ex.Message}");
+        }
+
+        return result;
+    }
+
     private List<KeyReference> ScanFiles(
         List<string> sourceFiles,
         bool strictMode,

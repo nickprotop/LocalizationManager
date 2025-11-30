@@ -55,6 +55,7 @@ public class KeyReferencesResponse
 public class FileScanRequest
 {
     public string FilePath { get; set; } = string.Empty;
+    public string? Content { get; set; }  // Optional: if provided, scan this content instead of reading from disk
 }
 
 // Note: Single file scan uses the same ScanResponse as full codebase scan

@@ -33,8 +33,18 @@ public class RazorScanner : PatternMatcher
         List<string>? resourceClassNames = null,
         List<string>? localizationMethods = null)
     {
-        var references = new List<KeyReference>();
         var content = ReadFileContent(filePath);
+        return ScanContent(filePath, content, strictMode, resourceClassNames, localizationMethods);
+    }
+
+    public override List<KeyReference> ScanContent(
+        string filePath,
+        string content,
+        bool strictMode = false,
+        List<string>? resourceClassNames = null,
+        List<string>? localizationMethods = null)
+    {
+        var references = new List<KeyReference>();
 
         if (string.IsNullOrEmpty(content))
             return references;

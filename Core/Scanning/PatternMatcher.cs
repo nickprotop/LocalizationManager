@@ -22,6 +22,22 @@ public abstract class PatternMatcher
         List<string>? localizationMethods = null);
 
     /// <summary>
+    /// Scan file content (string) for localization key references
+    /// </summary>
+    /// <param name="filePath">Path to the file (used for extension detection and KeyReference.FilePath)</param>
+    /// <param name="content">The file content to scan</param>
+    /// <param name="strictMode">If true, only match high-confidence static references</param>
+    /// <param name="resourceClassNames">Optional list of resource class names to detect</param>
+    /// <param name="localizationMethods">Optional list of localization method names to detect</param>
+    /// <returns>List of key references found in the content</returns>
+    public abstract List<KeyReference> ScanContent(
+        string filePath,
+        string content,
+        bool strictMode = false,
+        List<string>? resourceClassNames = null,
+        List<string>? localizationMethods = null);
+
+    /// <summary>
     /// Get file extensions supported by this pattern matcher
     /// </summary>
     public abstract string[] SupportedExtensions { get; }
