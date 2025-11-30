@@ -456,10 +456,13 @@ export class LrmService implements vscode.Disposable {
             return null;
         }
 
-        // Search for .resx files in workspace
+        // Search for .resx files in workspace, excluding common non-source directories
+        // - .lrm/backups: LRM backup files
+        // - node_modules: npm packages
+        // - bin/obj: .NET build outputs (may contain copied .resx files)
         const resxFiles = await vscode.workspace.findFiles(
             '**/*.resx',
-            '**/node_modules/**',
+            '{**/.lrm/**,**/node_modules/**,**/bin/**,**/obj/**}',
             10 // Limit to 10 files for performance
         );
 

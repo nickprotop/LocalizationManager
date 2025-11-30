@@ -161,6 +161,26 @@ export interface SearchResponse {
     appliedFilterMode: string;
 }
 
+// Credentials API types
+export interface CredentialProviderInfo {
+    provider: string;
+    displayName: string;
+    requiresApiKey: boolean;
+    source: 'environment' | 'secure_store' | 'config_file' | null;
+    isConfigured: boolean;
+}
+
+export interface CredentialProvidersResponse {
+    providers: CredentialProviderInfo[];
+    useSecureCredentialStore: boolean;
+}
+
+export interface ProviderTestResponse {
+    success: boolean;
+    provider: string;
+    message: string;
+}
+
 export class ApiClient {
     private client: AxiosInstance;
 
@@ -330,5 +350,36 @@ export class ApiClient {
             key: keyName,
             mergeAll: false
         });
+    }
+
+    // Credentials API
+    async getCredentialProviders(): Promise<CredentialProvidersResponse> {
+        const response = await this.client.get('/api/credentials/providers');
+        return response.data;
+    }
+
+    async setApiKey(provider: string, apiKey: string): Promise<{ success: boolean; message: string }> {
+        const response = await this.client.put(`/api/credentials/${encodeURIComponent(provider)}`, { apiKey });
+        return response.data;
+    }
+
+    async deleteApiKey(provider: string): Promise<{ success: boolean; message: string }> {
+        const response = await this.client.delete(`/api/credentials/${encodeURIComponent(provider)}`);
+        return response.data;
+    }
+
+    async getApiKeySource(provider: string): Promise<{ provider: string; source: string | null; isConfigured: boolean }> {
+        const response = await this.client.get(`/api/credentials/${encodeURIComponent(provider)}/source`);
+        return response.data;
+    }
+
+    async testProvider(provider: string): Promise<ProviderTestResponse> {
+        const response = await this.client.post(`/api/credentials/${encodeURIComponent(provider)}/test`);
+        return response.data;
+    }
+
+    async setSecureStoreEnabled(enabled: boolean): Promise<{ success: boolean; message: string }> {
+        const response = await this.client.put('/api/credentials/secure-store', { enabled });
+        return response.data;
     }
 }

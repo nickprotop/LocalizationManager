@@ -600,6 +600,141 @@ Merge duplicate occurrences of a key.
 
 ---
 
+### Credentials
+
+Manage API keys securely using the encrypted credential store.
+
+#### List Providers with Status
+```
+GET /api/credentials/providers
+```
+Get all translation providers with their credential configuration status.
+
+**Response:**
+```json
+{
+  "providers": [
+    {
+      "provider": "google",
+      "displayName": "Google Cloud Translation",
+      "requiresApiKey": true,
+      "source": "secure_store",
+      "isConfigured": true
+    },
+    {
+      "provider": "openai",
+      "displayName": "OpenAI",
+      "requiresApiKey": true,
+      "source": "environment",
+      "isConfigured": true
+    },
+    {
+      "provider": "lingva",
+      "displayName": "Lingva Translate",
+      "requiresApiKey": false,
+      "source": null,
+      "isConfigured": true
+    }
+  ],
+  "useSecureCredentialStore": true
+}
+```
+
+**Source Values:**
+- `environment`: API key from environment variable (`LRM_GOOGLE_API_KEY`, etc.)
+- `secure_store`: API key from encrypted credential store
+- `config_file`: API key from `lrm.json` (plain text)
+- `null`: No API key configured
+
+#### Set API Key
+```
+PUT /api/credentials/{provider}
+```
+Store an API key in the secure credential store (AES-256 encrypted).
+
+**Request Body:**
+```json
+{
+  "apiKey": "sk-your-api-key-here"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "API key for google stored securely"
+}
+```
+
+#### Delete API Key
+```
+DELETE /api/credentials/{provider}
+```
+Remove an API key from the secure credential store.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "API key for google removed from secure store"
+}
+```
+
+#### Get API Key Source
+```
+GET /api/credentials/{provider}/source
+```
+Get where an API key is configured (without revealing the actual key).
+
+**Response:**
+```json
+{
+  "provider": "google",
+  "source": "secure_store",
+  "isConfigured": true
+}
+```
+
+#### Test Provider
+```
+POST /api/credentials/{provider}/test
+```
+Test provider connection by performing a sample translation.
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "provider": "google",
+  "message": "Connection successful! Test translation: 'Hello' -> 'Hola'"
+}
+```
+
+**Response (Failure):**
+```json
+{
+  "success": false,
+  "provider": "google",
+  "message": "Authentication failed - check your API key"
+}
+```
+
+#### Enable/Disable Secure Store
+```
+PUT /api/credentials/secure-store
+```
+Enable or disable the secure credential store in configuration.
+
+**Request Body:**
+```json
+{
+  "enabled": true
+}
+```
+
+---
+
 ## Swagger UI
 
 Interactive API documentation is available at:

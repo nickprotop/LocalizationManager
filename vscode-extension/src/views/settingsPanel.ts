@@ -64,15 +64,62 @@ export class SettingsPanel {
     }
 
     private async testProvider(provider: string): Promise<void> {
-        vscode.window.showInformationMessage(`Testing ${provider} provider...`);
-        // TODO: Implement provider testing
-        // This would call the API to test the translation provider with the configured API key
+        try {
+            vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: `Testing ${provider} provider...`,
+                cancellable: false
+            }, async () => {
+                const result = await this.apiClient.testProvider(provider);
+                if (result.success) {
+                    vscode.window.showInformationMessage(result.message);
+                } else {
+                    vscode.window.showWarningMessage(result.message);
+                }
+            });
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to test provider: ${error.message}`);
+        }
     }
 
     private async saveSettings(settings: any): Promise<void> {
         const config = vscode.workspace.getConfiguration('lrm');
 
         try {
+            // Handle secure credential store toggle change
+            if (settings.useSecureCredentialStore !== undefined) {
+                try {
+                    await this.apiClient.setSecureStoreEnabled(settings.useSecureCredentialStore);
+                } catch (error) {
+                    // Continue even if this fails
+                }
+            }
+
+            // Save API keys to secure store if enabled and keys were provided
+            if (settings.useSecureCredentialStore && settings.apiKeys) {
+                const providerMap: { [key: string]: string } = {
+                    'Google': 'google',
+                    'Deepl': 'deepl',
+                    'Openai': 'openai',
+                    'Claude': 'claude',
+                    'Azureopenai': 'azureopenai',
+                    'Azure': 'azuretranslator'
+                };
+
+                for (const [inputKey, providerName] of Object.entries(providerMap)) {
+                    const apiKey = settings.apiKeys[inputKey];
+                    if (apiKey && apiKey.trim().length > 0) {
+                        try {
+                            await this.apiClient.setApiKey(providerName, apiKey);
+                        } catch (error: any) {
+                            vscode.window.showWarningMessage(`Failed to save ${providerName} API key: ${error.message}`);
+                        }
+                    }
+                }
+                // Clear apiKeys from settings so they don't get saved to lrm.json
+                settings.apiKeys = {};
+            }
+
             // Build complete lrm.json configuration
             const lrmConfig: any = {
                 DefaultLanguageCode: settings.defaultLanguageCode || undefined,
@@ -81,6 +128,7 @@ export class SettingsPanel {
                     MaxRetries: settings.maxRetries,
                     TimeoutSeconds: settings.timeoutSeconds,
                     BatchSize: settings.batchSize,
+                    UseSecureCredentialStore: settings.useSecureCredentialStore,
                     AIProviders: {}
                 },
                 Scanning: {
@@ -93,8 +141,8 @@ export class SettingsPanel {
                 }
             };
 
-            // Add API keys if provided
-            if (settings.apiKeys && Object.keys(settings.apiKeys).length > 0) {
+            // Add API keys to config only if NOT using secure store
+            if (!settings.useSecureCredentialStore && settings.apiKeys && Object.keys(settings.apiKeys).length > 0) {
                 lrmConfig.Translation.ApiKeys = settings.apiKeys;
             }
 
@@ -204,6 +252,20 @@ export class SettingsPanel {
                 // lrm.json doesn't exist yet, will use defaults
             }
 
+            // Get credential provider status (sources for API keys)
+            let credentialInfo: any = { providers: [], useSecureCredentialStore: false };
+            try {
+                credentialInfo = await this.apiClient.getCredentialProviders();
+            } catch (error) {
+                // Credentials API not available, continue with defaults
+            }
+
+            // Build a map of provider -> source
+            const credentialSources: { [key: string]: string | null } = {};
+            for (const p of credentialInfo.providers || []) {
+                credentialSources[p.provider.toLowerCase()] = p.source;
+            }
+
             const vscodeConfig = vscode.workspace.getConfiguration('lrm');
 
             const settings = {
@@ -214,6 +276,9 @@ export class SettingsPanel {
                 maxRetries: lrmConfig?.Translation?.MaxRetries ?? 3,
                 timeoutSeconds: lrmConfig?.Translation?.TimeoutSeconds ?? 30,
                 batchSize: lrmConfig?.Translation?.BatchSize ?? 10,
+                // Secure credential store
+                useSecureCredentialStore: credentialInfo.useSecureCredentialStore || lrmConfig?.Translation?.UseSecureCredentialStore || false,
+                credentialSources: credentialSources,
                 // Scanning
                 resourceClasses: lrmConfig?.Scanning?.ResourceClassNames || vscodeConfig.get('resourceClasses', ['Resources', 'Strings', 'AppResources']),
                 localizationMethods: lrmConfig?.Scanning?.LocalizationMethods || vscodeConfig.get('localizationMethods', ['GetString', 'GetLocalizedString', 'Translate', 'L', 'T']),
@@ -224,7 +289,7 @@ export class SettingsPanel {
                 scanCSharp: vscodeConfig.get('scanCSharp', true),
                 scanRazor: vscodeConfig.get('scanRazor', true),
                 scanXaml: vscodeConfig.get('scanXaml', true),
-                // API Keys
+                // API Keys (from config file - may be overridden by secure store)
                 apiKeys: lrmConfig?.Translation?.ApiKeys || {},
                 // AI Provider Settings
                 aiProviders: {
@@ -246,7 +311,20 @@ export class SettingsPanel {
 
     private getHtmlContent(providers: any[], settings: any): string {
         const freeProviders = providers.filter(p => !p.requiresApiKey);
-        const paidProviders = providers.filter(p => p.requiresApiKey);
+
+        // Helper to generate source indicator HTML
+        const getSourceIndicator = (providerKey: string): string => {
+            const source = settings.credentialSources?.[providerKey.toLowerCase()];
+            if (source === 'environment') {
+                return '<div class="key-source source-env">🌐 Environment Variable</div>';
+            } else if (source === 'secure_store') {
+                return '<div class="key-source source-secure">🔐 Secure Store</div>';
+            } else if (source === 'config_file') {
+                return '<div class="key-source source-config">📄 Config File (lrm.json)</div>';
+            } else {
+                return '<div class="key-source source-none">⚠️ Not configured</div>';
+            }
+        };
 
         return `<!DOCTYPE html>
 <html lang="en">
@@ -415,6 +493,25 @@ export class SettingsPanel {
         .provider-settings {
             margin-top: 15px;
         }
+        .key-source {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .key-source.source-secure { color: var(--vscode-charts-green); }
+        .key-source.source-env { color: var(--vscode-charts-blue); }
+        .key-source.source-config { color: var(--vscode-charts-yellow); }
+        .key-source.source-none { color: var(--vscode-editorWarning-foreground); }
+        .secure-store-toggle {
+            background-color: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -433,6 +530,14 @@ export class SettingsPanel {
     <!-- Translation Providers -->
     <div class="section">
         <h2>Translation Providers</h2>
+
+        <div class="secure-store-toggle">
+            <div class="checkbox-group">
+                <input type="checkbox" id="useSecureCredentialStore" ${settings.useSecureCredentialStore ? 'checked' : ''}>
+                <label for="useSecureCredentialStore">Use Secure Credential Store (AES-256 encrypted)</label>
+            </div>
+            <div class="hint">When enabled, new API keys are stored encrypted locally instead of in lrm.json</div>
+        </div>
 
         <div class="form-group">
             <label for="defaultProvider">Default Provider</label>
@@ -458,65 +563,175 @@ export class SettingsPanel {
             `).join('')}
         </ul>
 
-        <h3>Paid Providers (API Key Required)</h3>
-        <ul class="provider-list">
-            ${paidProviders.map(p => {
-                const providerKey = p.name.charAt(0).toUpperCase() + p.name.slice(1);
-                const currentKey = settings.apiKeys[providerKey] || '';
-                const isConfigured = p.isConfigured || currentKey.length > 0;
-                return `
-                <li class="provider-item">
-                    <div style="flex: 1;">
-                        <div class="provider-name">${p.displayName || p.name}</div>
-                        <div class="provider-status ${isConfigured ? 'status-ready' : 'status-needs-key'}">
-                            ${isConfigured ? 'Configured' : 'Requires API key'}
-                        </div>
-                        <div class="form-group" style="margin-top: 10px; margin-bottom: 0;">
-                            <input type="password"
-                                   id="apiKey_${providerKey}"
-                                   placeholder="Enter API key..."
-                                   value="${currentKey}"
-                                   style="max-width: 400px;">
-                        </div>
-                    </div>
-                    <button class="secondary" onclick="testProvider('${p.name}')">Test</button>
-                </li>
-            `;
-            }).join('')}
-        </ul>
-    </div>
+        <h3>Paid Providers</h3>
+        <div class="hint" style="margin-bottom: 15px;">Click to expand and configure API key and settings for each provider.</div>
 
-    <!-- Translation Settings -->
-    <div class="section">
-        <h2>Translation Settings</h2>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="maxRetries">Max Retries</label>
-                <input type="number" id="maxRetries" min="0" max="10" value="${settings.maxRetries}">
-                <div class="hint">Retry attempts for failed requests</div>
+        <!-- Google -->
+        <div class="collapsible" id="google-settings">
+            <div class="collapsible-header" onclick="toggleCollapsible('google-settings')">
+                <span>Google Cloud Translation ${settings.credentialSources?.['google'] ? '✓' : ''}</span>
+                <span class="arrow">&#9654;</span>
             </div>
-            <div class="form-group">
-                <label for="timeoutSeconds">Timeout (seconds)</label>
-                <input type="number" id="timeoutSeconds" min="5" max="300" value="${settings.timeoutSeconds}">
-                <div class="hint">Request timeout</div>
-            </div>
-            <div class="form-group">
-                <label for="batchSize">Batch Size</label>
-                <input type="number" id="batchSize" min="1" max="100" value="${settings.batchSize}">
-                <div class="hint">Keys per batch request</div>
+            <div class="collapsible-content">
+                <div class="form-group">
+                    <label for="apiKey_Google">API Key</label>
+                    <input type="password" id="apiKey_Google" value="" placeholder="Enter new API key to update...">
+                    ${getSourceIndicator('google')}
+                </div>
+                <button class="secondary" onclick="testProvider('google')" style="margin-top: 10px;">Test Connection</button>
             </div>
         </div>
-    </div>
 
-    <!-- AI Provider Settings -->
-    <div class="section">
-        <h2>AI Provider Settings</h2>
-        <div class="hint" style="margin-bottom: 15px;">Configure AI-specific settings for each provider. Click to expand.</div>
+        <!-- DeepL -->
+        <div class="collapsible" id="deepl-settings">
+            <div class="collapsible-header" onclick="toggleCollapsible('deepl-settings')">
+                <span>DeepL ${settings.credentialSources?.['deepl'] ? '✓' : ''}</span>
+                <span class="arrow">&#9654;</span>
+            </div>
+            <div class="collapsible-content">
+                <div class="form-group">
+                    <label for="apiKey_Deepl">API Key</label>
+                    <input type="password" id="apiKey_Deepl" value="" placeholder="Enter new API key to update...">
+                    ${getSourceIndicator('deepl')}
+                </div>
+                <button class="secondary" onclick="testProvider('deepl')" style="margin-top: 10px;">Test Connection</button>
+            </div>
+        </div>
+
+        <!-- OpenAI -->
+        <div class="collapsible" id="openai-provider-settings">
+            <div class="collapsible-header" onclick="toggleCollapsible('openai-provider-settings')">
+                <span>OpenAI ${settings.credentialSources?.['openai'] ? '✓' : ''}</span>
+                <span class="arrow">&#9654;</span>
+            </div>
+            <div class="collapsible-content">
+                <div class="form-group">
+                    <label for="apiKey_Openai">API Key</label>
+                    <input type="password" id="apiKey_Openai" value="" placeholder="Enter new API key to update...">
+                    ${getSourceIndicator('openai')}
+                </div>
+                <div class="form-row" style="margin-top: 15px;">
+                    <div class="form-group">
+                        <label for="openaiModel">Model</label>
+                        <input type="text" id="openaiModel" list="openaiModelList" value="${settings.aiProviders.openai.Model || settings.aiProviders.openai.model || ''}" placeholder="gpt-4o-mini">
+                        <datalist id="openaiModelList">
+                            <option value="gpt-4o-mini">
+                            <option value="gpt-4o">
+                            <option value="gpt-4-turbo">
+                            <option value="gpt-4">
+                            <option value="gpt-3.5-turbo">
+                            <option value="o1-preview">
+                            <option value="o1-mini">
+                        </datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="openaiRateLimit">Rate Limit/min</label>
+                        <input type="number" id="openaiRateLimit" min="1" max="500" value="${settings.aiProviders.openai.RateLimitPerMinute || settings.aiProviders.openai.rateLimitPerMinute || ''}" placeholder="60">
+                    </div>
+                </div>
+                <button class="secondary" onclick="testProvider('openai')" style="margin-top: 10px;">Test Connection</button>
+            </div>
+        </div>
+
+        <!-- Claude -->
+        <div class="collapsible" id="claude-provider-settings">
+            <div class="collapsible-header" onclick="toggleCollapsible('claude-provider-settings')">
+                <span>Claude (Anthropic) ${settings.credentialSources?.['claude'] ? '✓' : ''}</span>
+                <span class="arrow">&#9654;</span>
+            </div>
+            <div class="collapsible-content">
+                <div class="form-group">
+                    <label for="apiKey_Claude">API Key</label>
+                    <input type="password" id="apiKey_Claude" value="" placeholder="Enter new API key to update...">
+                    ${getSourceIndicator('claude')}
+                </div>
+                <div class="form-row" style="margin-top: 15px;">
+                    <div class="form-group">
+                        <label for="claudeModel">Model</label>
+                        <input type="text" id="claudeModel" list="claudeModelList" value="${settings.aiProviders.claude.Model || settings.aiProviders.claude.model || ''}" placeholder="claude-sonnet-4-20250514">
+                        <datalist id="claudeModelList">
+                            <option value="claude-sonnet-4-20250514">
+                            <option value="claude-3-5-sonnet-20241022">
+                            <option value="claude-3-5-haiku-20241022">
+                            <option value="claude-3-opus-20240229">
+                        </datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="claudeRateLimit">Rate Limit/min</label>
+                        <input type="number" id="claudeRateLimit" min="1" max="500" value="${settings.aiProviders.claude.RateLimitPerMinute || settings.aiProviders.claude.rateLimitPerMinute || ''}" placeholder="50">
+                    </div>
+                </div>
+                <button class="secondary" onclick="testProvider('claude')" style="margin-top: 10px;">Test Connection</button>
+            </div>
+        </div>
+
+        <!-- Azure OpenAI -->
+        <div class="collapsible" id="azureopenai-provider-settings">
+            <div class="collapsible-header" onclick="toggleCollapsible('azureopenai-provider-settings')">
+                <span>Azure OpenAI ${settings.credentialSources?.['azureopenai'] ? '✓' : ''}</span>
+                <span class="arrow">&#9654;</span>
+            </div>
+            <div class="collapsible-content">
+                <div class="form-group">
+                    <label for="apiKey_Azureopenai">API Key</label>
+                    <input type="password" id="apiKey_Azureopenai" value="" placeholder="Enter new API key to update...">
+                    ${getSourceIndicator('azureopenai')}
+                </div>
+                <div class="form-row" style="margin-top: 15px;">
+                    <div class="form-group">
+                        <label for="azureOpenAIEndpoint">Endpoint</label>
+                        <input type="text" id="azureOpenAIEndpoint" value="${settings.aiProviders.azureOpenAI.Endpoint || settings.aiProviders.azureOpenAI.endpoint || ''}" placeholder="https://your-resource.openai.azure.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="azureOpenAIDeployment">Deployment Name</label>
+                        <input type="text" id="azureOpenAIDeployment" value="${settings.aiProviders.azureOpenAI.DeploymentName || settings.aiProviders.azureOpenAI.deploymentName || ''}" placeholder="gpt-4">
+                    </div>
+                    <div class="form-group">
+                        <label for="azureOpenAIRateLimit">Rate Limit/min</label>
+                        <input type="number" id="azureOpenAIRateLimit" min="1" max="500" value="${settings.aiProviders.azureOpenAI.RateLimitPerMinute || settings.aiProviders.azureOpenAI.rateLimitPerMinute || ''}" placeholder="60">
+                    </div>
+                </div>
+                <button class="secondary" onclick="testProvider('azureopenai')" style="margin-top: 10px;">Test Connection</button>
+            </div>
+        </div>
+
+        <!-- Azure Translator -->
+        <div class="collapsible" id="azuretranslator-provider-settings">
+            <div class="collapsible-header" onclick="toggleCollapsible('azuretranslator-provider-settings')">
+                <span>Azure Translator ${settings.credentialSources?.['azuretranslator'] ? '✓' : ''}</span>
+                <span class="arrow">&#9654;</span>
+            </div>
+            <div class="collapsible-content">
+                <div class="form-group">
+                    <label for="apiKey_Azure">API Key</label>
+                    <input type="password" id="apiKey_Azure" value="" placeholder="Enter new API key to update...">
+                    ${getSourceIndicator('azuretranslator')}
+                </div>
+                <div class="form-row" style="margin-top: 15px;">
+                    <div class="form-group">
+                        <label for="azureTranslatorRegion">Region</label>
+                        <input type="text" id="azureTranslatorRegion" value="${settings.aiProviders.azureTranslator.Region || settings.aiProviders.azureTranslator.region || ''}" placeholder="westus">
+                    </div>
+                    <div class="form-group">
+                        <label for="azureTranslatorEndpoint">Endpoint (optional)</label>
+                        <input type="text" id="azureTranslatorEndpoint" value="${settings.aiProviders.azureTranslator.Endpoint || settings.aiProviders.azureTranslator.endpoint || ''}" placeholder="Default: api.cognitive.microsofttranslator.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="azureTranslatorRateLimit">Rate Limit/min</label>
+                        <input type="number" id="azureTranslatorRateLimit" min="1" max="1000" value="${settings.aiProviders.azureTranslator.RateLimitPerMinute || settings.aiProviders.azureTranslator.rateLimitPerMinute || ''}" placeholder="100">
+                    </div>
+                </div>
+                <button class="secondary" onclick="testProvider('azuretranslator')" style="margin-top: 10px;">Test Connection</button>
+            </div>
+        </div>
+
+        <h3 style="margin-top: 25px;">Free Providers</h3>
+        <div class="hint" style="margin-bottom: 15px;">No API key required. Click to configure optional settings.</div>
 
         <!-- Ollama -->
-        <div class="collapsible" id="ollama-settings">
-            <div class="collapsible-header" onclick="toggleCollapsible('ollama-settings')">
-                <span>Ollama (Local AI)</span>
+        <div class="collapsible" id="ollama-provider-settings">
+            <div class="collapsible-header" onclick="toggleCollapsible('ollama-provider-settings')">
+                <span>Ollama (Local AI - Free)</span>
                 <span class="arrow">&#9654;</span>
             </div>
             <div class="collapsible-content">
@@ -543,116 +758,13 @@ export class SettingsPanel {
                         <input type="number" id="ollamaRateLimit" min="1" max="100" value="${settings.aiProviders.ollama.RateLimitPerMinute || settings.aiProviders.ollama.rateLimitPerMinute || ''}" placeholder="10">
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- OpenAI -->
-        <div class="collapsible" id="openai-settings">
-            <div class="collapsible-header" onclick="toggleCollapsible('openai-settings')">
-                <span>OpenAI</span>
-                <span class="arrow">&#9654;</span>
-            </div>
-            <div class="collapsible-content">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="openaiModel">Model</label>
-                        <input type="text" id="openaiModel" list="openaiModelList" value="${settings.aiProviders.openai.Model || settings.aiProviders.openai.model || ''}" placeholder="gpt-4o-mini">
-                        <datalist id="openaiModelList">
-                            <option value="gpt-4o-mini">
-                            <option value="gpt-4o">
-                            <option value="gpt-4-turbo">
-                            <option value="gpt-4">
-                            <option value="gpt-3.5-turbo">
-                            <option value="o1-preview">
-                            <option value="o1-mini">
-                        </datalist>
-                    </div>
-                    <div class="form-group">
-                        <label for="openaiRateLimit">Rate Limit/min</label>
-                        <input type="number" id="openaiRateLimit" min="1" max="500" value="${settings.aiProviders.openai.RateLimitPerMinute || settings.aiProviders.openai.rateLimitPerMinute || ''}" placeholder="60">
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Claude -->
-        <div class="collapsible" id="claude-settings">
-            <div class="collapsible-header" onclick="toggleCollapsible('claude-settings')">
-                <span>Claude (Anthropic)</span>
-                <span class="arrow">&#9654;</span>
-            </div>
-            <div class="collapsible-content">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="claudeModel">Model</label>
-                        <input type="text" id="claudeModel" list="claudeModelList" value="${settings.aiProviders.claude.Model || settings.aiProviders.claude.model || ''}" placeholder="claude-3-5-sonnet-20241022">
-                        <datalist id="claudeModelList">
-                            <option value="claude-3-5-sonnet-20241022">
-                            <option value="claude-3-5-haiku-20241022">
-                            <option value="claude-3-opus-20240229">
-                            <option value="claude-3-sonnet-20240229">
-                            <option value="claude-3-haiku-20240307">
-                        </datalist>
-                    </div>
-                    <div class="form-group">
-                        <label for="claudeRateLimit">Rate Limit/min</label>
-                        <input type="number" id="claudeRateLimit" min="1" max="500" value="${settings.aiProviders.claude.RateLimitPerMinute || settings.aiProviders.claude.rateLimitPerMinute || ''}" placeholder="50">
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Azure OpenAI -->
-        <div class="collapsible" id="azureopenai-settings">
-            <div class="collapsible-header" onclick="toggleCollapsible('azureopenai-settings')">
-                <span>Azure OpenAI</span>
-                <span class="arrow">&#9654;</span>
-            </div>
-            <div class="collapsible-content">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="azureOpenAIEndpoint">Endpoint</label>
-                        <input type="text" id="azureOpenAIEndpoint" value="${settings.aiProviders.azureOpenAI.Endpoint || settings.aiProviders.azureOpenAI.endpoint || ''}" placeholder="https://your-resource.openai.azure.com">
-                    </div>
-                    <div class="form-group">
-                        <label for="azureOpenAIDeployment">Deployment Name</label>
-                        <input type="text" id="azureOpenAIDeployment" value="${settings.aiProviders.azureOpenAI.DeploymentName || settings.aiProviders.azureOpenAI.deploymentName || ''}" placeholder="gpt-4">
-                    </div>
-                    <div class="form-group">
-                        <label for="azureOpenAIRateLimit">Rate Limit/min</label>
-                        <input type="number" id="azureOpenAIRateLimit" min="1" max="500" value="${settings.aiProviders.azureOpenAI.RateLimitPerMinute || settings.aiProviders.azureOpenAI.rateLimitPerMinute || ''}" placeholder="60">
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Azure Translator -->
-        <div class="collapsible" id="azuretranslator-settings">
-            <div class="collapsible-header" onclick="toggleCollapsible('azuretranslator-settings')">
-                <span>Azure Translator</span>
-                <span class="arrow">&#9654;</span>
-            </div>
-            <div class="collapsible-content">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="azureTranslatorRegion">Region</label>
-                        <input type="text" id="azureTranslatorRegion" value="${settings.aiProviders.azureTranslator.Region || settings.aiProviders.azureTranslator.region || ''}" placeholder="westus">
-                    </div>
-                    <div class="form-group">
-                        <label for="azureTranslatorEndpoint">Endpoint (optional)</label>
-                        <input type="text" id="azureTranslatorEndpoint" value="${settings.aiProviders.azureTranslator.Endpoint || settings.aiProviders.azureTranslator.endpoint || ''}" placeholder="Default: api.cognitive.microsofttranslator.com">
-                    </div>
-                    <div class="form-group">
-                        <label for="azureTranslatorRateLimit">Rate Limit/min</label>
-                        <input type="number" id="azureTranslatorRateLimit" min="1" max="1000" value="${settings.aiProviders.azureTranslator.RateLimitPerMinute || settings.aiProviders.azureTranslator.rateLimitPerMinute || ''}" placeholder="100">
-                    </div>
-                </div>
+                <button class="secondary" onclick="testProvider('ollama')" style="margin-top: 10px;">Test Connection</button>
             </div>
         </div>
 
         <!-- Lingva -->
-        <div class="collapsible" id="lingva-settings">
-            <div class="collapsible-header" onclick="toggleCollapsible('lingva-settings')">
+        <div class="collapsible" id="lingva-provider-settings">
+            <div class="collapsible-header" onclick="toggleCollapsible('lingva-provider-settings')">
                 <span>Lingva (Free)</span>
                 <span class="arrow">&#9654;</span>
             </div>
@@ -667,12 +779,13 @@ export class SettingsPanel {
                         <input type="number" id="lingvaRateLimit" min="1" max="100" value="${settings.aiProviders.lingva.RateLimitPerMinute || settings.aiProviders.lingva.rateLimitPerMinute || ''}" placeholder="30">
                     </div>
                 </div>
+                <button class="secondary" onclick="testProvider('lingva')" style="margin-top: 10px;">Test Connection</button>
             </div>
         </div>
 
         <!-- MyMemory -->
-        <div class="collapsible" id="mymemory-settings">
-            <div class="collapsible-header" onclick="toggleCollapsible('mymemory-settings')">
+        <div class="collapsible" id="mymemory-provider-settings">
+            <div class="collapsible-header" onclick="toggleCollapsible('mymemory-provider-settings')">
                 <span>MyMemory (Free)</span>
                 <span class="arrow">&#9654;</span>
             </div>
@@ -684,6 +797,29 @@ export class SettingsPanel {
                         <div class="hint">Free tier: 5,000 chars/day</div>
                     </div>
                 </div>
+                <button class="secondary" onclick="testProvider('mymemory')" style="margin-top: 10px;">Test Connection</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Translation Settings -->
+    <div class="section">
+        <h2>Translation Settings</h2>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="maxRetries">Max Retries</label>
+                <input type="number" id="maxRetries" min="0" max="10" value="${settings.maxRetries}">
+                <div class="hint">Retry attempts for failed requests</div>
+            </div>
+            <div class="form-group">
+                <label for="timeoutSeconds">Timeout (seconds)</label>
+                <input type="number" id="timeoutSeconds" min="5" max="300" value="${settings.timeoutSeconds}">
+                <div class="hint">Request timeout</div>
+            </div>
+            <div class="form-group">
+                <label for="batchSize">Batch Size</label>
+                <input type="number" id="batchSize" min="1" max="100" value="${settings.batchSize}">
+                <div class="hint">Keys per batch request</div>
             </div>
         </div>
     </div>
@@ -810,6 +946,8 @@ export class SettingsPanel {
                     maxRetries: parseInt(document.getElementById('maxRetries').value) || 3,
                     timeoutSeconds: parseInt(document.getElementById('timeoutSeconds').value) || 30,
                     batchSize: parseInt(document.getElementById('batchSize').value) || 10,
+                    // Secure Credential Store
+                    useSecureCredentialStore: document.getElementById('useSecureCredentialStore').checked,
                     // Validation
                     enablePlaceholderValidation: document.getElementById('enablePlaceholderValidation').checked,
                     placeholderTypes: placeholderTypes.length > 0 ? placeholderTypes : ['dotnet'],

@@ -74,6 +74,74 @@ Translate missing values using free or paid providers.
 | `lrm.enableRealtimeScan` | Live diagnostics | `true` |
 | `lrm.scanOnSave` | Scan on file save | `true` |
 
+## Configuration & API Keys
+
+LRM stores configuration in two places:
+
+### 1. VS Code Settings
+Extension-specific settings stored in VS Code workspace settings:
+- Resource path, scanning options, file type filters
+- These are VS Code-only and don't affect CLI usage
+
+### 2. lrm.json (Project Configuration)
+Shared configuration file for both VS Code extension and CLI:
+- Translation provider settings, AI model configurations
+- Scanning patterns, validation rules
+- Located in your resource folder
+
+### API Key Storage
+
+API keys can be configured in three ways (in priority order):
+
+| Method | Security | Shared with CLI |
+|--------|----------|-----------------|
+| **Environment Variables** | High | Yes |
+| **Secure Credential Store** | High (AES-256 encrypted) | Yes |
+| **lrm.json** | Low (plain text) | Yes |
+
+#### Environment Variables (Recommended for CI/CD)
+```bash
+export LRM_GOOGLE_API_KEY="your-key"
+export LRM_OPENAI_API_KEY="your-key"
+export LRM_DEEPL_API_KEY="your-key"
+```
+
+#### Secure Credential Store (Recommended for Development)
+API keys are encrypted with AES-256 and stored locally:
+- **Windows**: `%LOCALAPPDATA%\LocalizationManager\credentials.json`
+- **Linux**: `~/.local/share/LocalizationManager/credentials.json`
+- **macOS**: `~/.local/share/LocalizationManager/credentials.json`
+
+Enable in Settings panel or via CLI:
+```bash
+lrm config set-api-key --provider google --key "your-key"
+```
+
+The encryption uses machine-specific keys, so credentials cannot be copied between machines.
+
+#### Plain Text in lrm.json (Not Recommended)
+```json
+{
+  "Translation": {
+    "ApiKeys": {
+      "Google": "your-key-here"
+    }
+  }
+}
+```
+
+> **Warning**: Add `lrm.json` to `.gitignore` if storing API keys in plain text.
+
+### Settings Panel
+
+Use **LRM: Open Settings** to configure:
+- Translation providers and API keys
+- AI model settings (OpenAI, Claude, Ollama, etc.)
+- Code scanning patterns
+- Validation rules
+
+The Settings panel shows where each API key is configured (environment, secure store, or config file) and allows testing provider connections.
+
 ## Troubleshooting
 - **Backend won't start**: Check "LRM Backend" output channel
 - **Resources not detected**: Use "LRM: Set Resource Path"
