@@ -518,3 +518,11 @@ CLAUDE.md
 *.swp
 *.swo
 *~
+
+# VS Code Extension
+vscode-extension/node_modules/
+vscode-extension/out/
+vscode-extension/bin/
+vscode-extension/*.vsix
+vscode-extension/.vscode-test/
+vscode-extension/package-lock.json
