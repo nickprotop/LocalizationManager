@@ -18,6 +18,24 @@
 
 **👉 [See Web UI Documentation →](docs/WEBUI.md)**
 
+### VS Code Extension
+
+![VS Code Extension](vscode-extension/images/dashboard.png)
+
+Manage localization directly in VS Code with real-time diagnostics, code scanning, and translation support.
+
+**Features:**
+- Real-time inline warnings for missing keys
+- Dashboard with translation coverage
+- Side-by-side resource editor
+- Code scanning to find unused/missing keys
+- Translation with free (Lingva, MyMemory, Ollama) and paid providers
+
+**Install from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=nickprotop.localization-manager):**
+```
+ext install nickprotop.localization-manager
+```
+
 ---
 
 ## Why This Tool Exists
@@ -43,6 +61,7 @@ LRM solves this by providing:
 | **Command Line** | ✅ Full CLI | ⚠️ PowerShell scripting | ❌ GUI only | ❌ GUI only | ⚠️ Manual XML |
 | **Terminal UI** | ✅ Interactive TUI | ❌ | ❌ | ❌ | ❌ |
 | **Web UI** | ✅ Browser-based | ❌ | ❌ | ❌ | ❌ |
+| **VS Code Extension** | ✅ Full integration | ⚠️ Partial | ❌ | ❌ | ❌ |
 | **REST API** | ✅ Full API | ❌ | ❌ | ❌ | ❌ |
 | **Machine Translation** | ✅ 10 providers (Google/DeepL/Azure/OpenAI/Claude/Ollama/Lingva/MyMemory) | ⚠️ External services | ❌ | ❌ | ❌ |
 | **CI/CD Integration** | ✅ Built-in | ⚠️ Complex | ❌ | ❌ | ⚠️ Custom scripts |
