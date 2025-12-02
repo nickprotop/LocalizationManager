@@ -573,6 +573,10 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - Pull request process
 - GitHub workflows
 
+### AI-Assisted Development
+
+This project was developed with AI assistance (Claude by Anthropic). All code was reviewed, tested, and validated by the maintainer. Contributors are welcome to use AI tools—just ensure you understand and can explain any code you submit.
+
 **Quick start for contributors:**
 ```bash
 git clone https://github.com/nickprotop/LocalizationManager.git
