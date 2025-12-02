@@ -12,10 +12,10 @@
 2. [Phase 1: Core Abstraction Layer](#phase-1-core-abstraction-layer)
 3. [Phase 2: JSON Backend Implementation](#phase-2-json-backend-implementation)
 4. [Phase 3: New CLI Commands](#phase-3-new-cli-commands)
-5. [Phase 4: Refactor Consumers](#phase-4-refactor-consumers)
-6. [Phase 5: NuGet Package](#phase-5-nuget-package)
-7. [Phase 6: VS Code Extension](#phase-6-vs-code-extension)
-8. [Phase 7: Documentation & Testing](#phase-7-documentation--testing)
+5. [Phase 4: Testing](#phase-4-testing)
+6. [Phase 5: Refactor Consumers](#phase-5-refactor-consumers)
+7. [Phase 6: NuGet Package](#phase-6-nuget-package)
+8. [Phase 7: VS Code Extension](#phase-7-vs-code-extension)
 9. [JSON Format Specification](#json-format-specification)
 10. [Interface Definitions](#interface-definitions)
 
@@ -59,18 +59,25 @@ public class ResourcesController : ControllerBase
 │   ├── IResourceDiscovery.cs
 │   ├── IResourceReader.cs
 │   ├── IResourceWriter.cs
+│   ├── IResourceValidator.cs
 │   └── IResourceBackendFactory.cs
 ├── Backends/                        # NEW: Implementations
 │   ├── Resx/
 │   │   ├── ResxResourceBackend.cs
 │   │   ├── ResxResourceDiscovery.cs
 │   │   ├── ResxResourceReader.cs
-│   │   └── ResxResourceWriter.cs
+│   │   ├── ResxResourceWriter.cs
+│   │   └── ResxResourceValidator.cs
 │   └── Json/
 │       ├── JsonResourceBackend.cs
 │       ├── JsonResourceDiscovery.cs
 │       ├── JsonResourceReader.cs
-│       └── JsonResourceWriter.cs
+│       ├── JsonResourceWriter.cs
+│       └── JsonResourceValidator.cs
+├── Exceptions/                      # NEW: Custom exceptions
+│   ├── ResourceException.cs
+│   ├── ResourceParseException.cs
+│   └── ResourceNotFoundException.cs
 ├── Models/                          # UNCHANGED (already format-agnostic)
 │   ├── ResourceEntry.cs
 │   ├── ResourceFile.cs
@@ -102,6 +109,7 @@ public class ResourcesController : ControllerBase
 - `/Core/Abstractions/IResourceDiscovery.cs`
 - `/Core/Abstractions/IResourceReader.cs`
 - `/Core/Abstractions/IResourceWriter.cs`
+- `/Core/Abstractions/IResourceValidator.cs`
 - `/Core/Abstractions/IResourceBackendFactory.cs`
 
 **Guide:**
@@ -129,6 +137,9 @@ public interface IResourceBackend
 
     /// <summary>Writer for saving resource files</summary>
     IResourceWriter Writer { get; }
+
+    /// <summary>Validator for checking resource files</summary>
+    IResourceValidator Validator { get; }
 }
 ```
 
@@ -189,6 +200,30 @@ public interface IResourceWriter
 ```
 
 ```csharp
+// /Core/Abstractions/IResourceValidator.cs
+namespace LocalizationManager.Core.Abstractions;
+
+/// <summary>
+/// Validates resource files for issues (missing translations, duplicates, etc.)
+/// </summary>
+public interface IResourceValidator
+{
+    /// <summary>Validate all resource files in the path</summary>
+    Task<ValidationResult> ValidateAsync(
+        string searchPath,
+        CancellationToken ct = default);
+
+    /// <summary>Synchronous version for backward compatibility</summary>
+    ValidationResult Validate(string searchPath);
+
+    /// <summary>Validate a single resource file</summary>
+    Task<ValidationResult> ValidateFileAsync(
+        ResourceFile file,
+        CancellationToken ct = default);
+}
+```
+
+```csharp
 // /Core/Abstractions/IResourceBackendFactory.cs
 namespace LocalizationManager.Core.Abstractions;
 
@@ -205,6 +240,57 @@ public interface IResourceBackendFactory
 
     /// <summary>Check if a backend is available</summary>
     bool IsBackendAvailable(string name);
+}
+```
+
+```csharp
+// /Core/Exceptions/ResourceException.cs
+namespace LocalizationManager.Core.Exceptions;
+
+/// <summary>
+/// Base exception for all resource-related errors
+/// </summary>
+public class ResourceException : Exception
+{
+    public string? FilePath { get; }
+
+    public ResourceException(string message, string? filePath = null, Exception? inner = null)
+        : base(message, inner)
+    {
+        FilePath = filePath;
+    }
+}
+
+/// <summary>
+/// Thrown when a resource file cannot be parsed (invalid JSON/XML, malformed structure)
+/// </summary>
+public class ResourceParseException : ResourceException
+{
+    public int? LineNumber { get; }
+    public int? Position { get; }
+
+    public ResourceParseException(string message, string filePath, int? lineNumber = null,
+        int? position = null, Exception? inner = null)
+        : base(message, filePath, inner)
+    {
+        LineNumber = lineNumber;
+        Position = position;
+    }
+}
+
+/// <summary>
+/// Thrown when a resource file or key is not found
+/// </summary>
+public class ResourceNotFoundException : ResourceException
+{
+    public string? Key { get; }
+
+    public ResourceNotFoundException(string message, string? filePath = null,
+        string? key = null, Exception? inner = null)
+        : base(message, filePath, inner)
+    {
+        Key = key;
+    }
 }
 ```
 
@@ -344,8 +430,12 @@ public class ResourceBackendFactory : IResourceBackendFactory
         // Check for existing files
         if (Directory.Exists(path))
         {
-            if (Directory.GetFiles(path, "*.json", SearchOption.TopDirectoryOnly).Any())
+            // Check for JSON resource files (exclude lrm*.json config files)
+            var jsonFiles = Directory.GetFiles(path, "*.json", SearchOption.TopDirectoryOnly)
+                .Where(f => !Path.GetFileName(f).StartsWith("lrm", StringComparison.OrdinalIgnoreCase));
+            if (jsonFiles.Any())
                 return GetBackend("json");
+
             if (Directory.GetFiles(path, "*.resx", SearchOption.TopDirectoryOnly).Any())
                 return GetBackend("resx");
         }
@@ -420,23 +510,23 @@ builder.Services.AddScoped<IResourceBackend>(sp =>
 
 **Guide for CLI (BaseCommandSettings.cs):**
 
-Add format option:
+Add backend option (note: --format is already used for output format table/json/simple):
 
 ```csharp
 public class BaseCommandSettings : CommandSettings
 {
     // ... existing properties ...
 
-    [CommandOption("--format <FORMAT>")]
-    [Description("Resource format: resx or json (auto-detected if not specified)")]
-    public string? Format { get; set; }
+    [CommandOption("--backend <BACKEND>")]
+    [Description("Resource backend: resx or json (auto-detected if not specified)")]
+    public string? Backend { get; set; }
 
     protected IResourceBackend GetBackend()
     {
-        var factory = new ResourceBackendFactory();
+        var factory = new ResourceBackendFactory(Configuration);
 
-        if (!string.IsNullOrEmpty(Format))
-            return factory.GetBackend(Format);
+        if (!string.IsNullOrEmpty(Backend))
+            return factory.GetBackend(Backend);
 
         // Try config file
         if (Configuration?.ResourceFormat != null)
@@ -544,18 +634,37 @@ public class JsonResourceDiscovery : IResourceDiscovery
             // No culture code: strings.json
             return (parts[0], "", filePath);
         }
-        else if (parts.Length == 2)
+
+        // Try to find a valid culture code from the end of parts
+        // This handles: strings.en, strings.en-US, strings.zh-Hans, strings.zh-Hans-CN
+        for (int i = 1; i < parts.Length; i++)
         {
-            // With culture: strings.en.json or strings.en-US.json
-            return (parts[0], parts[1], filePath);
-        }
-        else if (parts.Length == 3)
-        {
-            // Extended culture: strings.zh-Hans.json (treated as strings.zh-Hans)
-            return (parts[0], $"{parts[1]}-{parts[2]}", filePath);
+            var potentialCulture = string.Join("-", parts.Skip(i));
+            if (IsValidCultureCode(potentialCulture))
+            {
+                var baseName = string.Join(".", parts.Take(i));
+                return (baseName, potentialCulture, filePath);
+            }
         }
 
-        return null;
+        // No valid culture found - treat entire filename as base name
+        return (fileName, "", filePath);
+    }
+
+    private bool IsValidCultureCode(string code)
+    {
+        if (string.IsNullOrEmpty(code))
+            return false;
+
+        try
+        {
+            var culture = CultureInfo.GetCultureInfo(code);
+            return culture != null && !string.IsNullOrEmpty(culture.Name);
+        }
+        catch (CultureNotFoundException)
+        {
+            return false;
+        }
     }
 
     private string GetCultureDisplayName(string code)
@@ -674,18 +783,19 @@ public class JsonResourceReader : IResourceReader
 
     private string SerializePluralValue(JsonElement element)
     {
-        // Store plural forms as: "one|{0} item||other|{0} items"
-        var parts = new List<string>();
+        // Store plural forms as JSON string to avoid escaping issues with pipe delimiters
+        // Format: {"one":"{0} item","other":"{0} items"}
+        var pluralForms = new Dictionary<string, string>();
 
         foreach (var prop in element.EnumerateObject())
         {
             if (!prop.Name.StartsWith("_") && prop.Value.ValueKind == JsonValueKind.String)
             {
-                parts.Add($"{prop.Name}|{prop.Value.GetString()}");
+                pluralForms[prop.Name] = prop.Value.GetString() ?? "";
             }
         }
 
-        return string.Join("||", parts);
+        return JsonSerializer.Serialize(pluralForms);
     }
 
     public Task<ResourceFile> ReadAsync(LanguageInfo language, CancellationToken ct = default)
@@ -755,8 +865,8 @@ public class JsonResourceWriter : IResourceWriter
 
     private object CreateEntryValue(ResourceEntry entry)
     {
-        // Check if plural
-        if (entry.Comment == "[plural]" && entry.Value?.Contains("||") == true)
+        // Check if plural (stored as JSON string)
+        if (entry.Comment == "[plural]" && entry.Value?.StartsWith("{") == true)
         {
             return ParsePluralValue(entry.Value);
         }
@@ -778,13 +888,22 @@ public class JsonResourceWriter : IResourceWriter
     {
         var result = new Dictionary<string, object> { ["_plural"] = true };
 
-        foreach (var part in value.Split("||"))
+        try
         {
-            var kv = part.Split('|', 2);
-            if (kv.Length == 2)
+            // Parse JSON format: {"one":"{0} item","other":"{0} items"}
+            var pluralForms = JsonSerializer.Deserialize<Dictionary<string, string>>(value);
+            if (pluralForms != null)
             {
-                result[kv[0]] = kv[1];
+                foreach (var kv in pluralForms)
+                {
+                    result[kv.Key] = kv.Value;
+                }
             }
+        }
+        catch (JsonException)
+        {
+            // Fallback: treat as simple value if JSON parsing fails
+            result["other"] = value;
         }
 
         return result;
@@ -1099,8 +1218,12 @@ namespace LocalizationManager.Commands;
 
 public class ConvertCommandSettings : BaseFormattableCommandSettings
 {
+    [CommandOption("--from <FORMAT>")]
+    [Description("Source format: resx, json, i18next (auto-detected if not specified)")]
+    public string? SourceFormat { get; set; }
+
     [CommandOption("--to <FORMAT>")]
-    [Description("Target format: json")]
+    [Description("Target format: json, i18next")]
     public string TargetFormat { get; set; } = "json";
 
     [CommandOption("-o|--output <PATH>")]
@@ -1114,6 +1237,10 @@ public class ConvertCommandSettings : BaseFormattableCommandSettings
     [CommandOption("--include-comments")]
     [Description("Preserve comments in output")]
     public bool IncludeComments { get; set; } = true;
+
+    [CommandOption("--interpolation <STYLE>")]
+    [Description("Interpolation style: dotnet ({0}) or i18next ({{name}})")]
+    public string Interpolation { get; set; } = "dotnet";
 
     [CommandOption("--no-backup")]
     [Description("Skip backup creation")]
@@ -1210,6 +1337,8 @@ config.AddCommand<InitCommand>("init")
 config.AddCommand<ConvertCommand>("convert")
     .WithDescription("Convert resource files between formats")
     .WithExample(new[] { "convert", "--to", "json" })
+    .WithExample(new[] { "convert", "--from", "i18next", "--to", "json" })
+    .WithExample(new[] { "convert", "--to", "i18next", "--interpolation", "i18next" })
     .WithExample(new[] { "convert", "--to", "json", "--nested", "-o", "./JsonResources" });
 ```
 
@@ -1229,25 +1358,274 @@ commands="init convert validate stats ..."
 _lrm_init_opts="--interactive -i --format --default-lang --languages --base-name --path -p"
 
 # Add convert options
-_lrm_convert_opts="--to --output -o --nested --include-comments --no-backup --path -p"
+_lrm_convert_opts="--from --to --output -o --nested --include-comments --interpolation --no-backup --path -p"
 ```
 
 ---
 
-## Phase 4: Refactor Consumers
+### 3.5 i18next Format Converter
+
+**File to create:** `/Core/Converters/I18nextConverter.cs`
+
+**Guide:**
+
+```csharp
+namespace LocalizationManager.Core.Converters;
+
+/// <summary>
+/// Converts between LRM native JSON format and i18next JSON format
+/// </summary>
+public static class I18nextConverter
+{
+    /// <summary>
+    /// Convert i18next format to LRM native format
+    /// </summary>
+    public static ResourceFile FromI18next(string filePath, LanguageInfo language)
+    {
+        var content = File.ReadAllText(filePath);
+        using var doc = JsonDocument.Parse(content);
+        var entries = new List<ResourceEntry>();
+
+        ParseI18nextElement(doc.RootElement, "", entries);
+
+        return new ResourceFile { Language = language, Entries = entries };
+    }
+
+    private static void ParseI18nextElement(JsonElement element, string prefix, List<ResourceEntry> entries)
+    {
+        // Group plural keys: key_one, key_other, key_zero → key with plural forms
+        var pluralGroups = new Dictionary<string, Dictionary<string, string>>();
+        var regularKeys = new List<(string Key, JsonElement Value)>();
+
+        foreach (var prop in element.EnumerateObject())
+        {
+            var key = string.IsNullOrEmpty(prefix) ? prop.Name : $"{prefix}.{prop.Name}";
+
+            // Check for plural suffix
+            var pluralMatch = Regex.Match(prop.Name, @"^(.+)_(zero|one|two|few|many|other)$");
+            if (pluralMatch.Success && prop.Value.ValueKind == JsonValueKind.String)
+            {
+                var baseKey = string.IsNullOrEmpty(prefix)
+                    ? pluralMatch.Groups[1].Value
+                    : $"{prefix}.{pluralMatch.Groups[1].Value}";
+                var pluralForm = pluralMatch.Groups[2].Value;
+
+                if (!pluralGroups.ContainsKey(baseKey))
+                    pluralGroups[baseKey] = new();
+                pluralGroups[baseKey][pluralForm] = prop.Value.GetString() ?? "";
+            }
+            else if (prop.Value.ValueKind == JsonValueKind.Object)
+            {
+                // Nested object
+                ParseI18nextElement(prop.Value, key, entries);
+            }
+            else if (prop.Value.ValueKind == JsonValueKind.String)
+            {
+                regularKeys.Add((key, prop.Value));
+            }
+        }
+
+        // Add regular entries (skip if they're part of a plural group)
+        foreach (var (key, value) in regularKeys)
+        {
+            if (!pluralGroups.Keys.Any(pk => key.StartsWith(pk + "_")))
+            {
+                entries.Add(new ResourceEntry
+                {
+                    Key = key,
+                    Value = ConvertInterpolation(value.GetString(), toI18next: false)
+                });
+            }
+        }
+
+        // Add plural entries
+        foreach (var (key, forms) in pluralGroups)
+        {
+            var convertedForms = forms.ToDictionary(
+                kv => kv.Key,
+                kv => ConvertInterpolation(kv.Value, toI18next: false)
+            );
+            entries.Add(new ResourceEntry
+            {
+                Key = key,
+                Value = JsonSerializer.Serialize(convertedForms),
+                Comment = "[plural]"
+            });
+        }
+    }
+
+    /// <summary>
+    /// Convert LRM native format to i18next format
+    /// </summary>
+    public static void ToI18next(ResourceFile file, string outputPath, bool nested = true)
+    {
+        var root = new Dictionary<string, object>();
+
+        foreach (var entry in file.Entries)
+        {
+            if (entry.Comment == "[plural]" && entry.Value?.StartsWith("{") == true)
+            {
+                // Expand plural to i18next format (key_one, key_other)
+                var forms = JsonSerializer.Deserialize<Dictionary<string, string>>(entry.Value);
+                if (forms != null)
+                {
+                    foreach (var (form, value) in forms)
+                    {
+                        var i18nKey = $"{entry.Key}_{form}";
+                        var convertedValue = ConvertInterpolation(value, toI18next: true);
+                        SetValue(root, i18nKey, convertedValue, nested);
+                    }
+                }
+            }
+            else
+            {
+                var convertedValue = ConvertInterpolation(entry.Value ?? "", toI18next: true);
+                SetValue(root, entry.Key, convertedValue, nested);
+            }
+        }
+
+        var json = JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = true });
+        File.WriteAllText(outputPath, json);
+    }
+
+    /// <summary>
+    /// Convert interpolation between .NET ({0}, {1}) and i18next ({{count}}, {{name}})
+    /// </summary>
+    public static string ConvertInterpolation(string? value, bool toI18next)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+
+        if (toI18next)
+        {
+            // {0} → {{count}}, {1} → {{arg1}}, etc.
+            return Regex.Replace(value, @"\{(\d+)\}", m =>
+            {
+                var index = int.Parse(m.Groups[1].Value);
+                return index == 0 ? "{{count}}" : $"{{{{arg{index}}}}}";
+            });
+        }
+        else
+        {
+            // {{count}} → {0}, {{name}} → {1}, etc.
+            var argIndex = 0;
+            var argMap = new Dictionary<string, int>();
+            return Regex.Replace(value, @"\{\{(\w+)\}\}", m =>
+            {
+                var name = m.Groups[1].Value;
+                if (name == "count") return "{0}";
+                if (!argMap.ContainsKey(name))
+                    argMap[name] = ++argIndex;
+                return $"{{{argMap[name]}}}";
+            });
+        }
+    }
+
+    private static void SetValue(Dictionary<string, object> root, string key, object value, bool nested)
+    {
+        if (!nested || !key.Contains('.'))
+        {
+            root[key] = value;
+            return;
+        }
+
+        var parts = key.Split('.');
+        var current = root;
+        for (int i = 0; i < parts.Length - 1; i++)
+        {
+            if (!current.TryGetValue(parts[i], out var next) || next is not Dictionary<string, object>)
+            {
+                next = new Dictionary<string, object>();
+                current[parts[i]] = next;
+            }
+            current = (Dictionary<string, object>)next;
+        }
+        current[parts[^1]] = value;
+    }
+}
+```
+
+**Usage examples:**
+
+```bash
+# Import i18next files to LRM native format
+lrm convert --from i18next --to json -p ./i18n
+
+# Export to i18next format for React/Vue apps
+lrm convert --to i18next --interpolation i18next -o ./frontend/locales
+```
+
+---
+
+## Phase 4: Testing
+
+> **Goal:** Create comprehensive tests BEFORE refactoring consumers
+
+### Progress
+
+- [ ] 4.1 Add JSON backend unit tests
+- [ ] 4.2 Add RESX backend wrapper unit tests
+- [ ] 4.3 Add factory unit tests
+- [ ] 4.4 Add integration tests for convert command
+- [ ] 4.5 Add integration tests for init command
+- [ ] 4.6 Verify existing RESX tests still pass
+
+---
+
+### 4.1 JSON Backend Unit Tests
+
+**Files to create:**
+- `/LocalizationManager.Tests/UnitTests/JsonResourceDiscoveryTests.cs`
+- `/LocalizationManager.Tests/UnitTests/JsonResourceReaderTests.cs`
+- `/LocalizationManager.Tests/UnitTests/JsonResourceWriterTests.cs`
+- `/LocalizationManager.Tests/UnitTests/JsonResourceValidatorTests.cs`
+
+**Test Cases:**
+- Discovery: file naming patterns, culture code detection, lrm.json exclusion
+- Reader: flat keys, nested keys, _value/_comment, _plural (JSON format)
+- Writer: nested output, meta section, comment preservation, plural forms
+- Validator: missing translations, duplicate keys, invalid JSON
+
+### 4.2 Backend Factory Unit Tests
+
+**File to create:** `/LocalizationManager.Tests/UnitTests/ResourceBackendFactoryTests.cs`
+
+**Test Cases:**
+- GetBackend("resx") returns ResxResourceBackend
+- GetBackend("json") returns JsonResourceBackend
+- GetBackend("invalid") throws NotSupportedException
+- ResolveFromPath with .resx files returns resx backend
+- ResolveFromPath with .json files returns json backend
+- ResolveFromPath excludes lrm*.json from detection
+
+### 4.3 Integration Tests
+
+**Files to create:**
+- `/LocalizationManager.Tests/IntegrationTests/InitCommandTests.cs`
+- `/LocalizationManager.Tests/IntegrationTests/ConvertCommandTests.cs`
+
+**Test Cases:**
+- init: creates JSON files with correct structure
+- init: creates lrm.json configuration
+- convert: RESX to JSON conversion preserves all data
+- convert: nested keys option works correctly
+- convert: comments are preserved
+
+---
+
+## Phase 5: Refactor Consumers
 
 > **Goal:** Update all controllers and commands to use abstraction
 
 ### Progress
 
-- [ ] 4.1 Refactor controllers (13 files)
-- [ ] 4.2 Refactor commands (23 files)
-- [ ] 4.3 Update TUI (ResourceEditorWindow)
-- [ ] 4.4 Verify all functionality
+- [ ] 5.1 Refactor controllers (13 files)
+- [ ] 5.2 Refactor commands (23 files)
+- [ ] 5.3 Update TUI (ResourceEditorWindow)
+- [ ] 5.4 Verify all functionality
 
 ---
 
-### 4.1 Refactor Controllers
+### Refactor Controllers
 
 **Pattern for each controller:**
 
@@ -1323,7 +1701,7 @@ public override int Execute(CommandContext context, ViewCommandSettings settings
 
 ---
 
-## Phase 5: NuGet Package
+## Phase 6: NuGet Package
 
 > **Goal:** Create standalone NuGet package for consuming JSON localization
 
@@ -1360,7 +1738,7 @@ public override int Execute(CommandContext context, ViewCommandSettings settings
 
 ---
 
-## Phase 6: VS Code Extension
+## Phase 7: VS Code Extension
 
 > **Goal:** Update extension for JSON backend support
 
@@ -1371,18 +1749,6 @@ public override int Execute(CommandContext context, ViewCommandSettings settings
 - [ ] 6.3 Test with JSON backend
 
 *(Mostly automatic - API is format-agnostic)*
-
----
-
-## Phase 7: Documentation & Testing
-
-### Progress
-
-- [ ] 7.1 Update README.md
-- [ ] 7.2 Update API.md
-- [ ] 7.3 Add JSON backend unit tests
-- [ ] 7.4 Add integration tests
-- [ ] 7.5 Update sample configuration
 
 ---
 
