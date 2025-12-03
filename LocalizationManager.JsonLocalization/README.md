@@ -8,15 +8,15 @@ A modern JSON-based localization library for .NET applications. Part of the [LRM
 - **Git-friendly**: Clean diffs, easy merge conflict resolution
 - **Modern tooling**: Works with JSON editors, linters, and formatters
 - **Nested structure**: Organize keys hierarchically (e.g., `Errors.NotFound`)
-- **i18next compatibility**: Use the same format as popular JS frameworks
 - **No Visual Studio required**: Manage resources on any platform
+- **Full LRM integration**: Native format for LRM CLI, VS Code extension, and Web UI
 
 ## Features
 
 - **Standalone API** - Use directly without dependency injection
 - **ASP.NET Core Integration** - Full `IStringLocalizer<T>` support for drop-in replacement
 - **CLDR Pluralization** - Correct plural forms for 30+ languages (zero, one, two, few, many, other)
-- **Two JSON Formats** - Standard nested format or i18next-compatible format
+- **Nested Keys** - Organize keys hierarchically with dot notation
 - **Flexible Loading** - From file system or embedded assembly resources
 - **Culture Fallback** - Automatic fallback chain (e.g., `fr-CA` → `fr` → default)
 - **Hot Reload** - File system mode reloads on change (development)
@@ -164,12 +164,9 @@ app.MapGet("/items/{count}", (int count, JsonLocalizer localizer) =>
 | `UseEmbeddedResources` | bool | `false` | Load from assembly instead of file system |
 | `ResourceAssembly` | Assembly | Entry assembly | Assembly containing embedded resources |
 | `DefaultCulture` | CultureInfo | Invariant | Fallback culture when key not found |
-| `I18nextCompatible` | bool | `false` | Enable i18next format parsing |
 | `UseNestedKeys` | bool | `true` | Support dot-notation for nested objects |
 
-## JSON Format Reference
-
-### Standard Format (Recommended)
+## JSON Format
 
 ```json
 {
@@ -207,31 +204,6 @@ app.MapGet("/items/{count}", (int count, JsonLocalizer localizer) =>
 localizer["Navigation.Home"]     // "Home"
 localizer["Errors.NotFound"]     // "The requested resource was not found."
 ```
-
-### i18next Format
-
-Enable with `options.I18nextCompatible = true`:
-
-```json
-{
-  "welcome": "Welcome to our application!",
-  "greeting": "Hello, {{name}}!",
-
-  "navigation": {
-    "home": "Home",
-    "about": "About Us"
-  },
-
-  "items_zero": "No items",
-  "items_one": "{{count}} item",
-  "items_other": "{{count}} items"
-}
-```
-
-**Key differences:**
-- Interpolation uses `{{var}}` instead of `{0}`
-- Plurals use `_one`, `_other` suffixes instead of nested objects
-- Typically lowercase keys (convention, not required)
 
 ## File Naming Convention
 
