@@ -177,6 +177,22 @@ public class WebCommand : Command<WebCommand.Settings>
         // Register ConfigurationSchemaService for schema-enriched config display
         builder.Services.AddSingleton<LocalizationManager.Services.ConfigurationSchemaService>();
 
+        // Register resource backend factory and backend for multi-format support
+        builder.Services.AddSingleton<LocalizationManager.Core.Abstractions.IResourceBackendFactory,
+            LocalizationManager.Core.Backends.ResourceBackendFactory>();
+        builder.Services.AddScoped<LocalizationManager.Core.Abstractions.IResourceBackend>(sp =>
+        {
+            var factory = sp.GetRequiredService<LocalizationManager.Core.Abstractions.IResourceBackendFactory>();
+            var config = settings.LoadedConfiguration;
+            var format = config?.ResourceFormat;
+
+            if (!string.IsNullOrEmpty(format))
+                return factory.GetBackend(format);
+
+            // Auto-detect from path
+            return factory.ResolveFromPath(absoluteResourcePath);
+        });
+
         // Configure CORS if enabled in configuration
         var corsConfig = settings.LoadedConfiguration?.Web?.Cors;
         if (corsConfig?.Enabled == true && corsConfig.AllowedOrigins?.Count > 0)

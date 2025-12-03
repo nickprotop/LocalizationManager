@@ -13,12 +13,14 @@ _lrm_completions() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands
-    local commands="validate stats view add update delete merge-duplicates export import edit translate config scan check chain list-languages add-language remove-language backup web"
+    local commands="init convert validate stats view add update delete merge-duplicates export import edit translate config scan check chain list-languages add-language remove-language backup web"
 
     # Global options
-    local global_opts="--path -p --help -h --version -v"
+    local global_opts="--path -p --backend --help -h --version -v"
 
     # Command-specific options
+    local init_opts="--path -p --interactive -i --format --default-lang --languages --base-name --yes -y --help -h"
+    local convert_opts="--path -p --from --to --output -o --nested --include-comments --no-backup --yes -y --help -h"
     local validate_opts="--path -p --format --placeholder-types --no-placeholder-validation --no-scan-code --source-path --help -h"
     local stats_opts="--path -p --format --help -h"
     local view_opts="--path -p --show-comments --format --regex --sort --no-limit --case-sensitive --search-in --count --status --not --cultures --keys-only --help -h"
@@ -83,6 +85,11 @@ _lrm_completions() {
         --path|-p)
             # Complete directories
             COMPREPLY=( $(compgen -d -- "${cur}") )
+            return 0
+            ;;
+        --backend)
+            # Complete backend formats
+            COMPREPLY=( $(compgen -W "json resx" -- "${cur}") )
             return 0
             ;;
         --format)
@@ -196,6 +203,24 @@ _lrm_completions() {
     fi
 
     case "${command}" in
+        init)
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "${init_opts}" -- "${cur}") )
+            elif [[ "${prev}" == "--format" ]]; then
+                COMPREPLY=( $(compgen -W "json resx" -- "${cur}") )
+            else
+                COMPREPLY=()
+            fi
+            ;;
+        convert)
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "${convert_opts}" -- "${cur}") )
+            elif [[ "${prev}" == "--from" || "${prev}" == "--to" ]]; then
+                COMPREPLY=( $(compgen -W "json resx" -- "${cur}") )
+            else
+                COMPREPLY=()
+            fi
+            ;;
         validate)
             COMPREPLY=( $(compgen -W "${validate_opts}" -- "${cur}") )
             ;;

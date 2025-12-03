@@ -47,8 +47,7 @@ public class AddLanguageCommand : Command<AddLanguageCommandSettings>
         try
         {
             var manager = new LanguageFileManager();
-            var parser = new ResourceFileParser();
-            var discovery = new ResourceDiscovery();
+            manager.SetBackend(settings.GetBackend());
 
             // Step 1: Validate culture code
             AnsiConsole.MarkupLine($"[yellow]►[/] Validating culture code '{settings.Culture}'...");
@@ -61,7 +60,7 @@ public class AddLanguageCommand : Command<AddLanguageCommandSettings>
             AnsiConsole.MarkupLine($"[green]✓[/] Culture code valid: {culture!.DisplayName}");
 
             // Step 2: Discover existing languages
-            var languages = discovery.DiscoverLanguages(settings.GetResourcePath());
+            var languages = settings.DiscoverLanguages();
             if (languages.Count == 0)
             {
                 AnsiConsole.MarkupLine("[red]✗ No resource files found in the specified path[/]");
@@ -150,7 +149,7 @@ public class AddLanguageCommand : Command<AddLanguageCommandSettings>
             }
 
             // Parse source file if copying
-            var sourceFile = sourceLanguage != null ? parser.Parse(sourceLanguage) : null;
+            var sourceFile = sourceLanguage != null ? settings.ReadResourceFile(sourceLanguage) : null;
 
             // Step 6: Create new language file
             var copyEntries = !settings.Empty && sourceFile != null;

@@ -29,11 +29,8 @@ public class ListLanguagesCommand : Command<ListLanguagesCommandSettings>
 
         try
         {
-            var discovery = new ResourceDiscovery();
-            var parser = new ResourceFileParser();
-
-            // Discover languages
-            var languages = discovery.DiscoverLanguages(settings.GetResourcePath());
+            // Discover languages using the backend (auto-detected or specified)
+            var languages = settings.DiscoverLanguages();
             if (languages.Count == 0)
             {
                 AnsiConsole.MarkupLine("[yellow]No resource files found in the specified path[/]");
@@ -53,13 +50,13 @@ public class ListLanguagesCommand : Command<ListLanguagesCommandSettings>
                 var defaultLang = group.FirstOrDefault(l => string.IsNullOrEmpty(l.Code));
                 if (defaultLang != null)
                 {
-                    var defaultFile = parser.Parse(defaultLang);
+                    var defaultFile = settings.ReadResourceFile(defaultLang);
                     totalDefaultEntries = defaultFile.Entries.Count;
                 }
 
                 foreach (var lang in group)
                 {
-                    var resourceFile = parser.Parse(lang);
+                    var resourceFile = settings.ReadResourceFile(lang);
                     var entryCount = resourceFile.Entries.Count;
                     var coverage = totalDefaultEntries > 0
                         ? (int)((double)entryCount / totalDefaultEntries * 100)

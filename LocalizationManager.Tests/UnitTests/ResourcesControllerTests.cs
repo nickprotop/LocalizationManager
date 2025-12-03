@@ -3,6 +3,8 @@
 
 using LocalizationManager.Controllers;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Abstractions;
+using LocalizationManager.Core.Backends.Resx;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Models.Api;
 using Microsoft.AspNetCore.Mvc;
@@ -16,8 +18,7 @@ namespace LocalizationManager.Tests.UnitTests;
 public class ResourcesControllerTests : IDisposable
 {
     private readonly string _testDirectory;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly IResourceBackend _backend;
     private readonly ResourcesController _controller;
 
     public ResourcesControllerTests()
@@ -26,8 +27,7 @@ public class ResourcesControllerTests : IDisposable
         _testDirectory = Path.Combine(Path.GetTempPath(), $"LrmControllerTests_{Guid.NewGuid()}");
         Directory.CreateDirectory(_testDirectory);
 
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        _backend = new ResxResourceBackend();
 
         // Create initial test resource files
         CreateInitialResourceFiles();
@@ -40,7 +40,7 @@ public class ResourcesControllerTests : IDisposable
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configData)
             .Build();
-        _controller = new ResourcesController(configuration);
+        _controller = new ResourcesController(configuration, _backend);
     }
 
     private void CreateInitialResourceFiles()
@@ -83,8 +83,8 @@ public class ResourcesControllerTests : IDisposable
             }
         };
 
-        _parser.Write(defaultFile);
-        _parser.Write(greekFile);
+        _backend.Writer.Write(defaultFile);
+        _backend.Writer.Write(greekFile);
     }
 
     public void Dispose()
@@ -118,10 +118,10 @@ public class ResourcesControllerTests : IDisposable
         Assert.True(response.Success);
 
         // Verify values and comments were updated
-        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var languages = _backend.Discovery.DiscoverLanguages(_testDirectory);
         foreach (var lang in languages)
         {
-            var file = _parser.Parse(lang);
+            var file = _backend.Reader.Read(lang);
             var entry = file.Entries.FirstOrDefault(e => e.Key == "Save");
 
             Assert.NotNull(entry);
@@ -162,10 +162,10 @@ public class ResourcesControllerTests : IDisposable
         Assert.True(response.Success);
 
         // Verify global comment was applied to all languages
-        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var languages = _backend.Discovery.DiscoverLanguages(_testDirectory);
         foreach (var lang in languages)
         {
-            var file = _parser.Parse(lang);
+            var file = _backend.Reader.Read(lang);
             var entry = file.Entries.FirstOrDefault(e => e.Key == "Cancel");
 
             Assert.NotNull(entry);
@@ -196,10 +196,10 @@ public class ResourcesControllerTests : IDisposable
         Assert.True(response.Success);
 
         // Verify per-language comment takes priority for default, global applied to Greek
-        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var languages = _backend.Discovery.DiscoverLanguages(_testDirectory);
         foreach (var lang in languages)
         {
-            var file = _parser.Parse(lang);
+            var file = _backend.Reader.Read(lang);
             var entry = file.Entries.FirstOrDefault(e => e.Key == "Delete");
 
             Assert.NotNull(entry);
@@ -238,9 +238,9 @@ public class ResourcesControllerTests : IDisposable
         Assert.True(response.Success);
 
         // Verify value updated but original comment preserved
-        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var languages = _backend.Discovery.DiscoverLanguages(_testDirectory);
         var defaultLang = languages.First(l => l.IsDefault);
-        var file = _parser.Parse(defaultLang);
+        var file = _backend.Reader.Read(defaultLang);
         var entry = file.Entries.FirstOrDefault(e => e.Key == "Save");
 
         Assert.NotNull(entry);
@@ -285,18 +285,18 @@ public class ResourcesControllerTests : IDisposable
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
 
-        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var languages = _backend.Discovery.DiscoverLanguages(_testDirectory);
 
         // Default should remain unchanged
         var defaultLang = languages.First(l => l.IsDefault);
-        var defaultFile = _parser.Parse(defaultLang);
+        var defaultFile = _backend.Reader.Read(defaultLang);
         var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == "Save");
         Assert.Equal("Save", defaultEntry?.Value);  // Original value
         Assert.Equal("Save button", defaultEntry?.Comment);  // Original comment
 
         // Greek should be updated
         var greekLang = languages.First(l => l.Code == "el");
-        var greekFile = _parser.Parse(greekLang);
+        var greekFile = _backend.Reader.Read(greekLang);
         var greekEntry = greekFile.Entries.FirstOrDefault(e => e.Key == "Save");
         Assert.Equal("Νέα Ελληνική Τιμή", greekEntry?.Value);
         Assert.Equal("New Greek comment", greekEntry?.Comment);

@@ -3,6 +3,7 @@
 
 using Microsoft.AspNetCore.Mvc;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Models.Api;
 
@@ -13,14 +14,12 @@ namespace LocalizationManager.Controllers;
 public class ResourcesController : ControllerBase
 {
     private readonly string _resourcePath;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly IResourceBackend _backend;
 
-    public ResourcesController(IConfiguration configuration)
+    public ResourcesController(IConfiguration configuration, IResourceBackend backend)
     {
         _resourcePath = configuration["ResourcePath"] ?? Directory.GetCurrentDirectory();
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        _backend = backend;
     }
 
     /// <summary>
@@ -31,7 +30,7 @@ public class ResourcesController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
             var result = languages.Select(l => new ResourceFileInfo
             {
                 FileName = l.Name,
@@ -55,8 +54,8 @@ public class ResourcesController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var allKeys = resourceFiles
                 .SelectMany(f => f.Entries.Select(e => e.Key))
@@ -104,8 +103,8 @@ public class ResourcesController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             // Check for key existence and duplicates
             var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
@@ -211,8 +210,8 @@ public class ResourcesController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             // Check if key already exists
             var defaultFile = resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
@@ -235,7 +234,7 @@ public class ResourcesController : ControllerBase
                     Comment = request.Comment
                 });
 
-                _parser.Write(resourceFile);
+                _backend.Writer.Write(resourceFile);
             }
 
             return Ok(new OperationResponse
@@ -258,8 +257,8 @@ public class ResourcesController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var keyFound = false;
 
@@ -338,7 +337,7 @@ public class ResourcesController : ControllerBase
 
                 if (keyFound)
                 {
-                    _parser.Write(resourceFile);
+                    _backend.Writer.Write(resourceFile);
                 }
             }
 
@@ -371,8 +370,8 @@ public class ResourcesController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var deletedCount = 0;
 
@@ -396,7 +395,7 @@ public class ResourcesController : ControllerBase
                     deletedCount += removed;
                 }
 
-                _parser.Write(resourceFile);
+                _backend.Writer.Write(resourceFile);
             }
 
             if (deletedCount == 0)

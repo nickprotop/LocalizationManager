@@ -1,0 +1,31 @@
+{
+  "_meta": {
+    "language": "fr",
+    "isDefault": false,
+    "lastModified": "2025-01-01T00:00:00Z"
+  },
+  "Save": {
+    "_value": "Tout enregistrer",
+    "_comment": "Save button label"
+  },
+  "Cancel": "Annuler",
+  "WelcomeMessage": {
+    "_value": "Bienvenue dans notre application!",
+    "_comment": "Welcome message shown to users"
+  },
+  "EmptyValue": "",
+  "Errors": {
+    "NotFound": "Élément introuvable",
+    "AccessDenied": "Accès refusé"
+  },
+  "Buttons": {
+    "OK": "OK",
+    "Submit": "Soumettre",
+    "Close": "Fermer"
+  },
+  "Validation": {
+    "Required": "{0} est requis",
+    "MinLength": "{0} doit comporter au moins {1} caractères",
+    "Email": "Veuillez entrer une adresse e-mail valide"
+  }
+}

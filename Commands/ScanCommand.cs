@@ -107,30 +107,29 @@ public class ScanCommand : Command<ScanCommand.Settings>
         try
         {
             // Discover and parse resource files
-            var discovery = new ResourceDiscovery();
-            var languages = discovery.DiscoverLanguages(resourcePath);
+            var languages = settings.DiscoverLanguages();
+            var backendName = settings.GetBackendName();
 
             if (!languages.Any())
             {
                 if (isTableFormat)
                 {
-                    AnsiConsole.MarkupLine("[red]✗ No .resx files found![/]");
+                    AnsiConsole.MarkupLine($"[red]✗ No {backendName.ToUpper()} files found![/]");
                 }
                 else
                 {
-                    Console.Error.WriteLine("No .resx files found!");
+                    Console.Error.WriteLine($"No {backendName.ToUpper()} files found!");
                 }
                 return 1;
             }
 
-            var parser = new ResourceFileParser();
             var resourceFiles = new List<ResourceFile>();
 
             foreach (var lang in languages)
             {
                 try
                 {
-                    var resourceFile = parser.Parse(lang);
+                    var resourceFile = settings.ReadResourceFile(lang);
                     resourceFiles.Add(resourceFile);
                 }
                 catch (Exception ex)

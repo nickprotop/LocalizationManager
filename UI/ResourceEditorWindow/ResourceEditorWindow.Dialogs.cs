@@ -987,7 +987,7 @@ public partial class ResourceEditorWindow : Window
         };
 
         var manager = new LanguageFileManager();
-        var discovery = new ResourceDiscovery();
+        manager.SetBackend(_backend);
 
         cultureField.TextChanged += (oldValue) =>
         {
@@ -1173,6 +1173,7 @@ public partial class ResourceEditorWindow : Window
 
                     // Delete the file
                     var manager = new LanguageFileManager();
+                    manager.SetBackend(_backend);
                     manager.DeleteLanguageFile(rf.Language);
 
                     // Remove from list

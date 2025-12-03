@@ -57,8 +57,8 @@ public class BackupListCommand : AsyncCommand<BackupListCommand.Settings>
     {
         try
         {
+            settings.LoadConfiguration();
             var basePath = settings.GetResourcePath();
-            var manager = new ResourceDiscovery();
 
             if (!settings.AllFiles && string.IsNullOrWhiteSpace(settings.FileName))
             {

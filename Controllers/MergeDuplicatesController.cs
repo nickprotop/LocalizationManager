@@ -3,6 +3,7 @@
 
 using Microsoft.AspNetCore.Mvc;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Models.Api;
 
 namespace LocalizationManager.Controllers;
@@ -12,14 +13,12 @@ namespace LocalizationManager.Controllers;
 public class MergeDuplicatesController : ControllerBase
 {
     private readonly string _resourcePath;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly IResourceBackend _backend;
 
-    public MergeDuplicatesController(IConfiguration configuration)
+    public MergeDuplicatesController(IConfiguration configuration, IResourceBackend backend)
     {
         _resourcePath = configuration["ResourcePath"] ?? Directory.GetCurrentDirectory();
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        _backend = backend;
     }
 
     /// <summary>
@@ -30,8 +29,8 @@ public class MergeDuplicatesController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
             if (defaultFile == null)
@@ -86,8 +85,8 @@ public class MergeDuplicatesController : ControllerBase
                 return BadRequest(new ErrorResponse { Error = "You must specify a key or set mergeAll to true" });
             }
 
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
             if (defaultFile == null)
@@ -155,7 +154,7 @@ public class MergeDuplicatesController : ControllerBase
             // Write all updated files
             foreach (var file in resourceFiles)
             {
-                _parser.Write(file);
+                _backend.Writer.Write(file);
             }
 
             var message = request.MergeAll

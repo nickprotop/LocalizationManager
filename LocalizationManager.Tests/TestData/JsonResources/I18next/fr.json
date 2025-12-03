@@ -1,0 +1,14 @@
+{
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "ok": "OK"
+  },
+  "errors": {
+    "notFound": "Introuvable",
+    "accessDenied": "Accès refusé"
+  },
+  "items_one": "{{count}} élément",
+  "items_other": "{{count}} éléments",
+  "welcome": "Bienvenue, {{name}}!"
+}

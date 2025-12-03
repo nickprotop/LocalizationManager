@@ -19,6 +19,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using LocalizationManager.Core.Abstractions;
+using LocalizationManager.Core.Backends;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Shared.Models;
 
@@ -31,13 +33,33 @@ public class BackupRestoreService
 {
     private readonly BackupVersionManager _backupManager;
     private readonly BackupDiffService _diffService;
-    private readonly ResourceFileParser _parser;
+    private readonly IResourceBackendFactory _backendFactory;
 
     public BackupRestoreService(BackupVersionManager backupManager)
     {
         _backupManager = backupManager;
-        _diffService = new BackupDiffService();
-        _parser = new ResourceFileParser();
+        _backendFactory = new ResourceBackendFactory();
+        _diffService = new BackupDiffService(_backendFactory);
+    }
+
+    public BackupRestoreService(BackupVersionManager backupManager, IResourceBackendFactory backendFactory)
+    {
+        _backupManager = backupManager;
+        _backendFactory = backendFactory;
+        _diffService = new BackupDiffService(backendFactory);
+    }
+
+    /// <summary>
+    /// Gets the appropriate backend for a file based on its extension.
+    /// </summary>
+    private IResourceBackend GetBackendForFile(string filePath)
+    {
+        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        return extension switch
+        {
+            ".json" => _backendFactory.GetBackend("json"),
+            _ => _backendFactory.GetBackend("resx")
+        };
     }
 
     /// <summary>
@@ -146,8 +168,10 @@ public class BackupRestoreService
         // Parse both files
         var backupLangInfo = CreateLanguageInfo(backupFilePath);
         var targetLangInfo = CreateLanguageInfo(targetFilePath);
-        var backupFile = await Task.Run(() => _parser.Parse(backupLangInfo));
-        var targetFile = await Task.Run(() => _parser.Parse(targetLangInfo));
+        var backupBackend = GetBackendForFile(backupFilePath);
+        var targetBackend = GetBackendForFile(targetFilePath);
+        var backupFile = await Task.Run(() => backupBackend.Reader.Read(backupLangInfo));
+        var targetFile = await Task.Run(() => targetBackend.Reader.Read(targetLangInfo));
 
         // Create a dictionary of backup entries for fast lookup (case-insensitive)
         var backupEntries = backupFile.Entries.ToDictionary(e => e.Key, StringComparer.OrdinalIgnoreCase);
@@ -184,7 +208,7 @@ public class BackupRestoreService
         // Save the updated file
         if (restoredCount > 0)
         {
-            await Task.Run(() => _parser.Write(targetFile));
+            await Task.Run(() => targetBackend.Writer.Write(targetFile));
         }
 
         return restoredCount;
@@ -209,7 +233,8 @@ public class BackupRestoreService
         }
 
         var backupLangInfo = CreateLanguageInfo(backupFilePath);
-        var backupFile = await Task.Run(() => _parser.Parse(backupLangInfo));
+        var backend = GetBackendForFile(backupFilePath);
+        var backupFile = await Task.Run(() => backend.Reader.Read(backupLangInfo));
         return backupFile.Entries.Select(e => e.Key).ToList();
     }
 

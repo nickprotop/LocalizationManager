@@ -1,6 +1,6 @@
 # JSON Backend Implementation Guide
 
-> **Status:** Planning Complete
+> **Status:** Phase 5.4 Complete - Backup Services Refactored for Multi-Backend Support
 > **Target:** Full multi-backend support (RESX + JSON) across CLI/TUI/Web/API/VS Code Extension
 > **Plus:** NuGet package for consuming JSON localization in .NET apps
 
@@ -9,11 +9,11 @@
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
-2. [Phase 1: Core Abstraction Layer](#phase-1-core-abstraction-layer)
-3. [Phase 2: JSON Backend Implementation](#phase-2-json-backend-implementation)
-4. [Phase 3: New CLI Commands](#phase-3-new-cli-commands)
-5. [Phase 4: Testing](#phase-4-testing)
-6. [Phase 5: Refactor Consumers](#phase-5-refactor-consumers)
+2. [Phase 1: Core Abstraction Layer](#phase-1-core-abstraction-layer) ✅
+3. [Phase 2: JSON Backend Implementation](#phase-2-json-backend-implementation) ✅
+4. [Phase 3: New CLI Commands](#phase-3-new-cli-commands) ✅
+5. [Phase 4: Full Test Suite for Both Backends](#phase-4-full-test-suite-for-both-backends) ✅
+6. [Phase 5: Refactor Consumers](#phase-5-refactor-consumers) ✅
 7. [Phase 6: NuGet Package](#phase-6-nuget-package)
 8. [Phase 7: VS Code Extension](#phase-7-vs-code-extension)
 9. [JSON Format Specification](#json-format-specification)
@@ -93,12 +93,12 @@ public class ResourcesController : ControllerBase
 
 ### Progress
 
-- [ ] 1.1 Create abstraction interfaces
-- [ ] 1.2 Create RESX backend wrapper
-- [ ] 1.3 Create backend factory
-- [ ] 1.4 Update configuration model
-- [ ] 1.5 Setup dependency injection
-- [ ] 1.6 Verify existing functionality still works
+- [x] 1.1 Create abstraction interfaces
+- [x] 1.2 Create RESX backend wrapper
+- [x] 1.3 Create backend factory
+- [x] 1.4 Update configuration model
+- [x] 1.5 Setup dependency injection
+- [x] 1.6 Verify existing functionality still works
 
 ---
 
@@ -556,20 +556,220 @@ lrm edit -p ./TestResources
 
 ## Phase 2: JSON Backend Implementation
 
-> **Goal:** Create full JSON backend with flat/nested/plural support
+> **Goal:** Create full JSON backend with flat/nested/plural support and i18next auto-detection
 
 ### Progress
 
-- [ ] 2.1 Create JSON discovery
-- [ ] 2.2 Create JSON reader
-- [ ] 2.3 Create JSON writer
-- [ ] 2.4 Create JSON backend facade
-- [ ] 2.5 Handle special keys (_meta, _value, _comment, _plural)
-- [ ] 2.6 Test JSON backend
+- [x] 2.1 Create JSON format detector (auto-detect i18next vs standard)
+- [x] 2.2 Create JSON discovery
+- [x] 2.3 Create JSON reader
+- [x] 2.4 Create JSON writer
+- [x] 2.5 Create JSON backend facade
+- [x] 2.6 Handle special keys (_meta, _value, _comment, _plural)
+- [x] 2.7 Test JSON backend
 
 ---
 
-### 2.1 Create JSON Discovery
+### 2.1 Create JSON Format Detector
+
+**File to create:** `/Core/Backends/Json/JsonFormatDetector.cs`
+
+**Purpose:** Auto-detect whether JSON files use i18next conventions or standard LRM format when no explicit configuration is provided.
+
+**Detection Signals:**
+
+| Signal | i18next Score | Standard Score |
+|--------|---------------|----------------|
+| Files named only as culture codes (`en.json`) | +2 | 0 |
+| Files named `basename.culture.json` | 0 | +2 |
+| Found `{{...}}` interpolation in values | +2 | 0 |
+| Found `{0}`, `{1}` interpolation in values | 0 | +2 |
+| Keys ending with `_one`, `_other`, `_zero`, `_few`, `_many` | +3 | 0 |
+| Found `$t(...)` nesting references | +2 | 0 |
+| Found namespace separator `:` in keys | +1 | 0 |
+| Found `.` in keys (nested style) | 0 | +1 |
+
+**Guide:**
+
+```csharp
+namespace LocalizationManager.Core.Backends.Json;
+
+public enum DetectedJsonFormat
+{
+    Unknown,
+    Standard,
+    I18next
+}
+
+public class JsonFormatDetector
+{
+    private static readonly Regex I18nextInterpolation = new(@"\{\{[^}]+\}\}", RegexOptions.Compiled);
+    private static readonly Regex DotNetInterpolation = new(@"\{\d+\}", RegexOptions.Compiled);
+    private static readonly Regex I18nextNesting = new(@"\$t\([^)]+\)", RegexOptions.Compiled);
+    private static readonly string[] PluralSuffixes = { "_zero", "_one", "_two", "_few", "_many", "_other" };
+
+    public DetectedJsonFormat Detect(string path)
+    {
+        if (!Directory.Exists(path))
+            return DetectedJsonFormat.Unknown;
+
+        var jsonFiles = Directory.GetFiles(path, "*.json", SearchOption.TopDirectoryOnly)
+            .Where(f => !Path.GetFileName(f).StartsWith("lrm", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (!jsonFiles.Any())
+            return DetectedJsonFormat.Unknown;
+
+        int i18nextScore = 0;
+        int standardScore = 0;
+
+        // Check file naming convention
+        foreach (var file in jsonFiles)
+        {
+            var fileName = Path.GetFileNameWithoutExtension(file);
+
+            // Pure culture code file (en.json, fr-FR.json)
+            if (IsValidCultureCode(fileName))
+            {
+                i18nextScore += 2;
+            }
+            // basename.culture.json pattern
+            else if (fileName.Contains('.') && IsValidCultureCode(fileName.Split('.').Last()))
+            {
+                standardScore += 2;
+            }
+        }
+
+        // Sample content from first few files
+        foreach (var file in jsonFiles.Take(3))
+        {
+            try
+            {
+                var content = File.ReadAllText(file);
+                var (i18n, std) = AnalyzeContent(content);
+                i18nextScore += i18n;
+                standardScore += std;
+            }
+            catch
+            {
+                // Skip files that can't be read
+            }
+        }
+
+        // Determine winner
+        if (i18nextScore > standardScore && i18nextScore >= 3)
+            return DetectedJsonFormat.I18next;
+        if (standardScore > i18nextScore && standardScore >= 3)
+            return DetectedJsonFormat.Standard;
+
+        // Default to standard if unclear
+        return DetectedJsonFormat.Standard;
+    }
+
+    private (int i18next, int standard) AnalyzeContent(string content)
+    {
+        int i18next = 0;
+        int standard = 0;
+
+        // Check interpolation patterns
+        if (I18nextInterpolation.IsMatch(content))
+            i18next += 2;
+        if (DotNetInterpolation.IsMatch(content))
+            standard += 2;
+
+        // Check for $t() nesting
+        if (I18nextNesting.IsMatch(content))
+            i18next += 2;
+
+        // Check for plural suffixes in keys
+        try
+        {
+            using var doc = JsonDocument.Parse(content);
+            foreach (var prop in doc.RootElement.EnumerateObject())
+            {
+                // Check for plural suffix keys
+                if (PluralSuffixes.Any(suffix => prop.Name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)))
+                {
+                    i18next += 3;
+                    break;
+                }
+
+                // Check for namespace separator
+                if (prop.Name.Contains(':'))
+                    i18next += 1;
+
+                // Check for dot notation (could be either, slight preference for standard)
+                if (prop.Name.Contains('.') && !prop.Name.Contains(':'))
+                    standard += 1;
+            }
+        }
+        catch
+        {
+            // Invalid JSON, skip analysis
+        }
+
+        return (i18next, standard);
+    }
+
+    private bool IsValidCultureCode(string code)
+    {
+        if (string.IsNullOrEmpty(code))
+            return false;
+
+        try
+        {
+            var culture = CultureInfo.GetCultureInfo(code);
+            return culture != null && !string.IsNullOrEmpty(culture.Name);
+        }
+        catch (CultureNotFoundException)
+        {
+            return false;
+        }
+    }
+}
+```
+
+**Usage in JsonResourceBackend:**
+
+```csharp
+public class JsonResourceBackend : IResourceBackend
+{
+    private readonly JsonFormatConfiguration _config;
+    private readonly JsonFormatDetector _detector = new();
+
+    public JsonResourceBackend(string? path = null, JsonFormatConfiguration? config = null)
+    {
+        if (config != null)
+        {
+            _config = config;
+        }
+        else if (path != null)
+        {
+            // Auto-detect format
+            var detected = _detector.Detect(path);
+            _config = detected == DetectedJsonFormat.I18next
+                ? CreateI18nextConfig()
+                : new JsonFormatConfiguration();
+        }
+        else
+        {
+            _config = new JsonFormatConfiguration();
+        }
+    }
+
+    private static JsonFormatConfiguration CreateI18nextConfig() => new()
+    {
+        InterpolationFormat = "i18next",
+        PluralFormat = "cldr",
+        I18nextCompatible = true,
+        UseNestedKeys = false  // i18next typically uses flat keys with namespace:key
+    };
+}
+```
+
+---
+
+### 2.2 Create JSON Discovery
 
 **File to create:** `/Core/Backends/Json/JsonResourceDiscovery.cs`
 
@@ -686,7 +886,7 @@ public class JsonResourceDiscovery : IResourceDiscovery
 
 ---
 
-### 2.2 Create JSON Reader
+### 2.3 Create JSON Reader
 
 **File to create:** `/Core/Backends/Json/JsonResourceReader.cs`
 
@@ -805,7 +1005,7 @@ public class JsonResourceReader : IResourceReader
 
 ---
 
-### 2.3 Create JSON Writer
+### 2.4 Create JSON Writer
 
 **File to create:** `/Core/Backends/Json/JsonResourceWriter.cs`
 
@@ -988,7 +1188,7 @@ public class JsonResourceWriter : IResourceWriter
 
 ---
 
-### 2.4 Create JSON Backend Facade
+### 2.5 Create JSON Backend Facade
 
 **File to create:** `/Core/Backends/Json/JsonResourceBackend.cs`
 
@@ -1019,7 +1219,7 @@ public class JsonResourceBackend : IResourceBackend
 
 ---
 
-### 2.5 Update Factory
+### 2.6 Update Factory
 
 **File to modify:** `/Core/Backends/ResourceBackendFactory.cs`
 
@@ -1035,16 +1235,58 @@ private readonly Dictionary<string, Func<IResourceBackend>> _backends = new(Stri
 
 ---
 
+### 2.7 Test JSON Backend
+
+**Test files to create:**
+- `/LocalizationManager.Tests/UnitTests/JsonFormatDetectorTests.cs`
+- `/LocalizationManager.Tests/UnitTests/JsonResourceDiscoveryTests.cs`
+- `/LocalizationManager.Tests/UnitTests/JsonResourceReaderTests.cs`
+- `/LocalizationManager.Tests/UnitTests/JsonResourceWriterTests.cs`
+
+**Test data to create:**
+```
+/LocalizationManager.Tests/TestData/JsonResources/
+├── Standard/
+│   ├── strings.json           # Default language
+│   ├── strings.fr.json        # French
+│   └── strings.de.json        # German
+└── I18next/
+    ├── en.json                # English with {{name}}, key_one/key_other
+    ├── fr.json                # French
+    └── de.json                # German
+```
+
+**Test cases for JsonFormatDetector:**
+1. Empty directory → returns Unknown
+2. Only culture-code files (en.json, fr.json) → returns I18next
+3. basename.culture.json files → returns Standard
+4. Files with `{{...}}` interpolation → returns I18next
+5. Files with `{0}` interpolation → returns Standard
+6. Files with `_one`, `_other` plural keys → returns I18next
+7. Mixed signals → uses scoring to decide
+
+**Test cases for Reader/Writer:**
+1. Read flat JSON structure
+2. Read nested JSON structure
+3. Read i18next plural keys (_one, _other)
+4. Write preserves structure (flat stays flat, nested stays nested)
+5. Round-trip: read → write → read produces same result
+6. Handle _meta section correctly
+7. Handle _comment properties correctly
+
+---
+
 ## Phase 3: New CLI Commands
 
 > **Goal:** Add init wizard and convert command
+> **COMPLETED**
 
 ### Progress
 
-- [ ] 3.1 Create InitCommand with wizard
-- [ ] 3.2 Create ConvertCommand
-- [ ] 3.3 Register commands in Program.cs
-- [ ] 3.4 Update bash completion
+- [x] 3.1 Create InitCommand with wizard
+- [x] 3.2 Create ConvertCommand
+- [x] 3.3 Register commands in Program.cs
+- [ ] 3.4 Update bash completion (optional)
 
 ---
 
@@ -1556,18 +1798,21 @@ lrm convert --to i18next --interpolation i18next -o ./frontend/locales
 
 ---
 
-## Phase 4: Testing
+## Phase 4: Full Test Suite for Both Backends ✅
 
-> **Goal:** Create comprehensive tests BEFORE refactoring consumers
+> **Goal:** Create comprehensive test suite covering BOTH RESX and JSON backends, ensuring feature parity and compatibility
+> **Status:** ✅ COMPLETED - 650 tests total, all passing
 
 ### Progress
 
-- [ ] 4.1 Add JSON backend unit tests
-- [ ] 4.2 Add RESX backend wrapper unit tests
-- [ ] 4.3 Add factory unit tests
-- [ ] 4.4 Add integration tests for convert command
-- [ ] 4.5 Add integration tests for init command
-- [ ] 4.6 Verify existing RESX tests still pass
+- [x] 4.1 JSON Backend Unit Tests ✅ (45 tests: Reader 12, Writer 13, Discovery 20)
+- [x] 4.2 RESX Backend Unit Tests ✅ (31 tests already existed: Parser 10, Discovery 6, Manager 15)
+- [x] 4.3 Backend Factory Unit Tests ✅ (in MultiBackendIntegrationTests)
+- [x] 4.4 Cross-Backend Compatibility Tests ✅ (MultiBackendIntegrationTests: 10 tests)
+- [x] 4.5 Backup Service Tests ✅ (BackupSystemIntegrationTests + 3 JSON tests)
+- [x] 4.6 Command Integration Tests ✅ (Init: 6, Convert: 8 tests for both formats)
+- [x] 4.7 Controller Integration Tests ✅ (23 tests covering RESX/JSON/i18next backends)
+- [x] 4.8 Multi-Backend Command Tests ✅ (MergeDuplicates +8, Add +6, Delete +5 JSON tests)
 
 ---
 
@@ -1579,13 +1824,44 @@ lrm convert --to i18next --interpolation i18next -o ./frontend/locales
 - `/LocalizationManager.Tests/UnitTests/JsonResourceWriterTests.cs`
 - `/LocalizationManager.Tests/UnitTests/JsonResourceValidatorTests.cs`
 
-**Test Cases:**
-- Discovery: file naming patterns, culture code detection, lrm.json exclusion
-- Reader: flat keys, nested keys, _value/_comment, _plural (JSON format)
-- Writer: nested output, meta section, comment preservation, plural forms
-- Validator: missing translations, duplicate keys, invalid JSON
+**Test Cases - Discovery:**
+- File naming patterns: `strings.json`, `strings.fr.json`, `strings.en-US.json`
+- Culture code detection from filename
+- lrm.json exclusion from resource discovery
+- Multiple base names in same directory
+- Empty directory handling
 
-### 4.2 Backend Factory Unit Tests
+**Test Cases - Reader:**
+- Flat keys: `{"Hello": "World"}`
+- Nested keys: `{"Errors": {"NotFound": "Not found"}}`
+- Value with comment: `{"key": {"value": "...", "comment": "..."}}`
+- Plural entries: `{"Items": {"_plural": true, "one": "...", "other": "..."}}`
+- Empty file handling
+- Invalid JSON handling
+
+**Test Cases - Writer:**
+- Nested output option
+- _meta section generation
+- Comment preservation
+- Plural form serialization
+- Entry ordering
+
+**Test Cases - Validator:**
+- Missing translations between language files
+- Empty values detection
+- Placeholder mismatch detection
+
+### 4.2 RESX Backend Unit Tests (Mirror Tests)
+
+**Files to create:**
+- `/LocalizationManager.Tests/UnitTests/ResxResourceDiscoveryTests.cs`
+- `/LocalizationManager.Tests/UnitTests/ResxResourceReaderTests.cs`
+- `/LocalizationManager.Tests/UnitTests/ResxResourceWriterTests.cs`
+- `/LocalizationManager.Tests/UnitTests/ResxResourceValidatorTests.cs`
+
+**Purpose:** Mirror all JSON tests for RESX to ensure feature parity
+
+### 4.3 Backend Factory Unit Tests
 
 **File to create:** `/LocalizationManager.Tests/UnitTests/ResourceBackendFactoryTests.cs`
 
@@ -1595,37 +1871,151 @@ lrm convert --to i18next --interpolation i18next -o ./frontend/locales
 - GetBackend("invalid") throws NotSupportedException
 - ResolveFromPath with .resx files returns resx backend
 - ResolveFromPath with .json files returns json backend
+- ResolveFromPath with mixed files prioritizes JSON
 - ResolveFromPath excludes lrm*.json from detection
+- Empty directory defaults to RESX
 
-### 4.3 Integration Tests
+### 4.4 Cross-Backend Compatibility Tests
+
+**File to create:** `/LocalizationManager.Tests/IntegrationTests/CrossBackendTests.cs`
+
+**Test Cases:**
+- Convert RESX to JSON and back preserves all data
+- Keys with special characters work in both formats
+- Unicode characters preserved in both formats
+- Comments preserved across conversion
+- Entry order preserved (where applicable)
+
+### 4.5 Backup Service Tests (Both Formats)
+
+**Files to create:**
+- `/LocalizationManager.Tests/UnitTests/BackupVersionManagerTests.cs`
+- `/LocalizationManager.Tests/UnitTests/BackupRestoreServiceTests.cs`
+- `/LocalizationManager.Tests/UnitTests/BackupDiffServiceTests.cs`
+
+**Test Cases (run for BOTH RESX and JSON):**
+- Create backup preserves file extension
+- List backups returns correct metadata
+- Restore backup restores exact content
+- Backup diff shows correct changes
+- Backup rotation works correctly
+- Backup hash calculation is consistent
+- Key count tracking is accurate
+
+### 4.6 Command Integration Tests (Both Formats)
+
+**File to create:** `/LocalizationManager.Tests/IntegrationTests/CommandDualBackendTests.cs`
+
+**Purpose:** Run key commands against BOTH RESX and JSON test data to ensure identical behavior.
+
+**Commands to test with both backends:**
+- `validate` - Validation results match
+- `stats` - Statistics calculation matches
+- `view` - Key viewing works
+- `add` - Adding keys works
+- `update` - Updating keys works
+- `delete` - Deleting keys works
+- `translate` - Translation works (mock provider)
+- `export` - Export produces same CSV
+- `import` - Import works correctly
+- `add-language` - Language creation works
+- `remove-language` - Language removal works
+- `backup create/list/restore` - Backup operations work
+
+**Test Pattern:**
+```csharp
+[Theory]
+[InlineData("resx")]
+[InlineData("json")]
+public async Task Validate_ReturnsCorrectIssues_ForBothBackends(string backend)
+{
+    // Arrange: Create test files in specified format
+    // Act: Run validate command
+    // Assert: Same issues detected regardless of format
+}
+```
+
+### 4.7 Controller Integration Tests (Both Formats)
+
+**Files to create:**
+- `/LocalizationManager.Tests/IntegrationTests/ResourcesControllerDualBackendTests.cs`
+- `/LocalizationManager.Tests/IntegrationTests/BackupControllerDualBackendTests.cs`
+
+**Purpose:** Test Web API controllers work correctly with both backends.
+
+**Test Cases:**
+- GET /api/resources/keys returns same structure
+- POST /api/resources/keys/{key} creates entry
+- PUT /api/resources/keys/{key} updates entry
+- DELETE /api/resources/keys/{key} removes entry
+- GET /api/backup lists backups correctly
+- POST /api/backup/{file}/{version}/restore works
+
+---
+
+### Test Data Structure
+
+Create parallel test data directories:
+```
+/LocalizationManager.Tests/TestData/
+├── ResxResources/
+│   ├── TestResource.resx
+│   ├── TestResource.el.resx
+│   └── TestResource.fr.resx
+├── JsonResources/
+│   ├── TestResource.json
+│   ├── TestResource.el.json
+│   └── TestResource.fr.json
+└── MixedResources/
+    ├── strings.resx          # RESX files
+    └── config.json           # Non-resource JSON (should be ignored)
+```
+
+---
+
+### Init/Convert Command Tests
 
 **Files to create:**
 - `/LocalizationManager.Tests/IntegrationTests/InitCommandTests.cs`
 - `/LocalizationManager.Tests/IntegrationTests/ConvertCommandTests.cs`
 
-**Test Cases:**
-- init: creates JSON files with correct structure
-- init: creates lrm.json configuration
-- convert: RESX to JSON conversion preserves all data
-- convert: nested keys option works correctly
-- convert: comments are preserved
+**Init Command Test Cases:**
+- Creates JSON files with correct structure
+- Creates RESX files with correct structure
+- Creates lrm.json configuration
+- Interactive mode prompts work
+- Multiple languages created correctly
+
+**Convert Command Test Cases:**
+- RESX to JSON conversion preserves all data
+- JSON to RESX conversion preserves all data (future)
+- Nested keys option works correctly
+- Comments are preserved
+- Plurals are converted correctly
+- Output directory option works
 
 ---
 
 ## Phase 5: Refactor Consumers
 
-> **Goal:** Update all controllers and commands to use abstraction
+> **Goal:** Update all controllers, commands, and services to use abstraction
+> **COMPLETED**
 
 ### Progress
 
-- [ ] 5.1 Refactor controllers (13 files)
-- [ ] 5.2 Refactor commands (23 files)
-- [ ] 5.3 Update TUI (ResourceEditorWindow)
-- [ ] 5.4 Verify all functionality
+- [x] 5.1 Refactor controllers (13 files)
+- [x] 5.2 Refactor commands (18 files) - All commands updated
+- [x] 5.3 Update TUI (ResourceEditorWindow)
+- [x] 5.4 Refactor Backup Services (BackupVersionManager, BackupRestoreService, BackupDiffService)
+  - Added IResourceBackendFactory injection
+  - Auto-detect format from file extension
+  - Backup files preserve original extension (.json or .resx)
+  - Key counting works for both formats
+- [x] 5.5 Verify all functionality - 544 tests pass
 
 ---
 
-### Refactor Controllers
+### 5.1 Refactor Controllers
 
 **Pattern for each controller:**
 
@@ -1681,7 +2071,7 @@ public class ResourcesController : ControllerBase
 
 ---
 
-### 4.2 Refactor Commands
+### 5.2 Refactor Commands
 
 Similar pattern - use `GetBackend()` from `BaseCommandSettings`:
 
@@ -1707,13 +2097,13 @@ public override int Execute(CommandContext context, ViewCommandSettings settings
 
 ### Progress
 
-- [ ] 5.1 Create project structure
-- [ ] 5.2 Implement Localizer class
-- [ ] 5.3 Implement IStringLocalizer
-- [ ] 5.4 Implement EmbeddedResourceLoader
-- [ ] 5.5 Create source generator project
-- [ ] 5.6 Implement ResourcesGenerator
-- [ ] 5.7 Add pluralization rules
+- [ ] 6.1 Create project structure
+- [ ] 6.2 Implement Localizer class
+- [ ] 6.3 Implement IStringLocalizer
+- [ ] 6.4 Implement EmbeddedResourceLoader
+- [ ] 6.5 Create source generator project
+- [ ] 6.6 Implement ResourcesGenerator
+- [ ] 6.7 Add pluralization rules
 
 ---
 
@@ -1744,9 +2134,9 @@ public override int Execute(CommandContext context, ViewCommandSettings settings
 
 ### Progress
 
-- [ ] 6.1 Update lrmService.ts to pass format
-- [ ] 6.2 Update apiClient.ts types
-- [ ] 6.3 Test with JSON backend
+- [ ] 7.1 Update lrmService.ts to pass format
+- [ ] 7.2 Update apiClient.ts types
+- [ ] 7.3 Test with JSON backend
 
 *(Mostly automatic - API is format-agnostic)*
 

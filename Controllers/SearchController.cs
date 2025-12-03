@@ -3,6 +3,7 @@
 
 using Microsoft.AspNetCore.Mvc;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Models.Api;
 using LocalizationManager.UI.Filters;
@@ -14,15 +15,13 @@ namespace LocalizationManager.Controllers;
 public class SearchController : ControllerBase
 {
     private readonly string _resourcePath;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly IResourceBackend _backend;
     private readonly ResourceFilterService _filterService;
 
-    public SearchController(IConfiguration configuration, ResourceFilterService filterService)
+    public SearchController(IConfiguration configuration, IResourceBackend backend, ResourceFilterService filterService)
     {
         _resourcePath = configuration["ResourcePath"] ?? Directory.GetCurrentDirectory();
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        _backend = backend;
         _filterService = filterService;
     }
 
@@ -35,8 +34,8 @@ public class SearchController : ControllerBase
         try
         {
             // Load all keys
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var allKeys = resourceFiles
                 .SelectMany(f => f.Entries.Select(e => e.Key))

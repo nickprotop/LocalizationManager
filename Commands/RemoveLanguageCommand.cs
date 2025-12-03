@@ -44,8 +44,7 @@ public class RemoveLanguageCommand : Command<RemoveLanguageCommandSettings>
         try
         {
             var manager = new LanguageFileManager();
-            var parser = new ResourceFileParser();
-            var discovery = new ResourceDiscovery();
+            manager.SetBackend(settings.GetBackend());
 
             // Step 1: Validate culture code
             AnsiConsole.MarkupLine($"[yellow]►[/] Validating culture code '{settings.Culture}'...");
@@ -57,7 +56,7 @@ public class RemoveLanguageCommand : Command<RemoveLanguageCommandSettings>
             }
 
             // Step 2: Discover existing languages
-            var languages = discovery.DiscoverLanguages(settings.GetResourcePath());
+            var languages = settings.DiscoverLanguages();
             if (languages.Count == 0)
             {
                 AnsiConsole.MarkupLine("[red]✗ No resource files found in the specified path[/]");
@@ -106,7 +105,7 @@ public class RemoveLanguageCommand : Command<RemoveLanguageCommandSettings>
             }
 
             // Step 5: Parse file to get entry count
-            var resourceFile = parser.Parse(targetLanguage);
+            var resourceFile = settings.ReadResourceFile(targetLanguage);
             var entryCount = resourceFile.Entries.Count;
 
             // Step 6: Show preview and confirm

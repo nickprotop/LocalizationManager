@@ -21,6 +21,8 @@
 
 using System.Security.Cryptography;
 using System.Text.Json;
+using LocalizationManager.Core.Abstractions;
+using LocalizationManager.Core.Backends;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Shared.Models;
 
@@ -35,6 +37,7 @@ public class BackupVersionManager
     private const string ManifestFileName = "manifest.json";
     private readonly int _maxVersions;
     private readonly BackupRotationPolicy? _rotationPolicy;
+    private readonly IResourceBackendFactory _backendFactory;
 
     /// <summary>
     /// Initializes a new instance of BackupVersionManager.
@@ -45,6 +48,27 @@ public class BackupVersionManager
     {
         _maxVersions = maxVersions;
         _rotationPolicy = rotationPolicy;
+        _backendFactory = new ResourceBackendFactory();
+    }
+
+    public BackupVersionManager(int maxVersions, BackupRotationPolicy? rotationPolicy, IResourceBackendFactory backendFactory)
+    {
+        _maxVersions = maxVersions;
+        _rotationPolicy = rotationPolicy;
+        _backendFactory = backendFactory;
+    }
+
+    /// <summary>
+    /// Gets the appropriate backend for a file based on its extension.
+    /// </summary>
+    private IResourceBackend GetBackendForFile(string filePath)
+    {
+        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        return extension switch
+        {
+            ".json" => _backendFactory.GetBackend("json"),
+            _ => _backendFactory.GetBackend("resx")
+        };
     }
 
     /// <summary>
@@ -78,9 +102,10 @@ public class BackupVersionManager
         // Calculate next version number
         var nextVersion = (manifest.Backups.Any() ? manifest.Backups.Max(b => b.Version) : 0) + 1;
 
-        // Create backup file
+        // Create backup file (preserve original extension)
         var timestamp = DateTime.UtcNow;
-        var backupFileName = $"v{nextVersion:D3}_{timestamp:yyyy-MM-ddTHH-mm-ss}.resx";
+        var extension = Path.GetExtension(filePath);
+        var backupFileName = $"v{nextVersion:D3}_{timestamp:yyyy-MM-ddTHH-mm-ss}{extension}";
         var backupFilePath = Path.Combine(backupDir, backupFileName);
 
         // Copy file to backup location
@@ -309,15 +334,15 @@ public class BackupVersionManager
     }
 
     /// <summary>
-    /// Counts the number of keys in a .resx file.
+    /// Counts the number of keys in a resource file.
     /// </summary>
     private async Task<int> CountKeysInFileAsync(string filePath)
     {
         try
         {
-            var parser = new ResourceFileParser();
+            var backend = GetBackendForFile(filePath);
             var langInfo = CreateLanguageInfo(filePath);
-            var resourceFile = await Task.Run(() => parser.Parse(langInfo));
+            var resourceFile = await Task.Run(() => backend.Reader.Read(langInfo));
             return resourceFile.Entries.Count;
         }
         catch
@@ -333,11 +358,12 @@ public class BackupVersionManager
     {
         try
         {
-            var parser = new ResourceFileParser();
+            var oldBackend = GetBackendForFile(oldFilePath);
+            var newBackend = GetBackendForFile(newFilePath);
             var oldLangInfo = CreateLanguageInfo(oldFilePath);
             var newLangInfo = CreateLanguageInfo(newFilePath);
-            var oldFile = await Task.Run(() => parser.Parse(oldLangInfo));
-            var newFile = await Task.Run(() => parser.Parse(newLangInfo));
+            var oldFile = await Task.Run(() => oldBackend.Reader.Read(oldLangInfo));
+            var newFile = await Task.Run(() => newBackend.Reader.Read(newLangInfo));
 
             var oldKeys = new HashSet<string>(oldFile.Entries.Select(e => e.Key), StringComparer.OrdinalIgnoreCase);
             var newKeys = new HashSet<string>(newFile.Entries.Select(e => e.Key), StringComparer.OrdinalIgnoreCase);

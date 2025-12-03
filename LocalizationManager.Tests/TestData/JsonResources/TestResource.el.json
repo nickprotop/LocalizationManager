@@ -1,0 +1,31 @@
+{
+  "_meta": {
+    "language": "el",
+    "isDefault": false,
+    "lastModified": "2025-01-01T00:00:00Z"
+  },
+  "Save": {
+    "_value": "Αποθήκευση Όλων",
+    "_comment": "Save button label"
+  },
+  "Cancel": "Ακύρωση",
+  "WelcomeMessage": {
+    "_value": "Καλώς ήρθατε στην εφαρμογή μας!",
+    "_comment": "Welcome message shown to users"
+  },
+  "EmptyValue": "",
+  "Errors": {
+    "NotFound": "Το αντικείμενο δεν βρέθηκε",
+    "AccessDenied": "Δεν επιτρέπεται η πρόσβαση"
+  },
+  "Buttons": {
+    "OK": "ΟΚ",
+    "Submit": "Υποβολή",
+    "Close": "Κλείσιμο"
+  },
+  "Validation": {
+    "Required": "Το {0} είναι υποχρεωτικό",
+    "MinLength": "Το {0} πρέπει να έχει τουλάχιστον {1} χαρακτήρες",
+    "Email": "Παρακαλώ εισάγετε έγκυρη διεύθυνση email"
+  }
+}

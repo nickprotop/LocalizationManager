@@ -3,6 +3,7 @@
 
 using Microsoft.AspNetCore.Mvc;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Models.Api;
 using System.Globalization;
@@ -14,14 +15,12 @@ namespace LocalizationManager.Controllers;
 public class ImportController : ControllerBase
 {
     private readonly string _resourcePath;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly IResourceBackend _backend;
 
-    public ImportController(IConfiguration configuration)
+    public ImportController(IConfiguration configuration, IResourceBackend backend)
     {
         _resourcePath = configuration["ResourcePath"] ?? Directory.GetCurrentDirectory();
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        _backend = backend;
     }
 
     /// <summary>
@@ -37,8 +36,8 @@ public class ImportController : ControllerBase
                 return BadRequest(new ErrorResponse { Error = "CSV data is required" });
             }
 
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             // Parse CSV
             var lines = request.CsvData.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -113,7 +112,7 @@ public class ImportController : ControllerBase
             // Save all files
             foreach (var resourceFile in resourceFiles)
             {
-                _parser.Write(resourceFile);
+                _backend.Writer.Write(resourceFile);
             }
 
             return Ok(new ImportResult

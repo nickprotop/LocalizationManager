@@ -22,6 +22,7 @@
 using System.Data;
 using System.Timers;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Backup;
 using LocalizationManager.Core.Configuration;
 using LocalizationManager.Core.Models;
@@ -54,7 +55,7 @@ internal class EntryReference
 public partial class ResourceEditorWindow : Window
 {
     private readonly List<ResourceFile> _resourceFiles;
-    private readonly ResourceFileParser _parser;
+    private readonly IResourceBackend _backend;
     private readonly ResourceValidator _validator;
     private readonly ResourceFilterService _filterService;
     private readonly string _defaultLanguageCode;
@@ -103,10 +104,10 @@ public partial class ResourceEditorWindow : Window
         MissingFromResources  // Used in code but not defined in .resx (red/critical)
     }
 
-    public ResourceEditorWindow(List<ResourceFile> resourceFiles, ResourceFileParser parser, string defaultLanguageCode = "default", string? sourcePath = null, ConfigurationModel? configuration = null)
+    public ResourceEditorWindow(List<ResourceFile> resourceFiles, IResourceBackend backend, string defaultLanguageCode = "default", string? sourcePath = null, ConfigurationModel? configuration = null)
     {
         _resourceFiles = resourceFiles;
-        _parser = parser;
+        _backend = backend;
         _validator = new ResourceValidator();
         _filterService = new ResourceFilterService();
         _defaultLanguageCode = defaultLanguageCode;

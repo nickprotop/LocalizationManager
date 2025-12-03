@@ -19,6 +19,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using LocalizationManager.Core.Abstractions;
+using LocalizationManager.Core.Backends;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Shared.Enums;
 using LocalizationManager.Shared.Models;
@@ -30,11 +32,29 @@ namespace LocalizationManager.Core.Backup;
 /// </summary>
 public class BackupDiffService
 {
-    private readonly ResourceFileParser _parser;
+    private readonly IResourceBackendFactory _backendFactory;
 
     public BackupDiffService()
     {
-        _parser = new ResourceFileParser();
+        _backendFactory = new ResourceBackendFactory();
+    }
+
+    public BackupDiffService(IResourceBackendFactory backendFactory)
+    {
+        _backendFactory = backendFactory;
+    }
+
+    /// <summary>
+    /// Gets the appropriate backend for a file based on its extension.
+    /// </summary>
+    private IResourceBackend GetBackendForFile(string filePath)
+    {
+        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        return extension switch
+        {
+            ".json" => _backendFactory.GetBackend("json"),
+            _ => _backendFactory.GetBackend("resx")
+        };
     }
 
     /// <summary>
@@ -56,8 +76,11 @@ public class BackupDiffService
         var langInfoA = CreateLanguageInfo(filePathA);
         var langInfoB = CreateLanguageInfo(filePathB);
 
-        var fileA = await Task.Run(() => _parser.Parse(langInfoA));
-        var fileB = await Task.Run(() => _parser.Parse(langInfoB));
+        var backendA = GetBackendForFile(filePathA);
+        var backendB = GetBackendForFile(filePathB);
+
+        var fileA = await Task.Run(() => backendA.Reader.Read(langInfoA));
+        var fileB = await Task.Run(() => backendB.Reader.Read(langInfoB));
 
         return Compare(versionA, versionB, fileA, fileB, includeUnchanged);
     }
@@ -79,8 +102,11 @@ public class BackupDiffService
         var backupLangInfo = CreateLanguageInfo(backupFilePath);
         var currentLangInfo = CreateLanguageInfo(currentFilePath);
 
-        var backupFile = await Task.Run(() => _parser.Parse(backupLangInfo));
-        var currentFile = await Task.Run(() => _parser.Parse(currentLangInfo));
+        var backupBackend = GetBackendForFile(backupFilePath);
+        var currentBackend = GetBackendForFile(currentFilePath);
+
+        var backupFile = await Task.Run(() => backupBackend.Reader.Read(backupLangInfo));
+        var currentFile = await Task.Run(() => currentBackend.Reader.Read(currentLangInfo));
 
         var currentMetadata = new BackupMetadata
         {
@@ -111,8 +137,11 @@ public class BackupDiffService
         var backupLangInfo = CreateLanguageInfo(backupFilePath);
         var currentLangInfo = CreateLanguageInfo(currentFilePath);
 
-        var backupFile = await Task.Run(() => _parser.Parse(backupLangInfo));
-        var currentFile = await Task.Run(() => _parser.Parse(currentLangInfo));
+        var backupBackend = GetBackendForFile(backupFilePath);
+        var currentBackend = GetBackendForFile(currentFilePath);
+
+        var backupFile = await Task.Run(() => backupBackend.Reader.Read(backupLangInfo));
+        var currentFile = await Task.Run(() => currentBackend.Reader.Read(currentLangInfo));
 
         var currentMetadata = new BackupMetadata
         {

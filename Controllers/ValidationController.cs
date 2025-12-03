@@ -3,6 +3,7 @@
 
 using Microsoft.AspNetCore.Mvc;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Validation;
 using LocalizationManager.Shared.Enums;
 using LocalizationManager.Models.Api;
@@ -14,15 +15,13 @@ namespace LocalizationManager.Controllers;
 public class ValidationController : ControllerBase
 {
     private readonly string _resourcePath;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly IResourceBackend _backend;
     private readonly ResourceValidator _validator;
 
-    public ValidationController(IConfiguration configuration)
+    public ValidationController(IConfiguration configuration, IResourceBackend backend)
     {
         _resourcePath = configuration["ResourcePath"] ?? Directory.GetCurrentDirectory();
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        _backend = backend;
         _validator = new ResourceValidator();
     }
 
@@ -34,8 +33,8 @@ public class ValidationController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var placeholderTypes = request?.EnabledPlaceholderTypes ?? PlaceholderType.All;
             var result = _validator.Validate(resourceFiles, placeholderTypes);
@@ -76,8 +75,8 @@ public class ValidationController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var result = _validator.Validate(resourceFiles);
 

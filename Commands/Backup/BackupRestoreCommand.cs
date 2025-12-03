@@ -64,11 +64,11 @@ public class BackupRestoreCommand : AsyncCommand<BackupRestoreCommand.Settings>
     {
         try
         {
+            settings.LoadConfiguration();
             var basePath = settings.GetResourcePath();
-            var manager = new ResourceDiscovery();
 
             // Find the resource file
-            var filePath = FindResourceFile(settings.FileName, basePath);
+            var filePath = FindResourceFile(settings.FileName, basePath, settings);
             if (filePath == null)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] Resource file '{settings.FileName}' not found.");
@@ -200,10 +200,9 @@ public class BackupRestoreCommand : AsyncCommand<BackupRestoreCommand.Settings>
         }
     }
 
-    private string? FindResourceFile(string fileName, string basePath)
+    private string? FindResourceFile(string fileName, string basePath, Settings settings)
     {
-        var manager = new ResourceDiscovery();
-        var languages = manager.DiscoverLanguages(basePath);
+        var languages = settings.DiscoverLanguages();
 
         var file = languages.FirstOrDefault(l =>
             Path.GetFileName(l.FilePath).Equals(fileName, StringComparison.OrdinalIgnoreCase));

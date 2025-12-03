@@ -11,6 +11,8 @@
 _lrm() {
     local -a commands
     commands=(
+        'init:Initialize a new localization project'
+        'convert:Convert resource files between formats'
         'validate:Validate resource files for missing keys, duplicates, and empty values'
         'stats:Display statistics about resource files and translation coverage'
         'view:View details of a specific localization key'
@@ -36,6 +38,7 @@ _lrm() {
     local -a global_opts
     global_opts=(
         '(-p --path)'{-p,--path}'[Path to Resources folder]:directory:_directories'
+        '--backend[Resource format backend]:backend:(json resx)'
         '(-h --help)'{-h,--help}'[Show help information]'
         '(-v --version)'{-v,--version}'[Show version information]'
     )
@@ -73,6 +76,47 @@ _lrm() {
             ;;
         args)
             case $words[1] in
+                init)
+                    local -a resource_format_opts
+                    resource_format_opts=(
+                        'json:JSON format (recommended)'
+                        'resx:.NET RESX XML format'
+                    )
+                    _arguments \
+                        '(-i --interactive)'{-i,--interactive}'[Run interactive setup wizard]' \
+                        '--format[Resource format]:format:->resource_formats' \
+                        '--default-lang[Default language code]:lang:(en en-US en-GB)' \
+                        '--languages[Additional languages (comma-separated)]:languages' \
+                        '--base-name[Base filename for resources]:basename' \
+                        '(-y --yes)'{-y,--yes}'[Skip confirmation prompts]' \
+                        $global_opts
+                    case $state in
+                        resource_formats)
+                            _describe -t resource_formats 'resource formats' resource_format_opts
+                            ;;
+                    esac
+                    ;;
+                convert)
+                    local -a resource_format_opts
+                    resource_format_opts=(
+                        'json:JSON format'
+                        'resx:.NET RESX XML format'
+                    )
+                    _arguments \
+                        '--from[Source format]:format:->resource_formats' \
+                        '--to[Target format]:format:->resource_formats' \
+                        '(-o --output)'{-o,--output}'[Output directory]:directory:_directories' \
+                        '--nested[Convert to nested key structure (JSON only)]' \
+                        '--include-comments[Preserve comments in output]' \
+                        '--no-backup[Skip backup creation]' \
+                        '(-y --yes)'{-y,--yes}'[Skip confirmation prompts]' \
+                        $global_opts
+                    case $state in
+                        resource_formats)
+                            _describe -t resource_formats 'resource formats' resource_format_opts
+                            ;;
+                    esac
+                    ;;
                 validate)
                     _arguments \
                         '--format[Output format]:format:->formats' \

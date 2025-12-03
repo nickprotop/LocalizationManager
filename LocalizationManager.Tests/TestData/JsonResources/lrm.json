@@ -1,0 +1,11 @@
+{
+  "defaultLanguageCode": "en",
+  "resourceFormat": "json",
+  "json": {
+    "useNestedKeys": true,
+    "includeMeta": true,
+    "preserveComments": true,
+    "baseName": "TestResource",
+    "i18nextCompatible": false
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "resourceFormat": "json",
+  "json": {
+    "useNestedKeys": true,
+    "includeMeta": true,
+    "preserveComments": true,
+    "i18nextCompatible": true
+  }
+}

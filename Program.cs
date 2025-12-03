@@ -44,6 +44,20 @@ app.Configure(config =>
     config.AddExample(new[] { "view", "SaveButton", "--format", "json" });
     config.AddExample(new[] { "add", "NewKey", "--lang", "default:\"Save Changes\"", "--lang", "el:\"Αποθήκευση Αλλαγών\"" });
 
+    config.AddCommand<InitCommand>("init")
+        .WithDescription("Initialize a new localization project")
+        .WithExample(new[] { "init" })
+        .WithExample(new[] { "init", "-i" })
+        .WithExample(new[] { "init", "--format", "json", "--default-lang", "en" })
+        .WithExample(new[] { "init", "--format", "resx", "--languages", "fr,de,el" });
+
+    config.AddCommand<ConvertCommand>("convert")
+        .WithDescription("Convert resource files between formats")
+        .WithExample(new[] { "convert", "--to", "json" })
+        .WithExample(new[] { "convert", "--to", "resx" })
+        .WithExample(new[] { "convert", "--to", "json", "--nested" })
+        .WithExample(new[] { "convert", "--from", "resx", "--to", "json", "-o", "./JsonResources" });
+
     config.AddCommand<ValidateCommand>("validate")
         .WithDescription("Validate resource files for missing keys, duplicates, and empty values")
         .WithExample(new[] { "validate" })

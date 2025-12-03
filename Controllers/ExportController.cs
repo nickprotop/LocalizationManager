@@ -3,6 +3,7 @@
 
 using Microsoft.AspNetCore.Mvc;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Abstractions;
 
 namespace LocalizationManager.Controllers;
 
@@ -11,14 +12,12 @@ namespace LocalizationManager.Controllers;
 public class ExportController : ControllerBase
 {
     private readonly string _resourcePath;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly IResourceBackend _backend;
 
-    public ExportController(IConfiguration configuration)
+    public ExportController(IConfiguration configuration, IResourceBackend backend)
     {
         _resourcePath = configuration["ResourcePath"] ?? Directory.GetCurrentDirectory();
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        _backend = backend;
     }
 
     /// <summary>
@@ -29,8 +28,8 @@ public class ExportController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var defaultFile = resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
             if (defaultFile == null)
@@ -91,8 +90,8 @@ public class ExportController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var defaultFile = resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
             if (defaultFile == null)

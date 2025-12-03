@@ -53,8 +53,8 @@ public class BackupCreateCommand : AsyncCommand<BackupCreateCommand.Settings>
     {
         try
         {
+            settings.LoadConfiguration();
             var basePath = settings.GetResourcePath();
-            var manager = new ResourceDiscovery();
 
             if (!settings.AllFiles && string.IsNullOrWhiteSpace(settings.FileName))
             {
@@ -66,7 +66,7 @@ public class BackupCreateCommand : AsyncCommand<BackupCreateCommand.Settings>
 
             if (settings.AllFiles)
             {
-                var languages = manager.DiscoverLanguages(basePath);
+                var languages = settings.DiscoverLanguages();
                 if (!languages.Any())
                 {
                     AnsiConsole.MarkupLine("[yellow]No resource files found.[/]");
@@ -103,7 +103,7 @@ public class BackupCreateCommand : AsyncCommand<BackupCreateCommand.Settings>
             }
             else
             {
-                var filePath = FindResourceFile(settings.FileName!, basePath);
+                var filePath = FindResourceFile(settings.FileName!, basePath, settings);
                 if (filePath == null)
                 {
                     AnsiConsole.MarkupLine($"[red]Error:[/] Resource file '{settings.FileName}' not found.");
@@ -129,10 +129,9 @@ public class BackupCreateCommand : AsyncCommand<BackupCreateCommand.Settings>
         }
     }
 
-    private string? FindResourceFile(string fileName, string basePath)
+    private string? FindResourceFile(string fileName, string basePath, Settings settings)
     {
-        var manager = new ResourceDiscovery();
-        var languages = manager.DiscoverLanguages(basePath);
+        var languages = settings.DiscoverLanguages();
 
         var file = languages.FirstOrDefault(l =>
             Path.GetFileName(l.FilePath).Equals(fileName, StringComparison.OrdinalIgnoreCase));

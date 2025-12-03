@@ -135,8 +135,8 @@ public class BackupDiffCommand : AsyncCommand<BackupDiffCommand.Settings>
             if (compareWithCurrent)
             {
                 // Find current file
-                var manager = new ResourceDiscovery();
-                var languages = manager.DiscoverLanguages(basePath);
+                settings.LoadConfiguration();
+                var languages = settings.DiscoverLanguages();
                 var currentFile = languages.FirstOrDefault(l =>
                     Path.GetFileName(l.FilePath).Equals(settings.FileName, StringComparison.OrdinalIgnoreCase));
 

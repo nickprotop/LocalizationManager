@@ -1,0 +1,14 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "ok": "OK"
+  },
+  "errors": {
+    "notFound": "Not found",
+    "accessDenied": "Access denied"
+  },
+  "items_one": "{{count}} item",
+  "items_other": "{{count}} items",
+  "welcome": "Welcome, {{name}}!"
+}

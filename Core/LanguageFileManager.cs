@@ -2,6 +2,7 @@
 // Licensed under the MIT License
 
 using System.Globalization;
+using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Models;
 
 namespace LocalizationManager.Core;
@@ -11,11 +12,33 @@ namespace LocalizationManager.Core;
 /// </summary>
 public class LanguageFileManager
 {
-    private readonly ResourceFileParser _parser;
+    private IResourceBackend? _backend;
 
     public LanguageFileManager()
     {
-        _parser = new ResourceFileParser();
+    }
+
+    /// <summary>
+    /// Sets the backend to use for file operations.
+    /// </summary>
+    public void SetBackend(IResourceBackend backend)
+    {
+        _backend = backend;
+    }
+
+    private IResourceBackend GetBackend()
+    {
+        if (_backend == null)
+        {
+            // Default to RESX backend for backwards compatibility
+            _backend = new Backends.Resx.ResxResourceBackend();
+        }
+        return _backend;
+    }
+
+    private string GetFileExtension()
+    {
+        return GetBackend().SupportedExtensions.FirstOrDefault() ?? ".resx";
     }
 
     /// <summary>
@@ -41,7 +64,8 @@ public class LanguageFileManager
         }
 
         // Build target file path
-        var fileName = $"{baseName}.{cultureCode}.resx";
+        var extension = GetFileExtension();
+        var fileName = $"{baseName}.{cultureCode}{extension}";
         var filePath = Path.Combine(targetPath, fileName);
 
         // Check if file already exists
@@ -79,7 +103,7 @@ public class LanguageFileManager
         }
 
         // Write to disk
-        _parser.Write(resourceFile);
+        GetBackend().Writer.Write(resourceFile);
 
         return resourceFile;
     }
@@ -148,7 +172,8 @@ public class LanguageFileManager
     /// <returns>True if file exists, false otherwise</returns>
     public bool LanguageFileExists(string baseName, string cultureCode, string path)
     {
-        var fileName = $"{baseName}.{cultureCode}.resx";
+        var extension = GetFileExtension();
+        var fileName = $"{baseName}.{cultureCode}{extension}";
         var filePath = Path.Combine(path, fileName);
         return File.Exists(filePath);
     }

@@ -312,6 +312,118 @@ public class BackupSystemIntegrationTests : IDisposable
         return content;
     }
 
+    #region JSON Backup Tests
+
+    [Fact]
+    public async Task Json_FullWorkflow_CreateBackupAndRestore()
+    {
+        // Arrange - Create initial JSON file
+        var fileName = "TestResource.json";
+        var filePath = CreateJsonFile(fileName, new Dictionary<string, string>
+        {
+            { "Key1", "InitialValue1" },
+            { "Key2", "InitialValue2" },
+            { "Key3", "InitialValue3" }
+        });
+
+        // Act 1: Create backup
+        var backup1 = await _backupManager.CreateBackupAsync(filePath, "initial", _testPath);
+        Assert.Equal(1, backup1.Version);
+
+        // Act 2: Modify file
+        File.WriteAllText(filePath, GetJsonContent(new Dictionary<string, string>
+        {
+            { "Key1", "ModifiedValue1" },
+            { "Key2", "InitialValue2" },
+            { "Key4", "NewValue4" }
+        }));
+
+        // Act 3: Create second backup
+        var backup2 = await _backupManager.CreateBackupAsync(filePath, "modified", _testPath);
+        Assert.Equal(2, backup2.Version);
+
+        // Act 4: Restore first backup
+        await _restoreService.RestoreAsync(fileName, 1, filePath, _testPath, createBackupBeforeRestore: true);
+
+        // Assert: Verify restoration
+        var content = File.ReadAllText(filePath);
+        Assert.Contains("InitialValue1", content);
+        Assert.Contains("InitialValue2", content);
+        Assert.Contains("InitialValue3", content);
+        Assert.DoesNotContain("ModifiedValue1", content);
+        Assert.DoesNotContain("NewValue4", content);
+    }
+
+    [Fact]
+    public async Task Json_MultipleBackups_WorksLikeResx()
+    {
+        // Arrange
+        var fileName = "TestResource.json";
+        var filePath = CreateJsonFile(fileName, new Dictionary<string, string>
+        {
+            { "Key1", "Value1" }
+        });
+
+        // Act: Create 5 backups
+        for (int i = 1; i <= 5; i++)
+        {
+            File.WriteAllText(filePath, GetJsonContent(new Dictionary<string, string>
+            {
+                { "Key1", $"Value{i}" }
+            }));
+            await _backupManager.CreateBackupAsync(filePath, $"test{i}", _testPath);
+            await Task.Delay(10);
+        }
+
+        // Assert
+        var backups = await _backupManager.ListBackupsAsync(fileName, _testPath);
+        Assert.Equal(5, backups.Count);
+        Assert.Equal(5, backups[0].Version);
+        Assert.Equal(1, backups[4].Version);
+    }
+
+    [Fact]
+    public async Task Json_HashVerification_DetectsChanges()
+    {
+        // Arrange
+        var fileName = "TestResource.json";
+        var filePath = CreateJsonFile(fileName, new Dictionary<string, string>
+        {
+            { "Key1", "Value1" }
+        });
+
+        var backup1 = await _backupManager.CreateBackupAsync(filePath, "test1", _testPath);
+        var hash1 = backup1.Hash;
+
+        // Modify file
+        File.WriteAllText(filePath, GetJsonContent(new Dictionary<string, string>
+        {
+            { "Key1", "Value2" }
+        }));
+
+        var backup2 = await _backupManager.CreateBackupAsync(filePath, "test2", _testPath);
+        var hash2 = backup2.Hash;
+
+        // Assert
+        Assert.NotEqual(hash1, hash2);
+    }
+
+    private string CreateJsonFile(string fileName, Dictionary<string, string> entries)
+    {
+        var filePath = Path.Combine(_testPath, fileName);
+        var content = GetJsonContent(entries);
+        File.WriteAllText(filePath, content);
+        return filePath;
+    }
+
+    private string GetJsonContent(Dictionary<string, string> entries)
+    {
+        var pairs = entries.Select(e => $"  \"{e.Key}\": \"{e.Value}\"");
+        return "{\n" + string.Join(",\n", pairs) + "\n}";
+    }
+
+    #endregion
+
     public void Dispose()
     {
         try

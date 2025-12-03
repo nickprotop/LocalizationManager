@@ -3,6 +3,7 @@
 
 using Microsoft.AspNetCore.Mvc;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Backup;
 using LocalizationManager.Models.Api;
 
@@ -13,13 +14,13 @@ namespace LocalizationManager.Controllers;
 public class BackupController : ControllerBase
 {
     private readonly string _resourcePath;
-    private readonly ResourceDiscovery _discovery;
+    private readonly IResourceBackend _backend;
     private readonly BackupVersionManager _backupManager;
 
-    public BackupController(IConfiguration configuration)
+    public BackupController(IConfiguration configuration, IResourceBackend backend)
     {
         _resourcePath = configuration["ResourcePath"] ?? Directory.GetCurrentDirectory();
-        _discovery = new ResourceDiscovery();
+        _backend = backend;
         _backupManager = new BackupVersionManager();
     }
 
@@ -43,10 +44,11 @@ public class BackupController : ControllerBase
             return false;
         }
 
-        // Must end with .resx
-        if (!fileName.EndsWith(".resx", StringComparison.OrdinalIgnoreCase))
+        // Must end with a supported extension
+        var supportedExtensions = _backend.SupportedExtensions;
+        if (!supportedExtensions.Any(ext => fileName.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
         {
-            error = "File must be a .resx file";
+            error = $"File must have one of these extensions: {string.Join(", ", supportedExtensions)}";
             return false;
         }
 
@@ -94,7 +96,7 @@ public class BackupController : ControllerBase
             }
             else
             {
-                var languages = _discovery.DiscoverLanguages(_resourcePath);
+                var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
                 var allBackupsTasks = languages.Select(async lang =>
                 {
                     var backups = await _backupManager.ListBackupsAsync(lang.Name, _resourcePath);
@@ -132,8 +134,6 @@ public class BackupController : ControllerBase
     {
         try
         {
-            var parser = new ResourceFileParser();
-
             if (!string.IsNullOrEmpty(request.FileName))
             {
                 if (!IsValidFileName(request.FileName, out var error))
@@ -141,14 +141,14 @@ public class BackupController : ControllerBase
                     return BadRequest(new ErrorResponse { Error = error! });
                 }
 
-                var languages = _discovery.DiscoverLanguages(_resourcePath);
+                var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
                 var language = languages.FirstOrDefault(l => l.Name == request.FileName);
                 if (language == null)
                 {
                     return NotFound(new ErrorResponse { Error = $"File '{request.FileName}' not found" });
                 }
 
-                var resourceFile = parser.Parse(language);
+                var resourceFile = _backend.Reader.Read(language);
                 var metadata = await _backupManager.CreateBackupAsync(
                     language.FilePath,
                     request.Operation ?? "manual",
@@ -165,12 +165,12 @@ public class BackupController : ControllerBase
             else
             {
                 // Backup all files
-                var languages = _discovery.DiscoverLanguages(_resourcePath);
+                var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
                 var results = new List<BackupCreatedInfo>();
 
                 foreach (var lang in languages)
                 {
-                    var resourceFile = parser.Parse(lang);
+                    var resourceFile = _backend.Reader.Read(lang);
                     var metadata = await _backupManager.CreateBackupAsync(
                         lang.FilePath,
                         request.Operation ?? "manual",
@@ -256,9 +256,8 @@ public class BackupController : ControllerBase
                 return BadRequest(new ErrorResponse { Error = "Version must be a positive integer" });
             }
 
-            var parser = new ResourceFileParser();
             var restoreService = new BackupRestoreService(_backupManager);
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
             var language = languages.FirstOrDefault(l => l.Name == fileName);
 
             if (language == null)
@@ -266,7 +265,7 @@ public class BackupController : ControllerBase
                 return NotFound(new ErrorResponse { Error = $"File '{fileName}' not found" });
             }
 
-            var currentFile = parser.Parse(language);
+            var currentFile = _backend.Reader.Read(language);
 
             if (request?.Preview == true)
             {

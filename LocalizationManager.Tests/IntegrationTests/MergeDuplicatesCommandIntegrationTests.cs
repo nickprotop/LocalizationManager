@@ -2,31 +2,59 @@
 // Licensed under the MIT License
 
 using LocalizationManager.Core;
+using LocalizationManager.Core.Abstractions;
+using LocalizationManager.Core.Backends;
+using LocalizationManager.Core.Backends.Json;
+using LocalizationManager.Core.Backends.Resx;
+using LocalizationManager.Core.Configuration;
 using LocalizationManager.Core.Models;
 using Xunit;
 
 namespace LocalizationManager.Tests.IntegrationTests;
 
+/// <summary>
+/// Integration tests for merge duplicates functionality across both RESX and JSON backends.
+/// </summary>
 public class MergeDuplicatesCommandIntegrationTests : IDisposable
 {
     private readonly string _testDirectory;
+    private readonly string _resxDirectory;
+    private readonly string _jsonDirectory;
     private readonly ResourceFileParser _parser;
     private readonly ResourceDiscovery _discovery;
+    private readonly IResourceBackend _jsonBackend;
 
     public MergeDuplicatesCommandIntegrationTests()
     {
-        // Create temporary test directory
+        // Create temporary test directories
         _testDirectory = Path.Combine(Path.GetTempPath(), $"LrmTests_{Guid.NewGuid()}");
-        Directory.CreateDirectory(_testDirectory);
+        _resxDirectory = Path.Combine(_testDirectory, "resx");
+        _jsonDirectory = Path.Combine(_testDirectory, "json");
+        Directory.CreateDirectory(_resxDirectory);
+        Directory.CreateDirectory(_jsonDirectory);
 
         _parser = new ResourceFileParser();
         _discovery = new ResourceDiscovery();
+        _jsonBackend = new JsonResourceBackend(new JsonFormatConfiguration
+        {
+            UseNestedKeys = false,
+            IncludeMeta = false,
+            PreserveComments = false
+        });
 
         // Create initial test resource files with duplicates
         CreateResourceFilesWithDuplicates();
     }
 
     private void CreateResourceFilesWithDuplicates()
+    {
+        // Create RESX files
+        CreateResxFilesWithDuplicates();
+        // Create JSON files
+        CreateJsonFilesWithDuplicates();
+    }
+
+    private void CreateResxFilesWithDuplicates()
     {
         // Create default resource file with duplicates
         var defaultFile = new ResourceFile
@@ -37,7 +65,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
                 Code = "",
                 Name = "Default",
                 IsDefault = true,
-                FilePath = Path.Combine(_testDirectory, "TestResource.resx")
+                FilePath = Path.Combine(_resxDirectory, "TestResource.resx")
             },
             Entries = new List<ResourceEntry>
             {
@@ -60,7 +88,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
                 Code = "fr",
                 Name = "Français (fr)",
                 IsDefault = false,
-                FilePath = Path.Combine(_testDirectory, "TestResource.fr.resx")
+                FilePath = Path.Combine(_resxDirectory, "TestResource.fr.resx")
             },
             Entries = new List<ResourceEntry>
             {
@@ -78,11 +106,57 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
         _parser.Write(frenchFile);
     }
 
+    private void CreateJsonFilesWithDuplicates()
+    {
+        // JSON format doesn't support duplicate keys in the same file (keys are unique in JSON objects)
+        // But we can still test merging across files and general operations
+        var defaultFile = new ResourceFile
+        {
+            Language = new LanguageInfo
+            {
+                BaseName = "TestResource",
+                Code = "",
+                Name = "Default",
+                IsDefault = true,
+                FilePath = Path.Combine(_jsonDirectory, "TestResource.json")
+            },
+            Entries = new List<ResourceEntry>
+            {
+                new() { Key = "SingleKey", Value = "Single value" },
+                new() { Key = "DuplicateKey", Value = "First value" },
+                new() { Key = "TripleDuplicate", Value = "Value one" },
+                new() { Key = "AnotherKey", Value = "Another value" }
+            }
+        };
+
+        var frenchFile = new ResourceFile
+        {
+            Language = new LanguageInfo
+            {
+                BaseName = "TestResource",
+                Code = "fr",
+                Name = "Français (fr)",
+                IsDefault = false,
+                FilePath = Path.Combine(_jsonDirectory, "TestResource.fr.json")
+            },
+            Entries = new List<ResourceEntry>
+            {
+                new() { Key = "SingleKey", Value = "Valeur unique" },
+                new() { Key = "DuplicateKey", Value = "Première valeur" },
+                new() { Key = "TripleDuplicate", Value = "Valeur un" },
+                new() { Key = "AnotherKey", Value = "Une autre valeur" }
+            }
+        };
+
+        _jsonBackend.Writer.Write(defaultFile);
+        _jsonBackend.Writer.Write(frenchFile);
+    }
+
     [Fact]
     public void MergeAutoFirst_SingleKey_RemovesDuplicates()
     {
         // Arrange
-        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var languages = _discovery.DiscoverLanguages(_resxDirectory);
         var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
 
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
@@ -101,7 +175,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
         }
 
         // Assert: Re-read and verify only 1 occurrence remains
-        var reloadedLanguages = _discovery.DiscoverLanguages(_testDirectory);
+        var reloadedLanguages = _discovery.DiscoverLanguages(_resxDirectory);
         var reloadedFiles = reloadedLanguages.Select(lang => _parser.Parse(lang)).ToList();
         var reloadedDefault = reloadedFiles.First(rf => rf.Language.IsDefault);
 
@@ -126,7 +200,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
     public void MergeAutoFirst_TripleDuplicate_KeepsOnlyFirst()
     {
         // Arrange
-        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var languages = _discovery.DiscoverLanguages(_resxDirectory);
         var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
 
         // Act
@@ -138,7 +212,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
         }
 
         // Assert
-        var reloadedLanguages = _discovery.DiscoverLanguages(_testDirectory);
+        var reloadedLanguages = _discovery.DiscoverLanguages(_resxDirectory);
         var reloadedFiles = reloadedLanguages.Select(lang => _parser.Parse(lang)).ToList();
 
         foreach (var rf in reloadedFiles)
@@ -162,7 +236,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
     public void MergeAutoFirst_AllDuplicates_MergesAll()
     {
         // Arrange
-        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var languages = _discovery.DiscoverLanguages(_resxDirectory);
         var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
@@ -187,7 +261,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
         }
 
         // Assert: Verify no duplicates remain
-        var reloadedLanguages = _discovery.DiscoverLanguages(_testDirectory);
+        var reloadedLanguages = _discovery.DiscoverLanguages(_resxDirectory);
         var reloadedFiles = reloadedLanguages.Select(lang => _parser.Parse(lang)).ToList();
         var reloadedDefault = reloadedFiles.First(rf => rf.Language.IsDefault);
 
@@ -209,7 +283,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
     public void MergeCustomSelection_KeepsSelectedOccurrence()
     {
         // Arrange
-        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var languages = _discovery.DiscoverLanguages(_resxDirectory);
         var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
 
         // Select second occurrence for both languages
@@ -228,7 +302,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
         }
 
         // Assert
-        var reloadedLanguages = _discovery.DiscoverLanguages(_testDirectory);
+        var reloadedLanguages = _discovery.DiscoverLanguages(_resxDirectory);
         var reloadedFiles = reloadedLanguages.Select(lang => _parser.Parse(lang)).ToList();
 
         var reloadedDefault = reloadedFiles.First(rf => rf.Language.IsDefault);
@@ -246,7 +320,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
     public void MergeCustomSelection_DifferentPerLanguage_Success()
     {
         // Arrange
-        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var languages = _discovery.DiscoverLanguages(_resxDirectory);
         var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
 
         // Select different occurrences per language
@@ -265,7 +339,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
         }
 
         // Assert
-        var reloadedLanguages = _discovery.DiscoverLanguages(_testDirectory);
+        var reloadedLanguages = _discovery.DiscoverLanguages(_resxDirectory);
         var reloadedFiles = reloadedLanguages.Select(lang => _parser.Parse(lang)).ToList();
 
         var reloadedDefault = reloadedFiles.First(rf => rf.Language.IsDefault);
@@ -281,7 +355,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
     public void Merge_NonExistentKey_NoError()
     {
         // Arrange
-        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var languages = _discovery.DiscoverLanguages(_resxDirectory);
         var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
 
         // Act: Try to merge a non-existent key (should not throw)
@@ -296,7 +370,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
     public void Merge_SingleOccurrenceKey_NoChange()
     {
         // Arrange
-        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var languages = _discovery.DiscoverLanguages(_resxDirectory);
         var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
 
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
@@ -317,7 +391,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
     public void Merge_PreservesOtherKeys()
     {
         // Arrange
-        var languages = _discovery.DiscoverLanguages(_testDirectory);
+        var languages = _discovery.DiscoverLanguages(_resxDirectory);
         var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
 
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
@@ -332,7 +406,7 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
         }
 
         // Assert: Other keys should still exist
-        var reloadedLanguages = _discovery.DiscoverLanguages(_testDirectory);
+        var reloadedLanguages = _discovery.DiscoverLanguages(_resxDirectory);
         var reloadedFiles = reloadedLanguages.Select(lang => _parser.Parse(lang)).ToList();
         var reloadedDefault = reloadedFiles.First(rf => rf.Language.IsDefault);
 
@@ -340,6 +414,151 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
         Assert.Contains(reloadedDefault.Entries, e => e.Key == "AnotherKey");
         Assert.Contains(reloadedDefault.Entries, e => e.Key == "TripleDuplicate");
     }
+
+    #region JSON Backend Tests
+
+    [Fact]
+    public void Json_ReadWrite_PreservesAllKeys()
+    {
+        // Arrange - read JSON files
+        var languages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
+        var resourceFiles = languages.Select(lang => _jsonBackend.Reader.Read(lang)).ToList();
+
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+        Assert.Equal(4, defaultFile.Entries.Count);
+
+        // Act: Modify and save
+        defaultFile.Entries.First(e => e.Key == "SingleKey").Value = "Modified value";
+        _jsonBackend.Writer.Write(defaultFile);
+
+        // Assert: Re-read
+        var reloadedLanguages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
+        var reloadedDefault = _jsonBackend.Reader.Read(reloadedLanguages.First(l => l.IsDefault));
+
+        Assert.Equal(4, reloadedDefault.Entries.Count);
+        Assert.Equal("Modified value", reloadedDefault.Entries.First(e => e.Key == "SingleKey").Value);
+    }
+
+    [Fact]
+    public void Json_Discovery_FindsCorrectLanguages()
+    {
+        // Arrange & Act
+        var languages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
+
+        // Assert
+        Assert.Equal(2, languages.Count);
+        Assert.Single(languages, l => l.IsDefault);
+        Assert.Single(languages, l => l.Code == "fr");
+    }
+
+    [Fact]
+    public void Json_AddKey_AddsSuccessfully()
+    {
+        // Arrange
+        var languages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
+        var resourceFiles = languages.Select(lang => _jsonBackend.Reader.Read(lang)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+        var initialCount = defaultFile.Entries.Count;
+
+        // Act: Add new key
+        defaultFile.Entries.Add(new ResourceEntry { Key = "NewKey", Value = "New value" });
+        _jsonBackend.Writer.Write(defaultFile);
+
+        // Assert
+        var reloadedLanguages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
+        var reloadedDefault = _jsonBackend.Reader.Read(reloadedLanguages.First(l => l.IsDefault));
+        Assert.Equal(initialCount + 1, reloadedDefault.Entries.Count);
+        Assert.Contains(reloadedDefault.Entries, e => e.Key == "NewKey");
+    }
+
+    [Fact]
+    public void Json_DeleteKey_RemovesSuccessfully()
+    {
+        // Arrange
+        var languages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
+        var resourceFiles = languages.Select(lang => _jsonBackend.Reader.Read(lang)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+        var initialCount = defaultFile.Entries.Count;
+
+        // Act: Delete key
+        defaultFile.Entries.RemoveAll(e => e.Key == "AnotherKey");
+        _jsonBackend.Writer.Write(defaultFile);
+
+        // Assert
+        var reloadedLanguages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
+        var reloadedDefault = _jsonBackend.Reader.Read(reloadedLanguages.First(l => l.IsDefault));
+        Assert.Equal(initialCount - 1, reloadedDefault.Entries.Count);
+        Assert.DoesNotContain(reloadedDefault.Entries, e => e.Key == "AnotherKey");
+    }
+
+    [Fact]
+    public void Json_UpdateKey_UpdatesSuccessfully()
+    {
+        // Arrange
+        var languages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
+        var resourceFiles = languages.Select(lang => _jsonBackend.Reader.Read(lang)).ToList();
+        var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
+
+        // Act: Update key
+        var entry = defaultFile.Entries.First(e => e.Key == "DuplicateKey");
+        entry.Value = "Updated value";
+        _jsonBackend.Writer.Write(defaultFile);
+
+        // Assert
+        var reloadedLanguages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
+        var reloadedDefault = _jsonBackend.Reader.Read(reloadedLanguages.First(l => l.IsDefault));
+        Assert.Equal("Updated value", reloadedDefault.Entries.First(e => e.Key == "DuplicateKey").Value);
+    }
+
+    [Fact]
+    public void Json_PreservesKeyOrder()
+    {
+        // Arrange
+        var languages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
+        var defaultFile = _jsonBackend.Reader.Read(languages.First(l => l.IsDefault));
+        var originalOrder = defaultFile.Entries.Select(e => e.Key).ToList();
+
+        // Act: Modify one value and save
+        defaultFile.Entries.First(e => e.Key == "TripleDuplicate").Value = "Modified";
+        _jsonBackend.Writer.Write(defaultFile);
+
+        // Assert: Order should be preserved
+        var reloadedLanguages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
+        var reloadedDefault = _jsonBackend.Reader.Read(reloadedLanguages.First(l => l.IsDefault));
+        var newOrder = reloadedDefault.Entries.Select(e => e.Key).ToList();
+
+        Assert.Equal(originalOrder, newOrder);
+    }
+
+    [Fact]
+    public void Json_BackendParity_SameKeyCount()
+    {
+        // JSON and RESX should have the same number of unique keys
+        var resxLanguages = _discovery.DiscoverLanguages(_resxDirectory);
+        var jsonLanguages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
+
+        var resxDefault = _parser.Parse(resxLanguages.First(l => l.IsDefault));
+        var jsonDefault = _jsonBackend.Reader.Read(jsonLanguages.First(l => l.IsDefault));
+
+        var resxUniqueKeys = resxDefault.Entries.Select(e => e.Key).Distinct().Count();
+        var jsonKeyCount = jsonDefault.Entries.Count;
+
+        Assert.Equal(resxUniqueKeys, jsonKeyCount);
+    }
+
+    [Fact]
+    public void Json_BackendParity_SameLanguageCount()
+    {
+        // Both formats should discover same number of languages
+        var resxLanguages = _discovery.DiscoverLanguages(_resxDirectory);
+        var jsonLanguages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
+
+        Assert.Equal(resxLanguages.Count, jsonLanguages.Count);
+    }
+
+    #endregion
+
+    #region RESX-specific Helper Methods
 
     // Helper methods matching MergeDuplicatesCommand logic
 
@@ -392,6 +611,8 @@ public class MergeDuplicatesCommandIntegrationTests : IDisposable
             }
         }
     }
+
+    #endregion
 
     public void Dispose()
     {

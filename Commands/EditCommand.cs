@@ -66,24 +66,23 @@ public class EditCommand : Command<EditCommand.Settings>
         try
         {
             // Discover languages
-            var discovery = new ResourceDiscovery();
-            var languages = discovery.DiscoverLanguages(resourcePath);
+            var languages = settings.DiscoverLanguages();
+            var backendName = settings.GetBackendName();
 
             if (!languages.Any())
             {
-                AnsiConsole.MarkupLine("[red]✗ No .resx files found![/]");
+                AnsiConsole.MarkupLine($"[red]✗ No {backendName.ToUpper()} files found![/]");
                 return 1;
             }
 
             // Parse resource files
-            var parser = new ResourceFileParser();
             var resourceFiles = new List<ResourceFile>();
 
             foreach (var lang in languages)
             {
                 try
                 {
-                    var resourceFile = parser.Parse(lang);
+                    var resourceFile = settings.ReadResourceFile(lang);
                     resourceFiles.Add(resourceFile);
                 }
                 catch (Exception ex)
@@ -93,9 +92,10 @@ public class EditCommand : Command<EditCommand.Settings>
                 }
             }
 
-            // Launch TUI
+            // Launch TUI - pass backend for writing
+            var backend = settings.GetBackend();
             Application.Init();
-            Application.Run(new ResourceEditorWindow(resourceFiles, parser, defaultCode, sourcePath, settings.LoadedConfiguration));
+            Application.Run(new ResourceEditorWindow(resourceFiles, backend, defaultCode, sourcePath, settings.LoadedConfiguration));
             Application.Shutdown();
 
             return 0;

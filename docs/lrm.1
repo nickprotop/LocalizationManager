@@ -8,7 +8,7 @@ lrm \- Linux-native CLI tool for managing .NET .resx localization files
 [\fICOMMAND OPTIONS\fR]
 .SH DESCRIPTION
 .B LRM
-(Localization Resource Manager) is a powerful, Linux-native command-line tool for managing .NET .resx localization files with an interactive Terminal UI.
+(Localization Resource Manager) is a powerful, Linux-native command-line tool for managing .NET localization files (.resx and JSON formats) with an interactive Terminal UI.
 .PP
 Features include:
 .IP \(bu 2
@@ -32,12 +32,66 @@ Web UI with REST API for browser-based management
 .BR \-p ", " \-\-path " " \fIPATH\fR
 Path to Resources folder (default: current directory)
 .TP
+.BR \-\-backend " " \fIFORMAT\fR
+Resource format backend: json or resx (auto-detected if not specified)
+.TP
 .BR \-\-config\-file " " \fIPATH\fR
 Path to configuration file (optional, default: auto-discover lrm.json)
 .TP
 .BR \-h ", " \-\-help
 Show help information
 .SH COMMANDS
+.SS init
+Initialize a new localization project.
+.PP
+.B lrm init
+[\fB\-i\fR|\fB\-\-interactive\fR]
+[\fB\-\-format\fR \fIFORMAT\fR]
+[\fB\-\-default\-lang\fR \fICODE\fR]
+[\fB\-\-languages\fR \fICODES\fR]
+[\fB\-\-base\-name\fR \fINAME\fR]
+[\fB\-y\fR|\fB\-\-yes\fR]
+.TP
+.BR \-i ", " \-\-interactive
+Run interactive setup wizard
+.TP
+.BR \-\-format " " \fIFORMAT\fR
+Resource format: json (default), resx
+.TP
+.BR \-\-default\-lang " " \fICODE\fR
+Default language code (e.g., en, en-US)
+.TP
+.BR \-\-languages " " \fICODES\fR
+Additional language codes, comma-separated (e.g., fr,de,el)
+.TP
+.BR \-\-base\-name " " \fINAME\fR
+Base filename for resources (default: strings)
+.SS convert
+Convert resource files between formats (RESX and JSON).
+.PP
+.B lrm convert
+[\fB\-\-from\fR \fIFORMAT\fR]
+[\fB\-\-to\fR \fIFORMAT\fR]
+[\fB\-o\fR|\fB\-\-output\fR \fIPATH\fR]
+[\fB\-\-nested\fR]
+[\fB\-\-include\-comments\fR]
+[\fB\-\-no\-backup\fR]
+[\fB\-y\fR|\fB\-\-yes\fR]
+.TP
+.BR \-\-from " " \fIFORMAT\fR
+Source format: resx or json (auto-detected if not specified)
+.TP
+.BR \-\-to " " \fIFORMAT\fR
+Target format: resx or json
+.TP
+.BR \-o ", " \-\-output " " \fIPATH\fR
+Output directory (default: same as source)
+.TP
+.BR \-\-nested
+Convert dot-separated keys to nested structure (JSON only)
+.TP
+.BR \-\-include\-comments
+Preserve comments in output (default: true)
 .SS validate
 Validate resource files for missing translations, duplicates, and errors.
 .PP
@@ -433,6 +487,18 @@ Override default web server bind address
 .B LRM_WEB_AUTO_OPEN_BROWSER
 Enable/disable auto browser open (true/false)
 .SH EXAMPLES
+.TP
+Initialize a new JSON localization project:
+.B lrm init \-\-format json \-\-default\-lang en \-\-languages fr,de,el
+.TP
+Initialize with interactive wizard:
+.B lrm init \-i
+.TP
+Convert RESX files to JSON format:
+.B lrm convert \-\-to json
+.TP
+Convert JSON to RESX with nested keys flattened:
+.B lrm convert \-\-from json \-\-to resx
 .TP
 Validate all resource files:
 .B lrm validate

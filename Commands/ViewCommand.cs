@@ -171,25 +171,24 @@ public class ViewCommand : Command<ViewCommand.Settings>
                 AnsiConsole.WriteLine();
             }
 
-            // Discover languages
-            var discovery = new ResourceDiscovery();
-            var languages = discovery.DiscoverLanguages(resourcePath);
+            // Discover languages using the backend (auto-detected or specified)
+            var languages = settings.DiscoverLanguages();
+            var backendName = settings.GetBackendName();
 
             if (!languages.Any())
             {
-                AnsiConsole.MarkupLine("[red]✗ No .resx files found![/]");
+                AnsiConsole.MarkupLine($"[red]✗ No {backendName.ToUpper()} resource files found![/]");
                 return 1;
             }
 
-            // Parse resource files
-            var parser = new ResourceFileParser();
+            // Parse resource files using the backend
             var resourceFiles = new List<Core.Models.ResourceFile>();
 
             foreach (var lang in languages)
             {
                 try
                 {
-                    var resourceFile = parser.Parse(lang);
+                    var resourceFile = settings.ReadResourceFile(lang);
                     resourceFiles.Add(resourceFile);
                 }
                 catch (Exception ex)

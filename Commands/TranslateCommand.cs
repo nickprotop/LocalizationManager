@@ -79,9 +79,7 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
             }
 
             // Discover resource files
-            var resourcePath = settings.GetResourcePath();
-            var discovery = new ResourceDiscovery();
-            var languages = discovery.DiscoverLanguages(resourcePath);
+            var languages = settings.DiscoverLanguages();
 
             if (languages.Count == 0)
             {
@@ -97,8 +95,7 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
             }
 
             // Parse default resource file
-            var parser = new ResourceFileParser();
-            var defaultFile = parser.Parse(defaultLanguage);
+            var defaultFile = settings.ReadResourceFile(defaultLanguage);
             var entries = defaultFile.Entries;
 
             // Filter keys by pattern
@@ -141,7 +138,6 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
             // Level 2 Safety Check: When KEY pattern is provided, check for existing translations
             if (!string.IsNullOrWhiteSpace(settings.KeyPattern) && !settings.OnlyMissing && !settings.Overwrite)
             {
-                var safetyParser = new ResourceFileParser();
                 var existingCount = 0;
 
                 foreach (var targetLang in targetLanguages)
@@ -149,7 +145,7 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
                     var targetLanguageInfo = languages.FirstOrDefault(f => f.Code == targetLang);
                     if (targetLanguageInfo != null)
                     {
-                        var targetFile = safetyParser.Parse(targetLanguageInfo);
+                        var targetFile = settings.ReadResourceFile(targetLanguageInfo);
                         var targetDict = targetFile.Entries.ToDictionary(e => e.Key, e => e);
 
                         foreach (var key in keysToTranslate)
@@ -328,8 +324,6 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
         table.AddColumn("[cyan]Translation[/]");
         table.AddColumn("[cyan]Status[/]");
 
-        var parser = new ResourceFileParser();
-
         foreach (var targetLang in targetLanguages)
         {
             // Find the target language resource file
@@ -341,7 +335,7 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
             }
 
             // Load target resource file
-            var targetFile = parser.Parse(targetLanguageInfo);
+            var targetFile = settings.ReadResourceFile(targetLanguageInfo);
             var targetDict = targetFile.Entries.ToDictionary(e => e.Key, e => e);
 
             foreach (var key in keysToTranslate)
@@ -427,7 +421,7 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
             // Save the updated resource file
             if (!settings.DryRun)
             {
-                parser.Write(targetFile);
+                settings.WriteResourceFile(targetFile);
             }
         }
 

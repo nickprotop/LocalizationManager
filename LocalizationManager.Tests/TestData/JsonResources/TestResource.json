@@ -1,0 +1,31 @@
+{
+  "_meta": {
+    "language": "en",
+    "isDefault": true,
+    "lastModified": "2025-01-01T00:00:00Z"
+  },
+  "Save": {
+    "_value": "Save All",
+    "_comment": "Save button label"
+  },
+  "Cancel": "Cancel",
+  "WelcomeMessage": {
+    "_value": "Welcome to our application!",
+    "_comment": "Welcome message shown to users"
+  },
+  "EmptyValue": "",
+  "Errors": {
+    "NotFound": "Item not found",
+    "AccessDenied": "Access denied"
+  },
+  "Buttons": {
+    "OK": "OK",
+    "Submit": "Submit",
+    "Close": "Close"
+  },
+  "Validation": {
+    "Required": "{0} is required",
+    "MinLength": "{0} must be at least {1} characters",
+    "Email": "Please enter a valid email address"
+  }
+}

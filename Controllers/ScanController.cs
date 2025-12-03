@@ -3,6 +3,7 @@
 
 using Microsoft.AspNetCore.Mvc;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Scanning;
 using LocalizationManager.Models.Api;
 
@@ -14,16 +15,14 @@ public class ScanController : ControllerBase
 {
     private readonly string _resourcePath;
     private readonly string _sourcePath;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly IResourceBackend _backend;
     private readonly CodeScanner _scanner;
 
-    public ScanController(IConfiguration configuration)
+    public ScanController(IConfiguration configuration, IResourceBackend backend)
     {
         _resourcePath = configuration["ResourcePath"] ?? Directory.GetCurrentDirectory();
         _sourcePath = configuration["SourcePath"] ?? Directory.GetParent(_resourcePath)?.FullName ?? _resourcePath;
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        _backend = backend;
         _scanner = new CodeScanner();
     }
 
@@ -35,8 +34,8 @@ public class ScanController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
             if (defaultFile == null)
@@ -117,8 +116,8 @@ public class ScanController : ControllerBase
                 }
             }
 
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
             if (defaultFile == null)
@@ -169,8 +168,8 @@ public class ScanController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
             if (defaultFile == null)
@@ -201,8 +200,8 @@ public class ScanController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
             if (defaultFile == null)
@@ -233,8 +232,8 @@ public class ScanController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var excludePatterns = new List<string>
             {

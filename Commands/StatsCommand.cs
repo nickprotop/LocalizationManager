@@ -49,32 +49,31 @@ public class StatsCommand : Command<BaseFormattableCommandSettings>
 
         try
         {
-            // Discover languages
-            var discovery = new ResourceDiscovery();
-            var languages = discovery.DiscoverLanguages(resourcePath);
+            // Discover languages using the backend (auto-detected or specified)
+            var languages = settings.DiscoverLanguages();
+            var backendName = settings.GetBackendName();
 
             if (!languages.Any())
             {
                 if (isTableFormat)
                 {
-                    AnsiConsole.MarkupLine("[red]✗ No .resx files found![/]");
+                    AnsiConsole.MarkupLine($"[red]✗ No {backendName.ToUpper()} resource files found![/]");
                 }
                 else
                 {
-                    Console.Error.WriteLine("No .resx files found!");
+                    Console.Error.WriteLine($"No {backendName.ToUpper()} resource files found!");
                 }
                 return 1;
             }
 
-            // Parse resource files
-            var parser = new ResourceFileParser();
+            // Parse resource files using the backend
             var resourceFiles = new List<LocalizationManager.Core.Models.ResourceFile>();
 
             foreach (var lang in languages)
             {
                 try
                 {
-                    var resourceFile = parser.Parse(lang);
+                    var resourceFile = settings.ReadResourceFile(lang);
                     resourceFiles.Add(resourceFile);
                 }
                 catch (Exception ex)

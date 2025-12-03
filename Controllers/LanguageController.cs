@@ -3,6 +3,7 @@
 
 using Microsoft.AspNetCore.Mvc;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Models.Api;
 
@@ -13,16 +14,15 @@ namespace LocalizationManager.Controllers;
 public class LanguageController : ControllerBase
 {
     private readonly string _resourcePath;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly IResourceBackend _backend;
     private readonly LanguageFileManager _languageManager;
 
-    public LanguageController(IConfiguration configuration)
+    public LanguageController(IConfiguration configuration, IResourceBackend backend)
     {
         _resourcePath = configuration["ResourcePath"] ?? Directory.GetCurrentDirectory();
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        _backend = backend;
         _languageManager = new LanguageFileManager();
+        _languageManager.SetBackend(backend);
     }
 
     /// <summary>
@@ -33,8 +33,8 @@ public class LanguageController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
 
             var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
             var totalKeys = defaultFile?.Entries.Select(e => e.Key).Distinct().Count() ?? 0;
@@ -84,8 +84,8 @@ public class LanguageController : ControllerBase
                 return BadRequest(new ErrorResponse { Error = $"Invalid culture code: {request.CultureCode}" });
             }
 
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
-            var baseName = languages.First().Name.Replace(".resx", "");
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
+            var baseName = languages.First().BaseName;
 
             if (_languageManager.LanguageFileExists(baseName, request.CultureCode, _resourcePath))
             {
@@ -98,7 +98,7 @@ public class LanguageController : ControllerBase
                 var sourceLanguage = languages.FirstOrDefault(l => l.Code == request.CopyFrom);
                 if (sourceLanguage != null)
                 {
-                    sourceFile = _parser.Parse(sourceLanguage);
+                    sourceFile = _backend.Reader.Read(sourceLanguage);
                 }
             }
 
@@ -111,7 +111,7 @@ public class LanguageController : ControllerBase
 
             if (!request.Empty)
             {
-                _parser.Write(newFile);
+                _backend.Writer.Write(newFile);
             }
 
             return Ok(new AddLanguageResponse
@@ -137,7 +137,7 @@ public class LanguageController : ControllerBase
     {
         try
         {
-            var languages = _discovery.DiscoverLanguages(_resourcePath);
+            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
             var language = languages.FirstOrDefault(l => l.Code == cultureCode);
 
             if (language == null)

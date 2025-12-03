@@ -493,7 +493,7 @@ public partial class ResourceEditorWindow : Window
             // Save changes
             foreach (var rf in _resourceFiles)
             {
-                _parser.Write(rf);
+                _backend.Writer.Write(rf);
             }
 
             // Rebuild everything
@@ -684,7 +684,7 @@ public partial class ResourceEditorWindow : Window
 
             foreach (var rf in _resourceFiles)
             {
-                _parser.Write(rf);
+                _backend.Writer.Write(rf);
             }
 
             _hasUnsavedChanges = false;

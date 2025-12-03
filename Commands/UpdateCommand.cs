@@ -68,27 +68,27 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
             AnsiConsole.MarkupLine($"[blue]Scanning:[/] {resourcePath}");
             AnsiConsole.WriteLine();
 
-            // Discover languages
-            var discovery = new ResourceDiscovery();
-            var languages = discovery.DiscoverLanguages(resourcePath);
+            // Load configuration and discover languages
+            settings.LoadConfiguration();
+            var languages = settings.DiscoverLanguages();
+            var backendName = settings.GetBackendName();
 
             if (!languages.Any())
             {
-                AnsiConsole.MarkupLine("[red]✗ No .resx files found![/]");
+                AnsiConsole.MarkupLine($"[red]✗ No {backendName.ToUpper()} files found![/]");
                 return 1;
             }
 
             AnsiConsole.MarkupLine($"[green]✓ Found {languages.Count} language(s)[/]");
 
             // Parse resource files
-            var parser = new ResourceFileParser();
             var resourceFiles = new List<Core.Models.ResourceFile>();
 
             foreach (var lang in languages)
             {
                 try
                 {
-                    var resourceFile = parser.Parse(lang);
+                    var resourceFile = settings.ReadResourceFile(lang);
                     resourceFiles.Add(resourceFile);
                 }
                 catch (Exception ex)
@@ -280,7 +280,7 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
             // Save changes
             foreach (var rf in resourceFiles)
             {
-                parser.Write(rf);
+                settings.WriteResourceFile(rf);
             }
 
             AnsiConsole.MarkupLine($"[green]✓ Successfully updated key '{settings.Key.EscapeMarkup()}' in {updatedCount} language(s)[/]");
