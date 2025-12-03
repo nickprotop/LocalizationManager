@@ -1,0 +1,14 @@
+<Project>
+  <ItemGroup>
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="SourceItemType" />
+  </ItemGroup>
+
+  <!-- Auto-embed JSON files that are AdditionalFiles -->
+  <Target Name="EmbedJsonResources" BeforeTargets="PrepareForBuild">
+    <ItemGroup>
+      <EmbeddedResource Include="@(AdditionalFiles)"
+                        Condition="'%(Extension)' == '.json'"
+                        LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+  </Target>
+</Project>

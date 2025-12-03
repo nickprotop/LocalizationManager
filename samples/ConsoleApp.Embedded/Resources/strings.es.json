@@ -1,0 +1,20 @@
+{
+  "appName": "Mi Aplicación Embebida",
+  "greeting": "Hola, {0}!",
+  "buttons": {
+    "ok": "Aceptar",
+    "cancel": "Cancelar",
+    "apply": "Aplicar",
+    "close": "Cerrar"
+  },
+  "errors": {
+    "notFound": "Recurso no encontrado: {0}",
+    "accessDenied": "Acceso denegado",
+    "timeout": "Operación agotó el tiempo"
+  },
+  "fileCount": {
+    "zero": "Sin archivos",
+    "one": "Un archivo",
+    "other": "{0} archivos"
+  }
+}

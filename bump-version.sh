@@ -15,6 +15,8 @@ NC='\033[0m' # No Color
 CSPROJ_FILE="LocalizationManager.csproj"
 SHARED_CSPROJ_FILE="LocalizationManager.Shared/LocalizationManager.Shared.csproj"
 VSCODE_PACKAGE_JSON="vscode-extension/package.json"
+NUGET_RUNTIME_CSPROJ="LocalizationManager.JsonLocalization/LocalizationManager.JsonLocalization.csproj"
+NUGET_GENERATOR_CSPROJ="LocalizationManager.JsonLocalization.Generator/LocalizationManager.JsonLocalization.Generator.csproj"
 
 # Function to display usage
 usage() {
@@ -118,6 +120,17 @@ update_vscode_extension() {
     fi
 }
 
+# Function to update NuGet package version (only Version tag, no AssemblyVersion/FileVersion)
+update_nuget_csproj() {
+    local old_version=$1
+    local new_version=$2
+    local csproj_file=$3
+
+    if [ -f "$csproj_file" ]; then
+        sed -i "s|<Version>$old_version</Version>|<Version>$new_version</Version>|g" "$csproj_file"
+    fi
+}
+
 # Main script
 main() {
     # Parse arguments
@@ -162,6 +175,8 @@ main() {
     echo -e "  ${BLUE}•${NC} $CSPROJ_FILE"
     echo -e "  ${BLUE}•${NC} $SHARED_CSPROJ_FILE"
     echo -e "  ${BLUE}•${NC} $VSCODE_PACKAGE_JSON"
+    echo -e "  ${BLUE}•${NC} $NUGET_RUNTIME_CSPROJ"
+    echo -e "  ${BLUE}•${NC} $NUGET_GENERATOR_CSPROJ"
     echo ""
 
     # Confirmation prompt (unless -y flag)
@@ -186,6 +201,12 @@ main() {
 
     update_vscode_extension "$NEW_VERSION"
     echo -e "${GREEN}✓${NC} Updated $VSCODE_PACKAGE_JSON"
+
+    update_nuget_csproj "$CURRENT_VERSION" "$NEW_VERSION" "$NUGET_RUNTIME_CSPROJ"
+    echo -e "${GREEN}✓${NC} Updated $NUGET_RUNTIME_CSPROJ"
+
+    update_nuget_csproj "$CURRENT_VERSION" "$NEW_VERSION" "$NUGET_GENERATOR_CSPROJ"
+    echo -e "${GREEN}✓${NC} Updated $NUGET_GENERATOR_CSPROJ"
 
     # Success message
     echo ""

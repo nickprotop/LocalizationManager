@@ -1,6 +1,6 @@
 # JSON Backend Implementation Guide
 
-> **Status:** Phase 5.4 Complete - Backup Services Refactored for Multi-Backend Support
+> **Status:** Phase 6 In Progress - NuGet Package for JSON Localization
 > **Target:** Full multi-backend support (RESX + JSON) across CLI/TUI/Web/API/VS Code Extension
 > **Plus:** NuGet package for consuming JSON localization in .NET apps
 
@@ -2091,19 +2091,44 @@ public override int Execute(CommandContext context, ViewCommandSettings settings
 
 ---
 
-## Phase 6: NuGet Package
+## Phase 6: NuGet Package for JSON Localization
 
-> **Goal:** Create standalone NuGet package for consuming JSON localization
+> **Goal:** Create NuGet packages allowing .NET applications to consume JSON localization files managed by LRM
+> **Status:** ✅ Core Implementation Complete - Sample projects working
 
 ### Progress
 
-- [ ] 6.1 Create project structure
-- [ ] 6.2 Implement Localizer class
-- [ ] 6.3 Implement IStringLocalizer
-- [ ] 6.4 Implement EmbeddedResourceLoader
-- [ ] 6.5 Create source generator project
-- [ ] 6.6 Implement ResourcesGenerator
-- [ ] 6.7 Add pluralization rules
+- [x] 6.1 Create project structure (two packages) ✅
+- [x] 6.2 Extract & adapt core code from existing backend ✅
+- [x] 6.3 Implement standalone JsonLocalizer class ✅
+- [x] 6.4 Implement IStringLocalizer integration ✅
+- [x] 6.5 Implement DI extensions (AddJsonLocalization) ✅
+- [x] 6.6 Implement EmbeddedResourceLoader ✅
+- [x] 6.7 Implement FileSystemResourceLoader ✅
+- [x] 6.8 Create source generator project ✅
+- [x] 6.9 Implement ResourcesGenerator ✅
+- [x] 6.10 Create sample projects ✅
+  - ConsoleApp.Standalone (file system loading)
+  - ConsoleApp.Embedded (embedded resources)
+  - WebApp.AspNetCore (IStringLocalizer integration)
+  - ConsoleApp.SourceGenerator (strongly-typed access)
+- [x] 6.11 Write unit tests (136 tests for JsonLocalization package)
+- [ ] 6.12 Publish NuGet packages
+
+---
+
+### Package Architecture
+
+**Two NuGet Packages:**
+```
+LocalizationManager.JsonLocalization           (Runtime library)
+LocalizationManager.JsonLocalization.Generator (Source generator)
+```
+
+**Target Frameworks:**
+```xml
+<TargetFrameworks>net6.0;net7.0;net8.0;net9.0</TargetFrameworks>
+```
 
 ---
 
@@ -2111,20 +2136,123 @@ public override int Execute(CommandContext context, ViewCommandSettings settings
 
 ```
 /LocalizationManager.JsonLocalization/
-    LocalizationManager.JsonLocalization.csproj
-    Localizer.cs
-    JsonStringLocalizer.cs
-    JsonStringLocalizerFactory.cs
-    EmbeddedResourceLoader.cs
-    CldrPluralRuleProvider.cs
-    ServiceCollectionExtensions.cs
+├── LocalizationManager.JsonLocalization.csproj
+├── JsonLocalizer.cs                  # Standalone API
+├── JsonStringLocalizer.cs            # IStringLocalizer impl
+├── JsonStringLocalizerFactory.cs     # IStringLocalizerFactory impl
+├── JsonLocalizationOptions.cs        # Configuration options
+├── ServiceCollectionExtensions.cs    # AddJsonLocalization()
+├── IResourceLoader.cs                # Loader interface
+├── EmbeddedResourceLoader.cs         # Load from embedded resources
+├── FileSystemResourceLoader.cs       # Load from file system
+├── Core/                             # Extracted from main project
+│   ├── Models/
+│   │   ├── ResourceEntry.cs
+│   │   ├── ResourceFile.cs
+│   │   └── LanguageInfo.cs
+│   ├── JsonResourceReader.cs         # Adapted from existing
+│   ├── JsonFormatConfiguration.cs
+│   └── PluralResolver.cs             # Runtime plural selection
 
 /LocalizationManager.JsonLocalization.Generator/
-    LocalizationManager.JsonLocalization.Generator.csproj
-    ResourcesGenerator.cs
+├── LocalizationManager.JsonLocalization.Generator.csproj
+├── ResourcesGenerator.cs             # Source generator
+├── JsonKeyParser.cs                  # Parse JSON to extract keys
+├── build/
+│   └── LocalizationManager.JsonLocalization.Generator.targets
 ```
 
-*(Detailed implementation deferred - see original plan)*
+---
+
+### Key Design Decisions
+
+1. **Reuse Existing Code** (~1800 LOC from existing JSON backend)
+   - `JsonResourceReader.cs` - Already has pluralization & format detection
+   - `JsonFormatDetector.cs` - Auto-detects standard vs i18next
+   - Model classes - Zero dependencies
+
+2. **Standalone API (No DI Required)**
+   ```csharp
+   var localizer = new JsonLocalizer("./Resources", "strings");
+   var greeting = localizer["Hello"];
+   var plural = localizer.Plural("Items", count);
+   ```
+
+3. **ASP.NET Core Integration**
+   ```csharp
+   services.AddJsonLocalization(options => {
+       options.ResourcesPath = "Resources";
+       options.UseEmbeddedResources = true;
+   });
+   ```
+
+4. **Both Resource Loading Strategies**
+   - File system: Deploy JSON files alongside application
+   - Embedded: Compile JSON into assembly
+
+---
+
+### Embedded Resources Strategy
+
+**Option 1: Runtime Package Only (Manual Setup)**
+```xml
+<ItemGroup>
+  <EmbeddedResource Include="Resources\**\*.json" />
+</ItemGroup>
+```
+```csharp
+var localizer = new JsonLocalizer(
+    assembly: typeof(Program).Assembly,
+    resourceNamespace: "MyApp.Resources",
+    baseName: "strings");
+```
+
+**Option 2: Source Generator Package (Auto-Embed)**
+```xml
+<ItemGroup>
+  <AdditionalFiles Include="Resources\**\*.json" />
+</ItemGroup>
+```
+```csharp
+// Generated Resources class handles everything
+Console.WriteLine(Resources.Welcome);
+```
+
+---
+
+### Sample Projects
+
+Create in `/samples/` folder:
+
+| Project | Purpose |
+|---------|---------|
+| `ConsoleApp.Standalone` | Standalone API without DI, file system loading |
+| `ConsoleApp.Embedded` | Embedded resources in DLL |
+| `WebApp.AspNetCore` | ASP.NET Core with IStringLocalizer integration |
+| `WebApp.SourceGenerator` | Strongly-typed access via source generator |
+| `BlazorApp.Wasm` | Blazor WebAssembly example |
+
+---
+
+### Dependencies
+
+**Runtime Package:**
+- `Microsoft.Extensions.Localization.Abstractions` (optional)
+- `Microsoft.Extensions.DependencyInjection.Abstractions` (optional)
+- No mandatory external dependencies (uses System.Text.Json)
+
+**Generator Package:**
+- `Microsoft.CodeAnalysis.CSharp` 4.x
+- `Microsoft.CodeAnalysis.Analyzers`
+
+---
+
+### Testing Strategy
+
+1. Unit tests for JsonLocalizer (standalone)
+2. Integration tests for IStringLocalizer with WebApplicationFactory
+3. Generator tests using CSharpGeneratorDriver
+4. Pluralization tests for multiple cultures
 
 ---
 

@@ -1,0 +1,20 @@
+{
+  "appTitle": "Source Generator Demo",
+  "welcome": "Welcome to strongly-typed localization!",
+  "greeting": "Hello, {0}!",
+  "buttons": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete"
+  },
+  "errors": {
+    "required": "This field is required",
+    "minLength": "Minimum length is {0} characters",
+    "maxLength": "Maximum length is {0} characters"
+  },
+  "itemCount": {
+    "zero": "No items",
+    "one": "One item",
+    "other": "{0} items"
+  }
+}

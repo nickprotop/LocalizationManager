@@ -1,0 +1,16 @@
+{
+  "welcome": "欢迎使用我们的应用程序！",
+  "greeting": "你好，{0}！",
+  "navigation": {
+    "home": "首页",
+    "about": "关于我们",
+    "contact": "联系我们"
+  },
+  "messages": {
+    "success": "操作成功完成",
+    "error": "发生错误：{0}"
+  },
+  "itemCount": {
+    "other": "{0} 个项目"
+  }
+}

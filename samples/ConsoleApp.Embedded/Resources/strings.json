@@ -1,0 +1,20 @@
+{
+  "appName": "My Embedded Application",
+  "greeting": "Hello, {0}!",
+  "buttons": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "apply": "Apply",
+    "close": "Close"
+  },
+  "errors": {
+    "notFound": "Resource not found: {0}",
+    "accessDenied": "Access denied",
+    "timeout": "Operation timed out"
+  },
+  "fileCount": {
+    "zero": "No files",
+    "one": "One file",
+    "other": "{0} files"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "description": "German language resource file"
+  },
+  "greeting": "Hallo, {0}!",
+  "welcome": "Willkommen in der Anwendung",
+  "goodbye": "Auf Wiedersehen!",
+  "items": {
+    "one": "{0} Artikel",
+    "other": "{0} Artikel"
+  },
+  "messages": {
+    "success": "Vorgang erfolgreich abgeschlossen",
+    "error": "Ein Fehler ist aufgetreten: {0}",
+    "confirm": "Sind Sie sicher, dass Sie fortfahren möchten?"
+  },
+  "navigation": {
+    "home": "Startseite",
+    "settings": "Einstellungen",
+    "profile": "Profil",
+    "logout": "Abmelden"
+  }
+}

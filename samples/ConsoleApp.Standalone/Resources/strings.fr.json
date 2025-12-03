@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "description": "French language resource file"
+  },
+  "greeting": "Bonjour, {0} !",
+  "welcome": "Bienvenue dans l'application",
+  "goodbye": "Au revoir !",
+  "items": {
+    "one": "{0} article",
+    "other": "{0} articles"
+  },
+  "messages": {
+    "success": "Opération terminée avec succès",
+    "error": "Une erreur s'est produite : {0}",
+    "confirm": "Êtes-vous sûr de vouloir continuer ?"
+  },
+  "navigation": {
+    "home": "Accueil",
+    "settings": "Paramètres",
+    "profile": "Profil",
+    "logout": "Déconnexion"
+  }
+}

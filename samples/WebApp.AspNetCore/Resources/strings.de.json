@@ -1,0 +1,18 @@
+{
+  "welcome": "Willkommen in unserer Anwendung!",
+  "greeting": "Hallo, {0}!",
+  "navigation": {
+    "home": "Startseite",
+    "about": "Über uns",
+    "contact": "Kontakt"
+  },
+  "messages": {
+    "success": "Vorgang erfolgreich abgeschlossen",
+    "error": "Ein Fehler ist aufgetreten: {0}"
+  },
+  "itemCount": {
+    "zero": "Keine Artikel",
+    "one": "Ein Artikel",
+    "other": "{0} Artikel"
+  }
+}

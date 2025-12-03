@@ -1,0 +1,10 @@
+{
+  "appTitle": "Aplicación de prueba",
+  "welcome": "¡Bienvenido a la aplicación!",
+  "greeting": "¡Hola, {0}!",
+  "buttons": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar"
+  }
+}

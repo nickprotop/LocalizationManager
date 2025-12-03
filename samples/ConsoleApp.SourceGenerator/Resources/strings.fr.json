@@ -1,0 +1,20 @@
+{
+  "appTitle": "Démo du générateur de source",
+  "welcome": "Bienvenue dans la localisation fortement typée !",
+  "greeting": "Bonjour, {0} !",
+  "buttons": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer"
+  },
+  "errors": {
+    "required": "Ce champ est obligatoire",
+    "minLength": "La longueur minimale est de {0} caractères",
+    "maxLength": "La longueur maximale est de {0} caractères"
+  },
+  "itemCount": {
+    "zero": "Aucun élément",
+    "one": "Un élément",
+    "other": "{0} éléments"
+  }
+}

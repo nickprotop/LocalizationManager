@@ -1,0 +1,18 @@
+{
+  "welcome": "Welcome to our application!",
+  "greeting": "Hello, {0}!",
+  "navigation": {
+    "home": "Home",
+    "about": "About",
+    "contact": "Contact"
+  },
+  "messages": {
+    "success": "Operation completed successfully",
+    "error": "An error occurred: {0}"
+  },
+  "itemCount": {
+    "zero": "No items",
+    "one": "One item",
+    "other": "{0} items"
+  }
+}

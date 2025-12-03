@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "description": "Default language (English) resource file"
+  },
+  "greeting": "Hello, {0}!",
+  "welcome": "Welcome to the application",
+  "goodbye": "Goodbye!",
+  "items": {
+    "one": "{0} item",
+    "other": "{0} items"
+  },
+  "messages": {
+    "success": "Operation completed successfully",
+    "error": "An error occurred: {0}",
+    "confirm": "Are you sure you want to continue?"
+  },
+  "navigation": {
+    "home": "Home",
+    "settings": "Settings",
+    "profile": "Profile",
+    "logout": "Log out"
+  }
+}

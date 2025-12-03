@@ -71,6 +71,49 @@ jobs:
           echo "✓ Built all platforms"
 
       # ═══════════════════════════════════════════════════════════════
+      # NuGet Packages
+      # ═══════════════════════════════════════════════════════════════
+
+      - name: Build and push NuGet packages
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+
+          # Extract release notes for this version from CHANGELOG.md
+          # Get content between "## [X.Y.Z]" and the next "## [" or end
+          RELEASE_NOTES=$(sed -n "/^## \[$VERSION\]/,/^## \[/p" CHANGELOG.md | sed '1d;$d' | head -50)
+
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="See https://github.com/nprotopapas/LocalizationManager/releases/tag/v$VERSION"
+          fi
+
+          # Pack NuGet packages with release notes
+          dotnet pack LocalizationManager.JsonLocalization/LocalizationManager.JsonLocalization.csproj \
+            --configuration Release \
+            --output ./nupkg \
+            -p:PackageReleaseNotes="$RELEASE_NOTES"
+
+          dotnet pack LocalizationManager.JsonLocalization.Generator/LocalizationManager.JsonLocalization.Generator.csproj \
+            --configuration Release \
+            --output ./nupkg \
+            -p:PackageReleaseNotes="$RELEASE_NOTES"
+
+          echo "Generated NuGet packages:"
+          ls -la ./nupkg/*.nupkg
+
+          # Push to NuGet.org
+          for pkg in ./nupkg/*.nupkg; do
+            echo "Pushing $pkg..."
+            dotnet nuget push "$pkg" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
+
+          echo "✓ NuGet packages published"
+
+      # ═══════════════════════════════════════════════════════════════
       # VS Code Extension - Platform-Specific Builds
       # ═══════════════════════════════════════════════════════════════
 

@@ -1,0 +1,28 @@
+{
+  "appTitle": "Test Application",
+  "welcome": "Welcome to the app!",
+  "greeting": "Hello, {0}!",
+  "multiParam": "User {0} has {1} items",
+  "buttons": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete"
+  },
+  "errors": {
+    "required": "This field is required",
+    "minLength": "Minimum length is {0} characters"
+  },
+  "itemCount": {
+    "zero": "No items",
+    "one": "One item",
+    "other": "{0} items"
+  },
+  "messageCount": {
+    "zero": "No messages",
+    "one": "One message",
+    "few": "{0} messages",
+    "many": "{0} messages",
+    "other": "{0} messages"
+  },
+  "emptyValue": ""
+}

@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net7.0;net8.0;net9.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>LocalizationManager.JsonLocalization</PackageId>
+    <Version>0.6.24</Version>
+    <Authors>Nikolaos Protopapas</Authors>
+    <Company>LocalizationManager</Company>
+    <Product>LocalizationManager.JsonLocalization</Product>
+    <Description>JSON-based localization for .NET applications. Provides both standalone API and Microsoft.Extensions.Localization integration. Supports pluralization, i18next format, and embedded resources.</Description>
+    <Copyright>Copyright (c) 2025 Nikolaos Protopapas</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/nprotopapas/LocalizationManager</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nprotopapas/LocalizationManager</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>localization;i18n;json;l10n;globalization;translation;resources;aspnetcore</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- Build settings -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- Optional Microsoft.Extensions dependencies - only for DI integration -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Localization.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

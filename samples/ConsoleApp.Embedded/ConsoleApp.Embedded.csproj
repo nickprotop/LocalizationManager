@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../LocalizationManager.JsonLocalization/LocalizationManager.JsonLocalization.csproj" />
+  </ItemGroup>
+
+  <!-- Embed resource files in the assembly -->
+  <!--
+    Use WithCulture=false to prevent MSBuild from treating culture-specific files
+    as satellite assemblies. This ensures all JSON files are embedded in the main assembly.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources/strings.json">
+      <LogicalName>ConsoleApp.Embedded.Resources.strings.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources/strings.es.json" WithCulture="false">
+      <LogicalName>ConsoleApp.Embedded.Resources.strings.es.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources/strings.ja.json" WithCulture="false">
+      <LogicalName>ConsoleApp.Embedded.Resources.strings.ja.json</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>

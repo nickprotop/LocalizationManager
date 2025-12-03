@@ -1,0 +1,18 @@
+{
+  "appName": "埋め込みアプリケーション",
+  "greeting": "こんにちは、{0}さん！",
+  "buttons": {
+    "ok": "OK",
+    "cancel": "キャンセル",
+    "apply": "適用",
+    "close": "閉じる"
+  },
+  "errors": {
+    "notFound": "リソースが見つかりません: {0}",
+    "accessDenied": "アクセスが拒否されました",
+    "timeout": "操作がタイムアウトしました"
+  },
+  "fileCount": {
+    "other": "{0}個のファイル"
+  }
+}

@@ -51,6 +51,21 @@
     <EmbeddedResource Remove="LocalizationManager.Shared/**" />
     <None Remove="LocalizationManager.Shared/**" />
     <Content Remove="LocalizationManager.Shared/**" />
+
+    <Compile Remove="LocalizationManager.JsonLocalization/**" />
+    <EmbeddedResource Remove="LocalizationManager.JsonLocalization/**" />
+    <None Remove="LocalizationManager.JsonLocalization/**" />
+    <Content Remove="LocalizationManager.JsonLocalization/**" />
+
+    <Compile Remove="LocalizationManager.JsonLocalization.Generator/**" />
+    <EmbeddedResource Remove="LocalizationManager.JsonLocalization.Generator/**" />
+    <None Remove="LocalizationManager.JsonLocalization.Generator/**" />
+    <Content Remove="LocalizationManager.JsonLocalization.Generator/**" />
+
+    <Compile Remove="samples/**" />
+    <EmbeddedResource Remove="samples/**" />
+    <None Remove="samples/**" />
+    <Content Remove="samples/**" />
   </ItemGroup>
 
   <ItemGroup>

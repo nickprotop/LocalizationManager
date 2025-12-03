@@ -1,0 +1,20 @@
+{
+  "appTitle": "Application de test",
+  "welcome": "Bienvenue dans l'application !",
+  "greeting": "Bonjour, {0} !",
+  "multiParam": "L'utilisateur {0} a {1} éléments",
+  "buttons": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer"
+  },
+  "errors": {
+    "required": "Ce champ est obligatoire",
+    "minLength": "La longueur minimale est de {0} caractères"
+  },
+  "itemCount": {
+    "zero": "Aucun élément",
+    "one": "Un élément",
+    "other": "{0} éléments"
+  }
+}
