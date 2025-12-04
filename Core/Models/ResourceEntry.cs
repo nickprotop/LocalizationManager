@@ -22,7 +22,7 @@
 namespace LocalizationManager.Core.Models;
 
 /// <summary>
-/// Represents a single resource key-value pair from a .resx file.
+/// Represents a single resource key-value pair from a resource file (.resx or JSON).
 /// </summary>
 public class ResourceEntry
 {
@@ -33,6 +33,7 @@ public class ResourceEntry
 
     /// <summary>
     /// The resource value/translation.
+    /// For plural entries, this contains the "other" form as the default value.
     /// </summary>
     public string? Value { get; set; }
 
@@ -42,7 +43,30 @@ public class ResourceEntry
     public string? Comment { get; set; }
 
     /// <summary>
-    /// Indicates if this entry is empty/null.
+    /// Indicates if this entry represents a plural form (JSON only).
+    /// When true, PluralForms contains the different plural variations.
     /// </summary>
-    public bool IsEmpty => string.IsNullOrWhiteSpace(Value);
+    public bool IsPlural { get; set; }
+
+    /// <summary>
+    /// Plural form values keyed by CLDR plural category (zero, one, two, few, many, other).
+    /// Only populated when IsPlural is true.
+    /// </summary>
+    public Dictionary<string, string>? PluralForms { get; set; }
+
+    /// <summary>
+    /// Indicates if this entry is empty/null.
+    /// For plural entries, checks if all plural forms are empty.
+    /// </summary>
+    public bool IsEmpty => IsPlural
+        ? PluralForms == null || PluralForms.Count == 0 || PluralForms.Values.All(string.IsNullOrWhiteSpace)
+        : string.IsNullOrWhiteSpace(Value);
+
+    /// <summary>
+    /// Gets the effective value for display purposes.
+    /// For plural entries, returns the "other" form or first available form.
+    /// </summary>
+    public string? DisplayValue => IsPlural
+        ? PluralForms?.GetValueOrDefault("other") ?? PluralForms?.Values.FirstOrDefault() ?? Value
+        : Value;
 }

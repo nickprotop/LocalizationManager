@@ -171,13 +171,13 @@ public class JsonResourceWriter : IResourceWriter
     /// </summary>
     private object CreateEntryValue(ResourceEntry entry)
     {
-        // Check if plural (stored as JSON string)
-        if (entry.Comment == "[plural]" && entry.Value?.StartsWith("{") == true)
+        // Check if plural (use IsPlural flag)
+        if (entry.IsPlural && entry.PluralForms != null && entry.PluralForms.Count > 0)
         {
-            return ParsePluralValue(entry.Value);
+            return CreatePluralValue(entry);
         }
 
-        // Check if array (stored as JSON string)
+        // Check if array (stored as JSON string) - legacy support
         if (entry.Comment == "[array]" && entry.Value?.StartsWith("[") == true)
         {
             try
@@ -191,8 +191,7 @@ public class JsonResourceWriter : IResourceWriter
         }
 
         // Check if has comment and comments should be preserved
-        if (_config.PreserveComments && !string.IsNullOrEmpty(entry.Comment) &&
-            entry.Comment != "[plural]" && entry.Comment != "[array]")
+        if (_config.PreserveComments && !string.IsNullOrEmpty(entry.Comment))
         {
             return new Dictionary<string, string?>
             {
@@ -205,28 +204,24 @@ public class JsonResourceWriter : IResourceWriter
     }
 
     /// <summary>
-    /// Parses a plural value from its JSON storage format.
+    /// Creates the plural value object from the entry's PluralForms dictionary.
     /// </summary>
-    private Dictionary<string, object> ParsePluralValue(string value)
+    private Dictionary<string, object> CreatePluralValue(ResourceEntry entry)
     {
         var result = new Dictionary<string, object> { ["_plural"] = true };
 
-        try
+        if (entry.PluralForms != null)
         {
-            // Parse JSON format: {"one":"{0} item","other":"{0} items"}
-            var pluralForms = JsonSerializer.Deserialize<Dictionary<string, string>>(value);
-            if (pluralForms != null)
+            foreach (var kv in entry.PluralForms)
             {
-                foreach (var kv in pluralForms)
-                {
-                    result[kv.Key] = kv.Value;
-                }
+                result[kv.Key] = kv.Value;
             }
         }
-        catch (JsonException)
+
+        // Include comment if present
+        if (_config.PreserveComments && !string.IsNullOrEmpty(entry.Comment))
         {
-            // Fallback: treat as simple value if JSON parsing fails
-            result["other"] = value;
+            result["_comment"] = entry.Comment;
         }
 
         return result;

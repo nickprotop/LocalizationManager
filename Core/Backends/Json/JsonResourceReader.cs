@@ -196,12 +196,17 @@ public class JsonResourceReader : IResourceReader
         // Check for _plural (LRM-style plurals)
         if (element.TryGetProperty("_plural", out _))
         {
-            var pluralValue = SerializePluralValue(element, isLrmStyle: true);
+            var pluralForms = ExtractPluralForms(element, isLrmStyle: true);
+            var comment = element.TryGetProperty("_comment", out var commentElement)
+                ? commentElement.GetString()
+                : null;
             entries.Add(new ResourceEntry
             {
                 Key = key,
-                Value = pluralValue,
-                Comment = "[plural]"
+                Value = pluralForms.GetValueOrDefault("other") ?? pluralForms.Values.FirstOrDefault(),
+                Comment = comment,
+                IsPlural = true,
+                PluralForms = pluralForms
             });
             return;
         }
@@ -209,12 +214,13 @@ public class JsonResourceReader : IResourceReader
         // Check for i18next-style plurals (keys ending with _one, _other, etc.)
         if (_config.I18nextCompatible && HasI18nextPluralSiblings(element))
         {
-            var pluralValue = SerializePluralValue(element, isLrmStyle: false);
+            var pluralForms = ExtractPluralForms(element, isLrmStyle: false);
             entries.Add(new ResourceEntry
             {
                 Key = key,
-                Value = pluralValue,
-                Comment = "[plural]"
+                Value = pluralForms.GetValueOrDefault("other") ?? pluralForms.Values.FirstOrDefault(),
+                IsPlural = true,
+                PluralForms = pluralForms
             });
             return;
         }
@@ -245,16 +251,16 @@ public class JsonResourceReader : IResourceReader
     }
 
     /// <summary>
-    /// Serializes plural forms to a JSON string for storage.
+    /// Extracts plural forms from a JSON element into a dictionary.
     /// </summary>
-    private string SerializePluralValue(JsonElement element, bool isLrmStyle)
+    private Dictionary<string, string> ExtractPluralForms(JsonElement element, bool isLrmStyle)
     {
         var pluralForms = new Dictionary<string, string>();
 
         foreach (var prop in element.EnumerateObject())
         {
-            // Skip internal properties
-            if (prop.Name.StartsWith("_"))
+            // Skip internal properties (except we need to check _plural for LRM style)
+            if (prop.Name.StartsWith("_") && prop.Name != "_plural")
                 continue;
 
             // For LRM style, get values from under _plural
@@ -276,6 +282,6 @@ public class JsonResourceReader : IResourceReader
             }
         }
 
-        return JsonSerializer.Serialize(pluralForms);
+        return pluralForms;
     }
 }

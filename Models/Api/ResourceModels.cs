@@ -32,6 +32,8 @@ public class ResourceValue
 {
     public string? Value { get; set; }
     public string? Comment { get; set; }
+    public bool IsPlural { get; set; }
+    public Dictionary<string, string>? PluralForms { get; set; }
 }
 
 public class DuplicateOccurrence
@@ -48,7 +50,21 @@ public class AddKeyRequest
     [RegularExpression(@"^[\w\.\-\[\]\s]+$", ErrorMessage = "Key contains invalid characters")]
     public string Key { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Simple string values per language (for non-plural keys).
+    /// </summary>
     public Dictionary<string, string>? Values { get; set; }
+
+    /// <summary>
+    /// Whether this key is a plural form.
+    /// </summary>
+    public bool IsPlural { get; set; }
+
+    /// <summary>
+    /// Plural form values per language (for plural keys).
+    /// Key is language code, value is dictionary of plural forms (one, other, zero, etc.).
+    /// </summary>
+    public Dictionary<string, Dictionary<string, string>>? PluralValues { get; set; }
 
     [StringLength(2000, ErrorMessage = "Comment cannot exceed 2000 characters")]
     public string? Comment { get; set; }
