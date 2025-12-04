@@ -1,7 +1,7 @@
 {
   "name": "localization-manager",
   "displayName": "LRM - .NET Localization",
-  "description": "Manage .NET .resx localization files with real-time validation, translation, and code scanning",
+  "description": "Manage .NET localization files (.resx and JSON) with real-time validation, translation, and code scanning",
   "version": "0.6.24",
   "icon": "images/icon.png",
   "publisher": "nickprotop",
@@ -20,7 +20,9 @@
   "keywords": [
     "localization",
     "resx",
+    "json",
     "i18n",
+    "i18next",
     "translation",
     "dotnet",
     "csharp",
@@ -29,7 +31,13 @@
     "l10n"
   ],
   "activationEvents": [
-    "workspaceContains:**/*.resx"
+    "workspaceContains:**/*.resx",
+    "workspaceContains:**/lrm.json",
+    "workspaceContains:**/strings.json",
+    "workspaceContains:**/strings.*.json",
+    "workspaceContains:**/locales/**/*.json",
+    "workspaceContains:**/translations/**/*.json",
+    "workspaceContains:**/i18n/**/*.json"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -117,7 +125,7 @@
         "lrm.resourcePath": {
           "type": "string",
           "default": null,
-          "description": "Path to .resx resources folder (auto-detected if not set)"
+          "description": "Path to resources folder containing .resx or JSON files (auto-detected if not set)"
         },
         "lrm.enableRealtimeScan": {
           "type": "boolean",
@@ -188,7 +196,7 @@
         "lrm.enableCodeLens": {
           "type": "boolean",
           "default": true,
-          "description": "Show CodeLens for localization keys in .resx and code files"
+          "description": "Show CodeLens for localization keys in resource files (.resx, JSON) and code files"
         },
         "lrm.codeLens.showReferences": {
           "type": "boolean",
@@ -212,6 +220,16 @@
         }
       }
     },
+    "jsonValidation": [
+      {
+        "fileMatch": "lrm.json",
+        "url": "./schemas/lrm.schema.json"
+      },
+      {
+        "fileMatch": "**/lrm.json",
+        "url": "./schemas/lrm.schema.json"
+      }
+    ],
     "views": {
       "explorer": [
         {

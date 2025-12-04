@@ -1,6 +1,6 @@
 # JSON Backend Implementation Guide
 
-> **Status:** Phase 6 In Progress - NuGet Package for JSON Localization
+> **Status:** Phase 6 Complete ✅ - Phase 7 (VS Code Extension) **Nearly Complete** 🔄 (Tasks 7.1-7.9 done, 7.10-7.11 pending)
 > **Target:** Full multi-backend support (RESX + JSON) across CLI/TUI/Web/API/VS Code Extension
 > **Plus:** NuGet package for consuming JSON localization in .NET apps
 
@@ -2113,7 +2113,12 @@ public override int Execute(CommandContext context, ViewCommandSettings settings
   - WebApp.AspNetCore (IStringLocalizer integration)
   - ConsoleApp.SourceGenerator (strongly-typed access)
 - [x] 6.11 Write unit tests (136 tests for JsonLocalization package)
-- [ ] 6.12 Publish NuGet packages
+- [x] 6.12 Publish NuGet packages ✅
+  - Integrated into release workflow (`.github/workflows/release.yml`)
+  - Version sync via `bump-version.sh` (CLI, NuGet, VS Code all synced)
+  - Dynamic release notes extracted from CHANGELOG.md
+  - Comprehensive README documentation for both packages
+  - Removed inaccurate i18next claims from documentation
 
 ---
 
@@ -2256,17 +2261,518 @@ Create in `/samples/` folder:
 
 ---
 
-## Phase 7: VS Code Extension
+## Phase 7: VS Code Extension JSON Support
 
-> **Goal:** Update extension for JSON backend support
+> **Goal:** Update VS Code extension to work with JSON resource files
+> **Status:** **Nearly Complete** - Core Tasks 7.1-7.9 Complete ✅ (Testing & Docs pending)
+
+---
+
+### CRITICAL REVIEW FINDINGS
+
+This section documents issues discovered during comprehensive codebase analysis. These must be addressed for successful JSON support.
+
+#### BLOCKER ISSUES ✅ RESOLVED
+
+~~These issues **BLOCK** Phase 7 implementation and must be resolved first:~~
+
+| Issue | Severity | Description | Solution | Status |
+|-------|----------|-------------|----------|--------|
+| **Extension Won't Activate** | ~~BLOCKER~~ | `package.json` only has `workspaceContains:**/*.resx` activation. JSON-only projects invisible. | Add `workspaceContains:**/lrm.json` + common patterns | ✅ Fixed |
+
+#### RESOLVED ISSUES
+
+| Issue | Resolution |
+|-------|------------|
+| **Format Detection** | ~~Originally thought we needed an API endpoint~~. **RESOLVED**: Frontend reads `resourceFormat` from `lrm.json` directly, falls back to file-based detection. No API needed. |
+
+#### HIGH PRIORITY ISSUES
+
+| Issue | File(s) | Description | Impact | Status |
+|-------|---------|-------------|--------|--------|
+| **File watcher RESX-only** | `extension.ts:152` | `createFileSystemWatcher('**/*.resx')` | No live updates for JSON changes | ✅ Fixed |
+| **CodeLens RESX-only** | `extension.ts:77-99` | Registered with `pattern: '**/*.resx'` | No CodeLens in JSON files | ✅ Fixed |
+| **resxDiagnostics XML parsing** | `resxDiagnostics.ts` | Uses `<data name="${key}"` pattern | Diagnostics broken for JSON | ✅ Fixed |
+| **codeLens XML regex** | `codeLens.ts:84-89` | Uses `/<data\s+name="([^"]+)"[^>]*>/g` | Key discovery fails for JSON | ✅ Fixed |
+| **Cache not format-aware** | `cacheService.ts` | No format field in cache state | Stale data on format switch | ✅ Fixed |
+
+#### MEDIUM PRIORITY ISSUES
+
+| Issue | Description | Impact | Status |
+|-------|-------------|--------|--------|
+| **Culture extraction regex** | `resxDiagnostics.ts` uses `/\.([a-z]{2}(-[A-Z]{2})?)\\.resx$/i` | Language detection fails for JSON | ✅ Fixed |
+| **Nested key handling** | JSON supports `Navigation.Home` as nested object; RESX is flat | CodeLens/diagnostics must handle both | ✅ Fixed |
+| **i18next pattern detection** | `en.json`, `fr.json` files not recognized as resources | Common pattern missed | ✅ Fixed (lrmService.ts) |
+| **lrm.json not watched** | Config changes not detected | Format switch not reflected | ✅ Fixed (extension.ts) |
+
+#### ARCHITECTURAL OBSERVATIONS
+
+**API TypeScript Interfaces (apiClient.ts):**
+```typescript
+// CURRENT: No format information
+interface ResourceKey {
+    key: string;
+    values: ResourceValue[];
+    comment?: string;
+}
+
+// NEEDED: Add format awareness
+interface ConfigurationInfo {
+    format: 'resx' | 'json';
+    resourcePath: string;
+    // ...
+}
+```
+
+**Provider Pattern Duplication:**
+All 5 providers have RESX-specific code that needs dual-mode support:
+1. `resxDiagnostics.ts` - Uses XML patterns
+2. `codeLens.ts` - Uses XML regex
+3. `completionProvider.ts` - Language selector generic (OK)
+4. `codeDiagnostics.ts` - Pattern-based (may work)
+5. `quickFix.ts` - Depends on diagnostics (should work)
+
+**Recommended Architecture:**
+Create shared `ResourceDocumentParser` abstraction:
+```
+vscode-extension/src/utils/
+├── resourceDocumentParser.ts      # Interface
+├── resxDocumentParser.ts          # XML implementation
+└── jsonDocumentParser.ts          # JSON implementation
+```
+
+---
+
+### REVISED TASK ORDER (Dependency-Based)
+
+Based on the critical review, tasks should be reordered:
+
+| Order | Task | Reason | Status |
+|-------|------|--------|--------|
+| ~~**7.0**~~ | ~~Add `/api/configuration/format` endpoint~~ | ~~BLOCKER - Frontend needs format info~~ | Removed (reads lrm.json directly) |
+| **7.1** | Update `package.json` activation events | BLOCKER - Extension must activate | ✅ Complete |
+| **7.2** | Extend file watchers | Required for live updates | ✅ Complete |
+| **7.3** | Update auto-detection (`lrmService.ts`) | Core functionality | ✅ Complete |
+| **7.4** | Create ResourceDocumentParser abstraction | Enables provider updates | ✅ Complete |
+| **7.5** | Update CodeLens provider | Uses parser abstraction | ✅ Complete |
+| **7.6** | Update Diagnostics providers | Uses parser abstraction | ✅ Complete |
+| **7.7** | Cache format awareness | Prevents stale data | ✅ Complete |
+| **7.8** | Definition Provider (F12) | New feature - Go to key definition | ✅ Complete |
+| **7.9** | Reference Provider (Shift+F12) | New feature - Find all references | ✅ Complete |
+| **7.10** | Testing | Verify all works | ⏳ Pending |
+| **7.11** | Documentation | Update extension docs | ⏳ Pending |
+
+---
+
+### FILES REQUIRING CHANGES (Priority Order)
+
+| Priority | File | Changes Required |
+|----------|------|------------------|
+| 1 | `WebApi/ResourceApiEndpoints.cs` | NEW endpoint `/api/configuration/format` |
+| 2 | `vscode-extension/package.json` | Activation events, file associations |
+| 3 | `vscode-extension/src/extension.ts` | File watchers, provider registrations |
+| 4 | `vscode-extension/src/backend/lrmService.ts` | Auto-detection logic |
+| 5 | `vscode-extension/src/backend/apiClient.ts` | Format field in interfaces |
+| 6 | `vscode-extension/src/backend/cacheService.ts` | Format-aware caching |
+| 7 | `vscode-extension/src/providers/resxDiagnostics.ts` | Dual-mode parsing |
+| 8 | `vscode-extension/src/providers/codeLens.ts` | Dual-mode parsing |
+| 9 | NEW: `vscode-extension/src/utils/resourceDocumentParser.ts` | Parser abstraction |
+
+---
+
+### EDGE CASES TO HANDLE
+
+| Scenario | Challenge | Solution |
+|----------|-----------|----------|
+| Nested JSON keys | `Navigation.Home` → `{"Navigation":{"Home":"..."}}` | Parser must understand structure |
+| Plural entries | `{"Items":{"one":"...","other":"..."}}` | Don't show as `Items.one` in tree |
+| i18next files | `en.json`, `fr.json` (culture-only names) | Validate against known culture codes |
+| Mixed content JSON | JSON with both config and strings | Respect configured root key |
+| JSON comments | `"_comment": "..."` convention | ResourceEditor must display |
+| Format switch | User changes lrm.json format | Invalidate cache, refresh all |
+
+---
+
+### Completed Features (Existing)
+
+The VS Code extension already has these features working with RESX:
+
+| Category | Features |
+|----------|----------|
+| **Providers** | Code Diagnostics, RESX Diagnostics, Completion Provider, Quick Fix, CodeLens |
+| **Views** | Dashboard, Resource Editor, Resource Tree, Status Bar, Settings Panel |
+| **Backend** | API Client, LRM Service, Cache Service |
+| **Commands** | 25 commands (scan, validate, translate, add/edit/delete keys, export/import, etc.) |
 
 ### Progress
 
-- [ ] 7.1 Update lrmService.ts to pass format
-- [ ] 7.2 Update apiClient.ts types
-- [ ] 7.3 Test with JSON backend
+**Blockers (Must Complete First):**
+- [x] 7.1 Update `package.json` activation events ✅
 
-*(Mostly automatic - API is format-agnostic)*
+**Core JSON Support:**
+- [x] 7.2 Extend file watchers (JSON + lrm.json) ✅
+- [x] 7.3 Update resource auto-detection (includes lrm.json reading + file detection) ✅
+- [x] 7.4 Create ResourceDocumentParser abstraction ✅
+- [x] 7.5 Update CodeLens provider (dual-mode) ✅
+- [x] 7.6 Update Diagnostics providers (dual-mode) ✅
+- [x] 7.7 Add cache format awareness ✅
+
+**Additional Providers:**
+- [x] 7.8 Definition Provider (F12 to jump to .resx/.json definition) ✅
+- [x] 7.9 Reference Provider (Shift+F12 to find all code references) ✅
+
+**Testing & Documentation:**
+- [ ] 7.10 Test with JSON backend
+- [ ] 7.11 Update extension documentation
+
+> **Note:** Task 7.0 (API format endpoint) was removed - frontend reads `resourceFormat` from `lrm.json` directly.
+
+---
+
+### 7.0 Add Format API Endpoint (BLOCKER)
+
+**File to modify:** `WebApi/ResourceApiEndpoints.cs`
+
+**Purpose:** The VS Code extension frontend has NO way to know what format (RESX or JSON) the backend is using. This blocks ALL format-dependent features.
+
+**Implementation:**
+
+```csharp
+// Add to ResourceApiEndpoints.cs
+app.MapGet("/api/configuration/format", (IResourceBackend backend) =>
+{
+    return Results.Ok(new
+    {
+        format = backend.Name,  // "resx" or "json"
+        extensions = backend.SupportedExtensions  // [".resx"] or [".json"]
+    });
+});
+```
+
+**Frontend usage (apiClient.ts):**
+
+```typescript
+interface FormatInfo {
+    format: 'resx' | 'json';
+    extensions: string[];
+}
+
+async getFormat(): Promise<FormatInfo> {
+    return await this.get<FormatInfo>('/api/configuration/format');
+}
+```
+
+**Integration points:**
+1. Call on extension activation to determine format
+2. Store result in cache service
+3. Use to determine file patterns, CodeLens registration, diagnostics mode
+
+---
+
+### 7.1 Update Resource Auto-Detection
+
+**File to modify:** `vscode-extension/src/backend/lrmService.ts`
+
+**Design Decisions:**
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Mixed formats (RESX + JSON) | **Ask user** | Show picker dialog when both exist |
+| Detection strictness | **Medium** | Pattern-based exclusions for config files |
+| i18next support | **Yes** | Auto-detect `en.json`, `fr.json` if valid culture codes |
+
+#### Patterns to INCLUDE (JSON Resource Files)
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `{baseName}.json` | `strings.json` | Default language file |
+| `{baseName}.{culture}.json` | `strings.fr.json`, `strings.en-US.json` | Culture-specific files |
+| `{culture}.json` | `en.json`, `fr.json` | i18next style (culture code only) |
+
+#### Directories to EXCLUDE (glob patterns)
+
+```
+**/.lrm/**           # LRM backup files
+**/node_modules/**   # npm packages
+**/bin/**            # .NET build output
+**/obj/**            # .NET intermediate output
+**/.git/**           # Git repository
+**/.vscode/**        # VS Code settings
+**/.github/**        # GitHub workflows
+**/.idea/**          # JetBrains IDEs
+**/.vs/**            # Visual Studio
+**/dist/**           # Build output
+**/build/**          # Build output
+**/.devcontainer/**  # Dev container config
+```
+
+#### Filename Patterns to EXCLUDE (regex)
+
+```typescript
+const excludePatterns = [
+    // LRM config
+    /^lrm.*\.json$/,
+    // ASP.NET config
+    /^appsettings.*\.json$/,
+    // Node.js
+    /^package(-lock)?\.json$/,
+    /^npm.*\.json$/,
+    // TypeScript
+    /^tsconfig.*\.json$/,
+    /^tslint\.json$/,
+    // Build tools
+    /^webpack.*\.json$/,
+    /^babel.*\.json$/,
+    /^rollup.*\.json$/,
+    /^vite.*\.json$/,
+    // Linting/formatting
+    /^\.?eslint.*\.json$/,
+    /^\.?prettier.*\.json$/,
+    /^\.?stylelint.*\.json$/,
+    // Testing
+    /^jest.*\.json$/,
+    /^karma.*\.json$/,
+    /^cypress\.json$/,
+    // IDE
+    /^settings\.json$/,
+    /^extensions\.json$/,
+    /^launch\.json$/,
+    /^tasks\.json$/,
+    // NuGet
+    /\.nuget\..*\.json$/,
+    /project\.assets\.json$/,
+    /packages\.lock\.json$/,
+    // Generic config patterns
+    /.*config\.json$/,
+    /.*settings\.json$/,
+    /.*schema\.json$/,
+    /.*manifest\.json$/,
+];
+```
+
+#### Culture Code Validation
+
+```typescript
+// Common culture codes (fast path)
+const commonCodes = new Set([
+    'en', 'en-us', 'en-gb', 'fr', 'fr-fr', 'fr-ca',
+    'de', 'de-de', 'es', 'es-es', 'it', 'it-it',
+    'pt', 'pt-br', 'pt-pt', 'ru', 'ja', 'ko', 'zh',
+    'zh-hans', 'zh-hant', 'zh-cn', 'zh-tw', 'ar', 'he',
+    'nl', 'pl', 'tr', 'el', 'cs', 'sv', 'da', 'fi', 'no'
+]);
+
+// BCP 47 pattern fallback: xx or xx-XX or xx-Xxxx
+const bcp47Pattern = /^[a-z]{2}(-[a-z]{2,4})?$/i;
+```
+
+#### Implementation Steps
+
+**Step 1: Search for both formats in parallel**
+```typescript
+const [resxFiles, jsonFiles] = await Promise.all([
+    vscode.workspace.findFiles(
+        '**/*.resx',
+        '{**/.lrm/**,**/node_modules/**,**/bin/**,**/obj/**,**/.git/**,**/.vscode/**}',
+        10
+    ),
+    vscode.workspace.findFiles(
+        '**/*.json',
+        '{**/.lrm/**,**/node_modules/**,**/bin/**,**/obj/**,**/.git/**,**/.vscode/**,**/.github/**,**/.idea/**,**/.vs/**,**/dist/**,**/build/**,**/.devcontainer/**}',
+        50  // More results needed due to filtering
+    )
+]);
+```
+
+**Step 2: Filter JSON files through exclusion patterns**
+
+**Step 3: Validate remaining JSON files have resource naming pattern**
+
+**Step 4: If both formats found, show picker dialog**
+
+**Step 5: Return selected resource directory**
+
+#### Test Cases
+
+| Scenario | Expected Behavior |
+|----------|-------------------|
+| Only `.resx` files | Auto-select RESX directory |
+| Only `.json` resources | Auto-select JSON directory |
+| Both formats exist | Show picker dialog |
+| `appsettings.json` only | Return null (not a resource) |
+| `strings.json` + `strings.fr.json` | Detect as JSON resources |
+| `en.json` + `fr.json` (i18next) | Detect as JSON resources |
+| `config.en.json` | Exclude (matches *config* pattern) |
+| `package.json` | Exclude |
+| JSON in `node_modules/` | Exclude |
+
+---
+
+### 7.2 Create JSON Diagnostics Provider
+
+**File to create:** `vscode-extension/src/providers/jsonDiagnostics.ts`
+
+**Purpose:** Show validation issues (missing translations, empty values) in JSON resource files
+
+**Implementation:**
+- Mirror `resxDiagnostics.ts` structure
+- Parse JSON to find key locations (not XML patterns)
+- Support nested keys with dot notation
+- Reuse validation API (already format-agnostic)
+
+```typescript
+// Key difference from RESX: finding keys in JSON
+private findKeyInDocument(document: vscode.TextDocument, key: string): number {
+    // For nested keys like "Errors.NotFound", search for the nested structure
+    // or flat key depending on JSON format
+    const patterns = [
+        `"${key}"`,                           // Flat key
+        `"${key.split('.').pop()}"`,          // Last part of nested key
+    ];
+    // ...
+}
+```
+
+---
+
+### 7.3 Update File Patterns Throughout Extension
+
+**Files to modify:**
+
+| File | Change |
+|------|--------|
+| `resxDiagnostics.ts` line 42 | Add JSON pattern or create separate provider |
+| `codeDiagnostics.ts` | May need to detect JSON resources |
+| `completionProvider.ts` | Support JSON file editing |
+| `codeLens.ts` | Work with both formats |
+
+---
+
+### 7.4 Update Tree View for Format Awareness
+
+**File to modify:** `vscode-extension/src/views/resourceTreeView.ts`
+
+**Changes:**
+- Show format indicator (JSON/RESX) in tree labels
+- Use different icons for JSON vs RESX files
+- Support nested key visualization for JSON format
+
+---
+
+### 7.5 Test with JSON Backend
+
+**Manual testing checklist:**
+- [ ] Extension finds JSON resources in workspace
+- [ ] Tree view shows JSON files correctly
+- [ ] Add/edit/delete keys works with JSON
+- [ ] Translate command works with JSON
+- [ ] Validation issues show in JSON files
+- [ ] Code diagnostics find missing keys (JSON resources)
+- [ ] Export/import works with JSON resources
+
+---
+
+### 7.6 Update Extension Documentation
+
+**File to modify:** `vscode-extension/README.md`
+
+**Changes:**
+- Document JSON support
+- Add JSON-specific screenshots/examples
+- Note that format is auto-detected
+
+---
+
+### 7.7 Definition Provider (F12)
+
+**File to create:** `vscode-extension/src/providers/definition.ts`
+
+**Purpose:** Press F12 on a localization key in code to jump to its definition in the resource file (.resx or .json)
+
+**Implementation:**
+```typescript
+import * as vscode from 'vscode';
+
+export class DefinitionProvider implements vscode.DefinitionProvider {
+    async provideDefinition(
+        document: vscode.TextDocument,
+        position: vscode.Position
+    ): Promise<vscode.Definition | undefined> {
+        // 1. Extract key at cursor position
+        // 2. Find resource file containing the key
+        // 3. Find line number of key in resource file
+        // 4. Return Location pointing to that line
+    }
+}
+```
+
+**Patterns to detect:**
+- `Resources.KeyName` (property access)
+- `Resources["KeyName"]` (indexer)
+- `localizer["KeyName"]` (IStringLocalizer)
+- `GetString("KeyName")` (method call)
+
+**Registration in extension.ts:**
+```typescript
+context.subscriptions.push(
+    vscode.languages.registerDefinitionProvider(
+        ['csharp', 'razor'],
+        new DefinitionProvider(apiClient)
+    )
+);
+```
+
+---
+
+### 7.8 Reference Provider (Shift+F12)
+
+**File to create:** `vscode-extension/src/providers/references.ts`
+
+**Purpose:** Press Shift+F12 on a key in a resource file to find all code references
+
+**Implementation:**
+```typescript
+import * as vscode from 'vscode';
+
+export class ReferenceProvider implements vscode.ReferenceProvider {
+    async provideReferences(
+        document: vscode.TextDocument,
+        position: vscode.Position,
+        context: vscode.ReferenceContext
+    ): Promise<vscode.Location[]> {
+        // 1. Extract key name from resource file
+        // 2. Call API to get scan results (already have this!)
+        // 3. Filter to references of this specific key
+        // 4. Return array of Locations
+    }
+}
+```
+
+**Note:** Can reuse existing `/api/scan` endpoint which already finds key usages in code.
+
+**Registration in extension.ts:**
+```typescript
+context.subscriptions.push(
+    vscode.languages.registerReferenceProvider(
+        ['xml', 'json'],  // .resx and .json files
+        new ReferenceProvider(apiClient)
+    )
+);
+```
+
+---
+
+### Key Insight: Backend API is Format-Agnostic
+
+The LRM backend API already supports both formats transparently:
+- `/api/resources/keys` - Works for both
+- `/api/resources/validate` - Works for both
+- `/api/resources/translate` - Works for both
+
+Extension changes focus on:
+1. **File detection** - Find JSON files in workspace
+2. **Diagnostics** - Parse JSON to locate keys for squiggles
+3. **UI hints** - Show format in tree view
 
 ---
 

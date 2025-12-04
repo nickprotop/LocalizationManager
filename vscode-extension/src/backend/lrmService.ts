@@ -460,25 +460,294 @@ export class LrmService implements vscode.Disposable {
             return null;
         }
 
-        // Search for .resx files in workspace, excluding common non-source directories
-        // - .lrm/backups: LRM backup files
-        // - node_modules: npm packages
-        // - bin/obj: .NET build outputs (may contain copied .resx files)
-        const resxFiles = await vscode.workspace.findFiles(
-            '**/*.resx',
-            '{**/.lrm/**,**/node_modules/**,**/bin/**,**/obj/**}',
-            10 // Limit to 10 files for performance
-        );
+        // Search for both .resx AND JSON files in workspace
+        const excludePattern = '{**/.lrm/**,**/.backup/**,**/node_modules/**,**/bin/**,**/obj/**,**/.git/**,**/.vscode/**,**/.github/**,**/.idea/**,**/.vs/**,**/dist/**,**/build/**,**/.devcontainer/**,**/.claude/**}';
 
-        if (resxFiles.length === 0) {
+        const [resxFiles, jsonFiles] = await Promise.all([
+            vscode.workspace.findFiles('**/*.resx', excludePattern, 10),
+            vscode.workspace.findFiles('**/*.json', excludePattern, 50) // More results for filtering
+        ]);
+
+        // Filter JSON files to likely resource files
+        const filteredJsonFiles = jsonFiles.filter(f => this.isLikelyResourceFile(f.fsPath));
+
+        // Further filter JSON files: must have valid resource naming pattern
+        const validJsonResources = filteredJsonFiles.filter(f => {
+            const fileName = path.basename(f.fsPath);
+            const { baseName, culture } = this.extractCultureFromFilename(fileName);
+            // Accept if it has a culture code OR if it's a potential base file
+            return culture !== null || baseName.length > 0;
+        });
+
+        // Group files by directory to find resource directories
+        const jsonDirs = new Set(validJsonResources.map(f => path.dirname(f.fsPath)));
+        const resxDirs = new Set(resxFiles.map(f => path.dirname(f.fsPath)));
+
+        const hasResx = resxFiles.length > 0;
+        const hasJson = validJsonResources.length > 0;
+
+        if (!hasResx && !hasJson) {
             return null;
         }
 
-        // Get directory of first .resx file found
-        const firstResxPath = resxFiles[0].fsPath;
-        const resourceDir = path.dirname(firstResxPath);
+        if (hasResx && hasJson) {
+            // BOTH formats found - ask user which to use
+            const choice = await this.promptFormatChoice(
+                Array.from(resxDirs),
+                Array.from(jsonDirs)
+            );
 
-        return resourceDir;
+            if (!choice || choice.format === null) {
+                return null;
+            }
+
+            return choice.selectedDir || null;
+        }
+
+        // Only one format found
+        if (hasResx) {
+            return path.dirname(resxFiles[0].fsPath);
+        }
+
+        return path.dirname(validJsonResources[0].fsPath);
+    }
+
+    /**
+     * Checks if a JSON file is likely a resource file (not a config file)
+     */
+    private isLikelyResourceFile(filePath: string): boolean {
+        const fileName = path.basename(filePath).toLowerCase();
+        const dirPath = path.dirname(filePath).toLowerCase();
+
+        // EXCLUDE: Hidden directories (starting with .)
+        const pathParts = filePath.split(path.sep);
+        for (const part of pathParts) {
+            if (part.startsWith('.') && part !== '.') {
+                return false;
+            }
+        }
+
+        // EXCLUDE: Known non-resource directory patterns
+        const excludeDirPatterns = [
+            /[/\\]wwwroot[/\\]/i,      // ASP.NET static files
+            /[/\\]assets[/\\]/i,       // Static assets (often have JSON data files)
+            /[/\\]public[/\\]/i,       // Public static files
+            /[/\\]scripts[/\\]/i,      // Script directories
+            /[/\\]models[/\\]/i,       // Model/schema directories
+            /[/\\]data[/\\]/i,         // Data directories (not i18n)
+            /[/\\]api[/\\]/i,          // API directories
+            /[/\\]wasm[/\\]/i,         // WebAssembly output
+            /[/\\]wwwroot$/i,          // ASP.NET root
+        ];
+
+        // Allow if in known resource directories
+        const resourceDirPatterns = [
+            /[/\\]locales?[/\\]/i,
+            /[/\\]translations?[/\\]/i,
+            /[/\\]i18n[/\\]/i,
+            /[/\\]lang(uages?)?[/\\]/i,
+            /[/\\]resources?[/\\]/i,
+            /[/\\]strings?[/\\]/i,
+        ];
+
+        const inResourceDir = resourceDirPatterns.some(p => p.test(dirPath));
+        if (!inResourceDir) {
+            // Not in a known resource directory - apply stricter filtering
+            for (const pattern of excludeDirPatterns) {
+                if (pattern.test(dirPath)) {
+                    return false;
+                }
+            }
+        }
+
+        // EXCLUDE: Known non-resource filename patterns
+        const excludePatterns = [
+            /^lrm.*\.json$/,           // LRM config
+            /^appsettings.*\.json$/,   // ASP.NET config
+            /^package(-lock)?\.json$/, // Node.js
+            /^npm.*\.json$/,           // npm config
+            /^tsconfig.*\.json$/,      // TypeScript
+            /^tslint\.json$/,          // TSLint
+            /^webpack.*\.json$/,       // Webpack
+            /^babel.*\.json$/,         // Babel
+            /^rollup.*\.json$/,        // Rollup
+            /^vite.*\.json$/,          // Vite
+            /^\.?eslint.*\.json$/,     // ESLint
+            /^\.?prettier.*\.json$/,   // Prettier
+            /^\.?stylelint.*\.json$/,  // Stylelint
+            /^jest.*\.json$/,          // Jest
+            /^karma.*\.json$/,         // Karma
+            /^cypress\.json$/,         // Cypress
+            /^settings\.json$/,        // VS Code settings
+            /^extensions\.json$/,      // VS Code extensions
+            /^launch\.json$/,          // VS Code launch
+            /^tasks\.json$/,           // VS Code tasks
+            /\.nuget\..*\.json$/,      // NuGet
+            /project\.assets\.json$/,  // NuGet
+            /packages\.lock\.json$/,   // NuGet
+            /.*config\.json$/,         // Generic config
+            /.*settings\.json$/,       // Generic settings
+            /.*schema\.json$/,         // JSON schemas
+            /.*manifest\.json$/,       // Manifests
+            /^global\.json$/,          // .NET global.json
+            /^launchSettings\.json$/,  // ASP.NET launch settings
+            /^\..*\.json$/,            // Hidden JSON files
+        ];
+
+        for (const pattern of excludePatterns) {
+            if (pattern.test(fileName)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Common culture codes for quick validation
+     */
+    private static readonly COMMON_CULTURE_CODES = new Set([
+        'en', 'en-us', 'en-gb', 'fr', 'fr-fr', 'fr-ca',
+        'de', 'de-de', 'es', 'es-es', 'it', 'it-it',
+        'pt', 'pt-br', 'pt-pt', 'ru', 'ja', 'ko', 'zh',
+        'zh-hans', 'zh-hant', 'zh-cn', 'zh-tw', 'ar', 'he',
+        'nl', 'pl', 'tr', 'el', 'cs', 'sv', 'da', 'fi', 'no',
+        'hu', 'th', 'vi', 'id', 'ms', 'uk', 'ro', 'bg', 'hr',
+        'sk', 'sl', 'et', 'lv', 'lt', 'sr', 'hi', 'bn', 'ta'
+    ]);
+
+    /**
+     * Validates if a string looks like a culture code
+     */
+    private isValidCultureCode(code: string): boolean {
+        const lowerCode = code.toLowerCase();
+        if (LrmService.COMMON_CULTURE_CODES.has(lowerCode)) {
+            return true;
+        }
+        // Pattern: xx or xx-XX or xx-Xxxx (BCP 47)
+        return /^[a-z]{2}(-[a-z]{2,4})?$/i.test(code);
+    }
+
+    /**
+     * Extracts culture code from filename
+     * Returns baseName (without culture) and culture code (if present)
+     */
+    private extractCultureFromFilename(fileName: string): { baseName: string; culture: string | null } {
+        // Remove .json extension
+        const nameWithoutExt = fileName.replace(/\.json$/i, '');
+
+        // Check if entire filename is a culture code (i18next style: en.json, fr.json)
+        if (this.isValidCultureCode(nameWithoutExt)) {
+            return { baseName: '', culture: nameWithoutExt };
+        }
+
+        // Check for basename.culture pattern (strings.fr.json)
+        const lastDot = nameWithoutExt.lastIndexOf('.');
+        if (lastDot > 0) {
+            const potentialCulture = nameWithoutExt.substring(lastDot + 1);
+            if (this.isValidCultureCode(potentialCulture)) {
+                return {
+                    baseName: nameWithoutExt.substring(0, lastDot),
+                    culture: potentialCulture
+                };
+            }
+        }
+
+        // No culture code found - this is a base/default file
+        return { baseName: nameWithoutExt, culture: null };
+    }
+
+    /**
+     * Detects JSON sub-format (i18next vs standard) by analyzing files in directory
+     */
+    private async detectJsonSubFormat(dirPath: string): Promise<'i18next' | 'standard'> {
+        try {
+            const files = await vscode.workspace.fs.readDirectory(vscode.Uri.file(dirPath));
+            const jsonFiles = files.filter(([name, type]) =>
+                type === vscode.FileType.File && name.endsWith('.json')
+            );
+
+            // Check naming pattern: i18next uses culture-only names (en.json, fr.json)
+            let i18nextScore = 0;
+            let standardScore = 0;
+
+            for (const [fileName] of jsonFiles) {
+                const nameWithoutExt = fileName.replace(/\.json$/i, '');
+
+                // i18next pattern: just a culture code (en, fr, de, etc.)
+                if (this.isValidCultureCode(nameWithoutExt)) {
+                    i18nextScore++;
+                }
+                // Standard pattern: baseName.culture.json or just baseName.json
+                else if (nameWithoutExt.includes('.')) {
+                    const parts = nameWithoutExt.split('.');
+                    if (parts.length >= 2 && this.isValidCultureCode(parts[parts.length - 1])) {
+                        standardScore++;
+                    }
+                } else {
+                    // Base file like "strings.json" - could be either, slight preference for standard
+                    standardScore += 0.5;
+                }
+            }
+
+            return i18nextScore > standardScore ? 'i18next' : 'standard';
+        } catch {
+            return 'standard';
+        }
+    }
+
+    /**
+     * Prompts user to choose between RESX and JSON when both are found
+     */
+    private async promptFormatChoice(
+        resxDirs: string[],
+        jsonDirs: string[]
+    ): Promise<{ format: 'resx' | 'json' | null; selectedDir?: string }> {
+        interface FormatQuickPickItem extends vscode.QuickPickItem {
+            format: 'resx' | 'json';
+            dir: string;
+        }
+
+        const items: FormatQuickPickItem[] = [];
+
+        // Add RESX options
+        for (const dir of resxDirs) {
+            items.push({
+                label: '$(file-code) RESX',
+                description: path.basename(dir),
+                detail: dir,
+                format: 'resx',
+                dir: dir
+            });
+        }
+
+        // Add JSON options with sub-format detection
+        for (const dir of jsonDirs) {
+            const subFormat = await this.detectJsonSubFormat(dir);
+            const subFormatLabel = subFormat === 'i18next' ? 'i18next' : 'Standard';
+            items.push({
+                label: `$(json) JSON (${subFormatLabel})`,
+                description: path.basename(dir),
+                detail: dir,
+                format: 'json',
+                dir: dir
+            });
+        }
+
+        const selected = await vscode.window.showQuickPick(items, {
+            title: 'Multiple resource formats found',
+            placeHolder: 'Select which resource folder to use',
+            ignoreFocusOut: true
+        });
+
+        if (!selected) {
+            return { format: null };
+        }
+
+        return {
+            format: selected.format,
+            selectedDir: selected.dir
+        };
     }
 
     public async setResourcePath(newPath: string): Promise<void> {

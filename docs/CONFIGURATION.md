@@ -9,9 +9,12 @@ This document provides comprehensive information about configuring LocalizationM
 - [Complete Schema](#complete-schema)
 - [Configuration Sections](#configuration-sections)
   - [DefaultLanguageCode](#defaultlanguagecode)
+  - [ResourceFormat](#resourceformat)
+  - [Json](#json)
   - [Translation](#translation)
   - [Scanning](#scanning)
   - [Validation](#validation)
+  - [Web](#web)
 - [Priority System](#priority-system)
 - [Examples](#examples)
 - [Best Practices](#best-practices)
@@ -64,6 +67,16 @@ YourProject/
 ```json
 {
   "DefaultLanguageCode": "en",
+  "ResourceFormat": "resx",
+  "Json": {
+    "UseNestedKeys": true,
+    "IncludeMeta": true,
+    "PreserveComments": true,
+    "BaseName": "strings",
+    "InterpolationFormat": "dotnet",
+    "PluralFormat": "cldr",
+    "I18nextCompatible": false
+  },
   "Translation": {
     "DefaultProvider": "google",
     "MaxRetries": 3,
@@ -83,6 +96,12 @@ YourProject/
   "Validation": {
     "PlaceholderTypes": ["dotnet"],
     "EnablePlaceholderValidation": true
+  },
+  "Web": {
+    "Port": 5000,
+    "BindAddress": "localhost",
+    "AutoOpenBrowser": true,
+    "EnableHttps": false
   }
 }
 ```
@@ -122,6 +141,95 @@ YourProject/
 - Make output more intuitive for international teams
 - Match your project's primary language code
 - Clarify which language is the source/default
+
+---
+
+### ResourceFormat
+
+**Type:** `string`
+**Default:** Auto-detect based on files in resource path
+**Values:** `"resx"` or `"json"`
+
+```json
+{
+  "ResourceFormat": "json"
+}
+```
+
+**Behavior:**
+- Specifies which resource file backend to use
+- If not set, auto-detects based on existing files (`.resx` files → RESX backend, `.json` files → JSON backend)
+- When set explicitly, forces the specified backend regardless of detected files
+
+**Use Cases:**
+- Force JSON format when both `.resx` and `.json` files exist
+- Initialize a new project with JSON format before creating resource files
+- Override auto-detection when switching formats
+
+---
+
+### Json
+
+**Type:** `object`
+**Purpose:** Configure JSON resource file format (only applies when `ResourceFormat` is `"json"`)
+
+```json
+{
+  "ResourceFormat": "json",
+  "Json": {
+    "UseNestedKeys": true,
+    "IncludeMeta": true,
+    "PreserveComments": true,
+    "BaseName": "strings",
+    "InterpolationFormat": "dotnet",
+    "PluralFormat": "cldr",
+    "I18nextCompatible": false
+  }
+}
+```
+
+#### Json Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `UseNestedKeys` | bool | `true` | Use nested key structure (`Errors.NotFound` → `{"Errors": {"NotFound": "..."}}`) |
+| `IncludeMeta` | bool | `true` | Include `_meta` section with language info and timestamps |
+| `PreserveComments` | bool | `true` | Store comments as `_comment` properties |
+| `BaseName` | string | `"strings"` | Base filename for resources (produces `strings.json`, `strings.fr.json`) |
+| `InterpolationFormat` | string | `"dotnet"` | Placeholder format: `"dotnet"` ({0}), `"i18next"` ({{name}}), or `"icu"` ({name}) |
+| `PluralFormat` | string | `"cldr"` | Plural key format: `"cldr"` (_zero, _one, _two, _few, _many, _other) or `"simple"` (_singular, _plural) |
+| `I18nextCompatible` | bool | `false` | Enable full i18next compatibility mode |
+
+#### i18next Compatibility Mode
+
+When `I18nextCompatible` is `true`:
+- Uses i18next interpolation format (`{{variable}}`)
+- Uses CLDR plural suffixes (`_one`, `_other`, etc.)
+- Supports i18next-style nesting (`$t(key)`)
+- File naming uses culture codes only (`en.json`, `fr.json`)
+
+**Standard LRM Format:**
+```json
+{
+  "ResourceFormat": "json",
+  "Json": {
+    "BaseName": "strings",
+    "I18nextCompatible": false
+  }
+}
+```
+Produces: `strings.json`, `strings.fr.json`, `strings.de.json`
+
+**i18next Format:**
+```json
+{
+  "ResourceFormat": "json",
+  "Json": {
+    "I18nextCompatible": true
+  }
+}
+```
+Produces: `en.json`, `fr.json`, `de.json`
 
 ---
 
@@ -440,6 +548,72 @@ lrm validate --placeholder-types all
 The command will validate all placeholder types, ignoring the configuration file.
 
 **See Also:** [Placeholder Validation Guide](PLACEHOLDERS.md) for detailed information about placeholder detection and validation.
+
+---
+
+### Web
+
+**Type:** `object`
+**Purpose:** Configure the built-in web server for the `web` command and VS Code extension
+
+```json
+{
+  "Web": {
+    "Port": 5000,
+    "BindAddress": "localhost",
+    "AutoOpenBrowser": true,
+    "EnableHttps": false,
+    "HttpsCertificatePath": null,
+    "HttpsCertificatePassword": null,
+    "Cors": {
+      "Enabled": false,
+      "AllowedOrigins": [],
+      "AllowCredentials": false
+    }
+  }
+}
+```
+
+#### Web Options
+
+| Option | Type | Default | Env Variable | Description |
+|--------|------|---------|--------------|-------------|
+| `Port` | int | `5000` | `LRM_WEB_PORT` | Port to bind the web server |
+| `BindAddress` | string | `"localhost"` | `LRM_WEB_BIND_ADDRESS` | Address to bind (`localhost`, `0.0.0.0`, `*`) |
+| `AutoOpenBrowser` | bool | `true` | `LRM_WEB_AUTO_OPEN_BROWSER` | Auto-open browser on startup |
+| `EnableHttps` | bool | `false` | `LRM_WEB_HTTPS_ENABLED` | Enable HTTPS |
+| `HttpsCertificatePath` | string | `null` | `LRM_WEB_HTTPS_CERT_PATH` | Path to .pfx certificate |
+| `HttpsCertificatePassword` | string | `null` | `LRM_WEB_HTTPS_CERT_PASSWORD` | Certificate password |
+
+#### CORS Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `Cors.Enabled` | bool | `false` | Enable CORS for API access |
+| `Cors.AllowedOrigins` | string[] | `[]` | Allowed origins (e.g., `["http://localhost:3000"]`) |
+| `Cors.AllowCredentials` | bool | `false` | Allow credentials in requests |
+
+**Example: Custom Port**
+```json
+{
+  "Web": {
+    "Port": 8080,
+    "AutoOpenBrowser": false
+  }
+}
+```
+
+**Example: Enable CORS for Custom Frontend**
+```json
+{
+  "Web": {
+    "Cors": {
+      "Enabled": true,
+      "AllowedOrigins": ["http://localhost:3000"]
+    }
+  }
+}
+```
 
 ---
 

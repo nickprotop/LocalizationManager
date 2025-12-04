@@ -12,6 +12,8 @@ import { StatusBarManager } from './views/statusBar';
 import { DashboardPanel } from './views/dashboard';
 import { SettingsPanel } from './views/settingsPanel';
 import { LrmCodeLensProvider } from './providers/codeLens';
+import { LrmDefinitionProvider } from './providers/definitionProvider';
+import { LrmReferenceProvider } from './providers/referenceProvider';
 
 let lrmService: LrmService;
 let apiClient: ApiClient;
@@ -98,6 +100,20 @@ export async function activate(context: vscode.ExtensionContext) {
                 ],
                 codeLensProvider
             ),
+            // For JSON resource files
+            vscode.languages.registerCodeLensProvider(
+                [
+                    { language: 'json', pattern: '**/strings*.json' },
+                    { language: 'json', pattern: '**/locales/**/*.json' },
+                    { language: 'json', pattern: '**/translations/**/*.json' },
+                    { language: 'json', pattern: '**/i18n/**/*.json' },
+                    { pattern: '**/strings*.json' },
+                    { pattern: '**/locales/**/*.json' },
+                    { pattern: '**/translations/**/*.json' },
+                    { pattern: '**/i18n/**/*.json' }
+                ],
+                codeLensProvider
+            ),
             // For code files
             vscode.languages.registerCodeLensProvider(
                 [
@@ -113,6 +129,58 @@ export async function activate(context: vscode.ExtensionContext) {
             )
         );
         outputChannel.appendLine('CodeLens provider registered');
+
+        // Register Definition Provider (F12 - Go to Definition)
+        const definitionProvider = new LrmDefinitionProvider(cacheService);
+        context.subscriptions.push(
+            vscode.languages.registerDefinitionProvider(
+                [
+                    { language: 'csharp', scheme: 'file' },
+                    { language: 'razor', scheme: 'file' },
+                    { language: 'aspnetcorerazor', scheme: 'file' },
+                    { pattern: '**/*.cs' },
+                    { pattern: '**/*.razor' },
+                    { pattern: '**/*.cshtml' },
+                    { pattern: '**/*.xaml' },
+                    { pattern: '**/*.ts' },
+                    { pattern: '**/*.tsx' },
+                    { pattern: '**/*.js' },
+                    { pattern: '**/*.jsx' }
+                ],
+                definitionProvider
+            )
+        );
+        outputChannel.appendLine('Definition provider registered');
+
+        // Register Reference Provider (Shift+F12 - Find All References)
+        const referenceProvider = new LrmReferenceProvider();
+        context.subscriptions.push(
+            vscode.languages.registerReferenceProvider(
+                [
+                    // Code files
+                    { language: 'csharp', scheme: 'file' },
+                    { language: 'razor', scheme: 'file' },
+                    { language: 'aspnetcorerazor', scheme: 'file' },
+                    { pattern: '**/*.cs' },
+                    { pattern: '**/*.razor' },
+                    { pattern: '**/*.cshtml' },
+                    { pattern: '**/*.xaml' },
+                    { pattern: '**/*.ts' },
+                    { pattern: '**/*.tsx' },
+                    { pattern: '**/*.js' },
+                    { pattern: '**/*.jsx' },
+                    // Resource files
+                    { language: 'xml', pattern: '**/*.resx' },
+                    { pattern: '**/*.resx' },
+                    { language: 'json', pattern: '**/strings*.json' },
+                    { language: 'json', pattern: '**/locales/**/*.json' },
+                    { language: 'json', pattern: '**/translations/**/*.json' },
+                    { language: 'json', pattern: '**/i18n/**/*.json' }
+                ],
+                referenceProvider
+            )
+        );
+        outputChannel.appendLine('Reference provider registered');
 
         // Enable diagnostic providers based on settings
         const config = vscode.workspace.getConfiguration('lrm');
@@ -259,10 +327,13 @@ function setupEventListeners(context: vscode.ExtensionContext, enableRealtimeSca
 
     outputChannel.appendLine('=== Extension activation complete ===');
 
-    // Listen for .resx file changes
+    // Listen for resource file changes (.resx and JSON)
     const resxWatcher = vscode.workspace.createFileSystemWatcher('**/*.resx');
+    const jsonWatcher = vscode.workspace.createFileSystemWatcher('**/*.json');
+    const lrmConfigWatcher = vscode.workspace.createFileSystemWatcher('**/lrm.json');
 
-    resxWatcher.onDidChange(async () => {
+    // Helper to handle resource file changes
+    const handleResourceChange = async () => {
         // Invalidate shared cache first
         if (cacheService) {
             cacheService.invalidate();
@@ -275,10 +346,49 @@ function setupEventListeners(context: vscode.ExtensionContext, enableRealtimeSca
         if (codeLensProvider) {
             codeLensProvider.refresh();
         }
+    };
+
+    // Helper to filter JSON events to only resource files (exclude config files)
+    const isResourceJson = (uri: vscode.Uri): boolean => {
+        const fileName = uri.fsPath.toLowerCase();
+        // Exclude common config files
+        if (fileName.endsWith('lrm.json') ||
+            fileName.endsWith('package.json') ||
+            fileName.endsWith('package-lock.json') ||
+            fileName.endsWith('tsconfig.json') ||
+            fileName.includes('.vscode') ||
+            fileName.includes('node_modules')) {
+            return false;
+        }
+        return true;
+    };
+
+    // RESX file watchers
+    resxWatcher.onDidChange(handleResourceChange);
+    resxWatcher.onDidCreate(handleResourceChange);
+    resxWatcher.onDidDelete(handleResourceChange);
+
+    // JSON file watchers (filtered to resource files only)
+    jsonWatcher.onDidChange(async (uri) => {
+        if (isResourceJson(uri)) {
+            await handleResourceChange();
+        }
+    });
+    jsonWatcher.onDidCreate(async (uri) => {
+        if (isResourceJson(uri)) {
+            await handleResourceChange();
+        }
+    });
+    jsonWatcher.onDidDelete(async (uri) => {
+        if (isResourceJson(uri)) {
+            await handleResourceChange();
+        }
     });
 
-    resxWatcher.onDidCreate(async () => {
-        // Invalidate shared cache first
+    // lrm.json config file watcher - triggers full refresh when format config changes
+    lrmConfigWatcher.onDidChange(async () => {
+        outputChannel.appendLine('lrm.json config changed, refreshing...');
+        // Invalidate everything when config changes
         if (cacheService) {
             cacheService.invalidate();
         }
@@ -291,23 +401,16 @@ function setupEventListeners(context: vscode.ExtensionContext, enableRealtimeSca
             codeLensProvider.refresh();
         }
     });
-
-    resxWatcher.onDidDelete(async () => {
-        // Invalidate shared cache first
-        if (cacheService) {
-            cacheService.invalidate();
-        }
-        await resxDiagnostics.validateAllResources();
-        await resourceTreeView.loadResources();
-        if (completionProvider) {
-            completionProvider.invalidateCache();
-        }
-        if (codeLensProvider) {
-            codeLensProvider.refresh();
-        }
+    lrmConfigWatcher.onDidCreate(async () => {
+        outputChannel.appendLine('lrm.json config created, refreshing...');
+        await handleResourceChange();
+    });
+    lrmConfigWatcher.onDidDelete(async () => {
+        outputChannel.appendLine('lrm.json config deleted, refreshing...');
+        await handleResourceChange();
     });
 
-    context.subscriptions.push(resxWatcher);
+    context.subscriptions.push(resxWatcher, jsonWatcher, lrmConfigWatcher);
 
     // Scan visible editors on activation
     vscode.window.visibleTextEditors.forEach(editor => {

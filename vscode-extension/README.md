@@ -1,6 +1,6 @@
 # Localization Manager
 
-Manage .NET .resx localization files with real-time validation, translation, and code scanning.
+Manage .NET localization resources (.resx and JSON) with real-time validation, translation, and code scanning.
 
 ![Dashboard](https://raw.githubusercontent.com/nickprotop/LocalizationManager/main/vscode-extension/images/dashboard.png)
 
@@ -32,7 +32,7 @@ Find missing and unused keys across your codebase.
 ### CodeLens
 Get inline information and actions directly in your code.
 
-**In .resx files** (above each key):
+**In resource files** (.resx and .json, above each key):
 - Reference count (e.g., "12 references") - click to see all usages
 - Language coverage (e.g., "3/5 languages") - click to see missing translations
 - Quick translate action
@@ -42,6 +42,20 @@ Get inline information and actions directly in your code.
 - Key value preview (e.g., "Welcome to our app")
 - Missing language warnings - click to translate
 - Click to open the key in Resource Editor
+
+### JSON Resource Support
+Works with both RESX and JSON localization formats:
+- **Standard JSON**: `strings.json`, `strings.fr.json` pattern
+- **i18next**: `en.json`, `fr.json` pattern with nested keys
+
+Auto-detects format based on file naming and content patterns.
+
+### Go to Definition (F12)
+Press F12 on any localization key in code to jump directly to its definition in the resource file.
+- Supports: `Resources.KeyName`, `Localizer["Key"]`, `t("Key")`, and more patterns
+
+### Find All References (Shift+F12)
+Press Shift+F12 to find all usages of a key across your codebase and resource files.
 
 ### Key References
 See exactly where each key is used in your code.
@@ -61,12 +75,12 @@ Translate missing values using free or paid providers.
 
 ## Requirements
 - VS Code 1.80+
-- Workspace with .NET .resx files
+- Workspace with .NET localization files (.resx or .json)
 
 ## Quick Start
 1. Install the extension
-2. Open a workspace containing .resx files
-3. The extension auto-detects resources and starts the backend
+2. Open a workspace containing .resx or JSON resource files
+3. The extension auto-detects resources (if multiple formats found, you'll be asked to choose)
 4. Use Command Palette (Ctrl+Shift+P) → "LRM:" commands
 
 ## Commands
@@ -83,7 +97,7 @@ Translate missing values using free or paid providers.
 ## Settings
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `lrm.resourcePath` | Path to .resx folder | Auto-detected |
+| `lrm.resourcePath` | Path to resource folder (.resx or JSON) | Auto-detected |
 | `lrm.translationProvider` | Default provider | `mymemory` |
 | `lrm.enableRealtimeScan` | Live diagnostics | `true` |
 | `lrm.scanOnSave` | Scan on file save | `true` |

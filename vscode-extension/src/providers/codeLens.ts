@@ -1,10 +1,12 @@
 import * as vscode from 'vscode';
 import { CacheService } from '../backend/cacheService';
+import { getParserFactory, ResourceParserFactory } from '../parsers';
 
 /**
  * CodeLens provider for LRM extension.
  * Shows inline information and actions for localization keys in:
  * - .resx files: reference count, language coverage, translate action, unused/duplicate warnings
+ * - .json files: reference count, language coverage, translate action, unused/duplicate warnings
  * - Code files: key value, missing languages
  */
 export class LrmCodeLensProvider implements vscode.CodeLensProvider {
@@ -12,9 +14,11 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
     readonly onDidChangeCodeLenses = this._onDidChangeCodeLenses.event;
 
     private cacheService: CacheService;
+    private parserFactory: ResourceParserFactory;
 
     constructor(cacheService: CacheService) {
         this.cacheService = cacheService;
+        this.parserFactory = getParserFactory();
     }
 
     /**
@@ -35,9 +39,10 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
         console.log(`LRM CodeLens: provideCodeLenses called for ${document.fileName}`);
 
         try {
-            if (document.fileName.endsWith('.resx')) {
-                const lenses = await this.provideResxCodeLenses(document, token);
-                console.log(`LRM CodeLens: returning ${lenses.length} lenses for .resx file`);
+            // Check if this is a resource file (RESX or JSON)
+            if (this.isResourceFile(document)) {
+                const lenses = await this.provideResourceFileCodeLenses(document, token);
+                console.log(`LRM CodeLens: returning ${lenses.length} lenses for resource file`);
                 return lenses;
             } else {
                 const lenses = await this.provideCodeFileCodeLenses(document, token);
@@ -51,20 +56,60 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
     }
 
     /**
-     * Provide CodeLenses for .resx files
-     * Shows above each <data name="..."> entry:
+     * Check if a document is a resource file (RESX or JSON)
+     */
+    private isResourceFile(document: vscode.TextDocument): boolean {
+        const fileName = document.fileName.toLowerCase();
+
+        // Always consider .resx files as resource files
+        if (fileName.endsWith('.resx')) {
+            return true;
+        }
+
+        // For JSON, check if it's a likely resource file (not config)
+        if (fileName.endsWith('.json')) {
+            // Use the parser factory if initialized
+            if (this.parserFactory.isInitialized()) {
+                return this.parserFactory.isResourceDocument(document);
+            }
+
+            // Fallback: check common patterns
+            const baseName = fileName.replace(/\.json$/, '');
+            return this.matchesResourcePattern(baseName);
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a filename matches common resource file patterns
+     */
+    private matchesResourcePattern(baseName: string): boolean {
+        // Common resource file patterns
+        const resourcePatterns = [
+            /^strings(\.[a-z]{2}(-[a-z]{2,4})?)?$/i,
+            /^messages(\.[a-z]{2}(-[a-z]{2,4})?)?$/i,
+            /^translations?(\.[a-z]{2}(-[a-z]{2,4})?)?$/i,
+            /^[a-z]{2}(-[a-z]{2,4})?$/i,  // Culture code only (e.g., en.json, fr-FR.json)
+        ];
+
+        return resourcePatterns.some(p => p.test(baseName));
+    }
+
+    /**
+     * Provide CodeLenses for resource files (.resx or .json)
+     * Shows above each key entry:
      * - Reference count (e.g., "12 references")
      * - Language coverage (e.g., "3/5 languages")
      * - Translate action
      * - Unused warning (if 0 references)
      * - Duplicate warning (if duplicated)
      */
-    private async provideResxCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken): Promise<vscode.CodeLens[]> {
+    private async provideResourceFileCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken): Promise<vscode.CodeLens[]> {
         const lenses: vscode.CodeLens[] = [];
-        const text = document.getText();
         const config = vscode.workspace.getConfiguration('lrm');
 
-        console.log(`LRM CodeLens: provideResxCodeLenses for ${document.fileName}, text length: ${text.length}`);
+        console.log(`LRM CodeLens: provideResourceFileCodeLenses for ${document.fileName}`);
 
         // Pre-fetch data for all keys
         try {
@@ -80,25 +125,24 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
             // Continue without cached data
         }
 
-        // Find all <data name="..."> entries
-        const dataRegex = /<data\s+name="([^"]+)"[^>]*>/g;
-        let match;
-        let keyCount = 0;
+        // Get the appropriate parser for this document type
+        const parser = this.parserFactory.getParser(document);
+        const keys = parser.parseDocument(document);
 
-        while ((match = dataRegex.exec(text)) !== null) {
-            keyCount++;
+        console.log(`LRM CodeLens: parser found ${keys.length} keys`);
+
+        for (const key of keys) {
             if (token.isCancellationRequested) {
                 break;
             }
 
-            const keyName = match[1];
-            const startPos = document.positionAt(match.index);
+            const startPos = new vscode.Position(key.lineNumber, key.columnStart);
             const range = new vscode.Range(startPos, startPos);
 
             // Get reference count from cache
-            const refCount = this.cacheService.getReferenceCountFromCache(keyName);
-            const isUnused = this.cacheService.isKeyUnused(keyName);
-            const isDuplicate = this.cacheService.isKeyDuplicate(keyName);
+            const refCount = this.cacheService.getReferenceCountFromCache(key.key);
+            const isUnused = this.cacheService.isKeyUnused(key.key);
+            const isDuplicate = this.cacheService.isKeyDuplicate(key.key);
 
             // Reference count lens
             if (config.get<boolean>('codeLens.showReferences', true)) {
@@ -107,7 +151,7 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
                     lenses.push(new vscode.CodeLens(range, {
                         title: refLabel,
                         command: 'lrm.showKeyReferences',
-                        arguments: [keyName]
+                        arguments: [key.key]
                     }));
                 }
             }
@@ -115,7 +159,7 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
             // Language coverage lens
             if (config.get<boolean>('codeLens.showCoverage', true)) {
                 try {
-                    const details = await this.cacheService.getKeyDetails(keyName);
+                    const details = await this.cacheService.getKeyDetails(key.key);
                     const languages = Object.keys(details.values);
                     const filledCount = Object.values(details.values).filter(v => v.value && v.value.trim() !== '').length;
 
@@ -124,7 +168,7 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
                         lenses.push(new vscode.CodeLens(range, {
                             title: coverageLabel,
                             command: 'lrm.showMissingLanguages',
-                            arguments: [keyName]
+                            arguments: [key.key]
                         }));
                     }
                 } catch (error) {
@@ -137,7 +181,7 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
                 lenses.push(new vscode.CodeLens(range, {
                     title: 'Translate',
                     command: 'lrm.translateKeyFromLens',
-                    arguments: [keyName]
+                    arguments: [key.key]
                 }));
             }
 
@@ -146,7 +190,7 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
                 lenses.push(new vscode.CodeLens(range, {
                     title: '$(warning) Unused',
                     command: 'lrm.deleteUnusedKey',
-                    arguments: [keyName]
+                    arguments: [key.key]
                 }));
             }
 
@@ -155,12 +199,12 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
                 lenses.push(new vscode.CodeLens(range, {
                     title: '$(warning) Duplicate',
                     command: 'lrm.mergeDuplicateKey',
-                    arguments: [keyName]
+                    arguments: [key.key]
                 }));
             }
         }
 
-        console.log(`LRM CodeLens: found ${keyCount} keys, created ${lenses.length} lenses`);
+        console.log(`LRM CodeLens: found ${keys.length} keys, created ${lenses.length} lenses`);
         return lenses;
     }
 

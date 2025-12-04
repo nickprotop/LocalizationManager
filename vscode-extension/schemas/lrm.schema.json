@@ -1,0 +1,270 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/nickprotop/LocalizationManager/schemas/lrm.schema.json",
+  "title": "LRM Configuration",
+  "description": "Configuration schema for Localization Resource Manager (lrm.json)",
+  "type": "object",
+  "properties": {
+    "DefaultLanguageCode": {
+      "type": "string",
+      "description": "The language code for the default resource file (e.g., 'en', 'fr'). Used for display and as source language for translations.",
+      "examples": ["en", "fr", "de", "es"]
+    },
+    "ResourceFormat": {
+      "type": "string",
+      "enum": ["resx", "json"],
+      "description": "Resource file format: 'resx' (default) or 'json'. If not set, auto-detects based on existing files."
+    },
+    "Json": {
+      "type": "object",
+      "description": "JSON-specific configuration (only applies when ResourceFormat is 'json')",
+      "properties": {
+        "UseNestedKeys": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use nested key structure (Errors.NotFound → {\"Errors\": {\"NotFound\": \"...\"}})"
+        },
+        "IncludeMeta": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include _meta section in JSON files with language info and timestamps"
+        },
+        "PreserveComments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Preserve comments as _comment properties in JSON files"
+        },
+        "BaseName": {
+          "type": "string",
+          "default": "strings",
+          "description": "Base filename for resources (produces strings.json, strings.fr.json, etc.)"
+        },
+        "InterpolationFormat": {
+          "type": "string",
+          "enum": ["dotnet", "i18next", "icu"],
+          "default": "dotnet",
+          "description": "Placeholder format: 'dotnet' ({0}), 'i18next' ({{name}}), or 'icu' ({name})"
+        },
+        "PluralFormat": {
+          "type": "string",
+          "enum": ["cldr", "simple"],
+          "default": "cldr",
+          "description": "Plural suffix format: 'cldr' (_zero, _one, _other) or 'simple' (_singular, _plural)"
+        },
+        "I18nextCompatible": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable full i18next compatibility mode (overrides InterpolationFormat and PluralFormat)"
+        }
+      }
+    },
+    "Translation": {
+      "type": "object",
+      "description": "Machine translation configuration",
+      "properties": {
+        "DefaultProvider": {
+          "type": "string",
+          "enum": ["google", "deepl", "libretranslate", "ollama", "openai", "claude", "azureopenai", "azuretranslator", "lingva", "mymemory"],
+          "default": "google",
+          "description": "Default translation provider"
+        },
+        "MaxRetries": {
+          "type": "integer",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum retry attempts for failed translation requests"
+        },
+        "TimeoutSeconds": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 5,
+          "maximum": 300,
+          "description": "Timeout in seconds for translation requests"
+        },
+        "BatchSize": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Number of keys to translate in a single batch"
+        },
+        "UseSecureCredentialStore": {
+          "type": "boolean",
+          "default": false,
+          "description": "Store API keys encrypted in the user's application data directory"
+        },
+        "ApiKeys": {
+          "type": "object",
+          "description": "API keys for translation providers (prefer environment variables for security)",
+          "properties": {
+            "Google": { "type": "string", "description": "Google Cloud Translation API key" },
+            "DeepL": { "type": "string", "description": "DeepL API key" },
+            "LibreTranslate": { "type": "string", "description": "LibreTranslate API key" },
+            "OpenAI": { "type": "string", "description": "OpenAI API key" },
+            "Claude": { "type": "string", "description": "Anthropic Claude API key" },
+            "AzureOpenAI": { "type": "string", "description": "Azure OpenAI API key" },
+            "AzureTranslator": { "type": "string", "description": "Azure Translator API key" }
+          }
+        },
+        "AIProviders": {
+          "type": "object",
+          "description": "AI-powered translation provider settings",
+          "properties": {
+            "Ollama": {
+              "type": "object",
+              "properties": {
+                "ApiUrl": { "type": "string", "default": "http://localhost:11434", "description": "Ollama API endpoint" },
+                "Model": { "type": "string", "default": "llama3.2", "description": "Model name" },
+                "CustomSystemPrompt": { "type": "string", "description": "Custom system prompt" },
+                "RateLimitPerMinute": { "type": "integer", "default": 10 }
+              }
+            },
+            "OpenAI": {
+              "type": "object",
+              "properties": {
+                "Model": { "type": "string", "default": "gpt-4o-mini", "description": "Model name" },
+                "CustomSystemPrompt": { "type": "string", "description": "Custom system prompt" },
+                "RateLimitPerMinute": { "type": "integer", "default": 60 }
+              }
+            },
+            "Claude": {
+              "type": "object",
+              "properties": {
+                "Model": { "type": "string", "default": "claude-3-5-sonnet-20241022", "description": "Model name" },
+                "CustomSystemPrompt": { "type": "string", "description": "Custom system prompt" },
+                "RateLimitPerMinute": { "type": "integer", "default": 50 }
+              }
+            },
+            "AzureOpenAI": {
+              "type": "object",
+              "properties": {
+                "Endpoint": { "type": "string", "description": "Azure OpenAI endpoint URL" },
+                "DeploymentName": { "type": "string", "description": "Deployment name" },
+                "CustomSystemPrompt": { "type": "string", "description": "Custom system prompt" },
+                "RateLimitPerMinute": { "type": "integer", "default": 60 }
+              }
+            },
+            "AzureTranslator": {
+              "type": "object",
+              "properties": {
+                "Region": { "type": "string", "description": "Azure region (e.g., 'westus')" },
+                "Endpoint": { "type": "string", "description": "Custom endpoint URL" },
+                "RateLimitPerMinute": { "type": "integer", "default": 100 }
+              }
+            },
+            "Lingva": {
+              "type": "object",
+              "properties": {
+                "InstanceUrl": { "type": "string", "default": "https://lingva.ml", "description": "Lingva instance URL" },
+                "RateLimitPerMinute": { "type": "integer", "default": 30 }
+              }
+            },
+            "MyMemory": {
+              "type": "object",
+              "properties": {
+                "RateLimitPerMinute": { "type": "integer", "default": 20 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Scanning": {
+      "type": "object",
+      "description": "Code scanning configuration",
+      "properties": {
+        "ResourceClassNames": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["Resources", "Strings", "AppResources"],
+          "description": "Resource class names to detect (e.g., Resources.KeyName)"
+        },
+        "LocalizationMethods": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["GetString", "GetLocalizedString", "Translate", "L", "T"],
+          "description": "Localization method names to detect (e.g., GetString(\"KeyName\"))"
+        }
+      }
+    },
+    "Validation": {
+      "type": "object",
+      "description": "Validation configuration",
+      "properties": {
+        "PlaceholderTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["dotnet", "printf", "icu", "template", "all"]
+          },
+          "default": ["dotnet"],
+          "description": "Placeholder types to validate"
+        },
+        "EnablePlaceholderValidation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable placeholder validation"
+        }
+      }
+    },
+    "Web": {
+      "type": "object",
+      "description": "Web server configuration",
+      "properties": {
+        "Port": {
+          "type": "integer",
+          "default": 5000,
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Port to bind the web server"
+        },
+        "BindAddress": {
+          "type": "string",
+          "default": "localhost",
+          "description": "Address to bind (e.g., 'localhost', '0.0.0.0', '*')"
+        },
+        "AutoOpenBrowser": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-open browser on startup"
+        },
+        "EnableHttps": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable HTTPS"
+        },
+        "HttpsCertificatePath": {
+          "type": "string",
+          "description": "Path to HTTPS certificate file (.pfx)"
+        },
+        "HttpsCertificatePassword": {
+          "type": "string",
+          "description": "Password for HTTPS certificate"
+        },
+        "Cors": {
+          "type": "object",
+          "description": "CORS configuration",
+          "properties": {
+            "Enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable CORS"
+            },
+            "AllowedOrigins": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": [],
+              "description": "Allowed origins (e.g., ['http://localhost:3000'])"
+            },
+            "AllowCredentials": {
+              "type": "boolean",
+              "default": false,
+              "description": "Allow credentials in CORS requests"
+            }
+          }
+        }
+      }
+    }
+  }
+}

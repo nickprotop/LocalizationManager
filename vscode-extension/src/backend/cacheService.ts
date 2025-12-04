@@ -1,9 +1,16 @@
 import { ApiClient, ScanResult, ResourceKeyDetails, ValidationResult, KeyUsage, ResourceKey } from './apiClient';
 
 /**
+ * Resource format type
+ */
+export type ResourceFormat = 'resx' | 'json' | null;
+
+/**
  * Shared cache service for the LRM extension.
  * Provides centralized caching for scan results, key details, and validation data.
  * Used by CodeLens provider, Resource Editor, and diagnostics.
+ *
+ * Format-aware: Automatically invalidates cache when resource format changes.
  */
 export class CacheService {
     private scanResultsCache: ScanResult | null = null;
@@ -17,6 +24,12 @@ export class CacheService {
     private keysTimestamp: number = 0;
 
     private readonly TTL = 30000; // 30 seconds cache TTL
+
+    /** Current resource format (resx or json) */
+    private currentFormat: ResourceFormat = null;
+
+    /** Resource path associated with this cache */
+    private resourcePath: string | null = null;
 
     constructor(private apiClient: ApiClient) {}
 
@@ -159,7 +172,7 @@ export class CacheService {
     }
 
     /**
-     * Invalidate all caches (call when .resx files change)
+     * Invalidate all caches (call when resource files change)
      */
     invalidate(): void {
         this.scanResultsCache = null;
@@ -170,6 +183,43 @@ export class CacheService {
         this.scanResultsTimestamp = 0;
         this.validationTimestamp = 0;
         this.keysTimestamp = 0;
+    }
+
+    /**
+     * Set the current resource format and path
+     * Automatically invalidates cache if format or path changes
+     */
+    setResourceContext(format: ResourceFormat, resourcePath: string | null): void {
+        const formatChanged = this.currentFormat !== format;
+        const pathChanged = this.resourcePath !== resourcePath;
+
+        if (formatChanged || pathChanged) {
+            console.log(`CacheService: Context changed - format: ${this.currentFormat} -> ${format}, path changed: ${pathChanged}`);
+            this.currentFormat = format;
+            this.resourcePath = resourcePath;
+            this.invalidate();
+        }
+    }
+
+    /**
+     * Get the current resource format
+     */
+    getResourceFormat(): ResourceFormat {
+        return this.currentFormat;
+    }
+
+    /**
+     * Get the current resource path
+     */
+    getResourcePath(): string | null {
+        return this.resourcePath;
+    }
+
+    /**
+     * Check if the cache is valid for a given format and path
+     */
+    isValidFor(format: ResourceFormat, resourcePath: string | null): boolean {
+        return this.currentFormat === format && this.resourcePath === resourcePath;
     }
 
     /**

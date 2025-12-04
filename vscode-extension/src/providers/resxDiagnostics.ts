@@ -1,15 +1,27 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { ApiClient, ValidationResult } from '../backend/apiClient';
+import { getParserFactory, ResourceParserFactory } from '../parsers';
 
+/**
+ * Diagnostic provider for resource files (RESX and JSON)
+ * Provides inline warnings and errors for:
+ * - Missing translations
+ * - Extra keys (in non-default languages)
+ * - Empty values
+ * - Duplicate keys
+ */
 export class ResxDiagnosticProvider {
     private diagnosticCollection: vscode.DiagnosticCollection;
     private apiClient: ApiClient;
     private enabled: boolean = false;
     private validationCache: ValidationResult | null = null;
+    private parserFactory: ResourceParserFactory;
 
     constructor(apiClient: ApiClient) {
         this.apiClient = apiClient;
-        this.diagnosticCollection = vscode.languages.createDiagnosticCollection('lrm-resx');
+        this.diagnosticCollection = vscode.languages.createDiagnosticCollection('lrm-resources');
+        this.parserFactory = getParserFactory();
     }
 
     public enable(): void {
@@ -38,11 +50,24 @@ export class ResxDiagnosticProvider {
             // Clear all existing diagnostics
             this.diagnosticCollection.clear();
 
-            // Get all .resx files in workspace
-            const resxFiles = await vscode.workspace.findFiles('**/*.resx', '**/node_modules/**');
+            // Get resource files based on format
+            const format = this.parserFactory.getResourceFormat();
+            const excludePattern = '{**/node_modules/**,**/bin/**,**/obj/**,**/.git/**}';
 
-            // Process each .resx file
-            for (const fileUri of resxFiles) {
+            let resourceFiles: vscode.Uri[] = [];
+
+            if (format === 'json') {
+                // Get JSON resource files
+                const jsonFiles = await vscode.workspace.findFiles('**/*.json', excludePattern);
+                // Filter to only resource files
+                resourceFiles = jsonFiles.filter(f => this.isResourceFile(f.fsPath));
+            } else {
+                // Get RESX files
+                resourceFiles = await vscode.workspace.findFiles('**/*.resx', excludePattern);
+            }
+
+            // Process each resource file
+            for (const fileUri of resourceFiles) {
                 const diagnostics = await this.createDiagnosticsForFile(fileUri, result);
                 if (diagnostics.length > 0) {
                     this.diagnosticCollection.set(fileUri, diagnostics);
@@ -51,6 +76,46 @@ export class ResxDiagnosticProvider {
         } catch (error) {
             console.error('Resource validation error:', error);
         }
+    }
+
+    /**
+     * Check if a file path is likely a resource file
+     */
+    private isResourceFile(filePath: string): boolean {
+        const fileName = path.basename(filePath).toLowerCase();
+
+        // Exclude known config files
+        const excludePatterns = [
+            /^lrm.*\.json$/,
+            /^package(-lock)?\.json$/,
+            /^tsconfig.*\.json$/,
+            /^appsettings.*\.json$/,
+            /.*config\.json$/,
+            /.*settings\.json$/,
+        ];
+
+        if (excludePatterns.some(p => p.test(fileName))) {
+            return false;
+        }
+
+        // Use parser factory if initialized
+        if (this.parserFactory.isInitialized()) {
+            try {
+                // Check if file matches resource patterns
+                const normalizedPath = filePath.toLowerCase().replace(/\\/g, '/');
+                const resourcePatterns = ['/locales/', '/translations/', '/i18n/', '/lang/'];
+                if (resourcePatterns.some(p => normalizedPath.includes(p))) {
+                    return true;
+                }
+            } catch {
+                // Fall through to pattern matching
+            }
+        }
+
+        // Check for culture code patterns
+        const baseName = fileName.replace(/\.json$/, '');
+        return /^[a-z]{2}(-[a-z]{2,4})?$/i.test(baseName) ||
+               /^(strings|messages|translations?)(\.[a-z]{2}(-[a-z]{2,4})?)?$/i.test(baseName);
     }
 
     private async createDiagnosticsForFile(
@@ -115,18 +180,38 @@ export class ResxDiagnosticProvider {
     }
 
     private extractLanguageCode(fileName: string): string | null {
-        // Extract language code from filename
-        // Resources.resx -> "default"
-        // Resources.el.resx -> "el"
-        // Resources.en-US.resx -> "en-US"
+        const lowerFileName = fileName.toLowerCase();
 
-        const match = fileName.match(/\.([a-z]{2}(-[A-Z]{2})?)\.resx$/i);
-        if (match) {
-            return match[1];
+        // RESX pattern: Resources.resx, Resources.el.resx, Resources.en-US.resx
+        if (lowerFileName.endsWith('.resx')) {
+            const match = fileName.match(/\.([a-z]{2}(-[A-Z]{2})?)\.resx$/i);
+            if (match) {
+                return match[1];
+            }
+            return 'default';
         }
 
-        // Check if it's the default file (no language code)
-        if (fileName.endsWith('.resx')) {
+        // JSON patterns
+        if (lowerFileName.endsWith('.json')) {
+            const baseName = fileName.replace(/\.json$/i, '');
+
+            // i18next pattern: en.json, fr-FR.json (entire filename is culture code)
+            if (/^[a-z]{2}(-[a-z]{2,4})?$/i.test(baseName)) {
+                // Check if this is the default language (usually 'en' or configured)
+                // For now, treat 'en' as default, all others as localized
+                if (baseName.toLowerCase() === 'en') {
+                    return 'default';
+                }
+                return baseName;
+            }
+
+            // Standard pattern: strings.json, strings.el.json, strings.en-US.json
+            const match = baseName.match(/\.([a-z]{2}(-[a-z]{2,4})?)$/i);
+            if (match) {
+                return match[1];
+            }
+
+            // No culture code - this is the default file
             return 'default';
         }
 
@@ -221,13 +306,36 @@ export class ResxDiagnosticProvider {
     }
 
     private findKeyInDocument(document: vscode.TextDocument, key: string): number {
-        // Search for <data name="KeyName" pattern in .resx XML
-        const pattern = `<data name="${key}"`;
+        const fileName = document.fileName.toLowerCase();
 
-        for (let i = 0; i < document.lineCount; i++) {
-            const line = document.lineAt(i);
-            if (line.text.includes(pattern)) {
-                return i;
+        // Use parser to find key location
+        if (this.parserFactory.isInitialized()) {
+            const parser = this.parserFactory.getParser(document);
+            const range = parser.getKeyRange(document, key);
+            if (range) {
+                return range.start.line;
+            }
+        }
+
+        // Fallback: RESX pattern search
+        if (fileName.endsWith('.resx')) {
+            const pattern = `<data name="${key}"`;
+            for (let i = 0; i < document.lineCount; i++) {
+                const line = document.lineAt(i);
+                if (line.text.includes(pattern)) {
+                    return i;
+                }
+            }
+        }
+
+        // Fallback: JSON pattern search
+        if (fileName.endsWith('.json')) {
+            const pattern = `"${key}"`;
+            for (let i = 0; i < document.lineCount; i++) {
+                const line = document.lineAt(i);
+                if (line.text.includes(pattern)) {
+                    return i;
+                }
             }
         }
 
@@ -235,13 +343,42 @@ export class ResxDiagnosticProvider {
     }
 
     private findAllKeyOccurrences(document: vscode.TextDocument, key: string): number[] {
-        const pattern = `<data name="${key}"`;
         const lineNumbers: number[] = [];
+        const fileName = document.fileName.toLowerCase();
 
-        for (let i = 0; i < document.lineCount; i++) {
-            const line = document.lineAt(i);
-            if (line.text.includes(pattern)) {
-                lineNumbers.push(i);
+        // Use parser to find all occurrences
+        if (this.parserFactory.isInitialized()) {
+            const parser = this.parserFactory.getParser(document);
+            const keys = parser.parseDocument(document);
+            for (const k of keys) {
+                if (k.key === key) {
+                    lineNumbers.push(k.lineNumber);
+                }
+            }
+            if (lineNumbers.length > 0) {
+                return lineNumbers;
+            }
+        }
+
+        // Fallback: RESX pattern search
+        if (fileName.endsWith('.resx')) {
+            const pattern = `<data name="${key}"`;
+            for (let i = 0; i < document.lineCount; i++) {
+                const line = document.lineAt(i);
+                if (line.text.includes(pattern)) {
+                    lineNumbers.push(i);
+                }
+            }
+        }
+
+        // Fallback: JSON pattern search
+        if (fileName.endsWith('.json')) {
+            const pattern = `"${key}"`;
+            for (let i = 0; i < document.lineCount; i++) {
+                const line = document.lineAt(i);
+                if (line.text.includes(pattern)) {
+                    lineNumbers.push(i);
+                }
             }
         }
 
