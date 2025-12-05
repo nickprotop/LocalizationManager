@@ -819,6 +819,50 @@ lrm add NewFeature --lang default:"New experimental feature"
 # Ελληνικά (el): [you type the translation here]
 ```
 
+### Adding Plural Keys (JSON Backend Only)
+
+Plural keys allow different text for singular vs plural forms following CLDR plural rules (zero, one, two, few, many, other).
+
+```bash
+# Add plural key with common forms
+lrm add ItemCount --plural --plural-form one:"{0} item" --plural-form other:"{0} items"
+
+# Interactive plural mode (prompts for all forms per language)
+lrm add FileCount --plural -i
+# Output:
+# Interactive mode: Enter plural forms for each language
+# Common forms: one (singular), other (plural). Leave empty to skip a form.
+#
+# English (Default):
+#   one: {0} file
+#   other: {0} files
+#   zero:
+#
+# Ελληνικά (el):
+#   one: {0} αρχείο
+#   other: {0} αρχεία
+#   zero:
+```
+
+**JSON Structure Created:**
+```json
+{
+  "ItemCount": {
+    "_plural": true,
+    "one": "{0} item",
+    "other": "{0} items"
+  }
+}
+```
+
+**CLDR Plural Forms:**
+- `zero` - Used for zero quantity (some languages)
+- `one` - Singular form (1 item)
+- `two` - Dual form (2 items, used in Arabic, Welsh, etc.)
+- `few` - Few items (used in Slavic languages, etc.)
+- `many` - Many items (used in Arabic, Polish, etc.)
+- `other` - Default/plural form (required)
+
 ---
 
 ## Updating Existing Keys
@@ -870,6 +914,15 @@ lrm update SaveButton \
   --lang default:"Save" \
   --lang el:"Αποθήκευση" \
   -y
+```
+
+### Update Plural Forms
+```bash
+# Update specific plural forms for an existing plural key
+lrm update ItemCount --plural-form one:"{0} item selected" --plural-form other:"{0} items selected"
+
+# The update command detects plural keys automatically
+# and shows current plural values in the confirmation preview
 ```
 
 ---

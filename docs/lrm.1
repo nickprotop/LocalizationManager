@@ -148,6 +148,9 @@ Add a new key to all language files.
 \fIKEY\fR
 [\fB\-i\fR|\fB\-\-interactive\fR]
 [\fB\-\-lang\fR \fICULTURE\fR:\fIVALUE\fR]
+[\fB\-\-plural\fR]
+[\fB\-\-plural\-form\fR \fIFORM\fR:\fIVALUE\fR]
+[\fB\-\-comment\fR \fICOMMENT\fR]
 [\fB\-\-no\-backup\fR]
 .TP
 .I KEY
@@ -158,13 +161,41 @@ Interactive mode (prompts for values in all languages)
 .TP
 .BR \-\-lang " " \fICULTURE\fR:\fIVALUE\fR
 Specify value for a specific language (can be repeated)
+.TP
+.BR \-\-plural
+Create a plural key with multiple forms (JSON only). Use with \fB\-i\fR for interactive plural form entry.
+.TP
+.BR \-\-plural\-form " " \fIFORM\fR:\fIVALUE\fR
+Plural form value (can be repeated). Valid forms: zero, one, two, few, many, other. Example: \fB\-\-plural\-form one:"{0} item" \-\-plural\-form other:"{0} items"\fR
+.TP
+.BR \-\-comment " " \fICOMMENT\fR
+Optional comment for the resource entry
 .SS update
 Update values for an existing key.
 .PP
 .B lrm update
 \fIKEY\fR
 [\fB\-\-lang\fR \fICULTURE\fR:\fIVALUE\fR]
+[\fB\-\-plural\-form\fR \fIFORM\fR:\fIVALUE\fR]
+[\fB\-\-comment\fR \fICOMMENT\fR]
+[\fB\-i\fR|\fB\-\-interactive\fR]
+[\fB\-y\fR|\fB\-\-yes\fR]
 [\fB\-\-no\-backup\fR]
+.TP
+.BR \-\-lang " " \fICULTURE\fR:\fIVALUE\fR
+Specify value for a specific language (can be repeated)
+.TP
+.BR \-\-plural\-form " " \fIFORM\fR:\fIVALUE\fR
+Update plural form value for existing plural keys (can be repeated). Valid forms: zero, one, two, few, many, other.
+.TP
+.BR \-\-comment " " \fICOMMENT\fR
+Optional comment for the resource entry
+.TP
+.BR \-i ", " \-\-interactive
+Interactive mode (prompts for values in all languages)
+.TP
+.BR \-y ", " \-\-yes
+Skip confirmation prompts
 .SS delete
 Delete a key from all language files.
 .PP

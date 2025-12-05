@@ -194,6 +194,33 @@ Menu → File → Remove Language
 
 ---
 
+### Plural Key Support (JSON Backend)
+
+When using the JSON backend, the TUI supports editing plural keys with multiple forms (one, other, zero, etc.).
+
+**Identifying Plural Keys:**
+- Plural keys are displayed with a `[plural]` prefix in the table
+- Example: `[plural] one: {0} item, other: {0} items`
+
+**Editing Plural Keys:**
+1. Select a plural key and press `Enter`
+2. A specialized dialog opens with separate fields for each plural form:
+   - `one` - Singular form
+   - `other` - Plural form (required)
+   - `zero` - Zero quantity (optional)
+3. Each language has its own set of plural form fields
+4. Empty fields are skipped when saving
+
+**Plural Forms (CLDR):**
+- `zero` - Zero quantity (some languages)
+- `one` - Singular (1 item)
+- `two` - Dual (2 items)
+- `few` - Few items
+- `many` - Many items
+- `other` - Default/plural (required)
+
+---
+
 ### Search and Filtering
 
 The TUI provides powerful search and filtering capabilities.

@@ -97,8 +97,28 @@ Returns detailed information for a specific key, including comments.
 {
   "key": "SaveButton",
   "values": {
-    "default": { "value": "Save", "comment": "Button text" },
-    "el": { "value": "Αποθήκευση", "comment": null }
+    "default": { "value": "Save", "comment": "Button text", "isPlural": false },
+    "el": { "value": "Αποθήκευση", "comment": null, "isPlural": false }
+  },
+  "occurrenceCount": 1,
+  "hasDuplicates": false
+}
+```
+
+**Response for Plural Key:**
+```json
+{
+  "key": "ItemCount",
+  "values": {
+    "default": {
+      "value": "{0} items",
+      "comment": null,
+      "isPlural": true,
+      "pluralForms": {
+        "one": "{0} item",
+        "other": "{0} items"
+      }
+    }
   },
   "occurrenceCount": 1,
   "hasDuplicates": false
@@ -111,7 +131,7 @@ POST /api/resources/keys
 ```
 Add a new localization key.
 
-**Request Body:**
+**Request Body (Simple Key):**
 ```json
 {
   "key": "NewKey",
@@ -123,6 +143,33 @@ Add a new localization key.
 }
 ```
 
+**Request Body (Plural Key - JSON backend only):**
+```json
+{
+  "key": "ItemCount",
+  "isPlural": true,
+  "pluralValues": {
+    "default": {
+      "one": "{0} item",
+      "other": "{0} items"
+    },
+    "el": {
+      "one": "{0} αντικείμενο",
+      "other": "{0} αντικείμενα"
+    }
+  },
+  "comment": "Optional comment"
+}
+```
+
+**Plural Forms:**
+- `zero` - Used for zero quantity (some languages)
+- `one` - Singular form
+- `two` - Dual form (Arabic, Welsh, etc.)
+- `few` - Few items (Slavic languages, etc.)
+- `many` - Many items (Arabic, Polish, etc.)
+- `other` - Default/plural form (required)
+
 #### Update Key
 ```
 PUT /api/resources/keys/{keyName}
@@ -132,7 +179,7 @@ Update an existing key's values and comments.
 **Parameters:**
 - `occurrence` (optional): Specific occurrence index for duplicate keys
 
-**Request Body:**
+**Request Body (Simple Key):**
 ```json
 {
   "values": {
@@ -143,10 +190,26 @@ Update an existing key's values and comments.
 }
 ```
 
+**Request Body (Plural Key):**
+```json
+{
+  "values": {
+    "default": {
+      "isPlural": true,
+      "pluralForms": {
+        "one": "{0} item selected",
+        "other": "{0} items selected"
+      }
+    }
+  }
+}
+```
+
 **Notes:**
 - Each language entry in `values` contains a `value` (required) and optional `comment`
 - Per-language `comment` takes priority over the global `comment` field
 - Only languages included in `values` are updated; others remain unchanged
+- For plural keys, include `isPlural: true` and `pluralForms` dictionary
 
 #### Delete Key
 ```

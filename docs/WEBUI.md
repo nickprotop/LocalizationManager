@@ -69,6 +69,10 @@ Edit individual keys with full translation support:
 - Inline translation with provider selection
 - Code reference lookup
 - Delete key functionality
+- **Plural key support** (JSON backend only):
+  - Visual "Plural" badge on plural keys
+  - Separate input fields for each plural form (one, other, zero)
+  - CLDR plural forms: zero, one, two, few, many, other
 
 ![Key Editor](../assets/web-key-editor.png)
 

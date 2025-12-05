@@ -854,6 +854,8 @@ Greek: Απαγορεύεται
   - Use `default` for the default language file (the one without a culture code)
 - `-i, --interactive` - Interactive mode (prompts for all language values)
 - `--comment <COMMENT>` - Add comment to the key
+- `--plural` - Create a plural key with multiple forms (JSON backend only)
+- `--plural-form <FORM:VALUE>` - Plural form value (can be used multiple times). Valid forms: zero, one, two, few, many, other
 - `--no-backup` - Skip automatic backup creation
 
 **Examples:**
@@ -875,6 +877,12 @@ lrm add ErrorMessage --lang default:"ErrorMessage" --comment "TODO: Add actual e
 
 # Quick add without backup
 lrm add TestKey -l default:"Test" -l el:"Δοκιμή" --no-backup
+
+# Add plural key (JSON backend only)
+lrm add ItemCount --plural --plural-form one:"{0} item" --plural-form other:"{0} items"
+
+# Add plural key interactively (prompts for plural forms per language)
+lrm add ItemCount --plural -i
 ```
 
 **Interactive mode workflow:**
@@ -904,6 +912,7 @@ lrm add TestKey -l default:"Test" -l el:"Δοκιμή" --no-backup
 - `-l, --lang <CODE:VALUE>` - Language value (e.g., `default:"Save Changes"`, `el:"Αποθήκευση"`) - can be used multiple times
   - Use `default` for the default language file (the one without a culture code)
 - `--comment <COMMENT>` - Update the comment
+- `--plural-form <FORM:VALUE>` - Update plural form value (can be used multiple times). Valid forms: zero, one, two, few, many, other
 - `-i, --interactive` - Interactive mode (prompts for each language)
 - `-y, --yes` - Skip confirmation prompt
 - `--no-backup` - Skip automatic backup creation
@@ -921,6 +930,9 @@ lrm update SaveButton -y --no-backup
 
 # Update only comment
 lrm update SaveButton --comment "Updated description"
+
+# Update plural forms for an existing plural key
+lrm update ItemCount --plural-form one:"{0} item selected" --plural-form other:"{0} items selected"
 ```
 
 **Confirmation prompt:**

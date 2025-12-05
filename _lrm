@@ -201,14 +201,40 @@ _lrm() {
                     esac
                     ;;
                 add)
+                    local -a plural_form_opts
+                    plural_form_opts=(
+                        'zero:Used for zero quantity'
+                        'one:Used for singular (1 item)'
+                        'two:Used for dual (2 items)'
+                        'few:Used for few items'
+                        'many:Used for many items'
+                        'other:Used for all other quantities (required)'
+                    )
                     _arguments \
                         '1:key name' \
                         '*'{-l,--lang}'[Language value (code:value)]:langvalue' \
                         '--comment[Add comment]:comment' \
                         '--no-backup[Skip backup creation]' \
+                        '--plural[Create a plural key with multiple forms (JSON only)]' \
+                        '*--plural-form[Plural form value (form:value)]:pluralform:->plural_forms' \
+                        '(-i --interactive)'{-i,--interactive}'[Interactive mode]' \
                         $global_opts
+                    case $state in
+                        plural_forms)
+                            _describe -t plural_forms 'plural forms' plural_form_opts
+                            ;;
+                    esac
                     ;;
                 update)
+                    local -a plural_form_opts
+                    plural_form_opts=(
+                        'zero:Used for zero quantity'
+                        'one:Used for singular (1 item)'
+                        'two:Used for dual (2 items)'
+                        'few:Used for few items'
+                        'many:Used for many items'
+                        'other:Used for all other quantities (required)'
+                    )
                     _arguments \
                         '1:key name' \
                         '*'{-l,--lang}'[Language value (code:value)]:langvalue' \
@@ -216,7 +242,13 @@ _lrm() {
                         '(-i --interactive)'{-i,--interactive}'[Interactive mode]' \
                         '(-y --yes)'{-y,--yes}'[Skip confirmation]' \
                         '--no-backup[Skip backup creation]' \
+                        '*--plural-form[Update plural form value (form:value)]:pluralform:->plural_forms' \
                         $global_opts
+                    case $state in
+                        plural_forms)
+                            _describe -t plural_forms 'plural forms' plural_form_opts
+                            ;;
+                    esac
                     ;;
                 delete)
                     _arguments \
