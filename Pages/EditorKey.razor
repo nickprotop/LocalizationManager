@@ -84,7 +84,8 @@
                 {
                     var langCode = kvp.Key;
                     var resourceValue = kvp.Value;
-                    var isEmpty = string.IsNullOrWhiteSpace(resourceValue.Value);
+                    var isEmpty = string.IsNullOrWhiteSpace(resourceValue.Value) &&
+                                  !(resourceValue.IsPlural && resourceValue.PluralForms?.Any() == true);
                     var isDefault = langCode == defaultLanguageCode;
 
                     <div class="lrm-form-group">
@@ -95,16 +96,43 @@
                                 {
                                     <span class="lrm-badge lrm-badge-info">Source</span>
                                 }
+                                @if (resourceValue.IsPlural)
+                                {
+                                    <span class="lrm-badge lrm-badge-success">Plural</span>
+                                }
                                 @if (isEmpty && !isDefault)
                                 {
                                     <span class="lrm-badge lrm-badge-warning">Empty</span>
                                 }
                             </label>
                         </div>
-                        <textarea class="lrm-textarea"
-                                  rows="2"
-                                  @bind="editedValues[langCode].Value"
-                                  @bind:event="oninput"></textarea>
+
+                        @if (resourceValue.IsPlural)
+                        {
+                            <!-- Plural Form Fields -->
+                            <div class="lrm-plural-forms" style="background: var(--bg-secondary); padding: 0.5rem; border-radius: 4px;">
+                                @foreach (var form in new[] { "one", "other", "zero" })
+                                {
+                                    var formValue = GetPluralFormValue(langCode, form);
+                                    <div class="lrm-form-group" style="margin-bottom: 0.5rem;">
+                                        <label class="lrm-label lrm-text-muted" style="font-size: 0.85rem;">@form</label>
+                                        <input type="text"
+                                               class="lrm-input"
+                                               placeholder="@($"Enter {form} form (e.g., {{0}} item{(form == "other" ? "s" : "")})")"
+                                               value="@formValue"
+                                               @oninput="e => SetPluralFormValue(langCode, form, e.Value?.ToString() ?? string.Empty)" />
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <!-- Simple Value Field -->
+                            <textarea class="lrm-textarea"
+                                      rows="2"
+                                      @bind="editedValues[langCode].Value"
+                                      @bind:event="oninput"></textarea>
+                        }
 
                         @if (!string.IsNullOrWhiteSpace(resourceValue.Comment) || (editingComments.ContainsKey(langCode) && editingComments[langCode]))
                         {
@@ -141,6 +169,21 @@
                         }
                     </button>
                     <button class="lrm-button" @onclick="@(() => Navigation.NavigateTo("/editor"))">Cancel</button>
+                    @if (supportsPluralFormat)
+                    {
+                        @if (IsCurrentKeyPlural())
+                        {
+                            <button class="lrm-button" @onclick="ConvertToSimple" title="Convert this plural key to a simple key">
+                                Convert to Simple
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="lrm-button" @onclick="ConvertToPlural" title="Convert this simple key to a plural key">
+                                Convert to Plural
+                            </button>
+                        }
+                    }
                     <button class="lrm-button lrm-button-danger" @onclick="DeleteKey">Delete Key</button>
                 </div>
             </div>
@@ -346,6 +389,7 @@
     private string? successMessage;
     private string? defaultLanguageCode;
     private bool hasUnsavedTranslations = false;
+    private bool supportsPluralFormat = false;  // True when using JSON backend
 
     // Translate dialog state
     private bool showTranslateDialog = false;
@@ -408,9 +452,13 @@
             {
                 InitializeEditedValues();
 
-                // Find default language
+                // Find default language and detect plural support
                 var languages = await ResourceApi.GetResourceFilesAsync();
                 defaultLanguageCode = languages?.FirstOrDefault(l => l.IsDefault)?.Code ?? "default";
+
+                // Check if using JSON backend (supports plurals)
+                supportsPluralFormat = languages?.Any(l =>
+                    l.FilePath?.EndsWith(".json", StringComparison.OrdinalIgnoreCase) == true) ?? false;
 
                 // Initialize translate target languages (all non-default)
                 translateTargetLanguages = editedValues.Keys
@@ -446,19 +494,51 @@
             sourceValues = keyDetails.Values;
         }
 
-        // Create deep copy of values for editing
+        // Create deep copy of values for editing (including plural forms)
         editedValues = sourceValues.ToDictionary(
             kvp => kvp.Key,
             kvp => new ResourceValue
             {
                 Value = kvp.Value.Value,
-                Comment = kvp.Value.Comment
+                Comment = kvp.Value.Comment,
+                IsPlural = kvp.Value.IsPlural,
+                PluralForms = kvp.Value.PluralForms != null
+                    ? new Dictionary<string, string>(kvp.Value.PluralForms)
+                    : null
             });
 
         // Initialize comment editing state
         editingComments = editedValues.ToDictionary(
             kvp => kvp.Key,
             kvp => !string.IsNullOrWhiteSpace(kvp.Value.Comment));
+    }
+
+    private string GetPluralFormValue(string langCode, string form)
+    {
+        if (editedValues.TryGetValue(langCode, out var val) && val.PluralForms != null)
+        {
+            return val.PluralForms.GetValueOrDefault(form, string.Empty);
+        }
+        return string.Empty;
+    }
+
+    private void SetPluralFormValue(string langCode, string form, string value)
+    {
+        if (editedValues.TryGetValue(langCode, out var resourceValue))
+        {
+            resourceValue.PluralForms ??= new Dictionary<string, string>();
+            if (string.IsNullOrEmpty(value))
+            {
+                resourceValue.PluralForms.Remove(form);
+            }
+            else
+            {
+                resourceValue.PluralForms[form] = value;
+            }
+            // Keep Value in sync with 'other' form
+            resourceValue.Value = resourceValue.PluralForms.GetValueOrDefault("other")
+                ?? resourceValue.PluralForms.Values.FirstOrDefault();
+        }
     }
 
     private void OnOccurrenceChanged()
@@ -500,13 +580,15 @@
         {
             var request = new UpdateKeyRequest
             {
-                // Pass full ResourceValue objects with both Value and Comment per language
+                // Pass full ResourceValue objects with Value, Comment, and plural forms per language
                 Values = editedValues.ToDictionary(
                     kvp => kvp.Key,
                     kvp => new ResourceValue
                     {
                         Value = kvp.Value.Value ?? string.Empty,
-                        Comment = kvp.Value.Comment
+                        Comment = kvp.Value.Comment,
+                        IsPlural = kvp.Value.IsPlural,
+                        PluralForms = kvp.Value.PluralForms
                     }),
                 Occurrence = keyDetails?.HasDuplicates == true ? selectedOccurrence : null
             };
@@ -684,5 +766,65 @@
 
         var lastSlash = filePath.LastIndexOfAny(new[] { '/', '\\' });
         return lastSlash >= 0 ? filePath.Substring(lastSlash + 1) : filePath;
+    }
+
+    /// <summary>
+    /// Checks if the current key (in any language) is a plural key
+    /// </summary>
+    private bool IsCurrentKeyPlural()
+    {
+        return editedValues.Values.Any(v => v.IsPlural);
+    }
+
+    /// <summary>
+    /// Convert a simple key to a plural key - copies current value to "other" form
+    /// </summary>
+    private void ConvertToPlural()
+    {
+        foreach (var langCode in editedValues.Keys.ToList())
+        {
+            var resourceValue = editedValues[langCode];
+            if (!resourceValue.IsPlural)
+            {
+                var currentValue = resourceValue.Value ?? string.Empty;
+                resourceValue.IsPlural = true;
+                resourceValue.PluralForms = new Dictionary<string, string>
+                {
+                    ["other"] = currentValue  // Copy current value to "other" form
+                };
+                // Value is kept in sync with "other" form
+            }
+        }
+
+        successMessage = "Converted to plural key. Add plural form values and click 'Save Changes' to save.";
+        hasUnsavedTranslations = true;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Convert a plural key to a simple key - copies "other" form (or first available) to value
+    /// </summary>
+    private void ConvertToSimple()
+    {
+        foreach (var langCode in editedValues.Keys.ToList())
+        {
+            var resourceValue = editedValues[langCode];
+            if (resourceValue.IsPlural)
+            {
+                // Get the "other" form value, or the first available plural form
+                var simpleValue = resourceValue.PluralForms?.GetValueOrDefault("other")
+                    ?? resourceValue.PluralForms?.Values.FirstOrDefault()
+                    ?? resourceValue.Value
+                    ?? string.Empty;
+
+                resourceValue.IsPlural = false;
+                resourceValue.Value = simpleValue;
+                resourceValue.PluralForms = null;
+            }
+        }
+
+        successMessage = "Converted to simple key. Click 'Save Changes' to save.";
+        hasUnsavedTranslations = true;
+        StateHasChanged();
     }
 }

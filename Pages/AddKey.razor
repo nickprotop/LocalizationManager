@@ -45,13 +45,25 @@
                     <small class="lrm-text-muted">The key name must be unique across all resource files.</small>
                 </div>
 
+                @if (supportsPlurals)
+                {
+                    <div class="lrm-form-group">
+                        <label class="lrm-checkbox-label">
+                            <input type="checkbox" @bind="isPlural" />
+                            <span>This is a plural key</span>
+                        </label>
+                        <small class="lrm-text-muted">Plural keys have different values for different quantities (one, other, zero, etc.)</small>
+                    </div>
+                }
+
                 @if (languages != null)
                 {
                     <h3>Values by Language</h3>
                     @foreach (var lang in languages)
                     {
                         var langCode = lang.Code ?? "default";
-                        <div class="lrm-form-group">
+                        var currentLangCode = langCode; // Capture for closure
+                        <div class="lrm-form-group" @key="langCode">
                             <label class="lrm-label">
                                 @langCode
                                 @if (lang.IsDefault)
@@ -59,11 +71,32 @@
                                     <span class="lrm-badge lrm-badge-info">Default</span>
                                 }
                             </label>
-                            <input type="text"
-                                   class="lrm-input"
-                                   placeholder="Enter value for @langCode"
-                                   @bind="values[langCode]"
-                                   @bind:event="oninput" />
+                            @if (isPlural)
+                            {
+                                <div class="lrm-plural-forms">
+                                    @foreach (var form in pluralFormNames)
+                                    {
+                                        var currentForm = form; // Capture for closure
+                                        var formKey = $"{currentLangCode}:{currentForm}";
+                                        <div class="lrm-plural-form-row" @key="formKey">
+                                            <label class="lrm-plural-label">@form</label>
+                                            <input type="text"
+                                                   class="lrm-input lrm-input-plural"
+                                                   placeholder="@GetPluralPlaceholder(form)"
+                                                   value="@GetPluralValue(currentLangCode, currentForm)"
+                                                   @oninput="e => SetPluralValue(currentLangCode, currentForm, e.Value?.ToString() ?? string.Empty)" />
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <input type="text"
+                                       class="lrm-input"
+                                       placeholder="Enter value for @langCode"
+                                       value="@GetSimpleValue(currentLangCode)"
+                                       @oninput="e => SetSimpleValue(currentLangCode, e.Value?.ToString() ?? string.Empty)" />
+                            }
                         </div>
                     }
                 }
@@ -99,11 +132,30 @@
 @code {
     private List<ResourceFileInfo>? languages;
     private Dictionary<string, string> values = new();
+    private Dictionary<string, string> pluralValues = new();
     private string newKeyName = "";
     private string comment = "";
     private bool isAdding = false;
+    private bool isPlural = false;
+    private bool supportsPlurals = false;
     private string? errorMessage;
     private string? successMessage;
+
+    private static readonly string[] pluralFormNames = { "one", "other", "zero", "few", "many" };
+
+    private string GetSimpleValue(string langCode) => values.GetValueOrDefault(langCode, "");
+    private void SetSimpleValue(string langCode, string value) => values[langCode] = value;
+
+    private string GetPluralValue(string langCode, string form) => pluralValues.GetValueOrDefault($"{langCode}:{form}", "");
+    private void SetPluralValue(string langCode, string form, string value) => pluralValues[$"{langCode}:{form}"] = value;
+
+    private static string GetPluralPlaceholder(string form) => form switch
+    {
+        "other" => "Required - e.g. '{0} items'",
+        "one" => "Optional - e.g. '1 item'",
+        "zero" => "Optional - e.g. 'No items'",
+        _ => $"Optional - e.g. '{form} form'"
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -112,9 +164,18 @@
             languages = await ResourceApi.GetResourceFilesAsync();
             if (languages != null)
             {
+                // Check if using JSON backend (supports plurals)
+                supportsPlurals = languages.Any(l => l.FilePath?.EndsWith(".json", StringComparison.OrdinalIgnoreCase) == true);
+
                 foreach (var lang in languages)
                 {
-                    values[lang.Code ?? "default"] = "";
+                    var langCode = lang.Code ?? "default";
+                    values[langCode] = "";
+                    // Initialize plural form values
+                    foreach (var form in pluralFormNames)
+                    {
+                        pluralValues[$"{langCode}:{form}"] = "";
+                    }
                 }
             }
         }
@@ -140,10 +201,41 @@
             var request = new AddKeyRequest
             {
                 Key = newKeyName.Trim(),
-                Values = values.Where(kvp => !string.IsNullOrEmpty(kvp.Value))
-                               .ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                Comment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim()
+                Comment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim(),
+                IsPlural = isPlural
             };
+
+            if (isPlural)
+            {
+                // Build plural values dictionary: { "default": { "one": "...", "other": "..." }, ... }
+                var pluralValuesPerLang = new Dictionary<string, Dictionary<string, string>>();
+                if (languages != null)
+                {
+                    foreach (var lang in languages)
+                    {
+                        var langCode = lang.Code ?? "default";
+                        var langPluralForms = new Dictionary<string, string>();
+                        foreach (var form in pluralFormNames)
+                        {
+                            var formKey = $"{langCode}:{form}";
+                            if (pluralValues.TryGetValue(formKey, out var value) && !string.IsNullOrEmpty(value))
+                            {
+                                langPluralForms[form] = value;
+                            }
+                        }
+                        if (langPluralForms.Count > 0)
+                        {
+                            pluralValuesPerLang[langCode] = langPluralForms;
+                        }
+                    }
+                }
+                request.PluralValues = pluralValuesPerLang;
+            }
+            else
+            {
+                request.Values = values.Where(kvp => !string.IsNullOrEmpty(kvp.Value))
+                                       .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            }
 
             var result = await ResourceApi.AddKeyAsync(request);
             if (result?.Success == true)
@@ -173,6 +265,7 @@
     {
         newKeyName = "";
         comment = "";
+        isPlural = false;
         successMessage = null;
         errorMessage = null;
 
@@ -180,7 +273,12 @@
         {
             foreach (var lang in languages)
             {
-                values[lang.Code ?? "default"] = "";
+                var langCode = lang.Code ?? "default";
+                values[langCode] = "";
+                foreach (var form in pluralFormNames)
+                {
+                    pluralValues[$"{langCode}:{form}"] = "";
+                }
             }
         }
     }
