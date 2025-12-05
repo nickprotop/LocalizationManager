@@ -85,7 +85,20 @@ public partial class ResourceEditorWindow : Window
             foreach (var rf in _resourceFiles)
             {
                 var entry = GetNthOccurrence(rf, entryRef.Key, entryRef.OccurrenceNumber);
-                row[rf.Language.Name] = entry?.Value ?? "";
+                // For plural entries, show a summary; for simple entries, show the value
+                string displayValue;
+                if (entry?.IsPlural == true && entry.PluralForms != null && entry.PluralForms.Count > 0)
+                {
+                    // Show plural forms summary, e.g., "one: {0} item, other: {0} items"
+                    var forms = entry.PluralForms.Take(2).Select(kv => $"{kv.Key}: {TruncateValue(kv.Value, 20)}");
+                    displayValue = $"[plural] {string.Join(", ", forms)}";
+                    if (entry.PluralForms.Count > 2) displayValue += ", ...";
+                }
+                else
+                {
+                    displayValue = entry?.Value ?? "";
+                }
+                row[rf.Language.Name] = displayValue;
                 row[$"_Comment_{rf.Language.Code}"] = entry?.Comment ?? "";
             }
 
@@ -164,7 +177,19 @@ public partial class ResourceEditorWindow : Window
             foreach (var rf in _resourceFiles)
             {
                 var entry = GetNthOccurrence(rf, entryRef.Key, entryRef.OccurrenceNumber);
-                valueRow[rf.Language.Name] = entry?.Value ?? "";
+                // For plural entries, show a summary; for simple entries, show the value
+                string displayValue;
+                if (entry?.IsPlural == true && entry.PluralForms != null && entry.PluralForms.Count > 0)
+                {
+                    var forms = entry.PluralForms.Take(2).Select(kv => $"{kv.Key}: {TruncateValue(kv.Value, 20)}");
+                    displayValue = $"[plural] {string.Join(", ", forms)}";
+                    if (entry.PluralForms.Count > 2) displayValue += ", ...";
+                }
+                else
+                {
+                    displayValue = entry?.Value ?? "";
+                }
+                valueRow[rf.Language.Name] = displayValue;
             }
             dt.Rows.Add(valueRow);
 
@@ -552,4 +577,13 @@ public partial class ResourceEditorWindow : Window
 
     // Translation Methods
 
+    /// <summary>
+    /// Truncates a string value to the specified max length, adding ellipsis if needed.
+    /// </summary>
+    private static string TruncateValue(string? value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        if (value.Length <= maxLength) return value;
+        return value.Substring(0, maxLength - 3) + "...";
+    }
 }

@@ -32,6 +32,8 @@ namespace LocalizationManager.Commands;
 /// </summary>
 public class UpdateCommand : Command<UpdateCommand.Settings>
 {
+    private static readonly string[] ValidPluralForms = { "zero", "one", "two", "few", "many", "other" };
+
     public class Settings : BaseCommandSettings
     {
         [CommandArgument(0, "<KEY>")]
@@ -57,6 +59,10 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
         [CommandOption("-y|--yes")]
         [Description("Skip confirmation prompt")]
         public bool SkipConfirmation { get; set; }
+
+        [CommandOption("--plural-form <FORM>")]
+        [Description("Update plural form value in format 'form:\"value\"' (e.g., --plural-form one:\"{0} item\" --plural-form other:\"{0} items\"). Forms: zero, one, two, few, many, other.")]
+        public string[]? PluralForms { get; set; }
     }
 
     public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken = default)
@@ -114,6 +120,9 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
                 return 1;
             }
 
+            // Check if key is plural
+            bool isPlural = existingEntry.IsPlural;
+
             // Show current values
             var currentTable = new Table();
             currentTable.AddColumn("Language");
@@ -122,106 +131,195 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
             foreach (var rf in resourceFiles)
             {
                 var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
-                var value = entry?.Value?.EscapeMarkup() ?? "[dim](empty)[/]";
+                string value;
+                if (entry?.IsPlural == true && entry.PluralForms != null)
+                {
+                    var formStrings = entry.PluralForms.Select(kv => $"{kv.Key}: {kv.Value}");
+                    value = string.Join(", ", formStrings).EscapeMarkup();
+                    if (string.IsNullOrEmpty(value)) value = "[dim](empty)[/]";
+                }
+                else
+                {
+                    value = entry?.Value?.EscapeMarkup() ?? "[dim](empty)[/]";
+                }
                 currentTable.AddRow(rf.Language.Name, value);
             }
 
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[yellow]Updating key:[/] [bold]{settings.Key.EscapeMarkup()}[/]");
+            var pluralIndicator = isPlural ? " [cyan](plural)[/]" : "";
+            AnsiConsole.MarkupLine($"[yellow]Updating key:[/] [bold]{settings.Key.EscapeMarkup()}[/]{pluralIndicator}");
             AnsiConsole.WriteLine();
             AnsiConsole.Write(currentTable);
             AnsiConsole.WriteLine();
 
-            // Collect new values
+            // Collect new values (simple keys) or plural forms (plural keys)
             var updates = new Dictionary<string, string>();
+            var pluralUpdates = new Dictionary<string, string>(); // For plural forms: form -> value
 
-            if (settings.Interactive)
+            if (isPlural)
             {
-                // Interactive mode - prompt for each language
-                foreach (var rf in resourceFiles)
+                // Handle plural key updates
+                if (settings.Interactive)
                 {
-                    var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
-                    var currentValue = entry?.Value ?? "";
+                    AnsiConsole.MarkupLine("[dim]Enter new plural form values (press Enter to keep current):[/]");
+                    AnsiConsole.WriteLine();
 
-                    var newValue = AnsiConsole.Prompt(
-                        new TextPrompt<string>($"[cyan]{rf.Language.Name}:[/]")
-                            .DefaultValue(currentValue)
-                            .AllowEmpty()
-                    );
-
-                    if (newValue != currentValue)
+                    foreach (var form in new[] { "one", "other", "zero" })
                     {
-                        updates[rf.Language.Code] = newValue;
+                        var currentValue = existingEntry.PluralForms?.GetValueOrDefault(form, "") ?? "";
+                        var prompt = new TextPrompt<string>($"  [yellow]{form}:[/]")
+                            .DefaultValue(currentValue)
+                            .AllowEmpty();
+                        var newValue = AnsiConsole.Prompt(prompt);
+                        if (newValue != currentValue)
+                        {
+                            pluralUpdates[form] = newValue;
+                        }
+                    }
+                }
+                else if (settings.PluralForms != null && settings.PluralForms.Any())
+                {
+                    // Parse --plural-form arguments
+                    foreach (var formValue in settings.PluralForms)
+                    {
+                        var parts = formValue.Split(':', 2);
+                        if (parts.Length != 2)
+                        {
+                            AnsiConsole.MarkupLine($"[red]✗ Invalid plural format: '{formValue}'. Expected format: 'form:value' (e.g., one:\"{{0}} item\")[/]");
+                            return 1;
+                        }
+
+                        var form = parts[0].Trim().ToLowerInvariant();
+                        var value = parts[1];
+
+                        if (!ValidPluralForms.Contains(form))
+                        {
+                            AnsiConsole.MarkupLine($"[red]✗ Invalid plural form: '{form}'. Valid forms: {string.Join(", ", ValidPluralForms)}[/]");
+                            return 1;
+                        }
+
+                        pluralUpdates[form] = value;
                     }
                 }
             }
             else
             {
-                // Command-line mode - parse --lang arguments
-                if (settings.LanguageValues != null && settings.LanguageValues.Any())
+                // Handle simple key updates
+                if (settings.Interactive)
                 {
-                    foreach (var langValue in settings.LanguageValues)
+                    // Interactive mode - prompt for each language
+                    foreach (var rf in resourceFiles)
                     {
-                        var parts = langValue.Split(':', 2);
-                        if (parts.Length != 2)
+                        var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
+                        var currentValue = entry?.Value ?? "";
+
+                        var newValue = AnsiConsole.Prompt(
+                            new TextPrompt<string>($"[cyan]{rf.Language.Name}:[/]")
+                                .DefaultValue(currentValue)
+                                .AllowEmpty()
+                        );
+
+                        if (newValue != currentValue)
                         {
-                            AnsiConsole.MarkupLine($"[red]✗ Invalid format: '{langValue}'. Expected format: 'code:value' (e.g., en:Save)[/]");
-                            return 1;
+                            updates[rf.Language.Code] = newValue;
                         }
-
-                        var code = parts[0].Trim();
-                        var value = parts[1];
-
-                        // Normalize "default" alias to empty string
-                        if (code.Equals("default", StringComparison.OrdinalIgnoreCase))
+                    }
+                }
+                else
+                {
+                    // Command-line mode - parse --lang arguments
+                    if (settings.LanguageValues != null && settings.LanguageValues.Any())
+                    {
+                        foreach (var langValue in settings.LanguageValues)
                         {
-                            code = "";
-                        }
+                            var parts = langValue.Split(':', 2);
+                            if (parts.Length != 2)
+                            {
+                                AnsiConsole.MarkupLine($"[red]✗ Invalid format: '{langValue}'. Expected format: 'code:value' (e.g., en:Save)[/]");
+                                return 1;
+                            }
 
-                        // Validate language code exists
-                        var matchingLang = languages.FirstOrDefault(l => l.Code.Equals(code, StringComparison.OrdinalIgnoreCase));
-                        if (matchingLang == null)
-                        {
-                            var availableCodes = string.Join(", ", languages.Select(l => l.Code));
-                            AnsiConsole.MarkupLine($"[red]✗ Unknown language code: '{code}'[/]");
-                            AnsiConsole.MarkupLine($"[yellow]Available languages: {availableCodes}[/]");
-                            return 1;
-                        }
+                            var code = parts[0].Trim();
+                            var value = parts[1];
 
-                        updates[matchingLang.Code] = value;
+                            // Normalize "default" alias to empty string
+                            if (code.Equals("default", StringComparison.OrdinalIgnoreCase))
+                            {
+                                code = "";
+                            }
+
+                            // Validate language code exists
+                            var matchingLang = languages.FirstOrDefault(l => l.Code.Equals(code, StringComparison.OrdinalIgnoreCase));
+                            if (matchingLang == null)
+                            {
+                                var availableCodes = string.Join(", ", languages.Select(l => l.Code));
+                                AnsiConsole.MarkupLine($"[red]✗ Unknown language code: '{code}'[/]");
+                                AnsiConsole.MarkupLine($"[yellow]Available languages: {availableCodes}[/]");
+                                return 1;
+                            }
+
+                            updates[matchingLang.Code] = value;
+                        }
                     }
                 }
             }
 
             // Check if any updates were provided
-            if (!updates.Any() && settings.Comment == null)
+            if (!updates.Any() && !pluralUpdates.Any() && settings.Comment == null)
             {
                 AnsiConsole.MarkupLine("[yellow]⚠ No updates provided![/]");
-                AnsiConsole.MarkupLine("[dim]Use --lang code:value, --comment, or -i for interactive mode[/]");
+                if (isPlural)
+                {
+                    AnsiConsole.MarkupLine("[dim]Use --plural-form form:value, --comment, or -i for interactive mode[/]");
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine("[dim]Use --lang code:value, --comment, or -i for interactive mode[/]");
+                }
                 return 0;
             }
 
             // Show preview of changes
-            if (updates.Any())
+            if (updates.Any() || pluralUpdates.Any())
             {
-                var previewTable = new Table();
-                previewTable.AddColumn("Language");
-                previewTable.AddColumn("Old Value");
-                previewTable.AddColumn("New Value");
-
-                foreach (var kvp in updates)
-                {
-                    var rf = resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
-                    if (rf != null)
-                    {
-                        var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
-                        var oldValue = entry?.Value?.EscapeMarkup() ?? "[dim](empty)[/]";
-                        previewTable.AddRow(rf.Language.Name, oldValue, kvp.Value.EscapeMarkup());
-                    }
-                }
-
                 AnsiConsole.MarkupLine("[yellow]Changes to be made:[/]");
-                AnsiConsole.Write(previewTable);
+
+                if (pluralUpdates.Any())
+                {
+                    var pluralTable = new Table();
+                    pluralTable.AddColumn("Form");
+                    pluralTable.AddColumn("Old Value");
+                    pluralTable.AddColumn("New Value");
+
+                    foreach (var kvp in pluralUpdates)
+                    {
+                        var oldValue = existingEntry.PluralForms?.GetValueOrDefault(kvp.Key, "")?.EscapeMarkup() ?? "[dim](empty)[/]";
+                        if (string.IsNullOrEmpty(oldValue)) oldValue = "[dim](empty)[/]";
+                        pluralTable.AddRow(kvp.Key, oldValue, kvp.Value.EscapeMarkup());
+                    }
+
+                    AnsiConsole.Write(pluralTable);
+                }
+                else
+                {
+                    var previewTable = new Table();
+                    previewTable.AddColumn("Language");
+                    previewTable.AddColumn("Old Value");
+                    previewTable.AddColumn("New Value");
+
+                    foreach (var kvp in updates)
+                    {
+                        var rf = resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                        if (rf != null)
+                        {
+                            var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
+                            var oldValue = entry?.Value?.EscapeMarkup() ?? "[dim](empty)[/]";
+                            previewTable.AddRow(rf.Language.Name, oldValue, kvp.Value.EscapeMarkup());
+                        }
+                    }
+
+                    AnsiConsole.Write(previewTable);
+                }
                 AnsiConsole.WriteLine();
             }
 
@@ -250,16 +348,40 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
 
             // Apply updates
             int updatedCount = 0;
-            foreach (var kvp in updates)
+
+            if (pluralUpdates.Any())
             {
-                var rf = resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
-                if (rf != null)
+                // Apply plural form updates to all languages
+                foreach (var rf in resourceFiles)
                 {
                     var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
                     if (entry != null)
                     {
-                        entry.Value = kvp.Value;
+                        entry.PluralForms ??= new Dictionary<string, string>();
+                        foreach (var kvp in pluralUpdates)
+                        {
+                            entry.PluralForms[kvp.Key] = kvp.Value;
+                        }
+                        // Update Value to match 'other' form
+                        entry.Value = entry.PluralForms.GetValueOrDefault("other") ?? entry.PluralForms.Values.FirstOrDefault();
                         updatedCount++;
+                    }
+                }
+            }
+            else
+            {
+                // Apply simple value updates
+                foreach (var kvp in updates)
+                {
+                    var rf = resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                    if (rf != null)
+                    {
+                        var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(settings.Key, StringComparison.OrdinalIgnoreCase));
+                        if (entry != null)
+                        {
+                            entry.Value = kvp.Value;
+                            updatedCount++;
+                        }
                     }
                 }
             }
@@ -283,7 +405,8 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
                 settings.WriteResourceFile(rf);
             }
 
-            AnsiConsole.MarkupLine($"[green]✓ Successfully updated key '{settings.Key.EscapeMarkup()}' in {updatedCount} language(s)[/]");
+            var pluralNote = isPlural ? " (plural forms)" : "";
+            AnsiConsole.MarkupLine($"[green]✓ Successfully updated key '{settings.Key.EscapeMarkup()}'{pluralNote} in {updatedCount} language(s)[/]");
             return 0;
         }
         catch (DirectoryNotFoundException ex)

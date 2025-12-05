@@ -133,7 +133,9 @@ public class ResourcesController : ControllerBase
                         values[file.Language.Code ?? "default"] = new ResourceValue
                         {
                             Value = entry.Value,
-                            Comment = entry.Comment
+                            Comment = entry.Comment,
+                            IsPlural = entry.IsPlural,
+                            PluralForms = entry.PluralForms
                         };
                     }
                 }
@@ -160,7 +162,9 @@ public class ResourcesController : ControllerBase
                         occurrenceValues[file.Language.Code ?? "default"] = new ResourceValue
                         {
                             Value = entries[i].Value,
-                            Comment = entries[i].Comment
+                            Comment = entries[i].Comment,
+                            IsPlural = entries[i].IsPlural,
+                            PluralForms = entries[i].PluralForms
                         };
                     }
                 }
@@ -182,7 +186,9 @@ public class ResourcesController : ControllerBase
                     firstValues[file.Language.Code ?? "default"] = new ResourceValue
                     {
                         Value = entry.Value,
-                        Comment = entry.Comment
+                        Comment = entry.Comment,
+                        IsPlural = entry.IsPlural,
+                        PluralForms = entry.PluralForms
                     };
                 }
             }
@@ -223,16 +229,35 @@ public class ResourcesController : ControllerBase
             // Add the key to all resource files
             foreach (var resourceFile in resourceFiles)
             {
-                var value = request.Values?.ContainsKey(resourceFile.Language.Code ?? "default") == true
-                    ? request.Values[resourceFile.Language.Code ?? "default"]
-                    : string.Empty;
+                var langCode = resourceFile.Language.Code ?? "default";
 
-                resourceFile.Entries.Add(new ResourceEntry
+                if (request.IsPlural && request.PluralValues != null)
                 {
-                    Key = request.Key,
-                    Value = value,
-                    Comment = request.Comment
-                });
+                    // Add plural key
+                    var pluralForms = request.PluralValues.GetValueOrDefault(langCode)
+                        ?? new Dictionary<string, string> { ["other"] = "" };
+
+                    resourceFile.Entries.Add(new ResourceEntry
+                    {
+                        Key = request.Key,
+                        Value = pluralForms.GetValueOrDefault("other") ?? pluralForms.Values.FirstOrDefault(),
+                        Comment = request.Comment,
+                        IsPlural = true,
+                        PluralForms = pluralForms
+                    });
+                }
+                else
+                {
+                    // Add simple key
+                    var value = request.Values?.GetValueOrDefault(langCode) ?? string.Empty;
+
+                    resourceFile.Entries.Add(new ResourceEntry
+                    {
+                        Key = request.Key,
+                        Value = value,
+                        Comment = request.Comment
+                    });
+                }
 
                 _backend.Writer.Write(resourceFile);
             }
@@ -279,20 +304,7 @@ public class ResourcesController : ControllerBase
                         // Update value and comment if provided for this language
                         if (request.Values?.TryGetValue(langCode, out var resourceValue) == true)
                         {
-                            if (resourceValue.Value != null)
-                            {
-                                entry.Value = resourceValue.Value;
-                            }
-
-                            // Per-language comment takes priority over global comment
-                            if (resourceValue.Comment != null)
-                            {
-                                entry.Comment = resourceValue.Comment;
-                            }
-                            else if (request.Comment != null)
-                            {
-                                entry.Comment = request.Comment;
-                            }
+                            UpdateEntryFromResourceValue(entry, resourceValue, request.Comment);
                         }
                         else if (request.Comment != null)
                         {
@@ -312,20 +324,7 @@ public class ResourcesController : ControllerBase
                         // Update value and comment if provided for this language
                         if (request.Values?.TryGetValue(langCode, out var resourceValue) == true)
                         {
-                            if (resourceValue.Value != null)
-                            {
-                                entry.Value = resourceValue.Value;
-                            }
-
-                            // Per-language comment takes priority over global comment
-                            if (resourceValue.Comment != null)
-                            {
-                                entry.Comment = resourceValue.Comment;
-                            }
-                            else if (request.Comment != null)
-                            {
-                                entry.Comment = request.Comment;
-                            }
+                            UpdateEntryFromResourceValue(entry, resourceValue, request.Comment);
                         }
                         else if (request.Comment != null)
                         {
@@ -414,6 +413,43 @@ public class ResourcesController : ControllerBase
         catch (Exception)
         {
             return StatusCode(500, new ErrorResponse { Error = "An error occurred while processing your request" });
+        }
+    }
+
+    /// <summary>
+    /// Helper method to update a ResourceEntry from an API ResourceValue
+    /// </summary>
+    private static void UpdateEntryFromResourceValue(ResourceEntry entry, ResourceValue resourceValue, string? globalComment)
+    {
+        // Handle plural form updates
+        if (resourceValue.IsPlural || resourceValue.PluralForms != null)
+        {
+            entry.IsPlural = true;
+            if (resourceValue.PluralForms != null)
+            {
+                entry.PluralForms ??= new Dictionary<string, string>();
+                foreach (var kvp in resourceValue.PluralForms)
+                {
+                    entry.PluralForms[kvp.Key] = kvp.Value;
+                }
+                // Keep Value in sync with 'other' form
+                entry.Value = entry.PluralForms.GetValueOrDefault("other") ?? entry.PluralForms.Values.FirstOrDefault();
+            }
+        }
+        else if (resourceValue.Value != null)
+        {
+            // Simple value update
+            entry.Value = resourceValue.Value;
+        }
+
+        // Per-language comment takes priority over global comment
+        if (resourceValue.Comment != null)
+        {
+            entry.Comment = resourceValue.Comment;
+        }
+        else if (globalComment != null)
+        {
+            entry.Comment = globalComment;
         }
     }
 }
