@@ -34,9 +34,25 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
-      - name: Run tests
+      - name: Run .NET tests
         run: dotnet test --configuration Release --no-build --verbosity normal
+
+      # VS Code Extension Tests
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install extension dependencies
+        run: |
+          cd vscode-extension
+          npm install
+
+      - name: Run VS Code extension unit tests
+        run: |
+          cd vscode-extension
+          npm run test:unit
 
       - name: Test summary
         if: success()
-        run: echo "✅ All tests passed"
+        run: echo "✅ All tests passed (.NET and VS Code extension)"
