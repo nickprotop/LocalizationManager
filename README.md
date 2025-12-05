@@ -113,6 +113,12 @@ LRM solves this by providing:
   - Pattern matching for selective translation
   - Secure API key management (environment variables, encrypted store, or config file)
   - Customizable models, prompts, and endpoints for AI providers
+  - Plural form translation with CLDR support (zero/one/two/few/many/other)
+- **📦 JSON Localization** - Full support for JSON resource files alongside .resx
+  - Standard JSON format with nested keys and `_plural` markers
+  - i18next compatibility mode with suffix-based plurals (`_one`, `_other`)
+  - Auto-detection of format from file naming patterns
+  - Comments and metadata preservation
 - **🚀 CI/CD Automation** - Production-ready workflows for GitHub Actions, GitLab CI, Azure DevOps
   - Validate → Check Missing → Auto-Translate → Re-validate → Commit
   - Detailed translation reports per language

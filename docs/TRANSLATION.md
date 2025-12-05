@@ -11,6 +11,7 @@ LocalizationManager supports automatic translation of resource keys using multip
 - [Examples](#examples)
 - [Translation Cache](#translation-cache)
 - [Troubleshooting](#troubleshooting)
+- [Plural Translation Support](#plural-translation-support)
 
 ## Overview
 
@@ -820,6 +821,100 @@ Remove-Item "$env:LOCALAPPDATA\LocalizationManager\translation_cache.db"
 2. Verify environment variables are set correctly for your OS
 3. Ensure cache directory is accessible
 4. Check file permissions (Linux) or security settings (Windows)
+
+## Plural Translation Support
+
+LRM supports translating plural forms for both standard JSON and i18next formats. Plural keys are detected automatically and all forms are translated together.
+
+### Supported Plural Formats
+
+#### Standard JSON (CLDR Objects)
+
+In standard JSON format, plurals use the `_plural` marker with CLDR form keys:
+
+```json
+{
+  "itemCount": {
+    "_plural": true,
+    "zero": "No items",
+    "one": "{0} item",
+    "two": "{0} items",
+    "few": "{0} items",
+    "many": "{0} items",
+    "other": "{0} items"
+  }
+}
+```
+
+LRM detects these automatically and translates all plural forms together for consistency.
+
+#### i18next Format (Suffix Keys)
+
+In i18next format, plurals use suffixes (`_one`, `_other`, etc.):
+
+```json
+{
+  "items_zero": "No items",
+  "items_one": "{{count}} item",
+  "items_other": "{{count}} items"
+}
+```
+
+When translating, LRM:
+1. Groups related plural keys together (e.g., `items_one`, `items_other`)
+2. Translates all forms for each key
+3. Preserves the suffix structure in the output
+
+### CLDR Plural Forms
+
+LRM supports all six CLDR plural categories:
+
+| Form | Description | Example Languages |
+|------|-------------|-------------------|
+| `zero` | Zero quantity | Arabic, Latvian |
+| `one` | Singular | English, German, Spanish |
+| `two` | Dual | Arabic, Hebrew, Slovenian |
+| `few` | Paucal (few) | Russian, Polish, Czech |
+| `many` | Many | Russian, Polish, Arabic |
+| `other` | General plural | All languages (required) |
+
+**Note:** Most languages only use a subset of these forms. English uses only `one` and `other`, while Russian uses `one`, `few`, `many`, and `other`.
+
+### Translation Examples
+
+**Translating plurals to French:**
+```bash
+# Standard JSON
+lrm translate "itemCount" --target-languages fr --provider google
+
+# i18next format
+lrm translate "items*" --target-languages fr --provider google
+```
+
+**Translating all missing plurals:**
+```bash
+lrm translate --only-missing --target-languages fr,de,es
+```
+
+### Configuration for Plurals
+
+Configure plural format in `lrm.json`:
+
+```json
+{
+  "ResourceFormat": "json",
+  "Json": {
+    "PluralFormat": "cldr",
+    "I18nextCompatible": false
+  }
+}
+```
+
+**Options:**
+- `PluralFormat`: `"cldr"` (CLDR forms) or `"simple"` (singular/plural only)
+- `I18nextCompatible`: `true` for i18next suffix format (`_one`, `_other`)
+
+See [Configuration Guide](CONFIGURATION.md#json) for complete JSON configuration options.
 
 ## Best Practices
 
