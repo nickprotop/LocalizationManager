@@ -91,7 +91,8 @@ public class JsonResourceReader : IResourceReader
 
         ParseElement(doc.RootElement, "", entries);
 
-        return entries;
+        // Consolidate i18next-style plural suffix keys (item_one, item_other, etc.)
+        return ConsolidateI18nextPluralSuffixes(entries);
     }
 
     /// <summary>
@@ -211,8 +212,9 @@ public class JsonResourceReader : IResourceReader
             return;
         }
 
-        // Check for i18next-style plurals (keys ending with _one, _other, etc.)
-        if (_config.I18nextCompatible && HasI18nextPluralSiblings(element))
+        // Auto-detect CLDR plural objects (zero, one, two, few, many, other)
+        // Works regardless of i18next config - any nested object with >=2 CLDR plural forms
+        if (IsCldrPluralObject(element))
         {
             var pluralForms = ExtractPluralForms(element, isLrmStyle: false);
             entries.Add(new ResourceEntry
@@ -230,16 +232,17 @@ public class JsonResourceReader : IResourceReader
     }
 
     /// <summary>
-    /// Checks if an object has i18next-style plural form keys.
+    /// Checks if an object contains CLDR plural form keys (zero, one, two, few, many, other).
+    /// Returns true if at least 2 string properties match CLDR plural form names.
     /// </summary>
-    private bool HasI18nextPluralSiblings(JsonElement element)
+    private bool IsCldrPluralObject(JsonElement element)
     {
-        var pluralSuffixes = new[] { "one", "other", "zero", "two", "few", "many" };
+        var pluralForms = new[] { "one", "other", "zero", "two", "few", "many" };
         var foundForms = 0;
 
         foreach (var prop in element.EnumerateObject())
         {
-            if (pluralSuffixes.Contains(prop.Name, StringComparer.OrdinalIgnoreCase) &&
+            if (pluralForms.Contains(prop.Name, StringComparer.OrdinalIgnoreCase) &&
                 prop.Value.ValueKind == JsonValueKind.String)
             {
                 foundForms++;
@@ -248,6 +251,77 @@ public class JsonResourceReader : IResourceReader
 
         // Need at least 2 plural forms to consider it a plural entry
         return foundForms >= 2;
+    }
+
+    private static readonly string[] PluralSuffixes = { "_zero", "_one", "_two", "_few", "_many", "_other" };
+
+    /// <summary>
+    /// Extracts the base name and plural form from an i18next-style key.
+    /// Returns (baseName, pluralForm) or (key, null) if not a plural suffix key.
+    /// </summary>
+    private (string baseName, string? pluralForm) ExtractPluralSuffix(string key)
+    {
+        foreach (var suffix in PluralSuffixes)
+        {
+            if (key.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                return (key[..^suffix.Length], suffix[1..]); // "item_one" → ("item", "one")
+            }
+        }
+        return (key, null);
+    }
+
+    /// <summary>
+    /// Consolidates i18next-style plural keys (item_one, item_other, etc.) into single plural entries.
+    /// Only runs when i18nextCompatible config is enabled.
+    /// </summary>
+    private List<ResourceEntry> ConsolidateI18nextPluralSuffixes(List<ResourceEntry> entries)
+    {
+        if (!_config.I18nextCompatible)
+            return entries;
+
+        var result = new List<ResourceEntry>();
+        var pluralGroups = new Dictionary<string, Dictionary<string, ResourceEntry>>();
+
+        foreach (var entry in entries)
+        {
+            var (baseName, pluralForm) = ExtractPluralSuffix(entry.Key);
+
+            if (pluralForm != null)
+            {
+                if (!pluralGroups.ContainsKey(baseName))
+                    pluralGroups[baseName] = new Dictionary<string, ResourceEntry>();
+
+                pluralGroups[baseName][pluralForm] = entry;
+            }
+            else
+            {
+                result.Add(entry);
+            }
+        }
+
+        // Consolidate groups with 2+ forms into single plural entries
+        foreach (var (baseName, forms) in pluralGroups)
+        {
+            if (forms.Count >= 2)
+            {
+                var pluralEntry = new ResourceEntry
+                {
+                    Key = baseName,
+                    Value = forms.GetValueOrDefault("other")?.Value ?? forms.Values.First().Value,
+                    IsPlural = true,
+                    PluralForms = forms.ToDictionary(kv => kv.Key, kv => kv.Value.Value ?? "")
+                };
+                result.Add(pluralEntry);
+            }
+            else
+            {
+                // Single form - keep as regular entry with original key
+                result.AddRange(forms.Values);
+            }
+        }
+
+        return result;
     }
 
     /// <summary>
