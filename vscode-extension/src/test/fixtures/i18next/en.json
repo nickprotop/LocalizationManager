@@ -1,0 +1,14 @@
+{
+  "greeting": "Hello",
+  "farewell": "Goodbye",
+  "welcome": "Welcome, {{name}}!",
+  "nested": {
+    "key": "Nested value"
+  },
+  "items_one": "{{count}} item",
+  "items_other": "{{count}} items",
+  "messages_zero": "No messages",
+  "messages_one": "{{count}} message",
+  "messages_other": "{{count}} messages",
+  "reference": "$t(greeting), {{name}}"
+}

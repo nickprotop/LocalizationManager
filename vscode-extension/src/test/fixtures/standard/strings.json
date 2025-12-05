@@ -1,0 +1,22 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "generator": "LocalizationManager"
+  },
+  "greeting": "Hello",
+  "farewell": "Goodbye",
+  "welcome": "Welcome, {0}!",
+  "buttons": {
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "itemCount": {
+    "_plural": true,
+    "one": "{0} item",
+    "other": "{0} items"
+  },
+  "withComment": {
+    "_value": "Value with comment",
+    "_comment": "This is a comment"
+  }
+}

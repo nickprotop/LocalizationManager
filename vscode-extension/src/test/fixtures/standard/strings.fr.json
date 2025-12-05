@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "generator": "LocalizationManager",
+    "culture": "fr"
+  },
+  "greeting": "Bonjour",
+  "farewell": "Au revoir",
+  "welcome": "Bienvenue, {0}!",
+  "buttons": {
+    "save": "Enregistrer",
+    "cancel": "Annuler"
+  },
+  "itemCount": {
+    "_plural": true,
+    "one": "{0} article",
+    "other": "{0} articles"
+  }
+}

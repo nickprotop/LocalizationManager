@@ -1,0 +1,10 @@
+{
+  "greeting": "Bonjour",
+  "farewell": "Au revoir",
+  "welcome": "Bienvenue, {{name}}!",
+  "nested": {
+    "key": "Valeur imbriquee"
+  },
+  "items_one": "{{count}} article",
+  "items_other": "{{count}} articles"
+}
