@@ -351,52 +351,119 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
 
                 try
                 {
-                    // Try cache first
-                    var request = new TranslationRequest
+                    // Check if this is a plural key
+                    if (key.IsPlural && key.PluralForms != null && key.PluralForms.Count > 0)
                     {
-                        SourceText = key.Value ?? string.Empty,
-                        SourceLanguage = sourceLanguage,
-                        TargetLanguage = targetLang,
-                        TargetLanguageName = targetLanguageInfo.Name // Use the display name from LanguageInfo
-                    };
+                        // Translate each plural form
+                        var translatedForms = new Dictionary<string, string>();
+                        var anyFromCache = false;
+                        var anyFromApi = false;
 
-                    TranslationResponse response;
-
-                    if (cache != null && cache.TryGet(request, provider.Name, out var cachedResponse))
-                    {
-                        response = cachedResponse!;
-                    }
-                    else
-                    {
-                        // Translate via API
-                        response = await provider.TranslateAsync(request, cancellationToken);
-
-                        // Store in cache
-                        cache?.Store(request, response);
-                    }
-
-                    // Update or add entry
-                    if (targetDict.ContainsKey(key.Key))
-                    {
-                        targetDict[key.Key].Value = response.TranslatedText;
-                    }
-                    else
-                    {
-                        targetFile.Entries.Add(new ResourceEntry
+                        foreach (var (formName, formValue) in key.PluralForms)
                         {
-                            Key = key.Key,
-                            Value = response.TranslatedText,
-                            Comment = key.Comment
-                        });
-                    }
+                            if (string.IsNullOrWhiteSpace(formValue))
+                                continue;
 
-                    // Add to results table
-                    var status = response.FromCache ? "[dim](cached)[/]" : "[green]✓[/]";
-                    table.AddRow(
-                        key.Key.Length > 30 ? key.Key.Substring(0, 27) + "..." : key.Key,
-                        targetLang,
-                        response.TranslatedText.Length > 40 ? response.TranslatedText.Substring(0, 37) + "..." : response.TranslatedText,
-                        status);
+                            var request = new TranslationRequest
+                            {
+                                SourceText = formValue,
+                                SourceLanguage = sourceLanguage,
+                                TargetLanguage = targetLang,
+                                TargetLanguageName = targetLanguageInfo.Name,
+                                Context = $"Plural form '{formName}' of key '{key.Key}'"
+                            };
+
+                            TranslationResponse response;
+
+                            if (cache != null && cache.TryGet(request, provider.Name, out var cachedResponse))
+                            {
+                                response = cachedResponse!;
+                                anyFromCache = true;
+                            }
+                            else
+                            {
+                                response = await provider.TranslateAsync(request, cancellationToken);
+                                cache?.Store(request, response);
+                                anyFromApi = true;
+                            }
+
+                            translatedForms[formName] = response.TranslatedText;
+                        }
+
+                        // Update or add entry with plural forms
+                        if (targetDict.ContainsKey(key.Key))
+                        {
+                            targetDict[key.Key].IsPlural = true;
+                            targetDict[key.Key].PluralForms = translatedForms;
+                            targetDict[key.Key].Value = translatedForms.GetValueOrDefault("other") ?? translatedForms.Values.FirstOrDefault() ?? "";
+                        }
+                        else
+                        {
+                            targetFile.Entries.Add(new ResourceEntry
+                            {
+                                Key = key.Key,
+                                Value = translatedForms.GetValueOrDefault("other") ?? translatedForms.Values.FirstOrDefault() ?? "",
+                                Comment = key.Comment,
+                                IsPlural = true,
+                                PluralForms = translatedForms
+                            });
+                        }
+
+                        // Add to results table
+                        var status = anyFromApi ? "[green]✓[/]" : (anyFromCache ? "[dim](cached)[/]" : "[dim]N/A[/]");
+                        var displayValue = $"[[plural]] {translatedForms.Count} forms";
+                        table.AddRow(
+                            key.Key.Length > 30 ? key.Key.Substring(0, 27) + "..." : key.Key,
+                            targetLang,
+                            displayValue,
+                            status);
+                    }
+                    else
+                    {
+                        // Regular (non-plural) translation
+                        var request = new TranslationRequest
+                        {
+                            SourceText = key.Value ?? string.Empty,
+                            SourceLanguage = sourceLanguage,
+                            TargetLanguage = targetLang,
+                            TargetLanguageName = targetLanguageInfo.Name
+                        };
+
+                        TranslationResponse response;
+
+                        if (cache != null && cache.TryGet(request, provider.Name, out var cachedResponse))
+                        {
+                            response = cachedResponse!;
+                        }
+                        else
+                        {
+                            response = await provider.TranslateAsync(request, cancellationToken);
+                            cache?.Store(request, response);
+                        }
+
+                        // Update or add entry
+                        if (targetDict.ContainsKey(key.Key))
+                        {
+                            targetDict[key.Key].Value = response.TranslatedText;
+                        }
+                        else
+                        {
+                            targetFile.Entries.Add(new ResourceEntry
+                            {
+                                Key = key.Key,
+                                Value = response.TranslatedText,
+                                Comment = key.Comment
+                            });
+                        }
+
+                        // Add to results table
+                        var status = response.FromCache ? "[dim](cached)[/]" : "[green]✓[/]";
+                        table.AddRow(
+                            key.Key.Length > 30 ? key.Key.Substring(0, 27) + "..." : key.Key,
+                            targetLang,
+                            response.TranslatedText.Length > 40 ? response.TranslatedText.Substring(0, 37) + "..." : response.TranslatedText,
+                            status);
+                    }
                 }
                 catch (TranslationException ex)
                 {

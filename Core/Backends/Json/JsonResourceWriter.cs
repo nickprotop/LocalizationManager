@@ -76,15 +76,23 @@ public class JsonResourceWriter : IResourceWriter
         // Process entries (preserve original order)
         foreach (var entry in file.Entries)
         {
-            var value = CreateEntryValue(entry);
-
-            if (_config.UseNestedKeys && entry.Key.Contains('.'))
+            // In i18next mode, expand plurals to flat keys with suffixes
+            if (_isI18nextMode && entry.IsPlural && entry.PluralForms != null && entry.PluralForms.Count > 0)
             {
-                SetNestedValue(root, entry.Key.Split('.'), value);
+                WriteI18nextPluralEntries(root, entry);
             }
             else
             {
-                root[entry.Key] = value;
+                var value = CreateEntryValue(entry);
+
+                if (_config.UseNestedKeys && entry.Key.Contains('.'))
+                {
+                    SetNestedValue(root, entry.Key.Split('.'), value);
+                }
+                else
+                {
+                    root[entry.Key] = value;
+                }
             }
         }
 
@@ -204,7 +212,29 @@ public class JsonResourceWriter : IResourceWriter
     }
 
     /// <summary>
+    /// Writes i18next-style plural entries as flat keys with suffixes (e.g., key_one, key_other).
+    /// </summary>
+    private void WriteI18nextPluralEntries(Dictionary<string, object> root, ResourceEntry entry)
+    {
+        if (entry.PluralForms == null) return;
+
+        foreach (var form in entry.PluralForms)
+        {
+            // Create flat key with suffix: {key}_{form} (e.g., items_one, items_other)
+            var flatKey = $"{entry.Key}_{form.Key}";
+            root[flatKey] = form.Value;
+        }
+
+        // Write comment as a separate key if configured
+        if (_config.PreserveComments && !string.IsNullOrEmpty(entry.Comment))
+        {
+            root[$"_{entry.Key}_comment"] = entry.Comment;
+        }
+    }
+
+    /// <summary>
     /// Creates the plural value object from the entry's PluralForms dictionary.
+    /// Used for non-i18next modes with nested CLDR plural structure.
     /// </summary>
     private Dictionary<string, object> CreatePluralValue(ResourceEntry entry)
     {

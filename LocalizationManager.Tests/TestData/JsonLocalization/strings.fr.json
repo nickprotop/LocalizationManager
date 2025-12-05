@@ -1,4 +1,10 @@
 {
+  "_meta": {
+    "version": "1.0",
+    "generator": "LocalizationManager",
+    "updatedAt": "2025-12-05T18:43:57.9378385Z",
+    "culture": "fr"
+  },
   "appTitle": "Application de test",
   "welcome": "Bienvenue dans l'application !",
   "greeting": "Bonjour, {0} !",
@@ -13,6 +19,7 @@
     "minLength": "La longueur minimale est de {0} caractères"
   },
   "itemCount": {
+    "_plural": true,
     "zero": "Aucun élément",
     "one": "Un élément",
     "other": "{0} éléments"

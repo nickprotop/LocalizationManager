@@ -22,6 +22,7 @@
 using System.ComponentModel;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using LocalizationManager.Core.Backends.Json;
 
 namespace LocalizationManager.Commands;
 
@@ -185,6 +186,10 @@ public class WebCommand : Command<WebCommand.Settings>
             var factory = sp.GetRequiredService<LocalizationManager.Core.Abstractions.IResourceBackendFactory>();
             var config = settings.LoadedConfiguration;
             var format = config?.ResourceFormat;
+
+            // If JSON format with explicit config, use it
+            if (string.Equals(format, "json", StringComparison.OrdinalIgnoreCase) && config?.Json != null)
+                return new JsonResourceBackend(config.Json);
 
             if (!string.IsNullOrEmpty(format))
                 return factory.GetBackend(format);

@@ -1,4 +1,10 @@
 {
+  "_meta": {
+    "version": "1.0",
+    "generator": "LocalizationManager",
+    "updatedAt": "2025-12-05T18:43:56.2457581Z",
+    "culture": "es"
+  },
   "appTitle": "Aplicación de prueba",
   "welcome": "¡Bienvenido a la aplicación!",
   "greeting": "¡Hola, {0}!",
@@ -6,5 +12,11 @@
     "save": "Guardar",
     "cancel": "Cancelar",
     "delete": "Eliminar"
+  },
+  "itemCount": {
+    "_plural": true,
+    "zero": "No hay productos",
+    "one": "Un Item",
+    "other": "{0} artículos"
   }
 }

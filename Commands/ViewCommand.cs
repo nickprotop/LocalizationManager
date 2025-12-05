@@ -605,7 +605,24 @@ public class ViewCommand : Command<ViewCommand.Settings>
                         : rf.Language.Name;
 
                     var keyDisplay = firstRowForKey ? occ.DisplayKey.EscapeMarkup() : "";
-                    var value = entry?.IsEmpty == true ? "[dim](empty)[/]" : (entry?.Value?.EscapeMarkup() ?? "[red](missing)[/]");
+
+                    // Format value - show plural forms if plural key
+                    string value;
+                    if (entry?.IsPlural == true && entry.PluralForms?.Any() == true)
+                    {
+                        var pluralDisplay = string.Join(", ", entry.PluralForms
+                            .OrderBy(kv => kv.Key == "other" ? 0 : (kv.Key == "one" ? 1 : 2))
+                            .Select(kv => $"[dim]{kv.Key}:[/] {kv.Value.EscapeMarkup()}"));
+                        value = $"[green]◆[/] {pluralDisplay}";
+                    }
+                    else if (entry?.IsEmpty == true)
+                    {
+                        value = "[dim](empty)[/]";
+                    }
+                    else
+                    {
+                        value = entry?.Value?.EscapeMarkup() ?? "[red](missing)[/]";
+                    }
 
                     if (showComments)
                     {
@@ -687,12 +704,15 @@ public class ViewCommand : Command<ViewCommand.Settings>
 
                     var langCode = rf.Language.GetDisplayCode();
 
-                    if (showComments && entry != null && !string.IsNullOrWhiteSpace(entry.Comment))
+                    // Include plural info if entry is plural, or comments if showing comments
+                    if (entry?.IsPlural == true || (showComments && entry != null && !string.IsNullOrWhiteSpace(entry.Comment)))
                     {
                         translations[langCode] = new
                         {
-                            value = entry.Value,
-                            comment = entry.Comment
+                            value = entry?.Value,
+                            comment = showComments ? entry?.Comment : null,
+                            isPlural = entry?.IsPlural == true ? true : (bool?)null,
+                            pluralForms = entry?.IsPlural == true ? entry?.PluralForms : null
                         };
                     }
                     else
@@ -822,7 +842,19 @@ public class ViewCommand : Command<ViewCommand.Settings>
                         : rf.Language.Name;
                     var value = entry?.Value ?? "(missing)";
 
-                    Console.WriteLine($"{langLabel}: {value}");
+                    // Show plural forms if entry is plural
+                    if (entry?.IsPlural == true && entry.PluralForms?.Any() == true)
+                    {
+                        Console.WriteLine($"{langLabel}: [plural]");
+                        foreach (var form in entry.PluralForms.OrderBy(kv => kv.Key == "other" ? 0 : (kv.Key == "one" ? 1 : 2)))
+                        {
+                            Console.WriteLine($"  {form.Key}: {form.Value}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{langLabel}: {value}");
+                    }
 
                     if (showComments && entry != null && !string.IsNullOrWhiteSpace(entry.Comment))
                     {

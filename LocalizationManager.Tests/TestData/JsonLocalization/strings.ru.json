@@ -1,8 +1,15 @@
 {
+  "_meta": {
+    "version": "1.0",
+    "generator": "LocalizationManager",
+    "updatedAt": "2025-12-05T18:43:59.2699683Z",
+    "culture": "ru"
+  },
   "appTitle": "Тестовое приложение",
   "itemCount": {
+    "_plural": true,
     "zero": "Нет элементов",
-    "one": "{0} элемент",
+    "one": "1 элемент",
     "few": "{0} элемента",
     "many": "{0} элементов",
     "other": "{0} элементов"

@@ -105,40 +105,95 @@ public class TranslationController : ControllerBase
 
                     try
                     {
-                        var translationRequest = new Core.Translation.TranslationRequest
+                        // Check if this is a plural key
+                        if (sourceEntry.IsPlural && sourceEntry.PluralForms != null && sourceEntry.PluralForms.Count > 0)
                         {
-                            SourceText = sourceEntry.Value,
-                            SourceLanguage = request.SourceLanguage ?? "en",
-                            TargetLanguage = targetLang,
-                            Context = key
-                        };
+                            // Translate each plural form
+                            var translatedForms = new Dictionary<string, string>();
 
-                        var response = await provider.TranslateAsync(translationRequest);
-                        var translatedText = response.TranslatedText;
+                            foreach (var (formName, formValue) in sourceEntry.PluralForms)
+                            {
+                                if (string.IsNullOrWhiteSpace(formValue))
+                                    continue;
 
-                        // Update the entry
-                        var existingEntry = targetFile.Entries.FirstOrDefault(e => e.Key == key);
-                        if (existingEntry != null)
-                        {
-                            existingEntry.Value = translatedText;
+                                var translationRequest = new Core.Translation.TranslationRequest
+                                {
+                                    SourceText = formValue,
+                                    SourceLanguage = request.SourceLanguage ?? "en",
+                                    TargetLanguage = targetLang,
+                                    Context = $"Plural form '{formName}' of key '{key}'"
+                                };
+
+                                var response = await provider.TranslateAsync(translationRequest);
+                                translatedForms[formName] = response.TranslatedText;
+                            }
+
+                            // Update the entry with plural forms
+                            var existingEntry = targetFile.Entries.FirstOrDefault(e => e.Key == key);
+                            if (existingEntry != null)
+                            {
+                                existingEntry.IsPlural = true;
+                                existingEntry.PluralForms = translatedForms;
+                                existingEntry.Value = translatedForms.GetValueOrDefault("other") ?? translatedForms.Values.FirstOrDefault() ?? "";
+                            }
+                            else
+                            {
+                                targetFile.Entries.Add(new Core.Models.ResourceEntry
+                                {
+                                    Key = key,
+                                    Value = translatedForms.GetValueOrDefault("other") ?? translatedForms.Values.FirstOrDefault() ?? "",
+                                    Comment = sourceEntry.Comment,
+                                    IsPlural = true,
+                                    PluralForms = translatedForms
+                                });
+                            }
+
+                            results.Add(new TranslationResult
+                            {
+                                Key = key,
+                                Language = targetLang,
+                                TranslatedValue = $"[plural] {translatedForms.Count} forms",
+                                Success = true
+                            });
                         }
                         else
                         {
-                            targetFile.Entries.Add(new Core.Models.ResourceEntry
+                            // Regular (non-plural) translation
+                            var translationRequest = new Core.Translation.TranslationRequest
+                            {
+                                SourceText = sourceEntry.Value,
+                                SourceLanguage = request.SourceLanguage ?? "en",
+                                TargetLanguage = targetLang,
+                                Context = key
+                            };
+
+                            var response = await provider.TranslateAsync(translationRequest);
+                            var translatedText = response.TranslatedText;
+
+                            // Update the entry
+                            var existingEntry = targetFile.Entries.FirstOrDefault(e => e.Key == key);
+                            if (existingEntry != null)
+                            {
+                                existingEntry.Value = translatedText;
+                            }
+                            else
+                            {
+                                targetFile.Entries.Add(new Core.Models.ResourceEntry
+                                {
+                                    Key = key,
+                                    Value = translatedText,
+                                    Comment = sourceEntry.Comment
+                                });
+                            }
+
+                            results.Add(new TranslationResult
                             {
                                 Key = key,
-                                Value = translatedText,
-                                Comment = sourceEntry.Comment
+                                Language = targetLang,
+                                TranslatedValue = translatedText,
+                                Success = true
                             });
                         }
-
-                        results.Add(new TranslationResult
-                        {
-                            Key = key,
-                            Language = targetLang,
-                            TranslatedValue = translatedText,
-                            Success = true
-                        });
                     }
                     catch (Exception ex)
                     {

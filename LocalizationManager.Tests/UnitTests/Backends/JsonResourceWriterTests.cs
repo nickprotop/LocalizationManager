@@ -420,6 +420,312 @@ public class JsonResourceWriterTests : IDisposable
 
     #endregion
 
+    #region Plural Tests
+
+    [Fact]
+    public void Write_PluralEntry_WritesNestedCLDRFormat()
+    {
+        // Arrange
+        var config = new JsonFormatConfiguration { UseNestedKeys = false, IncludeMeta = false };
+        var writer = new JsonResourceWriter(config);
+        var filePath = Path.Combine(_tempDirectory, "plural.json");
+        var resourceFile = new ResourceFile
+        {
+            Language = new LanguageInfo
+            {
+                BaseName = "plural",
+                Code = "",
+                Name = "Default",
+                IsDefault = true,
+                FilePath = filePath
+            },
+            Entries = new List<ResourceEntry>
+            {
+                new()
+                {
+                    Key = "itemCount",
+                    Value = "",
+                    IsPlural = true,
+                    PluralForms = new Dictionary<string, string>
+                    {
+                        ["one"] = "{0} item",
+                        ["other"] = "{0} items"
+                    }
+                }
+            }
+        };
+
+        // Act
+        writer.Write(resourceFile);
+        var json = File.ReadAllText(filePath);
+        using var doc = JsonDocument.Parse(json);
+
+        // Assert - verify nested CLDR plural structure
+        Assert.True(doc.RootElement.TryGetProperty("itemCount", out var itemCount));
+        Assert.Equal(JsonValueKind.Object, itemCount.ValueKind);
+        Assert.True(itemCount.TryGetProperty("_plural", out var plural));
+        Assert.True(plural.GetBoolean());
+        Assert.True(itemCount.TryGetProperty("one", out var one));
+        Assert.Equal("{0} item", one.GetString());
+        Assert.True(itemCount.TryGetProperty("other", out var other));
+        Assert.Equal("{0} items", other.GetString());
+    }
+
+    [Fact]
+    public void Write_PluralEntry_RoundTrip()
+    {
+        // Arrange
+        var config = new JsonFormatConfiguration { UseNestedKeys = false, IncludeMeta = false };
+        var writer = new JsonResourceWriter(config);
+        var reader = new JsonResourceReader(config);
+        var filePath = Path.Combine(_tempDirectory, "plural_roundtrip.json");
+        var resourceFile = new ResourceFile
+        {
+            Language = new LanguageInfo
+            {
+                BaseName = "plural_roundtrip",
+                Code = "",
+                Name = "Default",
+                IsDefault = true,
+                FilePath = filePath
+            },
+            Entries = new List<ResourceEntry>
+            {
+                new()
+                {
+                    Key = "messages",
+                    Value = "",
+                    IsPlural = true,
+                    PluralForms = new Dictionary<string, string>
+                    {
+                        ["zero"] = "No messages",
+                        ["one"] = "{0} message",
+                        ["other"] = "{0} messages"
+                    }
+                }
+            }
+        };
+
+        // Act
+        writer.Write(resourceFile);
+        var readBack = reader.Read(resourceFile.Language);
+
+        // Assert
+        var entry = readBack.Entries.First(e => e.Key == "messages");
+        Assert.True(entry.IsPlural);
+        Assert.NotNull(entry.PluralForms);
+        Assert.Equal(3, entry.PluralForms.Count);
+        Assert.Equal("No messages", entry.PluralForms["zero"]);
+        Assert.Equal("{0} message", entry.PluralForms["one"]);
+        Assert.Equal("{0} messages", entry.PluralForms["other"]);
+    }
+
+    #endregion
+
+    #region i18next Mode Tests
+
+    [Fact]
+    public void Write_I18nextMode_PluralEntry_WritesFlatSuffixFormat()
+    {
+        // Arrange - i18next mode should write plurals as flat keys with suffixes
+        var config = new JsonFormatConfiguration { I18nextCompatible = true, IncludeMeta = false };
+        var writer = new JsonResourceWriter(config);
+        var filePath = Path.Combine(_tempDirectory, "i18next_plural.json");
+        var resourceFile = new ResourceFile
+        {
+            Language = new LanguageInfo
+            {
+                BaseName = "en",
+                Code = "",
+                Name = "Default",
+                IsDefault = true,
+                FilePath = filePath
+            },
+            Entries = new List<ResourceEntry>
+            {
+                new()
+                {
+                    Key = "items",
+                    Value = "",
+                    IsPlural = true,
+                    PluralForms = new Dictionary<string, string>
+                    {
+                        ["one"] = "{{count}} item",
+                        ["other"] = "{{count}} items"
+                    }
+                }
+            }
+        };
+
+        // Act
+        writer.Write(resourceFile);
+        var json = File.ReadAllText(filePath);
+        using var doc = JsonDocument.Parse(json);
+
+        // Assert - i18next format: flat keys with suffixes (items_one, items_other)
+        Assert.True(doc.RootElement.TryGetProperty("items_one", out var one));
+        Assert.Equal("{{count}} item", one.GetString());
+        Assert.True(doc.RootElement.TryGetProperty("items_other", out var other));
+        Assert.Equal("{{count}} items", other.GetString());
+
+        // Should NOT have nested object format
+        Assert.False(doc.RootElement.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Object);
+    }
+
+    [Fact]
+    public void Write_I18nextMode_PluralEntry_RoundTrip()
+    {
+        // Arrange - i18next mode read/write roundtrip
+        var config = new JsonFormatConfiguration { I18nextCompatible = true, IncludeMeta = false };
+        var writer = new JsonResourceWriter(config);
+        var reader = new JsonResourceReader(config);
+        var filePath = Path.Combine(_tempDirectory, "i18next_roundtrip.json");
+        var resourceFile = new ResourceFile
+        {
+            Language = new LanguageInfo
+            {
+                BaseName = "en",
+                Code = "",
+                Name = "Default",
+                IsDefault = true,
+                FilePath = filePath
+            },
+            Entries = new List<ResourceEntry>
+            {
+                new()
+                {
+                    Key = "messages",
+                    Value = "",
+                    IsPlural = true,
+                    PluralForms = new Dictionary<string, string>
+                    {
+                        ["zero"] = "No messages",
+                        ["one"] = "{{count}} message",
+                        ["other"] = "{{count}} messages"
+                    }
+                }
+            }
+        };
+
+        // Act
+        writer.Write(resourceFile);
+        var readBack = reader.Read(resourceFile.Language);
+
+        // Assert - should read back as a single consolidated plural entry
+        var entry = readBack.Entries.First(e => e.Key == "messages");
+        Assert.True(entry.IsPlural);
+        Assert.NotNull(entry.PluralForms);
+        Assert.Equal(3, entry.PluralForms.Count);
+        Assert.Equal("No messages", entry.PluralForms["zero"]);
+        Assert.Equal("{{count}} message", entry.PluralForms["one"]);
+        Assert.Equal("{{count}} messages", entry.PluralForms["other"]);
+    }
+
+    [Fact]
+    public void Write_I18nextMode_MixedEntries_WritesCorrectFormat()
+    {
+        // Arrange - mix of singular and plural entries
+        var config = new JsonFormatConfiguration { I18nextCompatible = true, IncludeMeta = false };
+        var writer = new JsonResourceWriter(config);
+        var filePath = Path.Combine(_tempDirectory, "i18next_mixed.json");
+        var resourceFile = new ResourceFile
+        {
+            Language = new LanguageInfo
+            {
+                BaseName = "en",
+                Code = "",
+                Name = "Default",
+                IsDefault = true,
+                FilePath = filePath
+            },
+            Entries = new List<ResourceEntry>
+            {
+                new() { Key = "title", Value = "Welcome" },
+                new()
+                {
+                    Key = "items",
+                    Value = "",
+                    IsPlural = true,
+                    PluralForms = new Dictionary<string, string>
+                    {
+                        ["one"] = "{{count}} item",
+                        ["other"] = "{{count}} items"
+                    }
+                },
+                new() { Key = "footer", Value = "Copyright 2025" }
+            }
+        };
+
+        // Act
+        writer.Write(resourceFile);
+        var json = File.ReadAllText(filePath);
+        using var doc = JsonDocument.Parse(json);
+
+        // Assert - singular entries as strings, plural as flat suffix keys
+        Assert.True(doc.RootElement.TryGetProperty("title", out var title));
+        Assert.Equal(JsonValueKind.String, title.ValueKind);
+        Assert.Equal("Welcome", title.GetString());
+
+        Assert.True(doc.RootElement.TryGetProperty("items_one", out var itemsOne));
+        Assert.Equal("{{count}} item", itemsOne.GetString());
+
+        Assert.True(doc.RootElement.TryGetProperty("items_other", out var itemsOther));
+        Assert.Equal("{{count}} items", itemsOther.GetString());
+
+        Assert.True(doc.RootElement.TryGetProperty("footer", out var footer));
+        Assert.Equal("Copyright 2025", footer.GetString());
+    }
+
+    [Fact]
+    public void Write_NonI18nextMode_PluralEntry_DoesNotWriteFlatFormat()
+    {
+        // Arrange - standard mode should NOT write flat suffix format
+        var config = new JsonFormatConfiguration { I18nextCompatible = false, IncludeMeta = false };
+        var writer = new JsonResourceWriter(config);
+        var filePath = Path.Combine(_tempDirectory, "standard_plural.json");
+        var resourceFile = new ResourceFile
+        {
+            Language = new LanguageInfo
+            {
+                BaseName = "standard",
+                Code = "",
+                Name = "Default",
+                IsDefault = true,
+                FilePath = filePath
+            },
+            Entries = new List<ResourceEntry>
+            {
+                new()
+                {
+                    Key = "items",
+                    Value = "",
+                    IsPlural = true,
+                    PluralForms = new Dictionary<string, string>
+                    {
+                        ["one"] = "{0} item",
+                        ["other"] = "{0} items"
+                    }
+                }
+            }
+        };
+
+        // Act
+        writer.Write(resourceFile);
+        var json = File.ReadAllText(filePath);
+        using var doc = JsonDocument.Parse(json);
+
+        // Assert - should NOT have flat suffix keys
+        Assert.False(doc.RootElement.TryGetProperty("items_one", out _));
+        Assert.False(doc.RootElement.TryGetProperty("items_other", out _));
+
+        // Should have nested CLDR structure
+        Assert.True(doc.RootElement.TryGetProperty("items", out var items));
+        Assert.Equal(JsonValueKind.Object, items.ValueKind);
+        Assert.True(items.TryGetProperty("_plural", out _));
+    }
+
+    #endregion
+
     #region Async Tests
 
     [Fact]

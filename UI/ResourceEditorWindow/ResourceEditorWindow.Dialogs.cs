@@ -2333,46 +2333,114 @@ public partial class ResourceEditorWindow : Window
                                 continue;
                             }
 
-                            var request = new TranslationRequest
+                            // Check if this is a plural key
+                            if (sourceEntry.IsPlural && sourceEntry.PluralForms != null && sourceEntry.PluralForms.Count > 0)
                             {
-                                SourceText = sourceEntry.Value,
-                                SourceLanguage = null, // Auto-detect
-                                TargetLanguage = targetLang!
-                            };
+                                // Translate each plural form
+                                var translatedForms = new Dictionary<string, string>();
 
-                            // Try cache first
-                            TranslationResponse? response = null;
-                            if (cache.TryGet(request, provider, out var cachedResponse) && cachedResponse != null)
-                            {
-                                response = cachedResponse;
+                                foreach (var (formName, formValue) in sourceEntry.PluralForms)
+                                {
+                                    if (string.IsNullOrWhiteSpace(formValue))
+                                        continue;
+
+                                    var request = new TranslationRequest
+                                    {
+                                        SourceText = formValue,
+                                        SourceLanguage = null, // Auto-detect
+                                        TargetLanguage = targetLang!,
+                                        Context = $"Plural form '{formName}' of key '{key}'"
+                                    };
+
+                                    TranslationResponse? response = null;
+                                    if (cache.TryGet(request, provider, out var cachedResponse) && cachedResponse != null)
+                                    {
+                                        response = cachedResponse;
+                                    }
+                                    else
+                                    {
+                                        response = await translationProvider.TranslateAsync(request);
+                                        cache.Store(request, response);
+                                    }
+
+                                    if (response != null && !string.IsNullOrWhiteSpace(response.TranslatedText))
+                                    {
+                                        translatedForms[formName] = response.TranslatedText;
+                                    }
+                                }
+
+                                // Update or add entry with plural forms
+                                if (translatedForms.Count > 0)
+                                {
+                                    if (targetEntry != null)
+                                    {
+                                        targetEntry.IsPlural = true;
+                                        targetEntry.PluralForms = translatedForms;
+                                        targetEntry.Value = translatedForms.GetValueOrDefault("other") ?? translatedForms.Values.FirstOrDefault() ?? "";
+                                        if (!string.IsNullOrWhiteSpace(sourceEntry.Comment) && string.IsNullOrWhiteSpace(targetEntry.Comment))
+                                        {
+                                            targetEntry.Comment = sourceEntry.Comment;
+                                        }
+                                        translated++;
+                                    }
+                                    else
+                                    {
+                                        targetFile.Entries.Add(new ResourceEntry
+                                        {
+                                            Key = key,
+                                            Value = translatedForms.GetValueOrDefault("other") ?? translatedForms.Values.FirstOrDefault() ?? "",
+                                            Comment = sourceEntry.Comment,
+                                            IsPlural = true,
+                                            PluralForms = translatedForms
+                                        });
+                                        translated++;
+                                    }
+                                }
                             }
                             else
                             {
-                                response = await translationProvider.TranslateAsync(request);
-                                cache.Store(request, response);
-                            }
-
-                            // Update or add entry
-                            if (response != null && !string.IsNullOrWhiteSpace(response.TranslatedText))
-                            {
-                                if (targetEntry != null)
+                                // Regular (non-plural) translation
+                                var request = new TranslationRequest
                                 {
-                                    targetEntry.Value = response.TranslatedText;
-                                    if (!string.IsNullOrWhiteSpace(sourceEntry.Comment) && string.IsNullOrWhiteSpace(targetEntry.Comment))
-                                    {
-                                        targetEntry.Comment = sourceEntry.Comment;
-                                    }
-                                    translated++;
+                                    SourceText = sourceEntry.Value,
+                                    SourceLanguage = null, // Auto-detect
+                                    TargetLanguage = targetLang!
+                                };
+
+                                // Try cache first
+                                TranslationResponse? response = null;
+                                if (cache.TryGet(request, provider, out var cachedResponse) && cachedResponse != null)
+                                {
+                                    response = cachedResponse;
                                 }
                                 else
                                 {
-                                    targetFile.Entries.Add(new ResourceEntry
+                                    response = await translationProvider.TranslateAsync(request);
+                                    cache.Store(request, response);
+                                }
+
+                                // Update or add entry
+                                if (response != null && !string.IsNullOrWhiteSpace(response.TranslatedText))
+                                {
+                                    if (targetEntry != null)
                                     {
-                                        Key = key,
-                                        Value = response.TranslatedText,
-                                        Comment = sourceEntry.Comment
-                                    });
-                                    translated++;
+                                        targetEntry.Value = response.TranslatedText;
+                                        if (!string.IsNullOrWhiteSpace(sourceEntry.Comment) && string.IsNullOrWhiteSpace(targetEntry.Comment))
+                                        {
+                                            targetEntry.Comment = sourceEntry.Comment;
+                                        }
+                                        translated++;
+                                    }
+                                    else
+                                    {
+                                        targetFile.Entries.Add(new ResourceEntry
+                                        {
+                                            Key = key,
+                                            Value = response.TranslatedText,
+                                            Comment = sourceEntry.Comment
+                                        });
+                                        translated++;
+                                    }
                                 }
                             }
 
