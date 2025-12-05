@@ -45,6 +45,16 @@ public partial class ResourceEditorWindow : Window
         var totalOccurrences = defaultFile?.Entries.Count(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)) ?? 0;
         var titleSuffix = totalOccurrences > 1 ? $" [{occurrenceNumber}]" : "";
 
+        // Check if this key is plural
+        var defaultEntry = defaultFile != null ? GetNthOccurrence(defaultFile, key, occurrenceNumber) : null;
+        var isPlural = defaultEntry?.IsPlural == true;
+
+        if (isPlural)
+        {
+            EditPluralKey(key, occurrenceNumber, titleSuffix);
+            return;
+        }
+
         var dialog = new Dialog
         {
             Title = $"Edit: {key}{titleSuffix}",
@@ -187,18 +197,339 @@ public partial class ResourceEditorWindow : Window
             Application.RequestStop();
         };
 
+        // Add "Convert to Plural" button only if backend supports plurals (JSON backend)
+        Button? btnConvertToPlural = null;
+        var supportsPlurals = _backend is Core.Backends.Json.JsonResourceBackend;
+        if (supportsPlurals)
+        {
+            btnConvertToPlural = new Button
+            {
+                Text = "→ Convert to Plural",
+                X = Pos.Right(btnAutoTranslate) + 2,
+                Y = Pos.AnchorEnd(2)
+            };
+
+            btnConvertToPlural.Clicked += () =>
+            {
+                // Save current values first
+                foreach (var kvp in fields)
+                {
+                    var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                    if (rf != null)
+                    {
+                        var entry = GetNthOccurrence(rf, key, occurrenceNumber);
+                        if (entry != null)
+                        {
+                            var currentValue = kvp.Value.Text.ToString() ?? "";
+                            // Convert to plural: set IsPlural, create PluralForms with 'other' = current value
+                            entry.IsPlural = true;
+                            entry.PluralForms = new Dictionary<string, string>
+                            {
+                                ["other"] = currentValue
+                            };
+                            entry.Value = currentValue;
+                        }
+                    }
+                }
+
+                // Save comments
+                foreach (var kvp in commentFields)
+                {
+                    var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                    if (rf != null)
+                    {
+                        var entry = GetNthOccurrence(rf, key, occurrenceNumber);
+                        if (entry != null)
+                        {
+                            entry.Comment = kvp.Value.Text.ToString();
+                        }
+                    }
+                }
+
+                _hasUnsavedChanges = true;
+                Application.RequestStop();
+
+                // Re-open as plural key editor
+                Application.MainLoop.Invoke(() =>
+                {
+                    MessageBox.Query("Converted", "Key converted to plural. Opening plural editor.", "OK");
+                    EditPluralKey(key, occurrenceNumber, titleSuffix);
+                });
+            };
+        }
+
         dialog.Add(btnAutoTranslate, btnSave, btnCancel);
+        if (btnConvertToPlural != null)
+        {
+            dialog.Add(btnConvertToPlural);
+        }
+        Application.Run(dialog);
+        dialog.Dispose();
+    }
+
+    private void EditPluralKey(string key, int occurrenceNumber, string titleSuffix)
+    {
+        var dialog = new Dialog
+        {
+            Title = $"Edit Plural: {key}{titleSuffix}",
+            Width = Dim.Percent(85),
+            Height = Dim.Percent(80)
+        };
+
+        var pluralForms = new[] { "one", "other", "zero", "two", "few", "many" };
+        // Dictionary: languageCode -> form -> TextField
+        var formFields = new Dictionary<string, Dictionary<string, TextField>>();
+        var commentFields = new Dictionary<string, TextField>();
+        var yPos = 1;
+
+        // Info label
+        var infoLabel = new Label
+        {
+            Text = "Plural forms: one (singular), other (plural). Use placeholders like {0}.",
+            X = 1,
+            Y = yPos,
+            ColorScheme = new ColorScheme { Normal = Terminal.Gui.Attribute.Make(Color.BrightCyan, Color.Black) }
+        };
+        dialog.Add(infoLabel);
+        yPos += 2;
+
+        foreach (var rf in _resourceFiles)
+        {
+            var entry = GetNthOccurrence(rf, key, occurrenceNumber);
+            var currentPluralForms = entry?.PluralForms ?? new Dictionary<string, string>();
+            var currentComment = entry?.Comment ?? string.Empty;
+
+            // Language header
+            var langLabel = new Label
+            {
+                Text = $"── {rf.Language.Name} ──",
+                X = 1,
+                Y = yPos,
+                ColorScheme = new ColorScheme { Normal = Terminal.Gui.Attribute.Make(Color.BrightYellow, Color.Black) }
+            };
+            dialog.Add(langLabel);
+            yPos++;
+
+            formFields[rf.Language.Code] = new Dictionary<string, TextField>();
+
+            // Show common forms: one, other, zero
+            foreach (var form in new[] { "one", "other", "zero" })
+            {
+                var formLabel = new Label
+                {
+                    Text = $"  {form}:",
+                    X = 1,
+                    Y = yPos,
+                    Width = 10
+                };
+
+                var formField = new TextField
+                {
+                    Text = currentPluralForms.GetValueOrDefault(form, ""),
+                    X = 12,
+                    Y = yPos,
+                    Width = Dim.Fill() - 2
+                };
+
+                formFields[rf.Language.Code][form] = formField;
+                dialog.Add(formLabel, formField);
+                yPos++;
+            }
+
+            // Comment field
+            var commentLabel = new Label
+            {
+                Text = "  Comment:",
+                X = 1,
+                Y = yPos,
+                Width = 10
+            };
+
+            var commentField = new TextField
+            {
+                Text = currentComment,
+                X = 12,
+                Y = yPos,
+                Width = Dim.Fill() - 2
+            };
+
+            commentFields[rf.Language.Code] = commentField;
+            dialog.Add(commentLabel, commentField);
+            yPos += 2;
+        }
+
+        var btnSave = new Button
+        {
+            Text = "Save",
+            X = Pos.Center() - 10,
+            Y = Pos.AnchorEnd(2),
+            IsDefault = true
+        };
+
+        var btnCancel = new Button
+        {
+            Text = "Cancel",
+            X = Pos.Center() + 10,
+            Y = Pos.AnchorEnd(2)
+        };
+
+        btnSave.Clicked += () =>
+        {
+            // Save plural form values
+            foreach (var langCode in formFields.Keys)
+            {
+                var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == langCode);
+                if (rf != null)
+                {
+                    var entry = GetNthOccurrence(rf, key, occurrenceNumber);
+                    if (entry != null)
+                    {
+                        entry.PluralForms ??= new Dictionary<string, string>();
+
+                        foreach (var formKvp in formFields[langCode])
+                        {
+                            var formValue = formKvp.Value.Text.ToString() ?? "";
+                            if (!string.IsNullOrEmpty(formValue))
+                            {
+                                entry.PluralForms[formKvp.Key] = formValue;
+                            }
+                            else
+                            {
+                                entry.PluralForms.Remove(formKvp.Key);
+                            }
+                        }
+
+                        // Update Value to match 'other' form
+                        entry.Value = entry.PluralForms.GetValueOrDefault("other") ?? entry.PluralForms.Values.FirstOrDefault();
+                        _hasUnsavedChanges = true;
+                    }
+                }
+            }
+
+            // Save comments
+            foreach (var kvp in commentFields)
+            {
+                var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                if (rf != null)
+                {
+                    var entry = GetNthOccurrence(rf, key, occurrenceNumber);
+                    if (entry != null)
+                    {
+                        entry.Comment = kvp.Value.Text.ToString();
+                    }
+                }
+            }
+
+            // Rebuild DataTable
+            if (_showComments)
+            {
+                _dataTable = BuildDataTableWithDoubleRows();
+            }
+            else
+            {
+                _dataTable = BuildDataTable();
+            }
+
+            if (_tableView != null)
+            {
+                _tableView.Table = _dataTable;
+            }
+
+            UpdateStatus();
+            FilterKeys();
+            Application.RequestStop();
+        };
+
+        btnCancel.Clicked += () =>
+        {
+            Application.RequestStop();
+        };
+
+        // Add "Convert to Simple" button
+        var btnConvertToSimple = new Button
+        {
+            Text = "← Convert to Simple",
+            X = 1,
+            Y = Pos.AnchorEnd(2)
+        };
+
+        btnConvertToSimple.Clicked += () =>
+        {
+            // Convert from plural to simple: copy 'other' form (or first available) to Value
+            foreach (var langCode in formFields.Keys)
+            {
+                var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == langCode);
+                if (rf != null)
+                {
+                    var entry = GetNthOccurrence(rf, key, occurrenceNumber);
+                    if (entry != null)
+                    {
+                        // Get value from 'other' form, or first available, or current value
+                        var simpleValue = entry.PluralForms?.GetValueOrDefault("other")
+                            ?? entry.PluralForms?.Values.FirstOrDefault()
+                            ?? entry.Value
+                            ?? "";
+
+                        // For the text fields, use the current values
+                        if (formFields.TryGetValue(langCode, out var langFormFields) &&
+                            langFormFields.TryGetValue("other", out var otherField))
+                        {
+                            simpleValue = otherField.Text.ToString() ?? simpleValue;
+                        }
+
+                        entry.IsPlural = false;
+                        entry.Value = simpleValue;
+                        entry.PluralForms = null;
+                    }
+                }
+            }
+
+            // Save comments
+            foreach (var kvp in commentFields)
+            {
+                var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                if (rf != null)
+                {
+                    var entry = GetNthOccurrence(rf, key, occurrenceNumber);
+                    if (entry != null)
+                    {
+                        entry.Comment = kvp.Value.Text.ToString();
+                    }
+                }
+            }
+
+            _hasUnsavedChanges = true;
+            Application.RequestStop();
+
+            // Re-open as simple key editor
+            Application.MainLoop.Invoke(() =>
+            {
+                MessageBox.Query("Converted", "Key converted to simple. Opening standard editor.", "OK");
+                EditKey(key, occurrenceNumber);
+            });
+        };
+
+        dialog.Add(btnConvertToSimple, btnSave, btnCancel);
         Application.Run(dialog);
         dialog.Dispose();
     }
 
     private void AddNewKey()
     {
+        // Check if backend supports plurals (JSON backend)
+        var supportsPlurals = _backend is Core.Backends.Json.JsonResourceBackend;
+        var isPlural = false;
+
+        // Calculate dialog height: base + languages * (simple or plural rows) + extra for plural option
+        var dialogHeight = supportsPlurals
+            ? 14 + _resourceFiles.Count * 5  // Room for plural checkbox
+            : 10 + _resourceFiles.Count * 5;
+
         var dialog = new Dialog
         {
             Title = "Add New Key",
-            Width = 60,
-            Height = 10 + _resourceFiles.Count * 5  // Increased for comment fields
+            Width = 70,
+            Height = dialogHeight
         };
 
         var keyLabel = new Label
@@ -218,48 +549,194 @@ public partial class ResourceEditorWindow : Window
 
         dialog.Add(keyLabel, keyField);
 
-        var valueFields = new Dictionary<string, TextField>();
-        var commentFields = new Dictionary<string, TextField>();
         var yPos = 4;
 
+        // Add plural checkbox if supported
+        CheckBox? pluralCheckbox = null;
+        if (supportsPlurals)
+        {
+            pluralCheckbox = new CheckBox
+            {
+                Text = "This is a plural key (e.g., for \"1 item\" vs \"5 items\")",
+                X = 1,
+                Y = yPos,
+                Checked = false
+            };
+            dialog.Add(pluralCheckbox);
+            yPos += 2;
+        }
+
+        // Simple value fields (shown when not plural)
+        var simpleValueFields = new Dictionary<string, TextField>();
+        var simpleCommentFields = new Dictionary<string, TextField>();
+        var simpleControls = new List<View>();
+
+        // Plural form fields (shown when plural)
+        var pluralFormFields = new Dictionary<string, Dictionary<string, TextField>>();  // langCode -> form -> field
+        var pluralCommentFields = new Dictionary<string, TextField>();
+        var pluralControls = new List<View>();
+
+        var pluralForms = new[] { "one", "other", "zero" };
+
+        var simpleYPos = yPos;
+        var pluralYPos = yPos;
+
+        // Create simple value fields
         foreach (var rf in _resourceFiles)
         {
-            // Value label and field
             var valueLabel = new Label
             {
                 Text = $"{rf.Language.Name}:",
                 X = 1,
-                Y = yPos
+                Y = simpleYPos
             };
 
             var valueField = new TextField
             {
                 X = 1,
-                Y = yPos + 1,
+                Y = simpleYPos + 1,
                 Width = Dim.Fill() - 1,
                 Text = ""
             };
 
-            // Comment label and field
             var commentLabel = new Label
             {
                 Text = "  Comment:",
                 X = 1,
-                Y = yPos + 2
+                Y = simpleYPos + 2
             };
 
             var commentField = new TextField
             {
                 X = 1,
-                Y = yPos + 3,
+                Y = simpleYPos + 3,
                 Width = Dim.Fill() - 1,
                 Text = ""
             };
 
-            valueFields[rf.Language.Code] = valueField;
-            commentFields[rf.Language.Code] = commentField;
-            dialog.Add(valueLabel, valueField, commentLabel, commentField);
-            yPos += 5;
+            simpleValueFields[rf.Language.Code] = valueField;
+            simpleCommentFields[rf.Language.Code] = commentField;
+            simpleControls.AddRange(new View[] { valueLabel, valueField, commentLabel, commentField });
+            simpleYPos += 5;
+        }
+
+        // Create plural form fields (only if supported)
+        if (supportsPlurals)
+        {
+            foreach (var rf in _resourceFiles)
+            {
+                var langHeader = new Label
+                {
+                    Text = $"── {rf.Language.Name} ──",
+                    X = 1,
+                    Y = pluralYPos,
+                    ColorScheme = new ColorScheme { Normal = Terminal.Gui.Attribute.Make(Color.BrightYellow, Color.Black) }
+                };
+                pluralControls.Add(langHeader);
+                pluralYPos++;
+
+                pluralFormFields[rf.Language.Code] = new Dictionary<string, TextField>();
+
+                foreach (var form in pluralForms)
+                {
+                    var formLabel = new Label
+                    {
+                        Text = $"  {form}:",
+                        X = 1,
+                        Y = pluralYPos,
+                        Width = 10
+                    };
+
+                    var placeholder = form switch
+                    {
+                        "other" => "Required - e.g. '{0} items'",
+                        "one" => "Optional - e.g. '1 item'",
+                        _ => $"Optional - {form} form"
+                    };
+
+                    var formField = new TextField
+                    {
+                        X = 12,
+                        Y = pluralYPos,
+                        Width = Dim.Fill() - 2,
+                        Text = ""
+                    };
+
+                    pluralFormFields[rf.Language.Code][form] = formField;
+                    pluralControls.AddRange(new View[] { formLabel, formField });
+                    pluralYPos++;
+                }
+
+                var commentLabel = new Label
+                {
+                    Text = "  Comment:",
+                    X = 1,
+                    Y = pluralYPos,
+                    Width = 10
+                };
+
+                var commentField = new TextField
+                {
+                    X = 12,
+                    Y = pluralYPos,
+                    Width = Dim.Fill() - 2,
+                    Text = ""
+                };
+
+                pluralCommentFields[rf.Language.Code] = commentField;
+                pluralControls.AddRange(new View[] { commentLabel, commentField });
+                pluralYPos += 2;
+            }
+        }
+
+        // Add simple controls by default
+        foreach (var ctrl in simpleControls)
+        {
+            dialog.Add(ctrl);
+        }
+
+        // Toggle between simple and plural views
+        void UpdateViewMode()
+        {
+            isPlural = pluralCheckbox?.Checked == true;
+
+            if (isPlural)
+            {
+                // Hide simple controls
+                foreach (var ctrl in simpleControls)
+                {
+                    ctrl.Visible = false;
+                }
+                // Show plural controls
+                foreach (var ctrl in pluralControls)
+                {
+                    if (!dialog.Subviews.Contains(ctrl))
+                    {
+                        dialog.Add(ctrl);
+                    }
+                    ctrl.Visible = true;
+                }
+            }
+            else
+            {
+                // Show simple controls
+                foreach (var ctrl in simpleControls)
+                {
+                    ctrl.Visible = true;
+                }
+                // Hide plural controls
+                foreach (var ctrl in pluralControls)
+                {
+                    ctrl.Visible = false;
+                }
+            }
+
+            dialog.SetNeedsDisplay();
+        }
+
+        if (pluralCheckbox != null)
+        {
+            pluralCheckbox.Toggled += (_) => UpdateViewMode();
         }
 
         var btnAdd = new Button
@@ -292,21 +769,60 @@ public partial class ResourceEditorWindow : Window
                 return;
             }
 
-            foreach (var kvp in valueFields)
+            if (isPlural)
             {
-                var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
-                if (rf != null)
+                // Add plural entries
+                foreach (var rf in _resourceFiles)
                 {
-                    var comment = commentFields.ContainsKey(kvp.Key)
-                        ? commentFields[kvp.Key].Text.ToString()
+                    var langCode = rf.Language.Code;
+                    var pluralFormsDict = new Dictionary<string, string>();
+
+                    foreach (var form in pluralForms)
+                    {
+                        if (pluralFormFields.TryGetValue(langCode, out var formFields) &&
+                            formFields.TryGetValue(form, out var field))
+                        {
+                            var value = field.Text.ToString() ?? "";
+                            if (!string.IsNullOrEmpty(value))
+                            {
+                                pluralFormsDict[form] = value;
+                            }
+                        }
+                    }
+
+                    var comment = pluralCommentFields.TryGetValue(langCode, out var commentField)
+                        ? commentField.Text.ToString()
                         : "";
 
                     rf.Entries.Add(new ResourceEntry
                     {
                         Key = key,
-                        Value = kvp.Value.Text.ToString(),
-                        Comment = comment
+                        Value = pluralFormsDict.GetValueOrDefault("other") ?? pluralFormsDict.Values.FirstOrDefault(),
+                        Comment = comment,
+                        IsPlural = true,
+                        PluralForms = pluralFormsDict.Count > 0 ? pluralFormsDict : null
                     });
+                }
+            }
+            else
+            {
+                // Add simple entries
+                foreach (var kvp in simpleValueFields)
+                {
+                    var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                    if (rf != null)
+                    {
+                        var comment = simpleCommentFields.ContainsKey(kvp.Key)
+                            ? simpleCommentFields[kvp.Key].Text.ToString()
+                            : "";
+
+                        rf.Entries.Add(new ResourceEntry
+                        {
+                            Key = key,
+                            Value = kvp.Value.Text.ToString(),
+                            Comment = comment
+                        });
+                    }
                 }
             }
 
@@ -314,7 +830,6 @@ public partial class ResourceEditorWindow : Window
             _allKeys = _allKeys.OrderBy(k => k).ToList();
 
             // Rebuild the entire table to account for new key
-            // This handles both single-row and double-row modes correctly
             if (_showComments)
             {
                 _dataTable = BuildDataTableWithDoubleRows();
