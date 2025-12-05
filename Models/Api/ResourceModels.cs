@@ -17,6 +17,7 @@ public class ResourceKeyInfo
     public Dictionary<string, string?> Values { get; set; } = new();
     public int OccurrenceCount { get; set; } = 1;
     public bool HasDuplicates { get; set; }
+    public bool IsPlural { get; set; }
 }
 
 public class ResourceKeyDetails

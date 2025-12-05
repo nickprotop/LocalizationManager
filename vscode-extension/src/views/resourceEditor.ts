@@ -1161,6 +1161,11 @@ export class ResourceEditorPanel {
 
                 const statuses = [];
 
+                // Check for plural key
+                if (resource.isPlural) {
+                    statuses.push({ icon: '🔢', title: 'Plural key', color: 'var(--vscode-charts-purple)' });
+                }
+
                 // Check for missing translations
                 const hasMissing = languages.some(lang => !resource.values[lang.code] || resource.values[lang.code].trim() === '');
                 if (hasMissing) {
@@ -1342,13 +1347,30 @@ export class ResourceEditorPanel {
             setStatus('Loading key details...');
         }
 
+        let currentKeyIsPlural = false;
+
         function showEditKeyModal(keyData) {
             currentEditingKey = keyData.key;
             document.getElementById('editKeyName').textContent = keyData.key;
 
+            // Check if any language has plural forms - if so, this is a plural key
+            currentKeyIsPlural = Object.values(keyData.values).some((v) => v && v.isPlural);
+
             // Build fields for each language
             const fieldsContainer = document.getElementById('editKeyFields');
             fieldsContainer.innerHTML = '';
+
+            // Add plural indicator if applicable
+            if (currentKeyIsPlural) {
+                const pluralBadge = document.createElement('div');
+                pluralBadge.style.marginBottom = '15px';
+                pluralBadge.style.padding = '8px 12px';
+                pluralBadge.style.background = 'var(--vscode-inputValidation-infoBackground)';
+                pluralBadge.style.borderLeft = '3px solid var(--vscode-charts-purple)';
+                pluralBadge.style.borderRadius = '3px';
+                pluralBadge.innerHTML = '🔢 <strong>Plural Key</strong> - This key has multiple plural forms (one, other, etc.)';
+                fieldsContainer.appendChild(pluralBadge);
+            }
 
             languages.forEach(lang => {
                 const langData = keyData.values[lang.code] || { value: '', comment: null };
@@ -1359,30 +1381,75 @@ export class ResourceEditorPanel {
                 fieldGroup.style.background = 'var(--vscode-editor-background)';
                 fieldGroup.style.borderRadius = '4px';
 
-                fieldGroup.innerHTML = \`
-                    <div style="font-weight: bold; margin-bottom: 10px; color: var(--vscode-foreground);">
-                        \${lang.code}\${lang.isDefault ? ' (Default)' : ''}
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: block; margin-bottom: 5px; font-size: 12px; opacity: 0.8;">Value:</label>
-                        <textarea
-                            id="edit-value-\${lang.code}"
-                            data-lang="\${lang.code}"
-                            style="width: 100%; min-height: 60px; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 3px; font-family: var(--vscode-font-family); resize: vertical;"
-                        >\${langData.value || ''}</textarea>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-size: 12px; opacity: 0.8;">Comment:</label>
-                        <input
-                            type="text"
-                            id="edit-comment-\${lang.code}"
-                            data-lang="\${lang.code}"
-                            placeholder="Optional comment"
-                            value="\${langData.comment || ''}"
-                            style="width: 100%; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 3px;"
-                        />
-                    </div>
-                \`;
+                // Check if this language has plural forms
+                const hasPluralForms = langData.isPlural && langData.pluralForms && Object.keys(langData.pluralForms).length > 0;
+
+                if (hasPluralForms) {
+                    // Render plural forms fields
+                    const pluralFormsHtml = ['zero', 'one', 'two', 'few', 'many', 'other']
+                        .filter(form => langData.pluralForms[form] !== undefined || form === 'one' || form === 'other')
+                        .map(form => \`
+                            <div style="margin-bottom: 8px;">
+                                <label style="display: inline-block; width: 60px; font-size: 11px; opacity: 0.8; text-transform: uppercase;">\${form}:</label>
+                                <input
+                                    type="text"
+                                    id="edit-plural-\${lang.code}-\${form}"
+                                    data-lang="\${lang.code}"
+                                    data-form="\${form}"
+                                    value="\${langData.pluralForms[form] || ''}"
+                                    placeholder="\${form} form"
+                                    style="flex: 1; padding: 6px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 3px; width: calc(100% - 70px);"
+                                />
+                            </div>
+                        \`).join('');
+
+                    fieldGroup.innerHTML = \`
+                        <div style="font-weight: bold; margin-bottom: 10px; color: var(--vscode-foreground);">
+                            \${lang.code}\${lang.isDefault ? ' (Default)' : ''} <span style="font-weight: normal; font-size: 11px; color: var(--vscode-charts-purple);">🔢 Plural</span>
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <label style="display: block; margin-bottom: 8px; font-size: 12px; opacity: 0.8;">Plural Forms:</label>
+                            \${pluralFormsHtml}
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-size: 12px; opacity: 0.8;">Comment:</label>
+                            <input
+                                type="text"
+                                id="edit-comment-\${lang.code}"
+                                data-lang="\${lang.code}"
+                                placeholder="Optional comment"
+                                value="\${langData.comment || ''}"
+                                style="width: 100%; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 3px;"
+                            />
+                        </div>
+                    \`;
+                } else {
+                    // Standard single value field
+                    fieldGroup.innerHTML = \`
+                        <div style="font-weight: bold; margin-bottom: 10px; color: var(--vscode-foreground);">
+                            \${lang.code}\${lang.isDefault ? ' (Default)' : ''}
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <label style="display: block; margin-bottom: 5px; font-size: 12px; opacity: 0.8;">Value:</label>
+                            <textarea
+                                id="edit-value-\${lang.code}"
+                                data-lang="\${lang.code}"
+                                style="width: 100%; min-height: 60px; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 3px; font-family: var(--vscode-font-family); resize: vertical;"
+                            >\${langData.value || ''}</textarea>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-size: 12px; opacity: 0.8;">Comment:</label>
+                            <input
+                                type="text"
+                                id="edit-comment-\${lang.code}"
+                                data-lang="\${lang.code}"
+                                placeholder="Optional comment"
+                                value="\${langData.comment || ''}"
+                                style="width: 100%; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 3px;"
+                            />
+                        </div>
+                    \`;
+                }
 
                 fieldsContainer.appendChild(fieldGroup);
             });
@@ -1483,13 +1550,42 @@ export class ResourceEditorPanel {
             // Collect all values and comments
             const values = {};
             languages.forEach(lang => {
-                const valueField = document.getElementById(\`edit-value-\${lang.code}\`);
                 const commentField = document.getElementById(\`edit-comment-\${lang.code}\`);
 
-                values[lang.code] = {
-                    value: valueField?.value || '',
-                    comment: commentField?.value || null
-                };
+                if (currentKeyIsPlural) {
+                    // Collect plural forms
+                    const pluralForms = {};
+                    ['zero', 'one', 'two', 'few', 'many', 'other'].forEach(form => {
+                        const formField = document.getElementById(\`edit-plural-\${lang.code}-\${form}\`);
+                        if (formField && formField.value) {
+                            pluralForms[form] = formField.value;
+                        }
+                    });
+
+                    // Only include if there are any forms
+                    if (Object.keys(pluralForms).length > 0) {
+                        values[lang.code] = {
+                            value: pluralForms['other'] || pluralForms['one'] || Object.values(pluralForms)[0] || '',
+                            comment: commentField?.value || null,
+                            isPlural: true,
+                            pluralForms: pluralForms
+                        };
+                    } else {
+                        values[lang.code] = {
+                            value: '',
+                            comment: commentField?.value || null,
+                            isPlural: true,
+                            pluralForms: {}
+                        };
+                    }
+                } else {
+                    // Standard single value
+                    const valueField = document.getElementById(\`edit-value-\${lang.code}\`);
+                    values[lang.code] = {
+                        value: valueField?.value || '',
+                        comment: commentField?.value || null
+                    };
+                }
             });
 
             vscode.postMessage({

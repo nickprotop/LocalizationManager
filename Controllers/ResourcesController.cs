@@ -68,10 +68,16 @@ public class ResourcesController : ControllerBase
 
             var keysWithValues = allKeys.Select(key => {
                 var values = new Dictionary<string, string?>();
+                var isPlural = false;
                 foreach (var file in resourceFiles)
                 {
                     var entry = file.Entries.FirstOrDefault(e => e.Key == key);
                     values[file.Language.Code ?? "default"] = entry?.Value;
+                    // Check if any entry for this key is plural
+                    if (entry?.IsPlural == true)
+                    {
+                        isPlural = true;
+                    }
                 }
 
                 // Check for duplicates in default file
@@ -83,7 +89,8 @@ public class ResourcesController : ControllerBase
                     Key = key,
                     Values = values,
                     OccurrenceCount = occurrenceCount,
-                    HasDuplicates = hasDuplicates
+                    HasDuplicates = hasDuplicates,
+                    IsPlural = isPlural
                 };
             });
 
