@@ -102,6 +102,37 @@ LRM solves this by providing:
 
 ---
 
+## JSON Localization
+
+> **Beyond .NET:** With JSON and i18next support, LRM becomes a universal localization tool for **React, Vue, Angular, Node.js**, and any project using JSON resources.
+
+**The Killer Combo:** JSON localization + 10 translation providers = automated multilingual apps in any ecosystem.
+
+```bash
+# Auto-translate your React/Vue/Angular app to 5 languages
+lrm translate --provider google --to fr,de,es,it,ja --path ./locales
+```
+
+**Why JSON?**
+- **Human-readable** - Edit directly in any text editor, no special tools needed
+- **Git-friendly** - Clean diffs and easy merge conflict resolution
+- **Nested structure** - Organize keys hierarchically (`Errors.NotFound`, `Navigation.Home`)
+- **Universal** - Works with any framework, any language, any platform
+
+**Two Formats Supported:**
+- **Standard JSON** - `.json` files with nested keys and CLDR plural markers (`_plural: true`)
+- **i18next** - Full compatibility with suffix-based plurals (`items_one`, `items_other`) for React, Vue, Angular, Node.js
+
+**For .NET Developers:**
+The `LocalizationManager.JsonLocalization` NuGet package is a drop-in replacement for `IStringLocalizer<T>` - migrate from .resx with one command:
+```bash
+lrm convert --from resx --to json --path ./Resources
+```
+
+**👉 [See JSON Localization Guide →](docs/JSON.md)** | [.NET NuGet Package →](LocalizationManager.JsonLocalization/README.md)
+
+---
+
 ## Features
 
 - **🤖 Machine Translation** - Automatic translation using 10 providers
@@ -119,6 +150,7 @@ LRM solves this by providing:
   - i18next compatibility mode with suffix-based plurals (`_one`, `_other`)
   - Auto-detection of format from file naming patterns
   - Comments and metadata preservation
+  - [See JSON format usage guide →](LocalizationManager.JsonLocalization/README.md)
 - **🚀 CI/CD Automation** - Production-ready workflows for GitHub Actions, GitLab CI, Azure DevOps
   - Validate → Check Missing → Auto-Translate → Re-validate → Commit
   - Detailed translation reports per language
@@ -555,6 +587,7 @@ LocalizationManager/
 
 | Document | Description |
 |----------|-------------|
+| [**docs/JSON.md**](docs/JSON.md) | **JSON localization guide (React, Vue, Angular, i18next, Node.js)** |
 | [docs/INSTALLATION.md](docs/INSTALLATION.md) | Complete installation guide for all platforms |
 | [docs/COMMANDS.md](docs/COMMANDS.md) | Detailed command reference with all options |
 | [**docs/TUI.md**](docs/TUI.md) 🆕 | **Terminal UI guide (keyboard shortcuts, features, workflows)** ⭐ |
