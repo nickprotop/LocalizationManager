@@ -13,11 +13,19 @@ export interface ResourceKey {
     values: { [language: string]: string };
     occurrenceCount: number;
     hasDuplicates: boolean;
+    isPlural: boolean;
+}
+
+export interface ResourceValueDetail {
+    value: string | null;
+    comment: string | null;
+    isPlural?: boolean;
+    pluralForms?: { [form: string]: string };
 }
 
 export interface ResourceKeyDetails {
     key: string;
-    values: { [language: string]: { value: string; comment: string | null } };
+    values: { [language: string]: ResourceValueDetail };
     occurrenceCount: number;
     hasDuplicates: boolean;
 }
@@ -132,13 +140,17 @@ export interface Statistics {
 
 export interface AddKeyRequest {
     key: string;
-    values: { [language: string]: string };
+    values?: { [language: string]: string };
     comment?: string;
+    isPlural?: boolean;
+    pluralValues?: { [language: string]: { [form: string]: string } };
 }
 
 export interface ResourceValueUpdate {
-    value: string;
+    value?: string;
     comment?: string | null;
+    isPlural?: boolean;
+    pluralForms?: { [form: string]: string };
 }
 
 export interface UpdateKeyRequest {

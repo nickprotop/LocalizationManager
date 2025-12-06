@@ -154,6 +154,7 @@ export class CacheService {
 
     /**
      * Get missing languages for a key (from cached key details)
+     * Handles both simple keys and plural keys
      */
     getMissingLanguages(key: string): string[] | null {
         const details = this.keyDetailsCache.get(key);
@@ -164,8 +165,17 @@ export class CacheService {
         // Find languages with empty values
         const missing: string[] = [];
         for (const [lang, data] of Object.entries(details.values)) {
-            if (!data.value || data.value.trim() === '') {
-                missing.push(lang);
+            // For plural keys, check if pluralForms has content
+            if (data.isPlural && data.pluralForms) {
+                const hasAnyPluralForm = Object.values(data.pluralForms).some(v => v && v.trim() !== '');
+                if (!hasAnyPluralForm) {
+                    missing.push(lang);
+                }
+            } else {
+                // For simple keys, check the value
+                if (!data.value || data.value.trim() === '') {
+                    missing.push(lang);
+                }
             }
         }
         return missing;

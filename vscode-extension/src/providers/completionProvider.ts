@@ -143,15 +143,17 @@ export class LocalizationCompletionProvider implements vscode.CompletionItemProv
     ): vscode.CompletionItem {
         const item = new vscode.CompletionItem(key.key, vscode.CompletionItemKind.Constant);
 
-        // Show default language value as detail
+        // Show default language value as detail, with plural indicator
         const defaultValue = key.values[defaultLang];
+        const pluralPrefix = key.isPlural ? '[plural] ' : '';
         if (defaultValue) {
             // Truncate long values for display
-            item.detail = defaultValue.length > 60
+            const displayValue = defaultValue.length > 60
                 ? defaultValue.substring(0, 57) + '...'
                 : defaultValue;
+            item.detail = pluralPrefix + displayValue;
         } else {
-            item.detail = '(no default value)';
+            item.detail = pluralPrefix + '(no default value)';
         }
 
         // Show all translations in documentation popup
