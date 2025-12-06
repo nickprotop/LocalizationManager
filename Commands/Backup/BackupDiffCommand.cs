@@ -22,6 +22,7 @@
 using LocalizationManager.Core;
 using LocalizationManager.Core.Backup;
 using LocalizationManager.Core.Enums;
+using LocalizationManager.Utils;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using LocalizationManager.Shared.Enums;
@@ -176,7 +177,7 @@ public class BackupDiffCommand : AsyncCommand<BackupDiffCommand.Settings>
             switch (settings.GetOutputFormat())
             {
                 case OutputFormat.Table:
-                    formatter.DisplayInConsole(diff, settings.ShowUnchanged);
+                    SpectreBackupDiffRenderer.DisplayInConsole(diff, settings.ShowUnchanged);
                     return 0;
 
                 case OutputFormat.Json:
