@@ -10,67 +10,960 @@ Git-native localization management platform. Users connect repos, edit translati
 
 ---
 
+## Key Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| **Web UI** | Blazor WebAssembly | Stateless API, horizontal scaling, offline capability |
+| **MVP Scope** | GitHub App + Web UI + CLI | Full vision from day one |
+| **Teams** | Multi-user from start | Required for Team tier pricing |
+| **Compliance** | GDPR-ready, SOC2 foundation | EU users, enterprise-ready architecture |
+| **API Keys** | Hybrid (user's first, platform fallback) | Best UX with cost control |
+| **Email** | Self-hosted sendmail + IMailService | Use existing infrastructure |
+| **Database** | Self-hosted PostgreSQL | Cost savings, full control |
+| **Conflict Resolution** | Optimistic locking + user prompt | Safe, user-controlled |
+| **Configuration** | Single `config.json` (git-ignored) | No appsettings.json, all config in one place |
+| **Infrastructure** | `setup.sh` + Docker Compose | Interactive or config-driven, isolated containers |
+
+---
+
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    DigitalOcean                         │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │              Nginx (reverse proxy)               │   │
-│  │              + Let's Encrypt SSL                 │   │
-│  └─────────────────────────────────────────────────┘   │
-│                         │                               │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │           ASP.NET Core API (Docker)              │   │
-│  │  • Auth (GitHub OAuth + API keys)                │   │
-│  │  • Project management                            │   │
-│  │  • Translation API                               │   │
-│  │  • GitHub webhook handler                        │   │
-│  └─────────────────────────────────────────────────┘   │
-│                         │                               │
-│  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐   │
-│  │  PostgreSQL  │  │    Redis     │  │ File Store  │   │
-│  │  (users,     │  │  (sessions,  │  │ (projects,  │   │
-│  │   projects)  │  │   cache)     │  │  temp files)│   │
-│  └──────────────┘  └──────────────┘  └─────────────┘   │
-└─────────────────────────────────────────────────────────┘
+                         ┌────────────────────────────────────────┐
+                         │          Client Browser                │
+                         │  ┌──────────────────────────────────┐  │
+                         │  │   Blazor WebAssembly (SPA)       │  │
+                         │  │   - Translation Editor           │  │
+                         │  │   - Project Dashboard            │  │
+                         │  │   - Offline-capable (PWA)        │  │
+                         │  └──────────────────────────────────┘  │
+                         └───────────────────┬────────────────────┘
+                                             │ REST API
+┌────────────────────────────────────────────┼────────────────────────────────────┐
+│                    DigitalOcean Droplet    │                                    │
+│  ┌─────────────────────────────────────────┴─────────────────────────────────┐  │
+│  │                    Nginx (reverse proxy + SSL)                            │  │
+│  │                    + Rate limiting + Security headers                     │  │
+│  └─────────────────────────────────────────┬─────────────────────────────────┘  │
+│                                            │                                    │
+│  ┌─────────────────────────────────────────┴─────────────────────────────────┐  │
+│  │                 ASP.NET Core Web API (Docker)                             │  │
+│  │  ├── AuthController (Email/Password, GitHub OAuth)                        │  │
+│  │  ├── ProjectsController (CRUD, team management)                           │  │
+│  │  ├── ResourcesController (keys, translations)                             │  │
+│  │  ├── SyncController (CLI push/pull)                                       │  │
+│  │  ├── WebhooksController (GitHub events)                                   │  │
+│  │  └── TranslationController (machine translation)                          │  │
+│  └─────────────────────────────────────────┬─────────────────────────────────┘  │
+│                                            │                                    │
+│  ┌──────────────┐  ┌──────────────┐  ┌─────┴─────────┐  ┌──────────────────┐    │
+│  │ PostgreSQL   │  │    Redis     │  │  File Store   │  │  Mail Server     │    │
+│  │ (self-host)  │  │  (sessions,  │  │  (DO Spaces   │  │  (sendmail)      │    │
+│  │              │  │   cache)     │  │   or local)   │  │                  │    │
+│  └──────────────┘  └──────────────┘  └───────────────┘  └──────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Infrastructure (DigitalOcean)
 
-### Minimal Setup (~$20-30/mo)
-- **1x Droplet** $12/mo (2GB RAM, 1 vCPU) - API + Nginx
-- **Managed PostgreSQL** $15/mo (or self-hosted on same droplet)
-- **Spaces** (S3-compatible) for file storage if needed
-
-### Growth Setup (~$50-70/mo)
+### Setup (~$30/mo)
 - **1x Droplet** $24/mo (4GB RAM, 2 vCPU)
-- **Managed PostgreSQL** $15/mo
-- **Managed Redis** $15/mo (or self-hosted)
-- **DO Spaces** $5/mo
+- **Self-hosted PostgreSQL** on droplet
+- **Self-hosted Redis** on droplet
+- **DO Spaces** $5/mo (backups)
+- **Domain** ~$1/mo
 
 ### Stack
 - Ubuntu 24.04 LTS
 - Docker + Docker Compose
-- Nginx reverse proxy
+- Nginx reverse proxy with security headers
 - Certbot for SSL
 - systemd for service management
 
 ---
 
-## Database Schema (Complete)
+## Infrastructure Setup Script
+
+**Principle:** Single `setup.sh` script to bootstrap entire infrastructure. Uses Docker Compose with `--pull` to avoid container conflicts. Either reads from existing `config.json` or prompts interactively.
+
+### File Structure
+
+```
+cloud/deploy/
+├── setup.sh                      # Main setup script
+├── docker-compose.yml            # Docker Compose definition
+├── docker-compose.override.yml   # Dev overrides (git-ignored)
+├── config.example.json           # Template (in git)
+└── config.json                   # Generated config (git-ignored)
+```
+
+### docker-compose.yml
+
+```yaml
+version: '3.8'
+
+name: lrmcloud  # Unique project name to avoid conflicts
+
+services:
+  api:
+    build:
+      context: ../src/LrmCloud.Api
+      dockerfile: Dockerfile
+    container_name: lrmcloud-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-5000}:8080"
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./data/logs:/var/log/lrmcloud
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ENVIRONMENT:-Production}
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: lrmcloud-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-lrmcloud}
+      - POSTGRES_USER=${POSTGRES_USER:-lrm}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+
+  redis:
+    image: redis:7-alpine
+    container_name: lrmcloud-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+### setup.sh
+
+```bash
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/config.json"
+ENV_FILE="$SCRIPT_DIR/.env"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+print_step() { echo -e "${YELLOW}►${NC} $1"; }
+print_success() { echo -e "${GREEN}✓${NC} $1"; }
+print_error() { echo -e "${RED}✗${NC} $1"; }
+print_info() { echo -e "${BLUE}ℹ${NC} $1"; }
+
+# Check dependencies
+if ! command -v jq &> /dev/null; then
+    print_error "jq is required. Install with: sudo apt install jq"
+    exit 1
+fi
+
+# Generate random password
+generate_password() {
+    openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 32
+}
+
+# Generate random key (base64)
+generate_key() {
+    openssl rand -base64 32
+}
+
+# Read value from config.json or return default
+config_get() {
+    local path=$1
+    local default=$2
+    if [ -f "$CONFIG_FILE" ]; then
+        local value=$(jq -r "$path // empty" "$CONFIG_FILE" 2>/dev/null)
+        echo "${value:-$default}"
+    else
+        echo "$default"
+    fi
+}
+
+# Extract password from connection string
+extract_password() {
+    echo "$1" | grep -oP 'Password=\K[^;]+' 2>/dev/null || echo ""
+}
+
+# Extract port from URL
+extract_port() {
+    echo "$1" | grep -oP ':\K\d+' 2>/dev/null || echo ""
+}
+
+echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${BLUE}║              LRM Cloud - Infrastructure Setup                  ║${NC}"
+echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+
+# Load existing values as defaults (or use fallback defaults)
+if [ -f "$CONFIG_FILE" ]; then
+    print_info "Found existing config.json - values shown as defaults"
+    EXISTING_CONFIG=true
+else
+    print_info "No config.json found - will create new configuration"
+    EXISTING_CONFIG=false
+fi
+
+# Read current values
+CURRENT_URL=$(config_get '.server.urls' 'http://0.0.0.0:5000')
+CURRENT_API_PORT=$(extract_port "$CURRENT_URL")
+CURRENT_API_PORT=${CURRENT_API_PORT:-5000}
+
+CURRENT_ENV=$(config_get '.server.environment' 'Production')
+
+CURRENT_DB_CONN=$(config_get '.database.connectionString' '')
+CURRENT_DB_PASSWORD=$(extract_password "$CURRENT_DB_CONN")
+
+CURRENT_REDIS_CONN=$(config_get '.redis.connectionString' '')
+CURRENT_REDIS_PASSWORD=$(echo "$CURRENT_REDIS_CONN" | grep -oP 'password=\K[^,]+' 2>/dev/null || echo "")
+
+CURRENT_JWT=$(config_get '.auth.jwtSecret' '')
+CURRENT_ENCRYPTION=$(config_get '.encryption.tokenKey' '')
+
+CURRENT_MAIL_HOST=$(config_get '.mail.host' 'localhost')
+CURRENT_MAIL_PORT=$(config_get '.mail.port' '25')
+CURRENT_MAIL_FROM=$(config_get '.mail.fromAddress' 'noreply@lrm.cloud')
+
+echo ""
+echo "Press Enter to keep current value, or type new value:"
+echo ""
+
+# Interactive prompts with current values as defaults
+read -p "API Port [$CURRENT_API_PORT]: " API_PORT
+API_PORT=${API_PORT:-$CURRENT_API_PORT}
+
+read -p "PostgreSQL Port [5432]: " POSTGRES_PORT
+POSTGRES_PORT=${POSTGRES_PORT:-5432}
+
+read -p "Redis Port [6379]: " REDIS_PORT
+REDIS_PORT=${REDIS_PORT:-6379}
+
+read -p "Environment [$CURRENT_ENV]: " ENVIRONMENT
+ENVIRONMENT=${ENVIRONMENT:-$CURRENT_ENV}
+
+read -p "Mail Host [$CURRENT_MAIL_HOST]: " MAIL_HOST
+MAIL_HOST=${MAIL_HOST:-$CURRENT_MAIL_HOST}
+
+read -p "Mail Port [$CURRENT_MAIL_PORT]: " MAIL_PORT
+MAIL_PORT=${MAIL_PORT:-$CURRENT_MAIL_PORT}
+
+read -p "Mail From [$CURRENT_MAIL_FROM]: " MAIL_FROM
+MAIL_FROM=${MAIL_FROM:-$CURRENT_MAIL_FROM}
+
+echo ""
+
+# Generate secrets only if not already set
+if [ -z "$CURRENT_DB_PASSWORD" ]; then
+    print_step "Generating PostgreSQL password..."
+    POSTGRES_PASSWORD=$(generate_password)
+else
+    POSTGRES_PASSWORD="$CURRENT_DB_PASSWORD"
+    print_info "Keeping existing PostgreSQL password"
+fi
+
+if [ -z "$CURRENT_REDIS_PASSWORD" ]; then
+    print_step "Generating Redis password..."
+    REDIS_PASSWORD=$(generate_password)
+else
+    REDIS_PASSWORD="$CURRENT_REDIS_PASSWORD"
+    print_info "Keeping existing Redis password"
+fi
+
+if [ -z "$CURRENT_JWT" ]; then
+    print_step "Generating JWT secret..."
+    JWT_SECRET=$(generate_password)$(generate_password)
+else
+    JWT_SECRET="$CURRENT_JWT"
+    print_info "Keeping existing JWT secret"
+fi
+
+if [ -z "$CURRENT_ENCRYPTION" ]; then
+    print_step "Generating encryption key..."
+    ENCRYPTION_KEY=$(generate_key)
+else
+    ENCRYPTION_KEY="$CURRENT_ENCRYPTION"
+    print_info "Keeping existing encryption key"
+fi
+
+# Preserve other existing config values
+CURRENT_JWT_EXPIRY=$(config_get '.auth.jwtExpiryHours' '24')
+CURRENT_REG=$(config_get '.features.registration' 'true')
+CURRENT_GITHUB=$(config_get '.features.githubSync' 'true')
+CURRENT_FREE_TRANS=$(config_get '.features.freeTranslations' 'true')
+CURRENT_FREE_CHARS=$(config_get '.limits.freeTranslationChars' '10000')
+CURRENT_MAX_PROJECTS=$(config_get '.limits.maxProjectsPerUser' '5')
+CURRENT_MAX_KEYS=$(config_get '.limits.maxKeysPerProject' '10000')
+
+# Write merged config.json
+print_step "Writing config.json..."
+cat > "$CONFIG_FILE" <<EOF
+{
+  "\$schema": "./config.schema.json",
+  "server": {
+    "urls": "http://0.0.0.0:${API_PORT}",
+    "environment": "${ENVIRONMENT}"
+  },
+  "database": {
+    "connectionString": "Host=lrmcloud-postgres;Port=5432;Database=lrmcloud;Username=lrm;Password=${POSTGRES_PASSWORD}"
+  },
+  "redis": {
+    "connectionString": "lrmcloud-redis:6379,password=${REDIS_PASSWORD}"
+  },
+  "encryption": {
+    "tokenKey": "${ENCRYPTION_KEY}"
+  },
+  "auth": {
+    "jwtSecret": "${JWT_SECRET}",
+    "jwtExpiryHours": ${CURRENT_JWT_EXPIRY}
+  },
+  "mail": {
+    "host": "${MAIL_HOST}",
+    "port": ${MAIL_PORT},
+    "fromAddress": "${MAIL_FROM}",
+    "fromName": "LRM Cloud"
+  },
+  "features": {
+    "registration": ${CURRENT_REG},
+    "githubSync": ${CURRENT_GITHUB},
+    "freeTranslations": ${CURRENT_FREE_TRANS}
+  },
+  "limits": {
+    "freeTranslationChars": ${CURRENT_FREE_CHARS},
+    "maxProjectsPerUser": ${CURRENT_MAX_PROJECTS},
+    "maxKeysPerProject": ${CURRENT_MAX_KEYS}
+  }
+}
+EOF
+chmod 600 "$CONFIG_FILE"
+print_success "Config saved to $CONFIG_FILE"
+
+# Create .env for docker-compose
+print_step "Writing .env for Docker Compose..."
+cat > "$ENV_FILE" <<EOF
+API_PORT=${API_PORT}
+POSTGRES_PORT=${POSTGRES_PORT}
+REDIS_PORT=${REDIS_PORT}
+POSTGRES_DB=lrmcloud
+POSTGRES_USER=lrm
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+REDIS_PASSWORD=${REDIS_PASSWORD}
+ENVIRONMENT=${ENVIRONMENT}
+EOF
+chmod 600 "$ENV_FILE"
+print_success "Created .env"
+
+# Pull latest images
+print_step "Pulling latest Docker images..."
+docker compose -f "$SCRIPT_DIR/docker-compose.yml" pull
+
+# Start/restart containers
+print_step "Starting containers..."
+docker compose -f "$SCRIPT_DIR/docker-compose.yml" up -d
+
+# Wait for PostgreSQL
+print_step "Waiting for PostgreSQL to be ready..."
+until docker exec lrmcloud-postgres pg_isready -U lrm -d lrmcloud &> /dev/null; do
+    sleep 1
+done
+print_success "PostgreSQL is ready"
+
+# Wait for Redis
+print_step "Waiting for Redis to be ready..."
+until docker exec lrmcloud-redis redis-cli -a "$REDIS_PASSWORD" ping &> /dev/null 2>&1; do
+    sleep 1
+done
+print_success "Redis is ready"
+
+echo ""
+echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}✓ Infrastructure setup complete!${NC}"
+echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+echo ""
+echo "Services running:"
+echo "  • API:        http://localhost:${API_PORT}"
+echo "  • PostgreSQL: localhost:${POSTGRES_PORT}"
+echo "  • Redis:      localhost:${REDIS_PORT}"
+echo ""
+echo "Configuration: $CONFIG_FILE"
+echo ""
+echo "Commands:"
+echo "  docker compose logs -f      # View logs"
+echo "  docker compose down         # Stop all services"
+echo "  docker compose restart      # Restart services"
+```
+
+### Usage
+
+```bash
+# First time setup (interactive)
+cd cloud/deploy
+./setup.sh
+
+# Subsequent runs (uses existing config.json)
+./setup.sh
+
+# Reset (start fresh)
+docker compose down -v
+rm config.json .env
+./setup.sh
+```
+
+---
+
+## CI/CD Deployment Script
+
+**Principle:** Single `deploy.sh` script for automated deployments. Git pull, rebuild images, restart containers. Safe rollback on failure.
+
+### deploy.sh
+
+```bash
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+print_step() { echo -e "${YELLOW}►${NC} $1"; }
+print_success() { echo -e "${GREEN}✓${NC} $1"; }
+print_error() { echo -e "${RED}✗${NC} $1"; }
+print_info() { echo -e "${BLUE}ℹ${NC} $1"; }
+
+# Parse arguments
+SKIP_PULL=false
+SKIP_BUILD=false
+FORCE=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --skip-pull) SKIP_PULL=true; shift ;;
+        --skip-build) SKIP_BUILD=true; shift ;;
+        --force|-f) FORCE=true; shift ;;
+        --help|-h)
+            echo "Usage: $0 [options]"
+            echo ""
+            echo "Options:"
+            echo "  --skip-pull   Skip git pull"
+            echo "  --skip-build  Skip Docker build (just restart)"
+            echo "  --force, -f   Don't ask for confirmation"
+            echo "  --help, -h    Show this help"
+            exit 0
+            ;;
+        *) print_error "Unknown option: $1"; exit 1 ;;
+    esac
+done
+
+echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${BLUE}║              LRM Cloud - Deployment                            ║${NC}"
+echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+
+# Check config exists
+if [ ! -f "$SCRIPT_DIR/config.json" ]; then
+    print_error "config.json not found. Run setup.sh first."
+    exit 1
+fi
+
+# Store current commit for rollback
+cd "$PROJECT_ROOT"
+CURRENT_COMMIT=$(git rev-parse HEAD)
+print_info "Current commit: ${CURRENT_COMMIT:0:8}"
+
+# Check for uncommitted changes
+if ! git diff-index --quiet HEAD --; then
+    print_error "Uncommitted changes detected. Commit or stash first."
+    exit 1
+fi
+
+# Confirmation
+if [ "$FORCE" = false ]; then
+    echo ""
+    read -p "Deploy to $(hostname)? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_info "Deployment cancelled"
+        exit 0
+    fi
+fi
+
+# Rollback function
+rollback() {
+    print_error "Deployment failed! Rolling back..."
+    cd "$PROJECT_ROOT"
+    git checkout "$CURRENT_COMMIT"
+    docker compose -f "$COMPOSE_FILE" up -d --no-build
+    print_error "Rolled back to ${CURRENT_COMMIT:0:8}"
+    exit 1
+}
+
+trap rollback ERR
+
+# Step 1: Git pull
+if [ "$SKIP_PULL" = false ]; then
+    print_step "Pulling latest changes..."
+    cd "$PROJECT_ROOT"
+    git fetch origin
+    git pull origin main
+    NEW_COMMIT=$(git rev-parse HEAD)
+    if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ]; then
+        print_info "Already up to date"
+    else
+        print_success "Updated to ${NEW_COMMIT:0:8}"
+        git log --oneline ${CURRENT_COMMIT}..${NEW_COMMIT} | head -10
+    fi
+else
+    print_info "Skipping git pull"
+fi
+
+# Step 2: Pull base images
+print_step "Pulling base Docker images..."
+docker compose -f "$COMPOSE_FILE" pull postgres redis
+
+# Step 3: Build API image
+if [ "$SKIP_BUILD" = false ]; then
+    print_step "Building API image..."
+    docker compose -f "$COMPOSE_FILE" build --no-cache api
+    print_success "Build complete"
+else
+    print_info "Skipping build"
+fi
+
+# Step 4: Stop old containers
+print_step "Stopping containers..."
+docker compose -f "$COMPOSE_FILE" stop api
+
+# Step 5: Start new containers
+print_step "Starting containers..."
+docker compose -f "$COMPOSE_FILE" up -d
+
+# Step 6: Wait for health
+print_step "Waiting for API to be healthy..."
+MAX_WAIT=60
+WAITED=0
+API_PORT=$(grep -oP 'API_PORT=\K\d+' "$SCRIPT_DIR/.env" || echo "5000")
+
+until curl -sf "http://localhost:$API_PORT/health" > /dev/null 2>&1; do
+    sleep 2
+    WAITED=$((WAITED + 2))
+    if [ $WAITED -ge $MAX_WAIT ]; then
+        print_error "API failed to start within ${MAX_WAIT}s"
+        rollback
+    fi
+    echo -n "."
+done
+echo ""
+print_success "API is healthy"
+
+# Step 7: Run migrations (if any)
+print_step "Running database migrations..."
+docker exec lrmcloud-api dotnet ef database update 2>/dev/null || print_info "No migrations to run"
+
+# Done
+trap - ERR
+echo ""
+echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}✓ Deployment complete!${NC}"
+echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+echo ""
+echo "Deployed commit: $(git rev-parse --short HEAD)"
+echo "API: http://localhost:$API_PORT"
+echo ""
+
+# Show recent logs
+print_info "Recent API logs:"
+docker compose -f "$COMPOSE_FILE" logs --tail=10 api
+```
+
+### Usage
+
+```bash
+# Standard deployment (git pull + build + restart)
+./deploy.sh
+
+# Quick restart (no git pull, no build)
+./deploy.sh --skip-pull --skip-build
+
+# Rebuild without pulling
+./deploy.sh --skip-pull
+
+# CI/CD (no confirmation prompt)
+./deploy.sh --force
+
+# Help
+./deploy.sh --help
+```
+
+### CI/CD Integration (GitHub Actions)
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to production
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /opt/lrmcloud
+            ./cloud/deploy/deploy.sh --force
+```
+
+### File Structure (updated)
+
+```
+cloud/deploy/
+├── setup.sh                      # First-time setup (interactive)
+├── deploy.sh                     # CI/CD deployment (automated)
+├── docker-compose.yml            # Docker Compose definition
+├── docker-compose.override.yml   # Dev overrides (git-ignored)
+├── config.example.json           # Template (in git)
+├── config.json                   # Generated config (git-ignored)
+└── .env                          # Docker env vars (git-ignored)
+```
+
+---
+
+## Configuration
+
+**Principle:** Single `config.json` file for ALL configuration (git-ignored). No `appsettings.json`. Strongly-typed with JSON Schema validation and DI access.
+
+### File Structure
+
+```
+cloud/src/LrmCloud.Api/
+├── config.json                   # ⚠️ ALL config - in .gitignore
+├── config.schema.json            # JSON Schema for validation/IDE support
+└── config.example.json           # Template for new deployments (in git)
+```
+
+### config.json
+
+```json
+{
+  "$schema": "./config.schema.json",
+
+  "server": {
+    "urls": "http://localhost:5000",
+    "environment": "Development"
+  },
+
+  "logging": {
+    "level": "Information",
+    "console": true,
+    "file": {
+      "enabled": true,
+      "path": "/var/log/lrmcloud/app.log",
+      "rollingInterval": "Day"
+    }
+  },
+
+  "cors": {
+    "origins": ["https://lrm.cloud", "http://localhost:3000"]
+  },
+
+  "database": {
+    "connectionString": "Host=localhost;Database=lrmcloud;Username=lrm;Password=xxx"
+  },
+
+  "redis": {
+    "connectionString": "localhost:6379,password=xxx"
+  },
+
+  "encryption": {
+    "tokenKey": "base64-encoded-32-byte-key-for-aes256"
+  },
+
+  "auth": {
+    "jwtSecret": "64-char-random-secret",
+    "jwtExpiryHours": 24,
+    "github": {
+      "clientId": "Ov23liXXXXXX",
+      "clientSecret": "xxxxxxxxxxxxxxxxxxxxxx"
+    }
+  },
+
+  "mail": {
+    "host": "mail.yourdomain.com",
+    "port": 587,
+    "username": "noreply@lrm.cloud",
+    "password": "xxxx",
+    "fromAddress": "noreply@lrm.cloud",
+    "fromName": "LRM Cloud"
+  },
+
+  "translation": {
+    "platformKeys": {
+      "google": "AIzaSyXXXXX",
+      "deepl": "xxxxxxxx-xxxx-xxxx-xxxx",
+      "azure": "xxxxxxxxxxxxxxxx"
+    },
+    "defaultProvider": "deepl"
+  },
+
+  "stripe": {
+    "secretKey": "sk_live_XXXXX",
+    "webhookSecret": "whsec_XXXXX",
+    "publishableKey": "pk_live_XXXXX"
+  },
+
+  "features": {
+    "registration": true,
+    "githubSync": true,
+    "freeTranslations": true
+  },
+
+  "limits": {
+    "freeTranslationChars": 10000,
+    "proTranslationChars": 100000,
+    "maxProjectsPerUser": 5,
+    "maxKeysPerProject": 10000
+  }
+}
+```
+
+### Strongly-Typed Configuration
+
+```csharp
+// Configuration/AppConfig.cs
+public class AppConfig
+{
+    public ServerConfig Server { get; set; } = new();
+    public LoggingConfig Logging { get; set; } = new();
+    public CorsConfig Cors { get; set; } = new();
+    public DatabaseConfig Database { get; set; } = new();
+    public RedisConfig Redis { get; set; } = new();
+    public EncryptionConfig Encryption { get; set; } = new();
+    public AuthConfig Auth { get; set; } = new();
+    public MailConfig Mail { get; set; } = new();
+    public TranslationConfig Translation { get; set; } = new();
+    public StripeConfig Stripe { get; set; } = new();
+    public FeaturesConfig Features { get; set; } = new();
+    public LimitsConfig Limits { get; set; } = new();
+}
+
+public class ServerConfig
+{
+    public string Urls { get; set; } = "http://localhost:5000";
+    public string Environment { get; set; } = "Development";
+}
+
+public class DatabaseConfig
+{
+    public required string ConnectionString { get; set; }
+}
+
+public class AuthConfig
+{
+    public required string JwtSecret { get; set; }
+    public int JwtExpiryHours { get; set; } = 24;
+    public GitHubOAuthConfig? GitHub { get; set; }
+}
+
+public class FeaturesConfig
+{
+    public bool Registration { get; set; } = true;
+    public bool GitHubSync { get; set; } = true;
+    public bool FreeTranslations { get; set; } = true;
+}
+
+public class LimitsConfig
+{
+    public int FreeTranslationChars { get; set; } = 10000;
+    public int ProTranslationChars { get; set; } = 100000;
+    public int MaxProjectsPerUser { get; set; } = 5;
+    public int MaxKeysPerProject { get; set; } = 10000;
+}
+// ... other config classes
+```
+
+### IConfigService
+
+```csharp
+// Services/IConfigService.cs
+public interface IConfigService
+{
+    AppConfig Config { get; }
+
+    // Convenience accessors
+    string GetDatabaseConnectionString();
+    string GetEncryptionKey();
+    string? GetTranslationKey(string provider);
+    bool IsFeatureEnabled(string feature);
+}
+
+// Services/ConfigService.cs
+public class ConfigService : IConfigService
+{
+    public AppConfig Config { get; }
+
+    public ConfigService()
+    {
+        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+        if (!File.Exists(configPath))
+            throw new FileNotFoundException($"config.json not found at {configPath}");
+
+        var json = File.ReadAllText(configPath);
+        Config = JsonSerializer.Deserialize<AppConfig>(json, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        }) ?? throw new InvalidOperationException("Failed to parse config.json");
+
+        ValidateRequired();
+    }
+
+    private void ValidateRequired()
+    {
+        if (string.IsNullOrEmpty(Config.Database?.ConnectionString))
+            throw new InvalidOperationException("database.connectionString is required");
+        if (string.IsNullOrEmpty(Config.Encryption?.TokenKey))
+            throw new InvalidOperationException("encryption.tokenKey is required");
+        if (string.IsNullOrEmpty(Config.Auth?.JwtSecret))
+            throw new InvalidOperationException("auth.jwtSecret is required");
+    }
+
+    public string GetDatabaseConnectionString() => Config.Database.ConnectionString;
+    public string GetEncryptionKey() => Config.Encryption.TokenKey;
+    public string? GetTranslationKey(string provider) =>
+        Config.Translation.PlatformKeys.GetValueOrDefault(provider.ToLower());
+    public bool IsFeatureEnabled(string feature) => feature switch
+    {
+        "registration" => Config.Features.Registration,
+        "githubSync" => Config.Features.GitHubSync,
+        "freeTranslations" => Config.Features.FreeTranslations,
+        _ => false
+    };
+}
+```
+
+### Registration in Program.cs
+
+```csharp
+// Program.cs - No appsettings.json, just config.json
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+});
+
+// Clear default config sources (removes appsettings.json)
+builder.Configuration.Sources.Clear();
+
+// Load only config.json
+builder.Configuration.AddJsonFile("config.json", optional: false, reloadOnChange: true);
+
+// Register config service as singleton
+builder.Services.AddSingleton<IConfigService, ConfigService>();
+
+// Configure services using config
+var configService = new ConfigService();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(configService.GetDatabaseConnectionString()));
+
+builder.Services.AddStackExchangeRedisCache(options =>
+    options.Configuration = configService.Config.Redis.ConnectionString);
+
+// Configure Kestrel URLs from config
+builder.WebHost.UseUrls(configService.Config.Server.Urls);
+```
+
+### .gitignore
+
+```
+# Config - NEVER commit (contains secrets)
+config.json
+
+# But DO commit the example
+!config.example.json
+```
+
+### config.example.json (committed to git)
+
+```json
+{
+  "$schema": "./config.schema.json",
+  "server": {
+    "urls": "http://localhost:5000",
+    "environment": "Development"
+  },
+  "database": {
+    "connectionString": "Host=localhost;Database=lrmcloud;Username=lrm;Password=CHANGE_ME"
+  },
+  "encryption": {
+    "tokenKey": "GENERATE_32_BYTE_BASE64_KEY"
+  },
+  "auth": {
+    "jwtSecret": "GENERATE_64_CHAR_SECRET"
+  }
+}
+```
+
+### Production Deployment
+
+On the server, `config.json` is:
+1. Created from `config.example.json` on first deploy
+2. Stored in `/etc/lrmcloud/config.json`
+3. Mounted into Docker container
+4. Permissions: `600` (owner read/write only)
+
+```yaml
+# docker-compose.prod.yml
+services:
+  api:
+    volumes:
+      - /etc/lrmcloud/config.json:/app/config.json:ro
+```
+
+---
+
+## Database Schema
+
+### Users & Auth
 
 ```sql
--- =====================
--- USERS & AUTH
--- =====================
-
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-
-    -- Authentication (multiple methods)
     auth_type VARCHAR(50) NOT NULL,        -- 'email', 'github', 'google'
     email VARCHAR(255) UNIQUE,
     email_verified BOOLEAN DEFAULT false,
@@ -79,8 +972,7 @@ CREATE TABLE users (
     -- GitHub OAuth (optional)
     github_id BIGINT UNIQUE,
     github_access_token_encrypted TEXT,
-    github_refresh_token_encrypted TEXT,
-    github_token_expires_at TIMESTAMP,
+    github_token_expires_at TIMESTAMPTZ,
 
     -- Profile
     username VARCHAR(255) NOT NULL,
@@ -90,123 +982,160 @@ CREATE TABLE users (
     -- Subscription
     plan VARCHAR(50) DEFAULT 'free',       -- free, pro, team, enterprise
     stripe_customer_id VARCHAR(255),
-    stripe_subscription_id VARCHAR(255),
     translation_chars_used INT DEFAULT 0,
     translation_chars_limit INT DEFAULT 10000,
-    translation_chars_reset_at TIMESTAMP,
-    projects_limit INT DEFAULT 1,
+    translation_chars_reset_at TIMESTAMPTZ,
 
-    -- Security
-    password_reset_token VARCHAR(255),
-    password_reset_expires TIMESTAMP,
-    email_verification_token VARCHAR(255),
-    last_login_at TIMESTAMP,
+    -- Security (tokens are hashed, not plain text)
+    password_reset_token_hash VARCHAR(255),
+    password_reset_expires TIMESTAMPTZ,
+    email_verification_token_hash VARCHAR(255),
+    last_login_at TIMESTAMPTZ,
     failed_login_attempts INT DEFAULT 0,
-    locked_until TIMESTAMP,
+    locked_until TIMESTAMPTZ,
 
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    -- Soft delete
+    deleted_at TIMESTAMPTZ,
+
+    -- Audit
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_github_id ON users(github_id);
-CREATE INDEX idx_users_stripe_customer ON users(stripe_customer_id);
 
--- =====================
--- PROJECTS
--- =====================
+-- Row-Level Security
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY users_own_data ON users
+    USING (id = current_setting('app.user_id')::INT);
+```
 
+### Organizations (Teams)
+
+```sql
+CREATE TABLE organizations (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
+    owner_id INT NOT NULL REFERENCES users(id),
+    plan VARCHAR(50) DEFAULT 'team',
+    stripe_customer_id VARCHAR(255),
+    translation_chars_used INT DEFAULT 0,
+    translation_chars_limit INT DEFAULT 500000,
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ
+);
+
+CREATE TABLE organization_members (
+    id SERIAL PRIMARY KEY,
+    organization_id INT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role VARCHAR(50) NOT NULL DEFAULT 'member',  -- owner, admin, member, viewer
+    invited_by INT REFERENCES users(id),
+    invited_at TIMESTAMPTZ,
+    accepted_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(organization_id, user_id)
+);
+
+CREATE INDEX idx_org_members_org ON organization_members(organization_id);
+CREATE INDEX idx_org_members_user ON organization_members(user_id);
+```
+
+### Projects
+
+```sql
 CREATE TABLE projects (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    organization_id INT REFERENCES organizations(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
 
     -- GitHub integration (NULL if CLI-only)
-    github_repo VARCHAR(255),              -- owner/repo
+    github_repo VARCHAR(255),
     github_installation_id BIGINT,
     github_default_branch VARCHAR(100) DEFAULT 'main',
     github_webhook_secret VARCHAR(255),
 
     -- Localization settings
-    localization_path VARCHAR(500) DEFAULT '.',  -- relative path in repo
+    localization_path VARCHAR(500) DEFAULT '.',
     format VARCHAR(50) NOT NULL,           -- resx, json, i18next
     default_language VARCHAR(10) DEFAULT 'en',
 
     -- Sync settings
-    sync_mode VARCHAR(50) DEFAULT 'manual', -- github_app, cli, manual
+    sync_mode VARCHAR(50) DEFAULT 'manual',
     auto_translate BOOLEAN DEFAULT false,
     auto_create_pr BOOLEAN DEFAULT true,
 
     -- State
-    last_synced_at TIMESTAMP,
+    last_synced_at TIMESTAMPTZ,
     last_synced_commit VARCHAR(40),
-    sync_status VARCHAR(50) DEFAULT 'pending', -- pending, syncing, synced, error
+    sync_status VARCHAR(50) DEFAULT 'pending',
     sync_error TEXT,
 
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
 
-    UNIQUE(user_id, name)
+    CONSTRAINT project_owner CHECK (
+        (user_id IS NOT NULL AND organization_id IS NULL) OR
+        (user_id IS NULL AND organization_id IS NOT NULL)
+    )
 );
 
 CREATE INDEX idx_projects_user ON projects(user_id);
+CREATE INDEX idx_projects_org ON projects(organization_id);
 CREATE INDEX idx_projects_github_repo ON projects(github_repo);
-CREATE INDEX idx_projects_installation ON projects(github_installation_id);
 
--- =====================
--- PROJECT LANGUAGES
--- =====================
+-- Row-Level Security
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+CREATE POLICY projects_access ON projects
+    USING (
+        user_id = current_setting('app.user_id')::INT
+        OR organization_id IN (
+            SELECT organization_id FROM organization_members
+            WHERE user_id = current_setting('app.user_id')::INT
+        )
+    );
+```
 
-CREATE TABLE project_languages (
-    id SERIAL PRIMARY KEY,
-    project_id INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    language_code VARCHAR(10) NOT NULL,    -- en, fr, de, etc.
-    is_default BOOLEAN DEFAULT false,
-    total_keys INT DEFAULT 0,
-    translated_keys INT DEFAULT 0,
-    created_at TIMESTAMP DEFAULT NOW(),
+### Resource Keys & Translations
 
-    UNIQUE(project_id, language_code)
-);
-
-CREATE INDEX idx_project_languages_project ON project_languages(project_id);
-
--- =====================
--- RESOURCE KEYS (cached from files)
--- =====================
-
+```sql
 CREATE TABLE resource_keys (
     id SERIAL PRIMARY KEY,
     project_id INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     key_name VARCHAR(500) NOT NULL,
-    key_path VARCHAR(500),                 -- for nested keys: "navigation.home"
+    key_path VARCHAR(500),
     is_plural BOOLEAN DEFAULT false,
     comment TEXT,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
+    version INT DEFAULT 1,  -- For optimistic locking
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
 
     UNIQUE(project_id, key_name)
 );
 
 CREATE INDEX idx_resource_keys_project ON resource_keys(project_id);
-CREATE INDEX idx_resource_keys_name ON resource_keys(key_name);
-
--- =====================
--- TRANSLATIONS
--- =====================
 
 CREATE TABLE translations (
     id SERIAL PRIMARY KEY,
     resource_key_id INT NOT NULL REFERENCES resource_keys(id) ON DELETE CASCADE,
     language_code VARCHAR(10) NOT NULL,
     value TEXT,
-    plural_form VARCHAR(20),               -- one, other, few, many, etc.
+    plural_form VARCHAR(20) DEFAULT '',    -- one, other, few, many, etc.
     status VARCHAR(50) DEFAULT 'pending',  -- pending, translated, reviewed, approved
-    translated_by VARCHAR(50),             -- user, machine:google, machine:deepl
+    translated_by VARCHAR(50),
     reviewed_by INT REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
+    version INT DEFAULT 1,  -- For optimistic locking
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
 
     UNIQUE(resource_key_id, language_code, plural_form)
 );
@@ -214,104 +1143,111 @@ CREATE TABLE translations (
 CREATE INDEX idx_translations_key ON translations(resource_key_id);
 CREATE INDEX idx_translations_language ON translations(language_code);
 CREATE INDEX idx_translations_status ON translations(status);
+CREATE INDEX idx_translations_updated ON translations(updated_at);
+```
 
--- =====================
--- API KEYS (for CLI sync)
--- =====================
+### API Keys
 
+```sql
 CREATE TABLE api_keys (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    project_id INT REFERENCES projects(id) ON DELETE CASCADE,  -- NULL = all projects
-    key_prefix VARCHAR(10) NOT NULL,       -- first 8 chars for identification
-    key_hash VARCHAR(255) NOT NULL,        -- bcrypt hash
+    project_id INT REFERENCES projects(id) ON DELETE CASCADE,
+    key_prefix VARCHAR(10) NOT NULL,
+    key_hash VARCHAR(255) NOT NULL,
     name VARCHAR(255),
-    scopes VARCHAR(255) DEFAULT 'read,write', -- read, write, translate
-    last_used_at TIMESTAMP,
-    expires_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW()
+    scopes VARCHAR(255) DEFAULT 'read,write',
+    last_used_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_api_keys_user ON api_keys(user_id);
 CREATE INDEX idx_api_keys_prefix ON api_keys(key_prefix);
+CREATE INDEX idx_api_keys_expires ON api_keys(expires_at);
+```
 
--- =====================
--- GITHUB APP INSTALLATIONS
--- =====================
+### Translation API Keys (Hierarchy)
 
-CREATE TABLE github_installations (
+```sql
+CREATE TABLE user_api_keys (
     id SERIAL PRIMARY KEY,
-    installation_id BIGINT UNIQUE NOT NULL,
-    account_login VARCHAR(255) NOT NULL,   -- user or org name
-    account_type VARCHAR(50),              -- User or Organization
-    access_token_encrypted TEXT,
-    token_expires_at TIMESTAMP,
-    repositories JSONB,                    -- list of repos with access
-    suspended_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider VARCHAR(50) NOT NULL,  -- google, deepl, openai, etc.
+    encrypted_key TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, provider)
 );
 
-CREATE INDEX idx_github_installations_id ON github_installations(installation_id);
+CREATE TABLE organization_api_keys (
+    id SERIAL PRIMARY KEY,
+    organization_id INT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    provider VARCHAR(50) NOT NULL,
+    encrypted_key TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(organization_id, provider)
+);
 
--- =====================
--- SYNC HISTORY
--- =====================
+CREATE TABLE project_api_keys (
+    id SERIAL PRIMARY KEY,
+    project_id INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    provider VARCHAR(50) NOT NULL,
+    encrypted_key TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(project_id, provider)
+);
+```
 
+### Sync & Conflicts
+
+```sql
 CREATE TABLE sync_history (
     id SERIAL PRIMARY KEY,
     project_id INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    sync_type VARCHAR(50) NOT NULL,        -- push, pull, github_webhook
-    direction VARCHAR(20),                 -- inbound, outbound
+    sync_type VARCHAR(50) NOT NULL,
+    direction VARCHAR(20),
     commit_sha VARCHAR(40),
     pr_number INT,
     pr_url TEXT,
     keys_added INT DEFAULT 0,
     keys_updated INT DEFAULT 0,
     keys_deleted INT DEFAULT 0,
-    status VARCHAR(50),                    -- success, failed, partial
+    status VARCHAR(50),
     error_message TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_sync_history_project ON sync_history(project_id);
-CREATE INDEX idx_sync_history_created ON sync_history(created_at);
-
--- =====================
--- TRANSLATION USAGE
--- =====================
-
-CREATE TABLE translation_usage (
+CREATE TABLE sync_conflicts (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    project_id INT REFERENCES projects(id) ON DELETE SET NULL,
-    provider VARCHAR(50) NOT NULL,         -- google, deepl, openai, etc.
-    source_language VARCHAR(10),
-    target_language VARCHAR(10),
-    chars_translated INT NOT NULL,
-    cost_estimate DECIMAL(10, 4),          -- estimated cost in USD
-    created_at TIMESTAMP DEFAULT NOW()
+    project_id INT NOT NULL REFERENCES projects(id),
+    resource_key_id INT REFERENCES resource_keys(id),
+    language_code VARCHAR(10),
+    local_value TEXT,
+    remote_value TEXT,
+    local_updated_at TIMESTAMPTZ,
+    remote_updated_at TIMESTAMPTZ,
+    resolution VARCHAR(50),  -- local_wins, remote_wins, manual
+    resolved_by INT REFERENCES users(id),
+    resolved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
+```
 
-CREATE INDEX idx_translation_usage_user ON translation_usage(user_id);
-CREATE INDEX idx_translation_usage_created ON translation_usage(created_at);
+### Audit Log
 
--- =====================
--- AUDIT LOG
--- =====================
-
+```sql
 CREATE TABLE audit_log (
     id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(id),
     project_id INT REFERENCES projects(id),
-    action VARCHAR(100) NOT NULL,          -- key.created, key.translated, project.synced
+    action VARCHAR(100) NOT NULL,
     entity_type VARCHAR(50),
     entity_id INT,
     old_value JSONB,
     new_value JSONB,
     ip_address INET,
     user_agent TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_audit_log_user ON audit_log(user_id);
@@ -321,14 +1257,82 @@ CREATE INDEX idx_audit_log_created ON audit_log(created_at);
 
 ---
 
+## Conflict Resolution Strategy
+
+### Overview
+Use **optimistic locking with user prompt** for conflicts:
+
+1. Each resource has a `version` number
+2. On sync, client sends its version
+3. If versions don't match, conflict detected
+4. User prompted to resolve
+
+### CLI Sync Flow
+
+```
+lrm push
+    │
+    ├── POST /api/sync/push { files, localVersions }
+    │
+    ├── Server compares versions
+    │       │
+    │       ├── No conflicts → Apply changes, return new versions
+    │       │
+    │       └── Conflicts detected → Return 409 with conflict details
+    │
+    └── CLI shows conflict UI:
+
+        ┌─────────────────────────────────────────────────────────┐
+        │ Conflict detected for key: WelcomeMessage (en)          │
+        │                                                         │
+        │ LOCAL (modified 2 hours ago):                          │
+        │   "Welcome to our app!"                                │
+        │                                                         │
+        │ REMOTE (modified 30 min ago by john@example.com):      │
+        │   "Welcome to LRM Cloud!"                              │
+        │                                                         │
+        │ [L] Keep local  [R] Keep remote  [M] Manual merge      │
+        └─────────────────────────────────────────────────────────┘
+```
+
+### Web UI Handling
+- Real-time updates via polling (every 5s) or WebSocket
+- If another user edits while you're editing:
+  - Toast notification: "This key was updated by John"
+  - Option to reload or overwrite
+
+### API Response for Conflicts
+
+```json
+{
+  "status": "conflict",
+  "conflicts": [
+    {
+      "key": "WelcomeMessage",
+      "language": "en",
+      "local": { "value": "Welcome to our app!", "version": 3, "updatedAt": "..." },
+      "remote": { "value": "Welcome to LRM Cloud!", "version": 4, "updatedAt": "...", "updatedBy": "john@..." }
+    }
+  ]
+}
+```
+
+---
+
 ## API Endpoints
 
 ### Auth
 ```
-GET  /auth/github              # Redirect to GitHub OAuth
-GET  /auth/github/callback     # OAuth callback
-POST /auth/logout
-GET  /api/me                   # Current user info
+POST /auth/register           # Email/password registration
+POST /auth/login              # Email/password login
+POST /auth/logout             # End session
+POST /auth/forgot-password    # Request reset email
+POST /auth/reset-password     # Set new password
+POST /auth/verify-email       # Confirm email address
+GET  /auth/github             # Redirect to GitHub OAuth
+GET  /auth/github/callback    # OAuth callback
+POST /auth/link-github        # Link GitHub to existing account
+GET  /api/me                  # Current user info
 ```
 
 ### Projects
@@ -336,6 +1340,7 @@ GET  /api/me                   # Current user info
 GET    /api/projects                    # List user's projects
 POST   /api/projects                    # Create project
 GET    /api/projects/:id                # Get project details
+PUT    /api/projects/:id                # Update project
 DELETE /api/projects/:id                # Delete project
 POST   /api/projects/:id/sync           # Trigger sync from GitHub
 ```
@@ -352,11 +1357,30 @@ GET    /api/projects/:id/stats          # Translation stats
 GET    /api/projects/:id/validate       # Validate resources
 ```
 
+### Organizations
+```
+GET    /api/organizations               # List user's organizations
+POST   /api/organizations               # Create organization
+GET    /api/organizations/:id           # Get organization details
+PUT    /api/organizations/:id           # Update organization
+DELETE /api/organizations/:id           # Delete organization
+GET    /api/organizations/:id/members   # List members
+POST   /api/organizations/:id/members   # Invite member
+DELETE /api/organizations/:id/members/:uid  # Remove member
+PUT    /api/organizations/:id/members/:uid  # Update member role
+```
+
 ### CLI Sync
 ```
 POST /api/sync/push           # Upload local files (API key auth)
 GET  /api/sync/pull           # Download current state
 POST /api/sync/commit         # Create PR/commit with changes
+```
+
+### GDPR
+```
+GET    /api/me/export         # Export all user data (JSON)
+DELETE /api/me                # Request account deletion
 ```
 
 ### GitHub Webhooks
@@ -371,6 +1395,7 @@ POST /webhooks/github         # Handle push events, PR events
 ```bash
 # Link project to cloud
 lrm cloud login                    # GitHub OAuth via browser
+lrm cloud logout                   # Clear stored credentials
 lrm cloud init                     # Create project, get API key
 lrm cloud link <project-id>        # Link existing local folder
 
@@ -386,753 +1411,215 @@ lrm cloud status                   # Show sync status
 
 ---
 
-## Authentication (Multiple Methods)
-
-### Supported Auth Methods
-- **Email/Password** - Standalone registration (no GitHub required)
-- **GitHub OAuth** - One-click login for developers
-- **Google OAuth** - (Future) Broader audience
-- **Account Linking** - Connect GitHub to existing email account
-
-### 1. Email/Password Registration
-
-**API Endpoints:**
-```
-POST /auth/register          # Create account
-POST /auth/login             # Email/password login
-POST /auth/logout            # End session
-POST /auth/forgot-password   # Request reset email
-POST /auth/reset-password    # Set new password
-POST /auth/verify-email      # Confirm email address
-```
-
-**Flow:**
-```
-User fills registration form (email, password, username)
-    ↓
-POST /auth/register
-    → Validate email unique, password strength
-    → Hash password (bcrypt, cost 12)
-    → Create user with email_verified = false
-    → Generate verification token
-    → Send verification email
-    ↓
-User clicks link in email
-    ↓
-POST /auth/verify-email?token=xxx
-    → Set email_verified = true
-    ↓
-User can now login
-```
-
-**Code (AuthController.cs):**
-```csharp
-[HttpPost("register")]
-public async Task<IActionResult> Register([FromBody] RegisterRequest request)
-{
-    // Validate
-    if (await _db.Users.AnyAsync(u => u.Email == request.Email))
-        return BadRequest("Email already registered");
-
-    if (!IsValidPassword(request.Password))
-        return BadRequest("Password must be 8+ chars with number and symbol");
-
-    // Create user
-    var user = new User
-    {
-        AuthType = "email",
-        Email = request.Email,
-        Username = request.Username ?? request.Email.Split('@')[0],
-        PasswordHash = BCrypt.HashPassword(request.Password, 12),
-        EmailVerified = false,
-        EmailVerificationToken = GenerateToken()
-    };
-
-    _db.Users.Add(user);
-    await _db.SaveChangesAsync();
-
-    // Send verification email
-    await _emailService.SendVerificationEmail(user.Email, user.EmailVerificationToken);
-
-    return Ok(new { message = "Please check your email to verify your account" });
-}
-
-[HttpPost("login")]
-public async Task<IActionResult> Login([FromBody] LoginRequest request)
-{
-    var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
-
-    if (user == null || !BCrypt.Verify(request.Password, user.PasswordHash))
-    {
-        // Track failed attempts
-        if (user != null)
-        {
-            user.FailedLoginAttempts++;
-            if (user.FailedLoginAttempts >= 5)
-                user.LockedUntil = DateTime.UtcNow.AddMinutes(15);
-            await _db.SaveChangesAsync();
-        }
-        return Unauthorized("Invalid email or password");
-    }
-
-    if (user.LockedUntil > DateTime.UtcNow)
-        return Unauthorized("Account locked. Try again later.");
-
-    if (!user.EmailVerified)
-        return Unauthorized("Please verify your email first");
-
-    // Reset failed attempts, update last login
-    user.FailedLoginAttempts = 0;
-    user.LastLoginAt = DateTime.UtcNow;
-    await _db.SaveChangesAsync();
-
-    // Set auth cookie
-    await HttpContext.SignInAsync(user.ToClaims());
-
-    return Ok(new { user = user.ToDto() });
-}
-```
-
-### 2. GitHub OAuth (Optional)
-
-**Setup:**
-- [ ] Create OAuth App at github.com/settings/developers
-- [ ] Set callback URL: `https://lrm.cloud/auth/github/callback`
-- [ ] Store Client ID and Client Secret in env vars
-
-**Flow:**
-```
-User clicks "Login with GitHub"
-    ↓
-Redirect to: github.com/login/oauth/authorize
-    ?client_id=xxx
-    &redirect_uri=https://lrm.cloud/auth/github/callback
-    &scope=user:email
-    ↓
-GitHub redirects back with ?code=xxx
-    ↓
-POST github.com/login/oauth/access_token
-    → Get access_token
-    ↓
-GET api.github.com/user
-    → Get user info (id, login, email, avatar)
-    ↓
-Create/update user in DB, set session cookie
-```
-
-**Code (AuthController.cs):**
-```csharp
-[HttpGet("github")]
-public IActionResult GitHubLogin([FromQuery] string? returnUrl)
-{
-    var state = GenerateState(returnUrl);  // CSRF protection
-    var url = $"https://github.com/login/oauth/authorize" +
-              $"?client_id={_config.GitHubClientId}" +
-              $"&redirect_uri={_config.GitHubCallbackUrl}" +
-              $"&scope=user:email" +
-              $"&state={state}";
-    return Redirect(url);
-}
-
-[HttpGet("github/callback")]
-public async Task<IActionResult> GitHubCallback(string code, string state)
-{
-    // Verify state (CSRF protection)
-    var returnUrl = ValidateState(state);
-
-    // Exchange code for token
-    var token = await _github.ExchangeCodeForToken(code);
-    var ghUser = await _github.GetUser(token);
-
-    // Check if GitHub account is linked to existing user
-    var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.GitHubId == ghUser.Id);
-
-    if (existingUser != null)
-    {
-        // Update token, login
-        existingUser.GitHubAccessTokenEncrypted = Encrypt(token);
-        await _db.SaveChangesAsync();
-        await HttpContext.SignInAsync(existingUser.ToClaims());
-    }
-    else
-    {
-        // Check if email already registered
-        var emailUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == ghUser.Email);
-        if (emailUser != null)
-        {
-            // Link GitHub to existing account
-            emailUser.GitHubId = ghUser.Id;
-            emailUser.GitHubAccessTokenEncrypted = Encrypt(token);
-            await _db.SaveChangesAsync();
-            await HttpContext.SignInAsync(emailUser.ToClaims());
-        }
-        else
-        {
-            // Create new user
-            var user = new User
-            {
-                AuthType = "github",
-                GitHubId = ghUser.Id,
-                Email = ghUser.Email,
-                EmailVerified = true,  // GitHub verified
-                Username = ghUser.Login,
-                AvatarUrl = ghUser.AvatarUrl,
-                GitHubAccessTokenEncrypted = Encrypt(token)
-            };
-            _db.Users.Add(user);
-            await _db.SaveChangesAsync();
-            await HttpContext.SignInAsync(user.ToClaims());
-        }
-    }
-
-    return Redirect(returnUrl ?? "/dashboard");
-}
-```
-
-### 3. Account Linking
-
-Users can link GitHub to their email account for repo access:
+## Email Service Abstraction
 
 ```csharp
-[HttpPost("link-github")]
-[Authorize]
-public async Task<IActionResult> LinkGitHub()
+// IMailService.cs
+public interface IMailService
 {
-    // Redirect to GitHub OAuth with "link" state
-    var state = GenerateState("link");
-    return Redirect($"https://github.com/login/oauth/authorize?...&state={state}");
+    Task SendEmailAsync(string to, string subject, string htmlBody, string? textBody = null);
+    Task SendTemplateEmailAsync(string to, string templateName, object model);
 }
 
-// In callback, check if state indicates linking:
-if (stateData.Action == "link")
+// SendmailService.cs - Your mail server
+public class SendmailService : IMailService
 {
-    var currentUser = await GetCurrentUser();
-    currentUser.GitHubId = ghUser.Id;
-    currentUser.GitHubAccessTokenEncrypted = Encrypt(token);
-    await _db.SaveChangesAsync();
-    return Redirect("/account/settings?linked=github");
+    private readonly IConfiguration _config;
+    private readonly ILogger<SendmailService> _logger;
+
+    public async Task SendEmailAsync(string to, string subject, string htmlBody, string? textBody)
+    {
+        var msg = new MimeMessage();
+        msg.From.Add(new MailboxAddress(_config["Mail:FromName"], _config["Mail:FromAddress"]));
+        msg.To.Add(MailboxAddress.Parse(to));
+        msg.Subject = subject;
+
+        var builder = new BodyBuilder
+        {
+            HtmlBody = htmlBody,
+            TextBody = textBody ?? StripHtml(htmlBody)
+        };
+        msg.Body = builder.ToMessageBody();
+
+        using var client = new SmtpClient();
+        await client.ConnectAsync(_config["Mail:Host"], _config.GetValue<int>("Mail:Port"), SecureSocketOptions.Auto);
+
+        if (!string.IsNullOrEmpty(_config["Mail:Username"]))
+            await client.AuthenticateAsync(_config["Mail:Username"], _config["Mail:Password"]);
+
+        await client.SendAsync(msg);
+        await client.DisconnectAsync(true);
+    }
+}
+
+// Configuration in appsettings.json
+{
+  "Mail": {
+    "Provider": "Sendmail",  // or "SendGrid", "Postmark" for future
+    "Host": "mail.yourdomain.com",
+    "Port": 587,
+    "FromAddress": "noreply@lrm.cloud",
+    "FromName": "LRM Cloud"
+  }
 }
 ```
 
 ---
 
-## GitHub App (Repo Access)
+## Translation API Key Hierarchy
 
-**Setup:**
+```csharp
+public class TranslationKeyResolver
+{
+    public async Task<string?> GetApiKey(Project project, User user, string provider)
+    {
+        // 1. Check project-level key
+        var projectKey = await _db.ProjectApiKeys
+            .FirstOrDefaultAsync(k => k.ProjectId == project.Id && k.Provider == provider);
+        if (projectKey != null)
+            return Decrypt(projectKey.EncryptedKey);
+
+        // 2. Check user-level key
+        var userKey = await _db.UserApiKeys
+            .FirstOrDefaultAsync(k => k.UserId == user.Id && k.Provider == provider);
+        if (userKey != null)
+            return Decrypt(userKey.EncryptedKey);
+
+        // 3. Check organization-level key (if team project)
+        if (project.OrganizationId.HasValue)
+        {
+            var orgKey = await _db.OrganizationApiKeys
+                .FirstOrDefaultAsync(k => k.OrganizationId == project.OrganizationId && k.Provider == provider);
+            if (orgKey != null)
+                return Decrypt(orgKey.EncryptedKey);
+        }
+
+        // 4. Fall back to platform key
+        return _config[$"Translation:{provider}:PlatformKey"];
+    }
+}
+```
+
+---
+
+## Security Implementation
+
+### Critical Fixes (Before Launch)
+
+1. **Account Enumeration Prevention**
+```csharp
+// Return same message for all login failures
+return Unauthorized(new { message = "Invalid email or password" });
+// Don't reveal if email exists
+```
+
+2. **Hash Password Reset Tokens**
+```csharp
+var token = GenerateSecureToken();
+var tokenHash = BCrypt.HashPassword(token, 10);
+user.PasswordResetTokenHash = tokenHash;
+// Send plain token to user, store hash
+```
+
+3. **Security Headers (nginx)**
+```nginx
+add_header X-Frame-Options "DENY" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-XSS-Protection "1; mode=block" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline';" always;
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+# Rate limiting
+limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
+location /api/auth/login {
+    limit_req zone=login burst=3 nodelay;
+}
+```
+
+4. **Row-Level Security**
+```sql
+-- Enabled on users, projects, resource_keys, translations tables
+-- Policies defined above in schema
+```
+
+### SOC2 Foundation
+
+1. **Audit Logging** - All changes logged with user, timestamp, old/new values
+2. **Session Management**
+   - Cookie: `HttpOnly`, `Secure`, `SameSite=Strict`
+   - Session expiry: 24 hours (configurable)
+   - Invalidate on password change
+3. **Data Encryption**
+   - AES-256-GCM for API keys and tokens
+   - Key stored in environment variable (not code)
+4. **Access Control**
+   - Role-based: owner, admin, member, viewer
+   - Scoped API keys
+
+---
+
+## GDPR Implementation
+
+### Required Features
+
+1. **Privacy Policy Page** - `/privacy`
+2. **Cookie Consent** - Simple banner (only essential cookies for MVP)
+3. **Data Export API**
+```
+GET /api/me/export
+→ Returns JSON with all user data
+```
+4. **Account Deletion API**
+```
+DELETE /api/me
+→ Soft delete with 30-day grace period
+→ Hard delete after 30 days (background job)
+```
+5. **Data Processing Agreement** - For team admins
+
+### Database Helper
+
+```sql
+CREATE FUNCTION export_user_data(user_id INT) RETURNS JSONB AS $$
+SELECT jsonb_build_object(
+    'user', row_to_json(u.*),
+    'projects', (SELECT jsonb_agg(row_to_json(p.*)) FROM projects p WHERE p.user_id = user_id),
+    'translations', (SELECT jsonb_agg(row_to_json(t.*)) FROM translations t
+                     JOIN resource_keys k ON t.resource_key_id = k.id
+                     JOIN projects p ON k.project_id = p.id
+                     WHERE p.user_id = user_id),
+    'audit_log', (SELECT jsonb_agg(row_to_json(a.*)) FROM audit_log a WHERE a.user_id = user_id)
+)
+FROM users u WHERE u.id = user_id;
+$$ LANGUAGE SQL;
+```
+
+---
+
+## GitHub App Integration
+
+### Setup
 - [ ] Create GitHub App at github.com/settings/apps/new
 - [ ] App name: "LRM Cloud"
 - [ ] Homepage: https://lrm.cloud
 - [ ] Webhook URL: https://lrm.cloud/webhooks/github
 - [ ] Webhook secret: Generate and store securely
-- [ ] Generate private key (.pem file)
+- [ ] Generate private key (.pem file) - store in secrets
 
-**Permissions:**
+### Permissions
 | Permission | Access | Reason |
 |------------|--------|--------|
 | Contents | Read & Write | Read localization files, create commits |
 | Pull requests | Read & Write | Create PRs with translation changes |
 | Metadata | Read | Get repo info |
 
-**Webhook Events:**
+### Webhook Events
 | Event | Handler |
 |-------|---------|
 | `installation` | Save installation ID, list of repos |
 | `installation_repositories` | Update repo list |
 | `push` | Sync localization files on push |
-| `pull_request` | (Future) Add translation status check |
-
-**Installation Flow:**
-```
-User clicks "Connect GitHub Repo"
-    ↓
-Redirect to: github.com/apps/lrm-cloud/installations/new
-    ↓
-User selects repos to grant access
-    ↓
-GitHub sends `installation` webhook
-    ↓
-We store installation_id + repos in github_installations table
-    ↓
-Redirect to: /dashboard with ?installation_id=xxx
-    ↓
-User creates project, selects from available repos
-```
-
-**Webhook Handler (WebhooksController.cs):**
-```csharp
-[HttpPost("github")]
-public async Task<IActionResult> GitHubWebhook()
-{
-    // Verify signature
-    var signature = Request.Headers["X-Hub-Signature-256"];
-    var payload = await ReadBodyAsync();
-    if (!VerifySignature(payload, signature))
-        return Unauthorized();
-
-    var eventType = Request.Headers["X-GitHub-Event"];
-    var delivery = Request.Headers["X-GitHub-Delivery"];
-
-    switch (eventType)
-    {
-        case "installation":
-            await HandleInstallation(payload);
-            break;
-        case "push":
-            await HandlePush(payload);
-            break;
-    }
-
-    return Ok();
-}
-
-private async Task HandlePush(string payload)
-{
-    var push = JsonSerializer.Deserialize<PushEvent>(payload);
-
-    // Find project for this repo
-    var project = await _db.Projects
-        .FirstOrDefaultAsync(p => p.GitHubRepo == push.Repository.FullName);
-
-    if (project == null) return;
-
-    // Check if localization files changed
-    var locFiles = push.Commits
-        .SelectMany(c => c.Added.Concat(c.Modified))
-        .Where(f => IsLocalizationFile(f, project.LocalizationPath))
-        .ToList();
-
-    if (locFiles.Any())
-    {
-        await _syncService.SyncFromGitHub(project, push.After);
-    }
-}
-```
-
-### 3. GitHub API Operations
-
-**Get Installation Token:**
-```csharp
-public async Task<string> GetInstallationToken(long installationId)
-{
-    // Create JWT from App private key
-    var jwt = CreateAppJwt();
-
-    // Exchange for installation token
-    var response = await _http.PostAsync(
-        $"https://api.github.com/app/installations/{installationId}/access_tokens",
-        null,
-        new AuthenticationHeaderValue("Bearer", jwt)
-    );
-
-    var token = JsonSerializer.Deserialize<InstallationToken>(response);
-    return token.Token;  // Valid for 1 hour
-}
-```
-
-**Read Localization Files:**
-```csharp
-public async Task<List<LocalizationFile>> GetLocalizationFiles(
-    string repo, string path, string token)
-{
-    // Get directory contents
-    var contents = await _http.GetAsync<List<GitHubContent>>(
-        $"https://api.github.com/repos/{repo}/contents/{path}",
-        new AuthenticationHeaderValue("token", token)
-    );
-
-    var files = new List<LocalizationFile>();
-    foreach (var item in contents.Where(c => c.Type == "file"))
-    {
-        if (IsLocalizationFile(item.Name))
-        {
-            var content = await GetFileContent(repo, item.Path, token);
-            files.Add(new LocalizationFile(item.Name, content));
-        }
-    }
-    return files;
-}
-```
-
-**Create PR with Changes:**
-```csharp
-public async Task<string> CreateTranslationPR(
-    Project project,
-    Dictionary<string, string> fileChanges,
-    string token)
-{
-    var repo = project.GitHubRepo;
-    var baseBranch = project.GitHubDefaultBranch;
-    var newBranch = $"lrm/translations-{DateTime.UtcNow:yyyyMMdd-HHmmss}";
-
-    // 1. Get base branch SHA
-    var baseRef = await GetRef(repo, baseBranch, token);
-
-    // 2. Create new branch
-    await CreateRef(repo, newBranch, baseRef.Sha, token);
-
-    // 3. Create commits for each file
-    foreach (var (path, content) in fileChanges)
-    {
-        await CreateOrUpdateFile(repo, path, content, newBranch, token);
-    }
-
-    // 4. Create PR
-    var pr = await CreatePullRequest(repo, new
-    {
-        title = "Update translations",
-        body = "Translations updated via LRM Cloud",
-        head = newBranch,
-        @base = baseBranch
-    }, token);
-
-    return pr.HtmlUrl;
-}
-
----
-
-## Blazor Frontend (Detailed)
-
-### Tech Stack
-- **Blazor Server** (real-time updates, C# reuse)
-- **MudBlazor** (Material Design component library)
-- **SignalR** (real-time sync notifications)
-
-### Project Structure
-```
-LrmCloud.Web/
-├── Program.cs
-├── App.razor
-├── _Imports.razor
-├── wwwroot/
-│   ├── css/
-│   └── images/
-├── Components/
-│   ├── Layout/
-│   │   ├── MainLayout.razor
-│   │   ├── NavMenu.razor
-│   │   └── LoginDisplay.razor
-│   ├── Shared/
-│   │   ├── LoadingSpinner.razor
-│   │   ├── ErrorAlert.razor
-│   │   └── ConfirmDialog.razor
-│   └── Translation/
-│       ├── TranslationEditor.razor
-│       ├── KeyList.razor
-│       ├── LanguageColumn.razor
-│       └── TranslationCell.razor
-├── Pages/
-│   ├── Index.razor              # Landing page
-│   ├── Login.razor              # GitHub OAuth
-│   ├── Dashboard.razor          # Project list
-│   ├── Projects/
-│   │   ├── ProjectDetail.razor
-│   │   ├── ProjectCreate.razor
-│   │   ├── ProjectSettings.razor
-│   │   └── ProjectEditor.razor
-│   └── Account/
-│       ├── AccountSettings.razor
-│       ├── ApiKeys.razor
-│       └── Billing.razor
-└── Services/
-    ├── AuthStateProvider.cs
-    ├── ProjectService.cs
-    └── TranslationService.cs
-```
-
-### Page Layouts
-
-#### Dashboard.razor
-```razor
-@page "/dashboard"
-@attribute [Authorize]
-
-<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
-    <MudText Typo="Typo.h4" Class="mb-4">My Projects</MudText>
-
-    <MudGrid>
-        <!-- Stats Cards -->
-        <MudItem xs="12" sm="4">
-            <MudCard>
-                <MudCardContent>
-                    <MudText Typo="Typo.h3">@_stats.TotalProjects</MudText>
-                    <MudText Typo="Typo.body2">Projects</MudText>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" sm="4">
-            <MudCard>
-                <MudCardContent>
-                    <MudText Typo="Typo.h3">@_stats.TranslationProgress%</MudText>
-                    <MudText Typo="Typo.body2">Translated</MudText>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" sm="4">
-            <MudCard>
-                <MudCardContent>
-                    <MudText Typo="Typo.h3">@_stats.CharsUsed / @_stats.CharsLimit</MudText>
-                    <MudText Typo="Typo.body2">Translation Chars</MudText>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-
-        <!-- Project List -->
-        <MudItem xs="12">
-            <MudTable Items="@_projects" Hover="true" Striped="true">
-                <HeaderContent>
-                    <MudTh>Name</MudTh>
-                    <MudTh>Format</MudTh>
-                    <MudTh>Languages</MudTh>
-                    <MudTh>Progress</MudTh>
-                    <MudTh>Last Sync</MudTh>
-                    <MudTh></MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd>@context.Name</MudTd>
-                    <MudTd><MudChip Size="Size.Small">@context.Format</MudChip></MudTd>
-                    <MudTd>@context.LanguageCount languages</MudTd>
-                    <MudTd>
-                        <MudProgressLinear Value="@context.TranslationProgress" Color="Color.Primary" />
-                    </MudTd>
-                    <MudTd>@context.LastSyncedAt?.Humanize()</MudTd>
-                    <MudTd>
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                       Href="@($"/projects/{context.Id}/edit")" />
-                    </MudTd>
-                </RowTemplate>
-            </MudTable>
-        </MudItem>
-
-        <!-- Create Project Button -->
-        <MudItem xs="12">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       Href="/projects/create">
-                Create Project
-            </MudButton>
-        </MudItem>
-    </MudGrid>
-</MudContainer>
-```
-
-#### ProjectEditor.razor (Translation Editor)
-```razor
-@page "/projects/{ProjectId:int}/edit"
-@attribute [Authorize]
-
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
-    <!-- Toolbar -->
-    <MudToolBar Dense="true" Class="mb-4">
-        <MudTextField @bind-Value="_searchText" Placeholder="Search keys..."
-                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                      Immediate="true" />
-        <MudSpacer />
-        <MudSelect T="string" Label="Filter" @bind-Value="_statusFilter">
-            <MudSelectItem Value="@("all")">All</MudSelectItem>
-            <MudSelectItem Value="@("missing")">Missing</MudSelectItem>
-            <MudSelectItem Value="@("translated")">Translated</MudSelectItem>
-        </MudSelect>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   OnClick="TranslateMissing" Disabled="@_isTranslating">
-            @if (_isTranslating)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
-            }
-            Translate Missing
-        </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Success"
-                   OnClick="CreatePR" Disabled="@(!_hasChanges)">
-            Create PR
-        </MudButton>
-    </MudToolBar>
-
-    <!-- Translation Grid -->
-    <MudTable Items="@_filteredKeys" Virtualize="true" Height="calc(100vh - 200px)"
-              FixedHeader="true" Dense="true" Hover="true">
-        <HeaderContent>
-            <MudTh Style="width: 250px">Key</MudTh>
-            @foreach (var lang in _languages)
-            {
-                <MudTh Style="min-width: 200px">
-                    <MudStack Row="true" AlignItems="AlignItems.Center">
-                        <MudText>@lang.Code</MudText>
-                        @if (lang.IsDefault)
-                        {
-                            <MudChip Size="Size.Small" Color="Color.Info">Default</MudChip>
-                        }
-                    </MudStack>
-                </MudTh>
-            }
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd>
-                <MudText Typo="Typo.body2" Style="font-family: monospace">
-                    @context.KeyName
-                </MudText>
-            </MudTd>
-            @foreach (var lang in _languages)
-            {
-                <MudTd>
-                    <TranslationCell Key="@context" Language="@lang.Code"
-                                     OnChanged="@(() => _hasChanges = true)" />
-                </MudTd>
-            }
-        </RowTemplate>
-    </MudTable>
-</MudContainer>
-
-@code {
-    [Parameter] public int ProjectId { get; set; }
-
-    private List<ResourceKey> _keys = new();
-    private List<ResourceKey> _filteredKeys => FilterKeys();
-    private List<Language> _languages = new();
-    private string _searchText = "";
-    private string _statusFilter = "all";
-    private bool _hasChanges = false;
-    private bool _isTranslating = false;
-
-    protected override async Task OnInitializedAsync()
-    {
-        var project = await ProjectService.GetAsync(ProjectId);
-        _keys = await ProjectService.GetKeysAsync(ProjectId);
-        _languages = project.Languages;
-    }
-
-    private async Task TranslateMissing()
-    {
-        _isTranslating = true;
-        await ProjectService.TranslateMissingAsync(ProjectId);
-        _keys = await ProjectService.GetKeysAsync(ProjectId);
-        _isTranslating = false;
-    }
-
-    private async Task CreatePR()
-    {
-        var prUrl = await ProjectService.CreatePRAsync(ProjectId);
-        NavigationManager.NavigateTo(prUrl);
-    }
-}
-```
-
-### Components
-
-#### TranslationCell.razor
-```razor
-<div class="translation-cell @GetStatusClass()">
-    @if (_isEditing)
-    {
-        <MudTextField @bind-Value="_value" Lines="2" Immediate="true"
-                      OnBlur="SaveChanges" Variant="Variant.Outlined" />
-    }
-    else
-    {
-        <div @onclick="StartEditing" class="cell-content">
-            @if (string.IsNullOrEmpty(_value))
-            {
-                <MudText Typo="Typo.body2" Color="Color.Warning">
-                    <em>Missing</em>
-                </MudText>
-            }
-            else
-            {
-                <MudText Typo="Typo.body2">@_value</MudText>
-            }
-        </div>
-    }
-</div>
-
-@code {
-    [Parameter] public ResourceKey Key { get; set; }
-    [Parameter] public string Language { get; set; }
-    [Parameter] public EventCallback OnChanged { get; set; }
-
-    private string _value;
-    private bool _isEditing = false;
-
-    protected override void OnParametersSet()
-    {
-        _value = Key.Translations.GetValueOrDefault(Language)?.Value;
-    }
-
-    private void StartEditing() => _isEditing = true;
-
-    private async Task SaveChanges()
-    {
-        _isEditing = false;
-        if (_value != Key.Translations.GetValueOrDefault(Language)?.Value)
-        {
-            await TranslationService.UpdateAsync(Key.Id, Language, _value);
-            await OnChanged.InvokeAsync();
-        }
-    }
-
-    private string GetStatusClass() => string.IsNullOrEmpty(_value) ? "missing" : "translated";
-}
-```
-
-### Authentication Flow
-
-```csharp
-// AuthStateProvider.cs
-public class LrmAuthStateProvider : AuthenticationStateProvider
-{
-    private readonly IHttpContextAccessor _httpContext;
-    private readonly IUserService _userService;
-
-    public override async Task<AuthenticationState> GetAuthenticationStateAsync()
-    {
-        var user = _httpContext.HttpContext?.User;
-
-        if (user?.Identity?.IsAuthenticated == true)
-        {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var dbUser = await _userService.GetByIdAsync(int.Parse(userId));
-
-            var claims = new List<Claim>
-            {
-                new(ClaimTypes.NameIdentifier, dbUser.Id.ToString()),
-                new(ClaimTypes.Name, dbUser.Username),
-                new("plan", dbUser.Plan),
-                new("avatar", dbUser.AvatarUrl ?? "")
-            };
-
-            var identity = new ClaimsIdentity(claims, "GitHub");
-            return new AuthenticationState(new ClaimsPrincipal(identity));
-        }
-
-        return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
-    }
-}
-```
-
-### Real-time Updates (SignalR)
-
-```csharp
-// SyncHub.cs
-public class SyncHub : Hub
-{
-    public async Task JoinProject(int projectId)
-    {
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"project-{projectId}");
-    }
-
-    public async Task LeaveProject(int projectId)
-    {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"project-{projectId}");
-    }
-}
-
-// When sync completes, notify connected clients
-public class SyncService
-{
-    private readonly IHubContext<SyncHub> _hubContext;
-
-    public async Task NotifySyncComplete(int projectId, SyncResult result)
-    {
-        await _hubContext.Clients.Group($"project-{projectId}")
-            .SendAsync("SyncComplete", result);
-    }
-}
 
 ---
 
@@ -1142,145 +1629,187 @@ public class SyncService
 |------|-------|----------|-------------|----------|
 | Free | $0 | 1 | 10K chars/mo | CLI sync only |
 | Pro | $9/mo | 5 | 100K chars/mo | GitHub App, web editor |
-| Team | $29/mo | 20 | 500K chars/mo | Multiple users, priority |
+| Team | $29/mo | 20 | 500K chars/mo | Multiple users, roles, priority |
 
-### Translation Costs (our cost)
+### Translation Costs (platform cost)
 - Google: ~$20/million chars
 - DeepL: ~$25/million chars
-- Free providers: $0
+- Free providers (MyMemory, Lingva): $0
 
 At $9/mo for 100K chars, margin is healthy even with paid providers.
 
 ---
 
-## Implementation Phases (Detailed Checklist)
+## Implementation Phases
 
-### Phase 0: Project Setup
+### Phase 0: Foundation (Week 1-2)
 - [ ] Create `cloud/` folder structure
-- [ ] Initialize `LrmCloud.sln` solution
-- [ ] Create `LrmCloud.Api` project (ASP.NET Core Web API)
-- [ ] Create `LrmCloud.Web` project (Blazor Server)
-- [ ] Create `LrmCloud.Core` project (shared models)
-- [ ] Set up Docker Compose (dev environment)
-- [ ] Configure GitHub Actions for cloud CI/CD
+- [ ] Initialize `LrmCloud.sln` with projects:
+  - `LrmCloud.Api` - ASP.NET Core Web API
+  - `LrmCloud.Web` - Blazor WebAssembly
+  - `LrmCloud.Shared` - Shared DTOs, models
+  - `LrmCloud.Tests`
+- [ ] Set up Docker Compose (dev)
+- [ ] Configure EF Core + migrations
+- [ ] Implement IMailService with Sendmail provider
+- [ ] Set up nginx with security headers
 
-### Phase 1: Infrastructure & Auth
-- [ ] Set up DigitalOcean droplet (Ubuntu 24.04)
-- [ ] Install Docker, Docker Compose
-- [ ] Configure Nginx reverse proxy
-- [ ] Set up Let's Encrypt SSL (certbot)
-- [ ] Deploy PostgreSQL (managed or Docker)
-- [ ] Create database schema (EF Core migrations)
-- [ ] **Email/Password Auth:**
-  - [ ] Registration endpoint
-  - [ ] Login endpoint
-  - [ ] Password hashing (bcrypt)
-  - [ ] Email verification flow
-  - [ ] Password reset flow
-- [ ] **GitHub OAuth:**
-  - [ ] Create GitHub OAuth App
-  - [ ] OAuth login flow
-  - [ ] Account linking (email ↔ GitHub)
-- [ ] Session management (cookies)
-- [ ] API key generation for CLI
+### Phase 1: Auth & Teams (Week 3-4)
+- [ ] Email/password registration
+- [ ] Email verification flow
+- [ ] Password reset flow (with hashed tokens)
+- [ ] GitHub OAuth login
+- [ ] Account linking (email ↔ GitHub)
+- [ ] Organization CRUD
+- [ ] Team invitations
+- [ ] Role-based access control
 
-### Phase 2: Core API
-- [ ] **User endpoints:**
-  - [ ] `GET /api/me` - current user
-  - [ ] `PUT /api/me` - update profile
-  - [ ] `GET /api/me/usage` - translation usage
-- [ ] **Project endpoints:**
-  - [ ] `GET /api/projects` - list projects
-  - [ ] `POST /api/projects` - create project
-  - [ ] `GET /api/projects/:id` - project details
-  - [ ] `PUT /api/projects/:id` - update project
-  - [ ] `DELETE /api/projects/:id` - delete project
-- [ ] **Resource endpoints:**
-  - [ ] `GET /api/projects/:id/keys` - list keys
-  - [ ] `GET /api/projects/:id/keys/:key` - key details
-  - [ ] `PUT /api/projects/:id/keys/:key` - update key
-  - [ ] `POST /api/projects/:id/keys` - add key
-  - [ ] `DELETE /api/projects/:id/keys/:key` - delete key
-  - [ ] `POST /api/projects/:id/translate` - translate missing
-  - [ ] `GET /api/projects/:id/stats` - statistics
-  - [ ] `GET /api/projects/:id/validate` - validation
+### Phase 2: Core API (Week 5-6)
+- [ ] Project CRUD
+- [ ] Resource key CRUD
+- [ ] Translation CRUD
+- [ ] Validation endpoint
+- [ ] Stats endpoint
+- [ ] Version tracking for optimistic locking
+- [ ] Row-Level Security policies
 
-### Phase 3: CLI Sync
-- [ ] **CLI commands:**
-  - [ ] `lrm cloud login` - browser OAuth flow
-  - [ ] `lrm cloud logout`
-  - [ ] `lrm cloud init` - create project
-  - [ ] `lrm cloud link` - link to existing project
-  - [ ] `lrm push` - upload local files
-  - [ ] `lrm pull` - download cloud files
-  - [ ] `lrm cloud status` - sync status
-- [ ] **Sync API:**
-  - [ ] `POST /api/sync/push` - receive files
-  - [ ] `GET /api/sync/pull` - send files
-  - [ ] Conflict detection
-  - [ ] Merge strategy
+### Phase 3: CLI Sync (Week 7-8)
+- [ ] `lrm cloud login` - browser OAuth
+- [ ] `lrm cloud init` - create project
+- [ ] `lrm push` - upload with version check
+- [ ] `lrm pull` - download with conflict detection
+- [ ] Conflict resolution UI in CLI
+- [ ] API key authentication
 
-### Phase 4: GitHub App
+### Phase 4: GitHub App (Week 9-10)
 - [ ] Register GitHub App
-- [ ] Store private key securely
-- [ ] **Webhook handler:**
-  - [ ] Signature verification
-  - [ ] `installation` event
-  - [ ] `installation_repositories` event
-  - [ ] `push` event
-- [ ] **GitHub API operations:**
-  - [ ] Get installation token
-  - [ ] Read repository files
-  - [ ] Create branch
-  - [ ] Create/update file
-  - [ ] Create pull request
-- [ ] Auto-sync on push
-- [ ] PR status checks (future)
+- [ ] Webhook handler with signature verification
+- [ ] Installation event handler
+- [ ] Push event → sync
+- [ ] Create PR with translations
+- [ ] Rate limit handling
 
-### Phase 5: Blazor Frontend
-- [ ] **Layout:**
-  - [ ] Main layout with nav
-  - [ ] Login/register pages
-  - [ ] Auth state provider
-- [ ] **Dashboard:**
-  - [ ] Project list
-  - [ ] Usage stats cards
-  - [ ] Create project button
-- [ ] **Project pages:**
-  - [ ] Project detail view
-  - [ ] Project settings
-  - [ ] API key management
-- [ ] **Translation editor:**
-  - [ ] Key list with search
-  - [ ] Multi-language columns
-  - [ ] Inline editing
-  - [ ] Translate missing button
-  - [ ] Create PR button
-- [ ] **Account pages:**
-  - [ ] Profile settings
-  - [ ] Link GitHub account
-  - [ ] Billing/subscription
+### Phase 5: Blazor WebAssembly UI (Week 11-13)
+- [ ] Auth state provider
+- [ ] Dashboard (project list, stats)
+- [ ] Project settings page
+- [ ] Translation editor (virtualized grid)
+- [ ] Search/filter
+- [ ] Inline editing
+- [ ] Translate missing button
+- [ ] Create PR button
+- [ ] Team management UI
+- [ ] PWA support (offline read-only)
 
-### Phase 6: Billing & Launch
+### Phase 6: Translation Service (Week 14)
+- [ ] API key hierarchy (project → user → org → platform)
+- [ ] Translation with fallback providers
+- [ ] Usage tracking and limits
+- [ ] Batch translation endpoint
+
+### Phase 7: Billing & Compliance (Week 15-16)
 - [ ] Stripe integration
-- [ ] Subscription plans
+- [ ] Subscription management
 - [ ] Usage metering
-- [ ] Usage limits enforcement
+- [ ] Privacy policy page
+- [ ] Cookie consent banner
+- [ ] Data export endpoint
+- [ ] Account deletion flow
+- [ ] Audit log UI
+
+### Phase 8: Launch Prep (Week 17)
 - [ ] Landing page
 - [ ] Documentation
-- [ ] Email templates (transactional)
-- [ ] ProductHunt submission prep
+- [ ] Load testing (k6)
+- [ ] Security testing (OWASP ZAP)
+- [ ] Backup verification
+- [ ] Monitoring setup
 
 ---
 
-## Security Considerations
+## Project Structure
 
-- GitHub tokens encrypted at rest (AES-256)
-- API keys hashed (bcrypt)
-- Rate limiting per user
-- Input validation on all endpoints
-- HTTPS only
-- Regular backups
+```
+LocalizationManager/
+├── [existing CLI code]
+│
+└── cloud/
+    ├── LrmCloud.sln
+    ├── src/
+    │   ├── LrmCloud.Api/
+    │   │   ├── Controllers/
+    │   │   │   ├── AuthController.cs
+    │   │   │   ├── ProjectsController.cs
+    │   │   │   ├── ResourcesController.cs
+    │   │   │   ├── OrganizationsController.cs
+    │   │   │   ├── SyncController.cs
+    │   │   │   ├── WebhooksController.cs
+    │   │   │   └── TranslationController.cs
+    │   │   ├── Services/
+    │   │   │   ├── IMailService.cs
+    │   │   │   ├── SendmailService.cs
+    │   │   │   ├── GitHubService.cs
+    │   │   │   ├── SyncService.cs
+    │   │   │   └── TranslationKeyResolver.cs
+    │   │   ├── Data/
+    │   │   │   ├── AppDbContext.cs
+    │   │   │   └── Migrations/
+    │   │   ├── Security/
+    │   │   │   ├── RowLevelSecurityMiddleware.cs
+    │   │   │   └── AuditLogMiddleware.cs
+    │   │   └── Program.cs
+    │   │
+    │   ├── LrmCloud.Web/           # Blazor WASM
+    │   │   ├── wwwroot/
+    │   │   ├── Pages/
+    │   │   │   ├── Index.razor
+    │   │   │   ├── Dashboard.razor
+    │   │   │   ├── Login.razor
+    │   │   │   └── Projects/
+    │   │   ├── Components/
+    │   │   │   ├── TranslationEditor.razor
+    │   │   │   ├── TranslationCell.razor
+    │   │   │   └── TeamManager.razor
+    │   │   ├── Services/
+    │   │   │   └── ApiClient.cs
+    │   │   └── Program.cs
+    │   │
+    │   └── LrmCloud.Shared/
+    │       ├── DTOs/
+    │       ├── Models/
+    │       └── Constants.cs
+    │
+    ├── tests/
+    │   └── LrmCloud.Tests/
+    │
+    ├── docker/
+    │   ├── docker-compose.yml
+    │   ├── docker-compose.prod.yml
+    │   └── nginx/
+    │       └── nginx.conf
+    │
+    └── deploy/
+        ├── setup-server.sh
+        └── deploy.sh
+```
+
+---
+
+## Cost Projection
+
+### Infrastructure (~$30/mo)
+| Item | Monthly Cost |
+|------|--------------|
+| DO Droplet (4GB) | $24 |
+| Self-hosted PostgreSQL | $0 |
+| Self-hosted Redis | $0 |
+| DO Spaces (backups) | $5 |
+| Domain | ~$1 |
+| **Total** | **~$30/mo** |
+
+### Break-even
+- At $9/mo Pro: 4 paying customers
+- Target: 20 paying customers by month 6 = $180 MRR
 
 ---
 
@@ -1293,74 +1822,9 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 
 ---
 
-## Cost Projection
-
-### Month 1-3 (MVP)
-- Droplet: $12
-- PostgreSQL: $15 (managed) or $0 (self-hosted)
-- Domain: ~$1
-- **Total:** $13-28/mo
-
-### Month 4-6 (Growth)
-- Larger droplet: $24
-- Managed DB: $15
-- Redis: $15
-- **Total:** ~$55/mo
-
-### Break-even
-- At $9/mo Pro plan: 4-6 paying customers covers costs
-- Target: 20 paying customers by month 6 = $180 MRR
-
----
-
-## Project Structure
-
-All SaaS in one isolated folder - maximum separation:
-
-```
-LocalizationManager/
-├── LocalizationManager/           # CLI (existing, unchanged)
-├── LocalizationManager.JsonLocalization/  # NuGet (existing, unchanged)
-├── LocalizationManager.Tests/     # Tests (existing, unchanged)
-├── LocalizationManager.sln        # Existing solution (unchanged)
-│
-└── cloud/                         # ALL SaaS CODE HERE - completely isolated
-    ├── LrmCloud.sln               # Separate solution for cloud
-    ├── src/
-    │   ├── LrmCloud.Api/          # ASP.NET Core Web API
-    │   │   ├── Controllers/
-    │   │   ├── Services/
-    │   │   ├── Data/              # EF Core, migrations
-    │   │   └── Program.cs
-    │   ├── LrmCloud.Web/          # Blazor frontend
-    │   │   ├── Pages/
-    │   │   └── Components/
-    │   └── LrmCloud.Core/         # Shared cloud models/logic
-    ├── tests/
-    │   └── LrmCloud.Tests/
-    ├── docker/
-    │   ├── docker-compose.yml
-    │   ├── docker-compose.prod.yml
-    │   └── nginx/
-    ├── deploy/
-    │   ├── setup-server.sh
-    │   └── deploy.sh
-    └── README.md                  # Cloud-specific docs
-```
-
-### Separation Benefits
-- CLI and Cloud have separate solutions
-- Cloud can be deployed independently
-- No changes to existing CLI codebase
-- Cloud references CLI as NuGet or project reference (one-way dependency)
-
----
-
 ## Next Steps
 
 1. Register domain (lrm.cloud? lrmcloud.io? getlrm.com?)
 2. Set up DigitalOcean droplet
-3. Create GitHub OAuth App
-4. Extract LocalizationManager.Core from CLI
-5. Create LocalizationManager.Cloud project
-6. Start with Phase 1: basic auth and project management
+3. Create GitHub OAuth App + GitHub App
+4. Start Phase 0: Foundation
