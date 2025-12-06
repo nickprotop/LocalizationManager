@@ -215,6 +215,7 @@ _lrm() {
                         '*'{-l,--lang}'[Language value (code:value)]:langvalue' \
                         '--comment[Add comment]:comment' \
                         '--no-backup[Skip backup creation]' \
+                        '--ask-missing[Prompt for missing language values]' \
                         '--plural[Create a plural key with multiple forms (JSON only)]' \
                         '*--plural-form[Plural form value (form:value)]:pluralform:->plural_forms' \
                         '(-i --interactive)'{-i,--interactive}'[Interactive mode]' \

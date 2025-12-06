@@ -853,6 +853,7 @@ Greek: Απαγορεύεται
 - `-l, --lang <CODE:VALUE>` - Language value (e.g., `default:"Save"`, `el:"Σώσει"`) - can be used multiple times
   - Use `default` for the default language file (the one without a culture code)
 - `-i, --interactive` - Interactive mode (prompts for all language values)
+- `--ask-missing` - Prompt for missing language values (by default, unspecified languages have empty values)
 - `--comment <COMMENT>` - Add comment to the key
 - `--plural` - Create a plural key with multiple forms (JSON backend only)
 - `--plural-form <FORM:VALUE>` - Plural form value (can be used multiple times). Valid forms: zero, one, two, few, many, other

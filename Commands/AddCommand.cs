@@ -53,6 +53,10 @@ public class AddCommandSettings : BaseCommandSettings
     [Description("Skip creating backups before modifying files")]
     public bool NoBackup { get; set; }
 
+    [CommandOption("--ask-missing")]
+    [Description("Prompt for missing language values. By default, unspecified languages will have empty values.")]
+    public bool AskMissing { get; set; }
+
     [CommandOption("--plural")]
     [Description("Create a plural key with multiple forms (JSON only). Use with -i for interactive plural form entry.")]
     public bool IsPlural { get; set; }
@@ -194,15 +198,26 @@ public class AddCommand : Command<AddCommandSettings>
                 values[lang.Code] = value;
             }
         }
-        else
+        else if (settings.AskMissing)
         {
-            // Non-interactive: prompt only for missing values
+            // Ask for missing: prompt only for missing values
             foreach (var lang in languages)
             {
                 if (!values.ContainsKey(lang.Code))
                 {
                     var value = AnsiConsole.Ask<string>($"[yellow]Enter value for {lang.Name}:[/]");
                     values[lang.Code] = value;
+                }
+            }
+        }
+        else
+        {
+            // Default: use empty values for unprovided languages (non-interactive)
+            foreach (var lang in languages)
+            {
+                if (!values.ContainsKey(lang.Code))
+                {
+                    values[lang.Code] = string.Empty;
                 }
             }
         }

@@ -148,6 +148,7 @@ Add a new key to all language files.
 \fIKEY\fR
 [\fB\-i\fR|\fB\-\-interactive\fR]
 [\fB\-\-lang\fR \fICULTURE\fR:\fIVALUE\fR]
+[\fB\-\-ask\-missing\fR]
 [\fB\-\-plural\fR]
 [\fB\-\-plural\-form\fR \fIFORM\fR:\fIVALUE\fR]
 [\fB\-\-comment\fR \fICOMMENT\fR]
@@ -161,6 +162,9 @@ Interactive mode (prompts for values in all languages)
 .TP
 .BR \-\-lang " " \fICULTURE\fR:\fIVALUE\fR
 Specify value for a specific language (can be repeated)
+.TP
+.BR \-\-ask\-missing
+Prompt for missing language values. By default, unspecified languages will have empty values.
 .TP
 .BR \-\-plural
 Create a plural key with multiple forms (JSON only). Use with \fB\-i\fR for interactive plural form entry.
