@@ -1385,9 +1385,8 @@ export class ResourceEditorPanel {
                 const hasPluralForms = langData.isPlural && langData.pluralForms && Object.keys(langData.pluralForms).length > 0;
 
                 if (hasPluralForms) {
-                    // Render plural forms fields
+                    // Render all CLDR plural forms so users can add any form
                     const pluralFormsHtml = ['zero', 'one', 'two', 'few', 'many', 'other']
-                        .filter(form => langData.pluralForms[form] !== undefined || form === 'one' || form === 'other')
                         .map(form => \`
                             <div style="margin-bottom: 8px;">
                                 <label style="display: inline-block; width: 60px; font-size: 11px; opacity: 0.8; text-transform: uppercase;">\${form}:</label>
