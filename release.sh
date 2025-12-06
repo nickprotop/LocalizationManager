@@ -300,6 +300,7 @@ EOF
     # Create version bump commit
     print_step "Creating version bump commit..."
     git add LocalizationManager.csproj LocalizationManager.Shared/LocalizationManager.Shared.csproj \
+        LocalizationManager.Core/LocalizationManager.Core.csproj \
         LocalizationManager.JsonLocalization/LocalizationManager.JsonLocalization.csproj \
         LocalizationManager.JsonLocalization.Generator/LocalizationManager.JsonLocalization.Generator.csproj \
         CHANGELOG.md debian/changelog vscode-extension/package.json

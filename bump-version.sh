@@ -14,6 +14,7 @@ NC='\033[0m' # No Color
 # Files to update
 CSPROJ_FILE="LocalizationManager.csproj"
 SHARED_CSPROJ_FILE="LocalizationManager.Shared/LocalizationManager.Shared.csproj"
+CORE_CSPROJ_FILE="LocalizationManager.Core/LocalizationManager.Core.csproj"
 VSCODE_PACKAGE_JSON="vscode-extension/package.json"
 NUGET_RUNTIME_CSPROJ="LocalizationManager.JsonLocalization/LocalizationManager.JsonLocalization.csproj"
 NUGET_GENERATOR_CSPROJ="LocalizationManager.JsonLocalization.Generator/LocalizationManager.JsonLocalization.Generator.csproj"
@@ -174,6 +175,7 @@ main() {
     echo "Files to update:"
     echo -e "  ${BLUE}•${NC} $CSPROJ_FILE"
     echo -e "  ${BLUE}•${NC} $SHARED_CSPROJ_FILE"
+    echo -e "  ${BLUE}•${NC} $CORE_CSPROJ_FILE"
     echo -e "  ${BLUE}•${NC} $VSCODE_PACKAGE_JSON"
     echo -e "  ${BLUE}•${NC} $NUGET_RUNTIME_CSPROJ"
     echo -e "  ${BLUE}•${NC} $NUGET_GENERATOR_CSPROJ"
@@ -198,6 +200,9 @@ main() {
 
     update_csproj "$CURRENT_VERSION" "$NEW_VERSION" "$SHARED_CSPROJ_FILE"
     echo -e "${GREEN}✓${NC} Updated $SHARED_CSPROJ_FILE"
+
+    update_csproj "$CURRENT_VERSION" "$NEW_VERSION" "$CORE_CSPROJ_FILE"
+    echo -e "${GREEN}✓${NC} Updated $CORE_CSPROJ_FILE"
 
     update_vscode_extension "$NEW_VERSION"
     echo -e "${GREEN}✓${NC} Updated $VSCODE_PACKAGE_JSON"
