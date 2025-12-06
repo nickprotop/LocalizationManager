@@ -2,6 +2,29 @@
 
 LRM provides full support for JSON-based localization files, making it a universal tool for **any project** - React, Vue, Angular, Node.js, .NET, or any framework using JSON resources.
 
+## Why LRM?
+
+| Feature | LRM | i18next-cli | Tolgee | i18n-ally | Locize |
+|---------|-----|-------------|--------|-----------|--------|
+| **Translation Providers** | 10 (incl. free) | Via Locize only | 3 | 2 | Cloud only |
+| **Free Translation** | Lingva, MyMemory, Ollama | No | No | No | No |
+| **Self-Contained Binary** | Yes | Needs Node.js | Needs Docker | VS Code only | Cloud |
+| **Offline Capable** | Yes (Ollama) | No | No | No | No |
+| **CLI** | Yes | Yes | Yes | No | Yes |
+| **Terminal UI (TUI)** | Yes | No | No | No | No |
+| **Web UI** | Yes | No | Yes | No | Yes |
+| **VS Code Extension** | Yes | No | Yes | Yes | Yes |
+| **REST API** | Yes | No | Yes | No | Yes |
+| **i18next Support** | Yes | Yes | Yes | Yes | Yes |
+| **RESX Support** | Yes | No | No | No | No |
+| **Pluralization (CLDR)** | Yes | Yes | Yes | Yes | Yes |
+| **Open Source** | MIT | MIT | MIT | MIT | Commercial |
+| **No Cloud Required** | Yes | Yes | Yes | Yes | No |
+
+**LRM is the only tool that combines**: 10 translation providers (including free options), complete offline capability, and a full toolset (CLI + TUI + Web + VS Code + API) in a single, self-contained binary.
+
+---
+
 ## Quick Start
 
 ### For React/Vue/Angular (i18next)
