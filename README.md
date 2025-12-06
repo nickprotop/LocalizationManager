@@ -627,32 +627,6 @@ dotnet run -- --help
 
 ---
 
-## Roadmap
-
-### ✅ Recently Completed
-- **Machine Translation Integration** - Google Cloud Translation, DeepL, LibreTranslate with caching
-- **CI/CD Automation** - Complete workflows for GitHub Actions, GitLab CI, Azure DevOps
-- **Translation Tracking** - Per-language translation reports with JSON output
-- **In-app Translation** - TUI integration with Ctrl+T, F4, F5 shortcuts
-- **Code Scanning** - Find unused keys and missing references in source code (C#, Razor, XAML)
-- **Configuration File** - Complete lrm.json support for project-wide defaults
-- **TUI Visual & Workflow Enhancements** - Code scanning integration, undo/redo, context menus, clipboard, progress bars, enhanced search
-- **Simple CLI Chaining** - Run multiple LRM commands sequentially in one invocation with `chain` command
-
-### 📋 Planned Features
-- **Diff View** - Compare translations between versions
-- **Plugin System** - Custom validators and exporters
-- **Web UI** - Browser-based editor as alternative to TUI
-- **Multiple File Formats** - Support for `.po`, `.xliff`, JSON
-- **Translation Comments** - Add translator notes and context
-- **Translation Workflows** - Review/approve flows for human validation
-- **Context Screenshots** - Attach UI screenshots to keys for translator context
-- **Advanced Code Scanning** - Support for JavaScript, TypeScript, and other languages
-
-See [GitHub Discussions](https://github.com/nickprotop/LocalizationManager/discussions) for feature requests and ideas.
-
----
-
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
