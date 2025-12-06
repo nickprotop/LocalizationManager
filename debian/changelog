@@ -1,6 +1,7 @@
-lrm (0.6.24-1) noble; urgency=medium
+lrm (0.6.25-1) noble; urgency=medium
 
-  * Added: Add CodeLens provider for localization keys\n
-  * Changed: Update VS Code extension plan with CodeLens implementation\n
+  * Fixed: Fix JSON plural detection and add i18next suffix consolidation\n
+  * Added: Add comparison table with i18n tools to JSON docs\n- Add JSON Localization section and comprehensive docs for React/Vue/Angular/i18next\n- Add --ask-missing option to add command for CLI-friendly default behavior\n- Add plural support to VS Code extension providers\n- Add plural key indicator and editing support to Web and VS Code UIs\n- Add VS Code extension unit test infrastructure\n- Add VS Code extension unit tests to CI workflow\n- Add plural form support for JSON localization\n- Add plural support to CLI add/update commands and API\n- Add plural key creation and conversion to TUI\n- Add plural key creation and conversion to Web UI\n- Add proper plural form support to ResourceEntry model\n- Add JSON support to VS Code extension\n- Add JSON localization NuGet packages with release workflow integration\n- Add JSON backend support with multi-backend architecture\n- Add JSON backend implementation plan\n
+  * Changed: Filter hidden directories from RESX folder auto-discovery\n- Show all CLDR plural forms in edit modal\n- Update documentation for JSON localization and plural support\n- Update documentation for plural key support\n- Remove inaccurate i18next claims from README\n- Update NuGet package READMEs with comprehensive documentation\n- Improve JSON backend implementation plan\n- Update README.md\n
 
- -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Sun, 30 Nov 2025 23:13:24 +0200
+ -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Sat, 06 Dec 2025 10:11:42 +0200
