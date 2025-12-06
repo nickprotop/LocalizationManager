@@ -468,6 +468,9 @@ export class LrmService implements vscode.Disposable {
             vscode.workspace.findFiles('**/*.json', excludePattern, 50) // More results for filtering
         ]);
 
+        // Filter RESX files to exclude hidden directories (backup folders, etc.)
+        const filteredResxFiles = resxFiles.filter(f => !this.isInHiddenDirectory(f.fsPath));
+
         // Filter JSON files to likely resource files
         const filteredJsonFiles = jsonFiles.filter(f => this.isLikelyResourceFile(f.fsPath));
 
@@ -481,9 +484,9 @@ export class LrmService implements vscode.Disposable {
 
         // Group files by directory to find resource directories
         const jsonDirs = new Set(validJsonResources.map(f => path.dirname(f.fsPath)));
-        const resxDirs = new Set(resxFiles.map(f => path.dirname(f.fsPath)));
+        const resxDirs = new Set(filteredResxFiles.map(f => path.dirname(f.fsPath)));
 
-        const hasResx = resxFiles.length > 0;
+        const hasResx = filteredResxFiles.length > 0;
         const hasJson = validJsonResources.length > 0;
 
         if (!hasResx && !hasJson) {
@@ -506,7 +509,7 @@ export class LrmService implements vscode.Disposable {
 
         // Only one format found
         if (hasResx) {
-            return path.dirname(resxFiles[0].fsPath);
+            return path.dirname(filteredResxFiles[0].fsPath);
         }
 
         return path.dirname(validJsonResources[0].fsPath);
@@ -601,6 +604,15 @@ export class LrmService implements vscode.Disposable {
         }
 
         return true;
+    }
+
+    /**
+     * Checks if a file path is inside a hidden directory (starting with .)
+     * This includes .lrm, .backup, .git, etc.
+     */
+    private isInHiddenDirectory(filePath: string): boolean {
+        const pathParts = filePath.split(path.sep);
+        return pathParts.some(part => part.startsWith('.') && part !== '.');
     }
 
     /**
