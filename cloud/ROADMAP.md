@@ -41,7 +41,7 @@ Git-native localization management platform. Users connect repos, edit translati
                          └───────────────────┬────────────────────┘
                                              │ REST API
 ┌────────────────────────────────────────────┼────────────────────────────────────┐
-│                    DigitalOcean Droplet    │                                    │
+│                                            │                                    │
 │  ┌─────────────────────────────────────────┴─────────────────────────────────┐  │
 │  │                    Nginx (reverse proxy + SSL)                            │  │
 │  │                    + Rate limiting + Security headers                     │  │
@@ -67,14 +67,7 @@ Git-native localization management platform. Users connect repos, edit translati
 
 ---
 
-## Infrastructure (DigitalOcean)
-
-### Setup (~$30/mo)
-- **1x Droplet** $24/mo (4GB RAM, 2 vCPU)
-- **Self-hosted PostgreSQL** on droplet
-- **Self-hosted Redis** on droplet
-- **DO Spaces** $5/mo (backups)
-- **Domain** ~$1/mo
+## Infrastructure
 
 ### Stack
 - Ubuntu 24.04 LTS
@@ -1795,24 +1788,6 @@ LocalizationManager/
 
 ---
 
-## Cost Projection
-
-### Infrastructure (~$30/mo)
-| Item | Monthly Cost |
-|------|--------------|
-| DO Droplet (4GB) | $24 |
-| Self-hosted PostgreSQL | $0 |
-| Self-hosted Redis | $0 |
-| DO Spaces (backups) | $5 |
-| Domain | ~$1 |
-| **Total** | **~$30/mo** |
-
-### Break-even
-- At $9/mo Pro: 4 paying customers
-- Target: 20 paying customers by month 6 = $180 MRR
-
----
-
 ## Monitoring
 
 - **Logs:** systemd journal + logrotate
@@ -1821,10 +1796,3 @@ LocalizationManager/
 - **Later:** Grafana if needed
 
 ---
-
-## Next Steps
-
-1. Register domain (lrm.cloud? lrmcloud.io? getlrm.com?)
-2. Set up DigitalOcean droplet
-3. Create GitHub OAuth App + GitHub App
-4. Start Phase 0: Foundation
