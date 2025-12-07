@@ -68,6 +68,133 @@ Git-native localization management platform. Users connect repos, edit translati
 
 ---
 
+## API Response Standards
+
+All API endpoints follow a consistent response format using a hybrid approach:
+- **Success responses**: Custom `ApiResponse<T>` wrapper
+- **Error responses**: RFC 7807 ProblemDetails (standard format with tooling support)
+
+### Success Response (with data)
+
+```json
+{
+  "data": {
+    "id": 1,
+    "email": "user@example.com",
+    "username": "john"
+  },
+  "meta": {
+    "timestamp": "2025-12-07T10:30:00Z"
+  }
+}
+```
+
+### Success Response (message only)
+
+```json
+{
+  "message": "Email verification sent",
+  "meta": {
+    "timestamp": "2025-12-07T10:30:00Z"
+  }
+}
+```
+
+### Paginated Response
+
+```json
+{
+  "data": [
+    { "id": 1, "key": "WelcomeMessage" },
+    { "id": 2, "key": "GoodbyeMessage" }
+  ],
+  "meta": {
+    "timestamp": "2025-12-07T10:30:00Z",
+    "page": 1,
+    "pageSize": 20,
+    "totalCount": 150,
+    "totalPages": 8
+  }
+}
+```
+
+### Error Response (ProblemDetails RFC 7807)
+
+```json
+{
+  "type": "https://lrm.cloud/errors/auth-invalid-credentials",
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "Invalid email or password",
+  "instance": "/api/auth/login",
+  "timestamp": "2025-12-07T10:30:00Z",
+  "errorCode": "AUTH_INVALID_CREDENTIALS",
+  "traceId": "0HMOQ2..."
+}
+```
+
+### Error Codes
+
+Error codes use `SCREAMING_SNAKE_CASE` convention:
+
+| Category | Codes |
+|----------|-------|
+| **AUTH_*** | `AUTH_INVALID_CREDENTIALS`, `AUTH_EMAIL_NOT_VERIFIED`, `AUTH_ACCOUNT_LOCKED`, `AUTH_TOKEN_EXPIRED`, `AUTH_TOKEN_INVALID`, `AUTH_UNAUTHORIZED`, `AUTH_FORBIDDEN` |
+| **REG_*** | `REG_EMAIL_EXISTS`, `REG_DISABLED`, `REG_INVALID_TOKEN`, `REG_TOKEN_EXPIRED` |
+| **VAL_*** | `VAL_INVALID_INPUT`, `VAL_REQUIRED_FIELD`, `VAL_INVALID_FORMAT` |
+| **RES_*** | `RES_NOT_FOUND`, `RES_ALREADY_EXISTS`, `RES_CONFLICT`, `RES_VERSION_MISMATCH` |
+| **SRV_*** | `SRV_INTERNAL_ERROR`, `SRV_SERVICE_UNAVAILABLE`, `SRV_RATE_LIMITED` |
+| **EXT_*** | `EXT_GITHUB_ERROR`, `EXT_TRANSLATION_ERROR`, `EXT_MAIL_ERROR` |
+
+### Controller Implementation
+
+All controllers extend `ApiControllerBase` which provides helper methods:
+
+```csharp
+public class AuthController : ApiControllerBase
+{
+    [HttpPost("register")]
+    public async Task<ActionResult<ApiResponse<UserDto>>> Register(RegisterRequest request)
+    {
+        // Validation error
+        if (!IsValidEmail(request.Email))
+            return BadRequest(ErrorCodes.VAL_INVALID_FORMAT, "Invalid email format");
+
+        // Success with data
+        var user = await _authService.RegisterAsync(request);
+        return Created(nameof(GetUser), new { id = user.Id }, user);
+
+        // Success with message
+        return Success("Registration successful. Check your email.");
+
+        // Not found
+        return NotFound(ErrorCodes.RES_NOT_FOUND, "User not found");
+
+        // Unauthorized
+        return Unauthorized(ErrorCodes.AUTH_INVALID_CREDENTIALS, "Invalid email or password");
+    }
+
+    [HttpGet("users")]
+    public async Task<ActionResult<ApiResponse<List<UserDto>>>> GetUsers(int page = 1, int pageSize = 20)
+    {
+        var (users, totalCount) = await _userService.GetPagedAsync(page, pageSize);
+        return Paginated(users, page, pageSize, totalCount);
+    }
+}
+```
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `LrmCloud.Shared/Api/ApiResponse.cs` | Response wrappers: `ApiResponse<T>`, `ApiResponse`, `ApiMeta` |
+| `LrmCloud.Shared/Api/ErrorCodes.cs` | All error code constants |
+| `LrmCloud.Shared/Api/ConflictResponse.cs` | Sync conflict response format |
+| `LrmCloud.Api/Controllers/ApiControllerBase.cs` | Base controller with `Success()`, `Paginated()`, `BadRequest()`, etc. |
+| `LrmCloud.Api/Middleware/GlobalExceptionHandler.cs` | Logs exceptions, returns ProblemDetails |
+
+---
+
 ## Infrastructure
 
 ### Stack
