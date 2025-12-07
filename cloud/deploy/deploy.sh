@@ -52,6 +52,12 @@ if [ ! -f "$SCRIPT_DIR/config.json" ]; then
     exit 1
 fi
 
+# Check .env exists
+if [ ! -f "$SCRIPT_DIR/.env" ]; then
+    print_error ".env not found. Run setup.sh first."
+    exit 1
+fi
+
 # Git operations only with --pull
 if [ "$DO_PULL" = true ]; then
     cd "$PROJECT_ROOT"
@@ -111,6 +117,53 @@ fi
 # Return to deploy directory for docker operations
 cd "$SCRIPT_DIR"
 
+# ============================================================================
+# Step 1.5: Regenerate nginx configuration from template (like setup.sh does)
+# ============================================================================
+print_step "Regenerating nginx configuration from template..."
+
+# Read SSL configuration from .env to determine which blocks to enable
+HTTPS_PORT=$(grep -oP '^HTTPS_PORT=\K.*' "$SCRIPT_DIR/.env" 2>/dev/null || echo "")
+
+# Determine SSL status
+if [ -n "$HTTPS_PORT" ]; then
+    SSL_ENABLED=true
+else
+    SSL_ENABLED=false
+fi
+
+NGINX_TEMPLATE="$SCRIPT_DIR/nginx/nginx.conf.template"
+NGINX_CONFIG="$SCRIPT_DIR/nginx/nginx.conf"
+
+if [ ! -f "$NGINX_TEMPLATE" ]; then
+    print_error "nginx template not found: $NGINX_TEMPLATE"
+    exit 1
+fi
+
+# Start with template
+cp "$NGINX_TEMPLATE" "$NGINX_CONFIG"
+
+# Process conditional blocks based on SSL configuration
+if [ "$SSL_ENABLED" = true ]; then
+    # SSL enabled: keep SSL block, make HTTP redirect to HTTPS
+    # Remove #SSL_START# and #SSL_END# markers (keep content)
+    sed -i '/#SSL_START#/d; /#SSL_END#/d' "$NGINX_CONFIG"
+    # Remove #REDIRECT_START# and #REDIRECT_END# markers (keep content)
+    sed -i '/#REDIRECT_START#/d; /#REDIRECT_END#/d' "$NGINX_CONFIG"
+    # Remove HTTP standalone block entirely
+    sed -i '/#HTTP_START#/,/#HTTP_END#/d' "$NGINX_CONFIG"
+    print_success "nginx configured with SSL"
+else
+    # SSL disabled: remove SSL and redirect blocks, keep HTTP standalone
+    sed -i '/#SSL_START#/,/#SSL_END#/d' "$NGINX_CONFIG"
+    sed -i '/#REDIRECT_START#/,/#REDIRECT_END#/d' "$NGINX_CONFIG"
+    # Remove #HTTP_START# and #HTTP_END# markers (keep content)
+    sed -i '/#HTTP_START#/d; /#HTTP_END#/d' "$NGINX_CONFIG"
+    print_success "nginx configured without SSL"
+fi
+
+# ============================================================================
+
 # Step 2: Pull base images
 print_step "Pulling base Docker images..."
 docker compose pull postgres redis minio
@@ -128,26 +181,34 @@ fi
 
 # Step 4: Stop old containers
 print_step "Stopping containers..."
-docker compose stop api web
+docker compose stop api web nginx
 
 # Step 5: Start new containers
 print_step "Starting containers..."
 docker compose up -d
 
-# Reload nginx to pick up any config changes from git pull
-docker compose restart nginx
-
 # Step 6: Wait for health
 print_step "Waiting for API to be healthy..."
 MAX_WAIT=60
 WAITED=0
-API_PORT=$(grep -oP 'API_PORT=\K\d+' "$SCRIPT_DIR/.env" 2>/dev/null || echo "5000")
+API_PORT=$(grep -oP '^API_PORT=\K\d+' "$SCRIPT_DIR/.env" 2>/dev/null || echo "")
 
-until curl -sf "http://localhost:$API_PORT/health" > /dev/null 2>&1; do
+# If no direct API port, check via nginx
+if [ -n "$API_PORT" ]; then
+    HEALTH_URL="http://localhost:$API_PORT/health"
+else
+    NGINX_PORT=$(grep -oP '^NGINX_PORT=\K\d+' "$SCRIPT_DIR/.env" 2>/dev/null || echo "80")
+    HEALTH_URL="http://localhost:$NGINX_PORT/health"
+fi
+
+until curl -sf "$HEALTH_URL" > /dev/null 2>&1; do
     sleep 2
     WAITED=$((WAITED + 2))
     if [ $WAITED -ge $MAX_WAIT ]; then
         print_error "API failed to start within ${MAX_WAIT}s"
+        print_info "Checking logs..."
+        docker compose logs --tail=20 api
+        docker compose logs --tail=20 nginx
         rollback
     fi
     echo -n "."
@@ -167,8 +228,14 @@ echo -e "${GREEN}═════════════════════
 echo -e "${GREEN}✓ Deployment complete!${NC}"
 echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
 echo ""
-echo "Deployed commit: $(git rev-parse --short HEAD)"
-echo "API: http://localhost:$API_PORT"
+if [ "$DO_PULL" = true ]; then
+    echo "Deployed commit: $(cd "$PROJECT_ROOT" && git rev-parse --short HEAD)"
+fi
+NGINX_PORT=$(grep -oP '^NGINX_PORT=\K\d+' "$SCRIPT_DIR/.env" 2>/dev/null || echo "80")
+echo "Web UI: http://localhost:$NGINX_PORT"
+if [ -n "$API_PORT" ]; then
+    echo "API (direct): http://localhost:$API_PORT"
+fi
 echo ""
 
 # Show recent logs
