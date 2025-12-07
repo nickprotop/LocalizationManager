@@ -75,6 +75,11 @@
     <EmbeddedResource Remove="samples/**" />
     <None Remove="samples/**" />
     <Content Remove="samples/**" />
+
+    <Compile Remove="cloud/**" />
+    <EmbeddedResource Remove="cloud/**" />
+    <None Remove="cloud/**" />
+    <Content Remove="cloud/**" />
   </ItemGroup>
 
   <ItemGroup>
