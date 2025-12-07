@@ -11,26 +11,52 @@ Self-hosted infrastructure for LRM Cloud using Docker Compose.
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                    Docker Compose Network                       │   │
 │  │                                                                 │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │   │
+│  │  ┌──────────────┐                                               │   │
+│  │  │    nginx     │  Reverse proxy with SSL & rate limiting       │   │
+│  │  │  :80 / :443  │                                               │   │
+│  │  └──────┬───────┘                                               │   │
+│  │         │                                                       │   │
+│  │  ┌──────▼───────┐  ┌──────────────┐  ┌──────────────┐           │   │
 │  │  │   API        │  │  PostgreSQL  │  │    Redis     │           │   │
 │  │  │  (ASP.NET)   │  │     16       │  │      7       │           │   │
-│  │  │   :8080      │  │    :5432     │  │    :6379     │           │   │ 
-│  │  └──────┬───────┘  └──────────────┘  └──────────────┘           │   │
-│  │         │                                                       │   │
-│  │  ┌──────┴───────┐                                               │   │
+│  │  │   :8080      │  │    :5432     │  │    :6379     │           │   │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘           │   │
+│  │                                                                 │   │
+│  │  ┌──────────────┐                                               │   │
 │  │  │    MinIO     │  S3-compatible object storage                 │   │
 │  │  │  (optional)  │  for exports, backups, attachments            │   │
 │  │  │ :9000/:9001  │                                               │   │
 │  │  └──────────────┘                                               │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                        │
-│  External Ports (configurable via .env):                               │
-│     API_PORT      > container :8080                                    │
+│  External Ports (configurable via setup.sh):                           │
+│     NGINX_PORT    > container :80  (HTTP)                              │
+│     HTTPS_PORT    > container :443 (HTTPS, optional)                   │
+│     API_PORT      > container :8080 (optional, bypasses nginx)         │
 │     POSTGRES_PORT > container :5432                                    │
 │     REDIS_PORT    > container :6379                                    │
 │     MINIO_PORT    > container :9000 (API)                              │
 │     MINIO_CONSOLE > container :9001 (Web UI)                           │
 └────────────────────────────────────────────────────────────────────────┘
+```
+
+## Deployment Scenarios
+
+### Standalone with SSL (self-hosted)
+```
+Browser → nginx (HTTPS :443) → API (:8080)
+                HTTP :80 redirects to HTTPS
+```
+
+### Behind Existing Proxy (e.g., DigitalOcean, Cloudflare)
+```
+Your nginx (HTTPS) → LRM nginx (HTTP :8080) → API (:8080)
+```
+
+### Development (with direct API access)
+```
+Browser → nginx (HTTP :8080) → API (:8080)
+          Direct API (:5000) for debugging
 ```
 
 ## Quick Start
@@ -60,7 +86,11 @@ Interactive script for first-time infrastructure setup. Can be re-run safely to 
 **Options prompted:**
 | Option | Default | Description |
 |--------|---------|-------------|
-| API Port | 5000 | External port for API access |
+| nginx HTTP Port | 80 | Main access port for the application |
+| Enable SSL? | No | Enable HTTPS with auto-generated certs |
+| HTTPS Port | 443 | HTTPS port (if SSL enabled) |
+| Direct API access? | No | Expose API port bypassing nginx |
+| API Port | 5000 | Direct API port (if enabled) |
 | PostgreSQL Port | 5432 | External port for database |
 | Redis Port | 6379 | External port for cache |
 | Environment | Production | ASP.NET environment |
@@ -138,7 +168,7 @@ journalctl-like log viewer for all services with filtering and follow mode.
 ./logs.sh --no-color          # Disable colors (for piping)
 ```
 
-**Services:** `api` (green), `postgres` (blue), `redis` (red), `minio` (magenta), `all`
+**Services:** `nginx` (cyan), `api` (green), `postgres` (blue), `redis` (red), `minio` (magenta), `all`
 
 ## Files
 
@@ -152,10 +182,18 @@ journalctl-like log viewer for all services with filtering and follow mode.
 | `Dockerfile.api` | ✓ | API container build |
 | `config.example.json` | ✓ | Configuration template |
 | `init-db.sql` | ✓ | PostgreSQL initialization |
+| `nginx/nginx.conf.template` | ✓ | nginx config template |
+| `nginx/ssl.conf` | ✓ | SSL/TLS configuration |
+| `certs/generate-self-signed.sh` | ✓ | Self-signed cert generator |
+| `certs/setup-letsencrypt.sh` | ✓ | Let's Encrypt setup script |
 | `.gitignore` | ✓ | Ignores secrets |
 | `config.json` | ✗ | **Generated - contains secrets** |
-| `.env` | ✗ | **Generated - contains secrets** |
-| `data/` | ✗ | **All persistent data (postgres, redis, minio, logs)** |
+| `.env` | ✗ | **Generated - port configuration** |
+| `docker-compose.override.yml` | ✗ | **Generated - port mappings** |
+| `nginx/nginx.conf` | ✗ | **Generated - processed from template** |
+| `certs/server.crt` | ✗ | **Generated - SSL certificate** |
+| `certs/server.key` | ✗ | **Generated - SSL private key** |
+| `data/` | ✗ | **All persistent data** |
 
 ## Configuration
 
@@ -237,12 +275,67 @@ jobs:
 
 ## Security
 
-- All secrets are stored in `config.json` with `chmod 600`
-- Passwords are auto-generated using `openssl rand`
+**Secrets & Encryption:**
+- All secrets stored in `config.json` with `chmod 600`
+- Passwords auto-generated using `openssl rand`
 - JWT secret is 64 characters
 - Encryption uses AES-256 with base64-encoded key
+
+**nginx Security Headers:**
+- `X-Frame-Options: DENY` - Prevents clickjacking
+- `X-Content-Type-Options: nosniff` - Prevents MIME sniffing
+- `X-XSS-Protection: 1; mode=block` - XSS filter
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Content-Security-Policy` - Restricts resource loading
+- `Strict-Transport-Security` - HSTS (with SSL only)
+- `Permissions-Policy` - Disables sensitive APIs
+
+**Rate Limiting:**
+- Login endpoint: 5 requests/minute (burst: 3)
+- General API: 100 requests/second
+
+**Network Isolation:**
+- API not directly exposed (nginx proxies)
 - Container network is isolated
-- Only specified ports are exposed to host
+- Only specified ports exposed to host
+
+## SSL/TLS Configuration
+
+### Self-Signed (Development)
+
+Self-signed certificates are auto-generated when you enable SSL during setup:
+
+```bash
+./setup.sh
+# Answer "y" to "Enable SSL?"
+# Certificates generated in certs/server.crt and certs/server.key
+```
+
+Browsers will show a security warning - this is expected for self-signed certs.
+
+### Let's Encrypt (Production)
+
+For production with a real domain:
+
+```bash
+# 1. Point your domain to this server's IP
+# 2. Ensure port 80 is accessible from the internet
+# 3. Run the Let's Encrypt setup:
+./certs/setup-letsencrypt.sh yourdomain.com you@example.com
+
+# 4. Add auto-renewal to crontab:
+0 3 * * * /path/to/certs/setup-letsencrypt.sh renew
+```
+
+### Behind Existing Proxy
+
+If you're behind an existing nginx/Cloudflare that handles SSL:
+
+```bash
+./setup.sh
+# Answer "n" to "Enable SSL?"
+# Use port 8080 or similar for nginx HTTP Port
+```
 
 ## Data Storage
 
@@ -250,10 +343,12 @@ All persistent data is stored in `./data/` (bind mounts, not Docker volumes):
 
 ```
 data/
-├── postgres/    # PostgreSQL database files
-├── redis/       # Redis RDB/AOF persistence
-├── minio/       # MinIO object storage
-└── logs/        # API application logs
+├── postgres/      # PostgreSQL database files
+├── redis/         # Redis RDB/AOF persistence
+├── minio/         # MinIO object storage
+└── logs/
+    ├── api/       # API application logs (daily rotation)
+    └── nginx/     # nginx access and error logs
 ```
 
 Benefits of bind mounts:

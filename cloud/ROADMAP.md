@@ -1072,7 +1072,7 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 - [x] Add health checks endpoint (/health)
 - [x] Configure EF Core + migrations
 - [x] Implement IMailService with Sendmail provider
-- [ ] Set up nginx with security headers
+- [x] Set up nginx with security headers
 
 ### Phase 1: Auth & Teams (Week 3-4)
 - [ ] Email/password registration
