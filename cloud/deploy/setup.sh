@@ -105,8 +105,15 @@ CURRENT_ENV=$(config_get '.server.environment' 'Production')
 CURRENT_DB_CONN=$(config_get '.database.connectionString' '')
 CURRENT_DB_PASSWORD=$(extract_password "$CURRENT_DB_CONN")
 
+# Store original password for change detection
+OLD_POSTGRES_PASSWORD="$CURRENT_DB_PASSWORD"
+
 CURRENT_REDIS_CONN=$(config_get '.redis.connectionString' '')
 CURRENT_REDIS_PASSWORD=$(echo "$CURRENT_REDIS_CONN" | grep -oP 'password=\K[^,]+' 2>/dev/null || echo "")
+
+# Store original passwords for change detection
+OLD_REDIS_PASSWORD="$CURRENT_REDIS_PASSWORD"
+OLD_MINIO_PASSWORD="$CURRENT_MINIO_PASSWORD"
 
 CURRENT_JWT=$(config_get '.auth.jwtSecret' '')
 CURRENT_ENCRYPTION=$(config_get '.encryption.tokenKey' '')
@@ -367,6 +374,7 @@ mkdir -p "$SCRIPT_DIR/data/postgres"
 mkdir -p "$SCRIPT_DIR/data/redis"
 mkdir -p "$SCRIPT_DIR/data/minio"
 mkdir -p "$SCRIPT_DIR/data/logs/api"
+mkdir -p "$SCRIPT_DIR/data/logs/web"
 mkdir -p "$SCRIPT_DIR/data/logs/nginx"
 print_success "Data directories ready"
 
@@ -466,6 +474,17 @@ if docker images lrmcloud-api --format '{{.ID}}' | grep -q .; then
     fi
 fi
 
+# Check if Web image needs rebuild
+REBUILD_WEB=false
+if docker images lrmcloud-web --format '{{.ID}}' | grep -q .; then
+    echo ""
+    echo -e "${BLUE}Web (Blazor) image already exists.${NC}"
+    read -p "Rebuild Web image? [y/N]: " REBUILD_RESPONSE
+    if [ "$REBUILD_RESPONSE" = "y" ] || [ "$REBUILD_RESPONSE" = "Y" ]; then
+        REBUILD_WEB=true
+    fi
+fi
+
 # Pull latest images
 print_step "Pulling latest Docker images..."
 docker compose pull
@@ -479,9 +498,38 @@ elif ! docker images lrmcloud-api --format '{{.ID}}' | grep -q .; then
     docker compose build api
 fi
 
+# Build Web if needed (first time or rebuild requested)
+if [ "$REBUILD_WEB" = true ]; then
+    print_step "Rebuilding Web (Blazor) image..."
+    docker compose build web --no-cache
+elif ! docker images lrmcloud-web --format '{{.ID}}' | grep -q .; then
+    print_step "Building Web (Blazor) image..."
+    docker compose build web
+fi
+
+# Check if Redis or MinIO passwords changed - need force-recreate
+RECREATE_SERVICES=""
+if [ -n "$OLD_REDIS_PASSWORD" ] && [ "$REDIS_PASSWORD" != "$OLD_REDIS_PASSWORD" ]; then
+    RECREATE_SERVICES="$RECREATE_SERVICES redis"
+    print_info "Redis password changed - will recreate container"
+fi
+if [ -n "$OLD_MINIO_PASSWORD" ] && [ "$MINIO_PASSWORD" != "$OLD_MINIO_PASSWORD" ]; then
+    RECREATE_SERVICES="$RECREATE_SERVICES minio"
+    print_info "MinIO password changed - will recreate container"
+fi
+
 # Start/restart containers
 print_step "Starting containers..."
-docker compose up -d
+if [ -n "$RECREATE_SERVICES" ]; then
+    docker compose up -d --force-recreate $RECREATE_SERVICES
+    docker compose up -d
+else
+    docker compose up -d
+fi
+
+# Reload nginx to pick up any config changes
+print_step "Reloading nginx configuration..."
+docker compose restart nginx
 
 # Wait for PostgreSQL
 print_step "Waiting for PostgreSQL to be ready..."
@@ -489,6 +537,17 @@ until docker exec lrmcloud-postgres pg_isready -U lrm -d lrmcloud &> /dev/null; 
     sleep 1
 done
 print_success "PostgreSQL is ready"
+
+# Update PostgreSQL password if changed
+if [ -n "$OLD_POSTGRES_PASSWORD" ] && [ "$POSTGRES_PASSWORD" != "$OLD_POSTGRES_PASSWORD" ]; then
+    print_step "Updating PostgreSQL password..."
+    if docker exec lrmcloud-postgres psql -U lrm -d lrmcloud -c "ALTER USER lrm PASSWORD '$POSTGRES_PASSWORD';" &> /dev/null; then
+        print_success "PostgreSQL password updated"
+    else
+        print_error "Failed to update PostgreSQL password. You may need to update it manually:"
+        print_info "  docker exec -it lrmcloud-postgres psql -U lrm -d lrmcloud -c \"ALTER USER lrm PASSWORD 'newpassword';\""
+    fi
+fi
 
 # Wait for Redis
 print_step "Waiting for Redis to be ready..."
