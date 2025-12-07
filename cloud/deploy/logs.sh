@@ -18,6 +18,7 @@ NC='\033[0m'
 declare -A SERVICES=(
     [nginx]="lrmcloud-nginx"
     [api]="lrmcloud-api"
+    [web]="lrmcloud-web"
     [postgres]="lrmcloud-postgres"
     [redis]="lrmcloud-redis"
     [minio]="lrmcloud-minio"
@@ -26,6 +27,7 @@ declare -A SERVICES=(
 declare -A SERVICE_COLORS=(
     [nginx]="$CYAN"
     [api]="$GREEN"
+    [web]="$YELLOW"
     [postgres]="$BLUE"
     [redis]="$RED"
     [minio]="$MAGENTA"
@@ -50,6 +52,7 @@ Usage: ./logs.sh [options] [service...]
 Services:
   nginx       nginx reverse proxy
   api         LRM Cloud API
+  web         Blazor WASM frontend
   postgres    PostgreSQL database
   redis       Redis cache
   minio       MinIO object storage
@@ -120,12 +123,12 @@ while [[ $# -gt 0 ]]; do
         *)
             # Service name
             if [[ "$1" == "all" ]]; then
-                SELECTED_SERVICES=(nginx api postgres redis minio)
+                SELECTED_SERVICES=(nginx api web postgres redis minio)
             elif [[ -n "${SERVICES[$1]}" ]]; then
                 SELECTED_SERVICES+=("$1")
             else
                 echo -e "${RED}Unknown service: $1${NC}"
-                echo "Available: nginx, api, postgres, redis, minio, all"
+                echo "Available: nginx, api, web, postgres, redis, minio, all"
                 exit 1
             fi
             shift
@@ -135,7 +138,7 @@ done
 
 # Default to all services
 if [ ${#SELECTED_SERVICES[@]} -eq 0 ]; then
-    SELECTED_SERVICES=(nginx api postgres redis minio)
+    SELECTED_SERVICES=(nginx api web postgres redis minio)
 fi
 
 # Check if containers exist

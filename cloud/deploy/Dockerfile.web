@@ -1,0 +1,59 @@
+# LRM Cloud Web - Blazor WASM Multi-stage Docker build
+# Location: cloud/deploy/Dockerfile.web
+# Build context: cloud/ (set in docker-compose.yml)
+# Build: cd cloud/deploy && docker compose build web
+# Run: cd cloud/deploy && docker compose up -d web
+
+# ============================================
+# Stage 1: Build Blazor WASM
+# ============================================
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
+
+WORKDIR /src
+
+# Copy project files first (for layer caching)
+COPY src/LrmCloud.Shared/LrmCloud.Shared.csproj LrmCloud.Shared/
+COPY src/LrmCloud.Web/LrmCloud.Web.csproj LrmCloud.Web/
+
+# Restore dependencies
+WORKDIR /src/LrmCloud.Web
+RUN dotnet restore
+
+# Copy source code
+WORKDIR /src
+COPY src/LrmCloud.Shared/ LrmCloud.Shared/
+COPY src/LrmCloud.Web/ LrmCloud.Web/
+
+# Build and publish (Blazor WASM outputs static files)
+WORKDIR /src/LrmCloud.Web
+RUN dotnet publish \
+    --configuration Release \
+    --output /app/publish
+
+# ============================================
+# Stage 2: Runtime (nginx for static files)
+# ============================================
+FROM nginx:alpine AS runtime
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Copy Blazor WASM published output to nginx html directory
+COPY --from=build /app/publish/wwwroot /usr/share/nginx/html
+
+# Copy nginx configuration for SPA routing (from deploy/nginx/)
+COPY deploy/nginx/blazor.conf /etc/nginx/conf.d/default.conf
+
+# Create log directory with correct permissions
+RUN mkdir -p /var/log/nginx && \
+    chown -R nginx:nginx /var/log/nginx
+
+# Expose port (internal, proxied by main nginx)
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -sf http://localhost:80/ || exit 1
+
+# nginx runs as non-root by default in this config
+CMD ["nginx", "-g", "daemon off;"]

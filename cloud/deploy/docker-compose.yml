@@ -16,6 +16,7 @@ services:
       - ./data/logs/nginx:/var/log/nginx
     depends_on:
       - api
+      - web
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
       interval: 30s
@@ -41,6 +42,25 @@ services:
       - redis
     environment:
       - ASPNETCORE_ENVIRONMENT=${ENVIRONMENT:-Production}
+
+  # ==========================================================================
+  # Web (Blazor WASM)
+  # ==========================================================================
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    container_name: lrmcloud-web
+    restart: unless-stopped
+    # No ports exposed - proxied by nginx
+    volumes:
+      - ./data/logs/web:/var/log/nginx
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # ==========================================================================
   # PostgreSQL Database

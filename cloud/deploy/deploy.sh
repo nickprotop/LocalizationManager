@@ -115,10 +115,12 @@ cd "$SCRIPT_DIR"
 print_step "Pulling base Docker images..."
 docker compose pull postgres redis minio
 
-# Step 3: Build API image (unless --restart-only)
+# Step 3: Build images (unless --restart-only)
 if [ "$RESTART_ONLY" = false ]; then
     print_step "Building API image..."
     docker compose build --no-cache api
+    print_step "Building Web (Blazor WASM) image..."
+    docker compose build --no-cache web
     print_success "Build complete"
 else
     print_info "Restart only (skipping build)"
@@ -126,11 +128,14 @@ fi
 
 # Step 4: Stop old containers
 print_step "Stopping containers..."
-docker compose stop api
+docker compose stop api web
 
 # Step 5: Start new containers
 print_step "Starting containers..."
 docker compose up -d
+
+# Reload nginx to pick up any config changes from git pull
+docker compose restart nginx
 
 # Step 6: Wait for health
 print_step "Waiting for API to be healthy..."
