@@ -2,8 +2,17 @@
 config.json
 .env
 
-# Docker compose override for local dev
+# Docker compose override for port configuration
 docker-compose.override.yml
+
+# Generated nginx config
+nginx/nginx.conf
+
+# SSL certificates (contains private keys)
+certs/server.key
+certs/server.crt
+certs/letsencrypt/
+certs/webroot/
 
 # Data directories
 data/

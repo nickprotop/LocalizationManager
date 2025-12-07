@@ -16,6 +16,7 @@ NC='\033[0m'
 
 # Service definitions
 declare -A SERVICES=(
+    [nginx]="lrmcloud-nginx"
     [api]="lrmcloud-api"
     [postgres]="lrmcloud-postgres"
     [redis]="lrmcloud-redis"
@@ -23,6 +24,7 @@ declare -A SERVICES=(
 )
 
 declare -A SERVICE_COLORS=(
+    [nginx]="$CYAN"
     [api]="$GREEN"
     [postgres]="$BLUE"
     [redis]="$RED"
@@ -46,6 +48,7 @@ LRM Cloud - Log Viewer
 Usage: ./logs.sh [options] [service...]
 
 Services:
+  nginx       nginx reverse proxy
   api         LRM Cloud API
   postgres    PostgreSQL database
   redis       Redis cache
@@ -117,12 +120,12 @@ while [[ $# -gt 0 ]]; do
         *)
             # Service name
             if [[ "$1" == "all" ]]; then
-                SELECTED_SERVICES=(api postgres redis minio)
+                SELECTED_SERVICES=(nginx api postgres redis minio)
             elif [[ -n "${SERVICES[$1]}" ]]; then
                 SELECTED_SERVICES+=("$1")
             else
                 echo -e "${RED}Unknown service: $1${NC}"
-                echo "Available: api, postgres, redis, minio, all"
+                echo "Available: nginx, api, postgres, redis, minio, all"
                 exit 1
             fi
             shift
@@ -132,7 +135,7 @@ done
 
 # Default to all services
 if [ ${#SELECTED_SERVICES[@]} -eq 0 ]; then
-    SELECTED_SERVICES=(api postgres redis minio)
+    SELECTED_SERVICES=(nginx api postgres redis minio)
 fi
 
 # Check if containers exist
