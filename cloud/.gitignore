@@ -1,0 +1,10 @@
+# .NET build outputs
+bin/
+obj/
+
+# IDE
+.vs/
+*.user
+
+# dotnet-ef tool manifest
+.config/
