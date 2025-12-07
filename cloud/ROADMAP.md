@@ -1057,7 +1057,7 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 
 ## Implementation Phases
 
-### Phase 0: Foundation (Week 1-2)
+### Phase 0: Foundation (Week 1-2) ✅ COMPLETED
 - [x] Create `cloud/` folder structure
 - [x] Initialize `LrmCloud.sln` with projects:
   - `LrmCloud.Api` - ASP.NET Core Web API
@@ -1066,13 +1066,14 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
   - `LrmCloud.Tests`
 - [x] Set up Docker Compose (dev)
 - [x] Create setup.sh (interactive config generation)
-- [x] Create deploy.sh (automated deployment)
+- [x] Create deploy.sh (automated deployment with nginx config regeneration)
 - [x] Create Dockerfile.api (multi-stage build)
 - [x] Implement CloudConfiguration (type-safe config binding)
 - [x] Add health checks endpoint (/health)
 - [x] Configure EF Core + migrations
 - [x] Implement IMailService with Sendmail provider
 - [x] Set up nginx with security headers
+- [x] Fix deploy.sh nginx configuration bug (regenerate config on each deploy)
 
 ### Phase 1: Auth & Teams (Week 3-4)
 - [ ] Email/password registration

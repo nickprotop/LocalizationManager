@@ -1,6 +1,7 @@
 namespace LrmCloud.Api;
 
 using LrmCloud.Api.Data;
+using LrmCloud.Api.Middleware;
 using LrmCloud.Api.Services;
 using LrmCloud.Shared.Configuration;
 using Microsoft.EntityFrameworkCore;
@@ -136,7 +137,24 @@ public class Program
             // API & Security
             // =============================================================================
 
-            builder.Services.AddControllers();
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+                    options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+                    options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.CamelCase));
+                });
+
+            // Configure ProblemDetails for consistent error responses (RFC 7807)
+            builder.Services.AddProblemDetails(options =>
+            {
+                options.CustomizeProblemDetails = context =>
+                {
+                    context.ProblemDetails.Extensions["timestamp"] = DateTime.UtcNow;
+                    context.ProblemDetails.Instance = context.HttpContext.Request.Path;
+                };
+            });
+
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddOpenApi();
 
@@ -188,6 +206,10 @@ public class Program
             {
                 options.MessageTemplate = "{RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000}ms";
             });
+
+            // Global exception handler (custom - logs with Serilog, uses our error codes, hides details in production)
+            app.ConfigureExceptionHandler(app.Environment);
+            app.UseStatusCodePages();
 
             // Security headers
             app.Use(async (context, next) =>
