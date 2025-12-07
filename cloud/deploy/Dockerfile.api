@@ -1,0 +1,67 @@
+# LRM Cloud API - Multi-stage Docker build
+# Location: cloud/deploy/Dockerfile.api
+# Build context: cloud/src (set in docker-compose.yml)
+# Build: cd cloud/deploy && docker compose build api
+# Run: cd cloud/deploy && docker compose up -d api
+
+# ============================================
+# Stage 1: Build
+# ============================================
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
+
+WORKDIR /src
+
+# Copy project files first (for layer caching)
+COPY LrmCloud.Shared/LrmCloud.Shared.csproj LrmCloud.Shared/
+COPY LrmCloud.Api/LrmCloud.Api.csproj LrmCloud.Api/
+
+# Restore dependencies
+WORKDIR /src/LrmCloud.Api
+RUN dotnet restore
+
+# Copy source code
+WORKDIR /src
+COPY LrmCloud.Shared/ LrmCloud.Shared/
+COPY LrmCloud.Api/ LrmCloud.Api/
+
+# Build and publish
+WORKDIR /src/LrmCloud.Api
+RUN dotnet publish \
+    --configuration Release \
+    --output /app/publish
+
+# ============================================
+# Stage 2: Runtime
+# ============================================
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Security: Run as non-root user
+RUN addgroup -S lrmcloud && adduser -S lrmcloud -G lrmcloud
+
+WORKDIR /app
+
+# Copy published app
+COPY --from=build --chown=lrmcloud:lrmcloud /app/publish .
+
+# Create logs directory (owned by lrmcloud user)
+RUN mkdir -p /app/logs && chown lrmcloud:lrmcloud /app/logs
+
+# Switch to non-root user
+USER lrmcloud
+
+# Expose port (internal, mapped via docker-compose)
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -sf http://localhost:8080/health || exit 1
+
+# Set environment variables
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+# Entry point
+ENTRYPOINT ["dotnet", "LrmCloud.Api.dll"]

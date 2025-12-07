@@ -1,0 +1,9 @@
+# Generated config (contains secrets)
+config.json
+.env
+
+# Docker compose override for local dev
+docker-compose.override.yml
+
+# Data directories
+data/

@@ -1,0 +1,46 @@
+{
+  "$schema": "./config.schema.json",
+  "server": {
+    "urls": "http://0.0.0.0:8080",
+    "environment": "Production"
+  },
+  "database": {
+    "connectionString": "Host=lrmcloud-postgres;Port=5432;Database=lrmcloud;Username=lrm;Password=CHANGE_ME",
+    "autoMigrate": true
+  },
+  "redis": {
+    "connectionString": "lrmcloud-redis:6379,password=CHANGE_ME"
+  },
+  "storage": {
+    "endpoint": "lrmcloud-minio:9000",
+    "accessKey": "lrmcloud",
+    "secretKey": "CHANGE_ME",
+    "bucket": "lrmcloud",
+    "useSSL": false
+  },
+  "encryption": {
+    "tokenKey": "CHANGE_ME_BASE64_KEY"
+  },
+  "auth": {
+    "jwtSecret": "CHANGE_ME_LONG_RANDOM_STRING",
+    "jwtExpiryHours": 24
+  },
+  "mail": {
+    "host": "localhost",
+    "port": 25,
+    "username": "",
+    "password": "",
+    "fromAddress": "noreply@lrm.cloud",
+    "fromName": "LRM Cloud"
+  },
+  "features": {
+    "registration": true,
+    "githubSync": true,
+    "freeTranslations": true
+  },
+  "limits": {
+    "freeTranslationChars": 10000,
+    "maxProjectsPerUser": 5,
+    "maxKeysPerProject": 10000
+  }
+}
