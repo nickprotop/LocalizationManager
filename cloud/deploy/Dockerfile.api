@@ -35,22 +35,32 @@ RUN dotnet publish \
 # ============================================
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
 
-# Install curl for health checks
-RUN apk add --no-cache curl
+# Install curl for health checks, su-exec for dropping privileges
+RUN apk add --no-cache curl su-exec
 
-# Security: Run as non-root user
+# Create non-root user (no fixed UID - entrypoint handles permissions)
 RUN addgroup -S lrmcloud && adduser -S lrmcloud -G lrmcloud
 
 WORKDIR /app
 
 # Copy published app
-COPY --from=build --chown=lrmcloud:lrmcloud /app/publish .
+COPY --from=build /app/publish .
 
-# Create logs directory (owned by lrmcloud user)
-RUN mkdir -p /app/logs && chown lrmcloud:lrmcloud /app/logs
+# Create entrypoint script inline (fixes permissions, then drops to non-root user)
+RUN cat > /app/entrypoint.sh << 'EOF'
+#!/bin/sh
+set -e
+# Fix ownership of log directory (mounted from host with unknown UID)
+if [ -d "/var/log/lrmcloud" ]; then
+    chown -R lrmcloud:lrmcloud /var/log/lrmcloud 2>/dev/null || true
+fi
+# Drop to non-root user and run the app
+exec su-exec lrmcloud dotnet LrmCloud.Api.dll "$@"
+EOF
+RUN chmod +x /app/entrypoint.sh
 
-# Switch to non-root user
-USER lrmcloud
+# Create log directory
+RUN mkdir -p /var/log/lrmcloud /app/logs
 
 # Expose port (internal, mapped via docker-compose)
 EXPOSE 8080
@@ -63,5 +73,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
-# Entry point
-ENTRYPOINT ["dotnet", "LrmCloud.Api.dll"]
+# Entrypoint runs as root, fixes permissions, then drops to lrmcloud user
+ENTRYPOINT ["/app/entrypoint.sh"]
