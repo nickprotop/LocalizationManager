@@ -1,6 +1,7 @@
 namespace LrmCloud.Api;
 
 using LrmCloud.Api.Data;
+using LrmCloud.Api.Services;
 using LrmCloud.Shared.Configuration;
 using Microsoft.EntityFrameworkCore;
 using HealthChecks.NpgSql;
@@ -89,6 +90,12 @@ public class Program
 
             // Register configuration in DI
             builder.Services.AddCloudConfiguration(config);
+
+            // =============================================================================
+            // Services
+            // =============================================================================
+
+            builder.Services.AddScoped<IMailService, SmtpMailService>();
 
             // =============================================================================
             // Database (PostgreSQL + EF Core)
