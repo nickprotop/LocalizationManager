@@ -10,53 +10,196 @@ Self-hosted infrastructure for LRM Cloud using Docker Compose.
 │                                                                        │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                    Docker Compose Network                       │   │
+│  │                       (lrmcloud_default)                        │   │
 │  │                                                                 │   │
 │  │  ┌──────────────┐                                               │   │
 │  │  │    nginx     │  Reverse proxy with SSL & rate limiting       │   │
-│  │  │  :80 / :443  │                                               │   │
+│  │  │  :80 / :443  │  Routes /api/* → API, /* → Web               │   │
 │  │  └──────┬───────┘                                               │   │
 │  │         │                                                       │   │
+│  │  ┌──────┴───────┐  ┌──────────────┐                             │   │
+│  │  │ /api/* → API │  │ /* → Web     │                             │   │
+│  │  │              │  │ (Blazor WASM)│                             │   │
+│  │  └──────┬───────┘  └──────┬───────┘                             │   │
+│  │         │                 │                                     │   │
+│  │  ┌──────▼───────┐  ┌──────▼───────┐                             │   │
+│  │  │     API      │  │     Web      │                             │   │
+│  │  │  (ASP.NET)   │  │   (nginx +   │                             │   │
+│  │  │   :8080      │  │ Blazor WASM) │                             │   │
+│  │  │              │  │    :80       │                             │   │
+│  │  └──────┬───────┘  └──────────────┘                             │   │
+│  │         │                                                       │   │
 │  │  ┌──────▼───────┐  ┌──────────────┐  ┌──────────────┐           │   │
-│  │  │   API        │  │  PostgreSQL  │  │    Redis     │           │   │
-│  │  │  (ASP.NET)   │  │     16       │  │      7       │           │   │
-│  │  │   :8080      │  │    :5432     │  │    :6379     │           │   │
+│  │  │  PostgreSQL  │  │    Redis     │  │    MinIO     │           │   │
+│  │  │     16       │  │      7       │  │  (optional)  │           │   │
+│  │  │    :5432     │  │    :6379     │  │ :9000/:9001  │           │   │
 │  │  └──────────────┘  └──────────────┘  └──────────────┘           │   │
-│  │                                                                 │   │
-│  │  ┌──────────────┐                                               │   │
-│  │  │    MinIO     │  S3-compatible object storage                 │   │
-│  │  │  (optional)  │  for exports, backups, attachments            │   │
-│  │  │ :9000/:9001  │                                               │   │
-│  │  └──────────────┘                                               │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                        │
 │  External Ports (configurable via setup.sh):                           │
-│     NGINX_PORT    > container :80  (HTTP)                              │
-│     HTTPS_PORT    > container :443 (HTTPS, optional)                   │
-│     API_PORT      > container :8080 (optional, bypasses nginx)         │
-│     POSTGRES_PORT > container :5432                                    │
-│     REDIS_PORT    > container :6379                                    │
-│     MINIO_PORT    > container :9000 (API)                              │
-│     MINIO_CONSOLE > container :9001 (Web UI)                           │
+│     NGINX_PORT    → container :80  (HTTP)                              │
+│     HTTPS_PORT    → container :443 (HTTPS, optional)                   │
+│     API_PORT      → container :8080 (optional, bypasses nginx)         │
+│     POSTGRES_PORT → container :5432                                    │
+│     REDIS_PORT    → container :6379                                    │
+│     MINIO_PORT    → container :9000 (API)                              │
+│     MINIO_CONSOLE → container :9001 (Web UI)                           │
 └────────────────────────────────────────────────────────────────────────┘
+```
+
+## Container Details
+
+| Container | Image | Internal Port | Purpose |
+|-----------|-------|---------------|---------|
+| `lrmcloud-nginx` | nginx:alpine | 80, 443 | Reverse proxy, SSL termination, rate limiting |
+| `lrmcloud-api` | Custom (Dockerfile.api) | 8080 | ASP.NET Core Web API |
+| `lrmcloud-web` | Custom (Dockerfile.web) | 80 | Blazor WASM static files (served by nginx inside) |
+| `lrmcloud-postgres` | postgres:16-alpine | 5432 | PostgreSQL database |
+| `lrmcloud-redis` | redis:7-alpine | 6379 | Session cache, rate limiting |
+| `lrmcloud-minio` | minio/minio:latest | 9000, 9001 | S3-compatible object storage |
+
+## Request Flow
+
+```
+Browser Request: https://lrm.cloud/api/projects
+    │
+    ▼
+┌─────────────────┐
+│ lrmcloud-nginx  │  Port 443 (or 80)
+│ nginx:alpine    │
+└────────┬────────┘
+         │ Route: /api/* → upstream api
+         ▼
+┌─────────────────┐
+│ lrmcloud-api    │  Port 8080 (internal)
+│ ASP.NET Core    │
+└────────┬────────┘
+         │ Queries
+         ▼
+┌─────────────────┐  ┌─────────────────┐
+│ lrmcloud-postgres│  │ lrmcloud-redis  │
+│ PostgreSQL      │  │ Redis Cache     │
+└─────────────────┘  └─────────────────┘
+
+Browser Request: https://lrm.cloud/ (Blazor WASM)
+    │
+    ▼
+┌─────────────────┐
+│ lrmcloud-nginx  │  Port 443 (or 80)
+│ nginx:alpine    │
+└────────┬────────┘
+         │ Route: /* → upstream web
+         ▼
+┌─────────────────┐
+│ lrmcloud-web    │  Port 80 (internal)
+│ nginx + static  │  Serves index.html, _framework/*.dll, etc.
+└─────────────────┘
 ```
 
 ## Deployment Scenarios
 
 ### Standalone with SSL (self-hosted)
 ```
-Browser → nginx (HTTPS :443) → API (:8080)
-                HTTP :80 redirects to HTTPS
+Browser → nginx (HTTPS :443) → /api/* → API (:8080)
+                              → /*     → Web (Blazor WASM)
+          HTTP :80 redirects to HTTPS
 ```
 
 ### Behind Existing Proxy (e.g., DigitalOcean, Cloudflare)
 ```
-Your nginx (HTTPS) → LRM nginx (HTTP :8080) → API (:8080)
+Your nginx (HTTPS) → LRM nginx (HTTP :8080) → /api/* → API (:8080)
+                                            → /*     → Web (Blazor WASM)
 ```
 
 ### Development (with direct API access)
 ```
-Browser → nginx (HTTP :8080) → API (:8080)
+Browser → nginx (HTTP :8080) → /api/* → API (:8080)
+                             → /*     → Web (Blazor WASM)
           Direct API (:5000) for debugging
+```
+
+## How Everything Connects
+
+### Configuration Flow
+
+The infrastructure uses a layered configuration approach:
+
+```
+setup.sh (interactive prompts)
+    │
+    ├──► config.json          API configuration (server, database, auth, mail)
+    │                         Read by: API container at startup
+    │                         Contains: Connection strings, JWT secret, mail settings
+    │
+    ├──► .env                 Docker Compose environment
+    │                         Used by: docker-compose.yml, db.sh, logs.sh
+    │                         Contains: Ports, database credentials
+    │
+    ├──► docker-compose.override.yml    Port mappings
+    │                                   Used by: Docker Compose
+    │                                   Contains: Host port → container port mappings
+    │
+    └──► nginx/nginx.conf     nginx configuration (generated from template)
+                              Used by: nginx container
+                              Contains: SSL settings, routing rules, rate limiting
+```
+
+### Container Build Process
+
+```
+Dockerfile.api:
+    1. Uses sdk:9.0 to restore and publish
+    2. Copies /app/publish to runtime image
+    3. Entry point: dotnet LrmCloud.Api.dll
+
+Dockerfile.web:
+    1. Uses sdk:9.0 to build Blazor WASM
+    2. Output: /app/publish/wwwroot (static files)
+    3. Uses nginx:alpine to serve static files
+    4. Entry point: nginx serves /, handles SPA fallback to index.html
+```
+
+### Service Dependencies
+
+```
+lrmcloud-nginx
+    └── depends on: api, web (waits for /health endpoint)
+
+lrmcloud-api
+    ├── depends on: postgres (healthy)
+    ├── depends on: redis (healthy)
+    └── depends on: minio (healthy)
+
+lrmcloud-web
+    └── no dependencies (static files only)
+
+lrmcloud-postgres
+    └── uses: data/postgres/ (persistent storage)
+
+lrmcloud-redis
+    └── uses: data/redis/ (persistent storage)
+
+lrmcloud-minio
+    └── uses: data/minio/ (persistent storage)
+```
+
+### nginx Routing
+
+```nginx
+# All API requests → API container
+location /api/ {
+    proxy_pass http://api:8080;
+}
+
+# All other requests → Web container (Blazor WASM)
+location / {
+    proxy_pass http://web:80;
+}
+
+# Health check (returns 204 from nginx itself)
+location /health {
+    return 204;
+}
 ```
 
 ## Quick Start
@@ -78,10 +221,17 @@ Interactive script for first-time infrastructure setup. Can be re-run safely to 
 **What it does:**
 1. Prompts for configuration (ports, mail settings)
 2. Auto-generates secure passwords and keys
-3. Creates `config.json` and `.env`
-4. Pulls Docker images
-5. Starts all containers
-6. Waits for services to be healthy
+3. Creates `config.json` (API configuration)
+4. Creates `.env` (Docker Compose environment)
+5. Creates `docker-compose.override.yml` (port mappings)
+6. Generates `nginx/nginx.conf` from template (SSL or HTTP mode)
+7. Creates data directories for persistent storage
+8. Generates self-signed SSL certificate (if SSL enabled)
+9. Pulls Docker images (postgres, redis, minio)
+10. Builds API and Web containers
+11. Starts all containers
+12. Waits for services to be healthy
+13. Creates MinIO bucket
 
 **Options prompted:**
 | Option | Default | Description |
@@ -102,35 +252,49 @@ Interactive script for first-time infrastructure setup. Can be re-run safely to 
 | Mail From Name | LRM Cloud | Sender display name |
 
 **Auto-generated secrets (preserved on re-run):**
-- PostgreSQL password
-- Redis password
-- JWT secret (64 chars)
-- Encryption key (AES-256)
+- PostgreSQL password (32 chars, alphanumeric)
+- Redis password (32 chars, alphanumeric)
+- MinIO password (32 chars, alphanumeric)
+- JWT secret (64 chars, alphanumeric)
+- Encryption key (AES-256 base64)
+
+**nginx Configuration:**
+
+The `nginx/nginx.conf` is generated from `nginx/nginx.conf.template` based on SSL settings:
+- **SSL enabled**: HTTPS server block + HTTP→HTTPS redirect
+- **SSL disabled**: HTTP server block only
+
+This template processing happens in both `setup.sh` and `deploy.sh` to ensure consistency.
 
 ### deploy.sh - CI/CD Deployment
 
-Automated deployment script with rollback on failure.
+Automated deployment script with rollback on failure. Regenerates nginx configuration from template on each deploy.
 
 ```bash
-# Standard deployment
+# Standard deployment (local changes)
 ./deploy.sh
 
+# Production deployment (pull from git first)
+./deploy.sh --pull
+
 # Options
-./deploy.sh --skip-pull    # Don't git pull
-./deploy.sh --skip-build   # Don't rebuild (just restart)
-./deploy.sh --force        # No confirmation prompt (for CI/CD)
-./deploy.sh --help         # Show help
+./deploy.sh --pull           # Git pull before deployment
+./deploy.sh --restart-only   # Skip build, just restart containers
+./deploy.sh --force, -f      # No confirmation prompt (for CI/CD)
+./deploy.sh --help, -h       # Show help
 ```
 
 **Deployment steps:**
-1. Git pull latest changes
-2. Pull base Docker images
-3. Build API container
-4. Stop old API container
-5. Start new containers
-6. Health check (60s timeout)
-7. Run database migrations
-8. **Automatic rollback on any failure**
+1. Validate `config.json` and `.env` exist
+2. Git pull latest changes (if `--pull`)
+3. **Regenerate nginx.conf from template** (ensures SSL/HTTP config is correct)
+4. Pull base Docker images (postgres, redis, minio)
+5. Build API and Web containers (unless `--restart-only`)
+6. Stop API, Web, and nginx containers
+7. Start all containers (nginx gets fresh config)
+8. Health check via nginx or direct API (60s timeout)
+9. Show deployment status
+10. **Automatic git rollback on any failure** (if `--pull` was used)
 
 ### db.sh - Database Management
 
