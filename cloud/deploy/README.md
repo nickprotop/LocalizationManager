@@ -102,15 +102,55 @@ Automated deployment script with rollback on failure.
 7. Run database migrations
 8. **Automatic rollback on any failure**
 
+### db.sh - Database Management
+
+PostgreSQL database management with interactive menu or command-line arguments.
+
+```bash
+./db.sh                  # Interactive menu
+./db.sh status           # Show database status (size, tables, connections)
+./db.sh tables           # List all tables with row counts
+./db.sh shell            # Interactive PostgreSQL shell
+./db.sh export [file]    # Export database to SQL file
+./db.sh import <file>    # Import database from SQL file
+./db.sh truncate         # Empty all tables (keep schema)
+./db.sh drop             # Drop all tables (reset schema)
+./db.sh reset            # Drop + restart API (re-run migrations)
+./db.sh connections      # Show active database connections
+./db.sh vacuum           # Run VACUUM ANALYZE (optimize)
+./db.sh logs [lines]     # Show PostgreSQL container logs
+```
+
+### logs.sh - Unified Log Viewer
+
+journalctl-like log viewer for all services with filtering and follow mode.
+
+```bash
+./logs.sh                     # Last 50 lines from all services
+./logs.sh -f                  # Follow all services (Ctrl+C to stop)
+./logs.sh -f api              # Follow API logs only
+./logs.sh api postgres        # Logs from specific services
+./logs.sh -n 100 api          # Last 100 lines from API
+./logs.sh --since 1h          # Logs from last hour
+./logs.sh -g "error"          # Filter by pattern (case-insensitive)
+./logs.sh -f -g "ERROR" api   # Follow + filter
+./logs.sh -t                  # Show timestamps
+./logs.sh --no-color          # Disable colors (for piping)
+```
+
+**Services:** `api` (green), `postgres` (blue), `redis` (red), `minio` (magenta), `all`
+
 ## Files
 
 | File | Git | Description |
 |------|-----|-------------|
 | `setup.sh` | ✓ | Initial setup script |
 | `deploy.sh` | ✓ | CI/CD deployment script |
+| `db.sh` | ✓ | Database management script |
+| `logs.sh` | ✓ | Unified log viewer |
 | `docker-compose.yml` | ✓ | Container definitions |
+| `Dockerfile.api` | ✓ | API container build |
 | `config.example.json` | ✓ | Configuration template |
-| `config.schema.json` | ✓ | JSON Schema for validation |
 | `init-db.sql` | ✓ | PostgreSQL initialization |
 | `.gitignore` | ✓ | Ignores secrets |
 | `config.json` | ✗ | **Generated - contains secrets** |
@@ -137,8 +177,23 @@ All configuration is in `config.json` (git-ignored). The API reads this file at 
 ## Common Operations
 
 ```bash
-# View logs
-docker compose logs -f api
+# View logs (all services)
+./logs.sh -f
+
+# View API logs only
+./logs.sh -f api
+
+# Filter logs for errors
+./logs.sh -g "error"
+
+# Database status
+./db.sh status
+
+# Database shell
+./db.sh shell
+
+# Export database
+./db.sh export backup.sql
 
 # Restart services
 docker compose restart
@@ -150,9 +205,6 @@ docker compose down
 docker compose down -v
 rm config.json .env
 ./setup.sh
-
-# Database shell
-docker exec -it lrmcloud-postgres psql -U lrm -d lrmcloud
 
 # Redis shell
 docker exec -it lrmcloud-redis redis-cli -a "$(grep REDIS_PASSWORD .env | cut -d= -f2)"
@@ -215,9 +267,12 @@ Benefits of bind mounts:
 # Full backup (all data)
 tar czf backup-$(date +%Y%m%d).tar.gz data/
 
-# Database-only backup
-docker exec lrmcloud-postgres pg_dump -U lrm lrmcloud > backup.sql
+# Database-only backup (auto-timestamped)
+./db.sh export
+
+# Database backup to specific file
+./db.sh export backup.sql
 
 # Restore database
-docker exec -i lrmcloud-postgres psql -U lrm -d lrmcloud < backup.sql
+./db.sh import backup.sql
 ```
