@@ -21,6 +21,7 @@ Git-native localization management platform. Users connect repos, edit translati
 | **API Keys** | Hybrid (user's first, platform fallback) | Best UX with cost control |
 | **Email** | Self-hosted sendmail + IMailService | Use existing infrastructure |
 | **Database** | Self-hosted PostgreSQL | Cost savings, full control |
+| **File Storage** | Self-hosted MinIO | S3-compatible, scalable, can migrate to AWS S3 later |
 | **Conflict Resolution** | Optimistic locking + user prompt | Safe, user-controlled |
 | **Configuration** | Single `config.json` (git-ignored) | No appsettings.json, all config in one place |
 | **Infrastructure** | `setup.sh` + Docker Compose | Interactive or config-driven, isolated containers |
@@ -1636,14 +1637,19 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 ## Implementation Phases
 
 ### Phase 0: Foundation (Week 1-2)
-- [ ] Create `cloud/` folder structure
-- [ ] Initialize `LrmCloud.sln` with projects:
+- [x] Create `cloud/` folder structure
+- [x] Initialize `LrmCloud.sln` with projects:
   - `LrmCloud.Api` - ASP.NET Core Web API
   - `LrmCloud.Web` - Blazor WebAssembly
   - `LrmCloud.Shared` - Shared DTOs, models
   - `LrmCloud.Tests`
-- [ ] Set up Docker Compose (dev)
-- [ ] Configure EF Core + migrations
+- [x] Set up Docker Compose (dev)
+- [x] Create setup.sh (interactive config generation)
+- [x] Create deploy.sh (automated deployment)
+- [x] Create Dockerfile.api (multi-stage build)
+- [x] Implement CloudConfiguration (type-safe config binding)
+- [x] Add health checks endpoint (/health)
+- [x] Configure EF Core + migrations
 - [ ] Implement IMailService with Sendmail provider
 - [ ] Set up nginx with security headers
 
