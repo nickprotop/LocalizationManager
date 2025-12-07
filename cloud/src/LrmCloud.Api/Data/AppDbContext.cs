@@ -86,6 +86,9 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.InvitedById)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Match parent's soft-delete filters (both org and user)
+            entity.HasQueryFilter(e => e.Organization!.DeletedAt == null && e.User!.DeletedAt == null);
         });
 
         // =====================================================================
@@ -133,6 +136,9 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.KeyPrefix);
             entity.HasIndex(e => e.ExpiresAt);
+
+            // Match parent's soft-delete filter
+            entity.HasQueryFilter(e => e.User!.DeletedAt == null);
         });
 
         // =====================================================================
@@ -141,11 +147,17 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<UserApiKey>(entity =>
         {
             entity.HasIndex(e => new { e.UserId, e.Provider }).IsUnique();
+
+            // Match parent's soft-delete filter
+            entity.HasQueryFilter(e => e.User!.DeletedAt == null);
         });
 
         modelBuilder.Entity<OrganizationApiKey>(entity =>
         {
             entity.HasIndex(e => new { e.OrganizationId, e.Provider }).IsUnique();
+
+            // Match parent's soft-delete filter
+            entity.HasQueryFilter(e => e.Organization!.DeletedAt == null);
         });
 
         modelBuilder.Entity<ProjectApiKey>(entity =>
