@@ -90,7 +90,9 @@ env_get() {
 
 # Read current values
 # Ports are stored in .env (external/host ports), not in config.json
-CURRENT_API_PORT=$(env_get 'API_PORT' '5000')
+CURRENT_NGINX_PORT=$(env_get 'NGINX_PORT' '80')
+CURRENT_HTTPS_PORT=$(env_get 'HTTPS_PORT' '')
+CURRENT_API_PORT=$(env_get 'API_PORT' '')
 CURRENT_POSTGRES_PORT=$(env_get 'POSTGRES_PORT' '5432')
 CURRENT_REDIS_PORT=$(env_get 'REDIS_PORT' '6379')
 CURRENT_MINIO_PORT=$(env_get 'MINIO_PORT' '9000')
@@ -120,10 +122,58 @@ echo ""
 echo "Press Enter to keep current value, or type new value:"
 echo ""
 
-# Interactive prompts with current values as defaults
-read -p "API Port [$CURRENT_API_PORT]: " API_PORT
-API_PORT=${API_PORT:-$CURRENT_API_PORT}
+# ============================================================================
+# nginx Reverse Proxy Configuration
+# ============================================================================
+echo -e "${BLUE}nginx Reverse Proxy:${NC}"
 
+read -p "nginx HTTP Port [$CURRENT_NGINX_PORT]: " NGINX_PORT
+NGINX_PORT=${NGINX_PORT:-$CURRENT_NGINX_PORT}
+
+# SSL Configuration
+if [ -n "$CURRENT_HTTPS_PORT" ]; then
+    CURRENT_SSL_ENABLED="y"
+    SSL_DEFAULT="Y/n"
+else
+    CURRENT_SSL_ENABLED="n"
+    SSL_DEFAULT="y/N"
+fi
+
+read -p "Enable SSL? [$SSL_DEFAULT]: " ENABLE_SSL
+ENABLE_SSL=${ENABLE_SSL:-$CURRENT_SSL_ENABLED}
+
+if [ "$ENABLE_SSL" = "y" ] || [ "$ENABLE_SSL" = "Y" ]; then
+    SSL_ENABLED=true
+    DEFAULT_HTTPS_PORT=${CURRENT_HTTPS_PORT:-443}
+    read -p "HTTPS Port [$DEFAULT_HTTPS_PORT]: " HTTPS_PORT
+    HTTPS_PORT=${HTTPS_PORT:-$DEFAULT_HTTPS_PORT}
+else
+    SSL_ENABLED=false
+    HTTPS_PORT=""
+fi
+
+# Direct API Access
+if [ -n "$CURRENT_API_PORT" ]; then
+    CURRENT_API_ENABLED="y"
+    API_DEFAULT="Y/n"
+else
+    CURRENT_API_ENABLED="n"
+    API_DEFAULT="y/N"
+fi
+
+read -p "Expose direct API access (bypasses nginx)? [$API_DEFAULT]: " ENABLE_API
+ENABLE_API=${ENABLE_API:-$CURRENT_API_ENABLED}
+
+if [ "$ENABLE_API" = "y" ] || [ "$ENABLE_API" = "Y" ]; then
+    DEFAULT_API_PORT=${CURRENT_API_PORT:-5000}
+    read -p "Direct API Port [$DEFAULT_API_PORT]: " API_PORT
+    API_PORT=${API_PORT:-$DEFAULT_API_PORT}
+else
+    API_PORT=""
+fi
+
+echo ""
+echo -e "${BLUE}Database & Cache Ports:${NC}"
 read -p "PostgreSQL Port [$CURRENT_POSTGRES_PORT]: " POSTGRES_PORT
 POSTGRES_PORT=${POSTGRES_PORT:-$CURRENT_POSTGRES_PORT}
 
@@ -286,17 +336,26 @@ print_success "Config saved to $CONFIG_FILE"
 # Create .env for docker-compose
 print_step "Writing .env for Docker Compose..."
 cat > "$ENV_FILE" <<EOF
+# nginx Ports
+NGINX_PORT=${NGINX_PORT}
+HTTPS_PORT=${HTTPS_PORT}
 API_PORT=${API_PORT}
+
+# Database & Cache Ports
 POSTGRES_PORT=${POSTGRES_PORT}
 REDIS_PORT=${REDIS_PORT}
 MINIO_PORT=${MINIO_PORT}
 MINIO_CONSOLE=${MINIO_CONSOLE}
+
+# Database Credentials
 POSTGRES_DB=lrmcloud
 POSTGRES_USER=lrm
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 REDIS_PASSWORD=${REDIS_PASSWORD}
 MINIO_USER=lrmcloud
 MINIO_PASSWORD=${MINIO_PASSWORD}
+
+# Environment
 ENVIRONMENT=${ENVIRONMENT}
 EOF
 chmod 600 "$ENV_FILE"
@@ -307,12 +366,118 @@ print_step "Creating data directories..."
 mkdir -p "$SCRIPT_DIR/data/postgres"
 mkdir -p "$SCRIPT_DIR/data/redis"
 mkdir -p "$SCRIPT_DIR/data/minio"
-mkdir -p "$SCRIPT_DIR/data/logs"
+mkdir -p "$SCRIPT_DIR/data/logs/api"
+mkdir -p "$SCRIPT_DIR/data/logs/nginx"
 print_success "Data directories ready"
+
+# ============================================================================
+# Generate nginx configuration from template
+# ============================================================================
+print_step "Generating nginx configuration..."
+
+# Read template
+NGINX_TEMPLATE="$SCRIPT_DIR/nginx/nginx.conf.template"
+NGINX_CONFIG="$SCRIPT_DIR/nginx/nginx.conf"
+
+if [ ! -f "$NGINX_TEMPLATE" ]; then
+    print_error "nginx template not found: $NGINX_TEMPLATE"
+    exit 1
+fi
+
+# Start with template
+cp "$NGINX_TEMPLATE" "$NGINX_CONFIG"
+
+# Process conditional blocks based on SSL configuration
+if [ "$SSL_ENABLED" = true ]; then
+    # SSL enabled: keep SSL block, make HTTP redirect to HTTPS
+    # Remove #SSL_START# and #SSL_END# markers (keep content)
+    sed -i '/#SSL_START#/d; /#SSL_END#/d' "$NGINX_CONFIG"
+    # Remove #REDIRECT_START# and #REDIRECT_END# markers (keep content)
+    sed -i '/#REDIRECT_START#/d; /#REDIRECT_END#/d' "$NGINX_CONFIG"
+    # Remove HTTP standalone block entirely
+    sed -i '/#HTTP_START#/,/#HTTP_END#/d' "$NGINX_CONFIG"
+    print_success "nginx configured with SSL (HTTPS:$HTTPS_PORT, HTTP:$NGINX_PORT → redirect)"
+else
+    # SSL disabled: remove SSL and redirect blocks, keep HTTP standalone
+    sed -i '/#SSL_START#/,/#SSL_END#/d' "$NGINX_CONFIG"
+    sed -i '/#REDIRECT_START#/,/#REDIRECT_END#/d' "$NGINX_CONFIG"
+    # Remove #HTTP_START# and #HTTP_END# markers (keep content)
+    sed -i '/#HTTP_START#/d; /#HTTP_END#/d' "$NGINX_CONFIG"
+    print_success "nginx configured without SSL (HTTP:$NGINX_PORT)"
+fi
+
+# ============================================================================
+# Generate docker-compose.override.yml for port configuration
+# ============================================================================
+print_step "Generating docker-compose.override.yml..."
+
+OVERRIDE_FILE="$SCRIPT_DIR/docker-compose.override.yml"
+cat > "$OVERRIDE_FILE" <<EOF
+# Generated by setup.sh - port configuration
+# Edit via setup.sh, not directly
+
+services:
+  nginx:
+    ports:
+EOF
+
+# Add HTTPS port if SSL enabled
+if [ -n "$HTTPS_PORT" ]; then
+    echo "      - \"${HTTPS_PORT}:443\"" >> "$OVERRIDE_FILE"
+fi
+
+# Add HTTP port
+if [ -n "$NGINX_PORT" ]; then
+    echo "      - \"${NGINX_PORT}:80\"" >> "$OVERRIDE_FILE"
+fi
+
+# Add API port if direct access enabled
+if [ -n "$API_PORT" ]; then
+    cat >> "$OVERRIDE_FILE" <<EOF
+
+  api:
+    ports:
+      - "${API_PORT}:8080"
+EOF
+fi
+
+print_success "Created docker-compose.override.yml"
+
+# ============================================================================
+# Generate SSL certificates if needed
+# ============================================================================
+if [ "$SSL_ENABLED" = true ]; then
+    if [ ! -f "$SCRIPT_DIR/certs/server.crt" ] || [ ! -f "$SCRIPT_DIR/certs/server.key" ]; then
+        print_step "Generating self-signed SSL certificate..."
+        "$SCRIPT_DIR/certs/generate-self-signed.sh" localhost
+    else
+        print_info "SSL certificates already exist"
+    fi
+fi
+
+# Check if API image needs rebuild
+REBUILD_API=false
+if docker images lrmcloud-api --format '{{.ID}}' | grep -q .; then
+    echo ""
+    echo -e "${BLUE}API image already exists.${NC}"
+    read -p "Rebuild API image? [y/N]: " REBUILD_RESPONSE
+    if [ "$REBUILD_RESPONSE" = "y" ] || [ "$REBUILD_RESPONSE" = "Y" ]; then
+        REBUILD_API=true
+    fi
+fi
 
 # Pull latest images
 print_step "Pulling latest Docker images..."
 docker compose pull
+
+# Build API if needed (first time or rebuild requested)
+if [ "$REBUILD_API" = true ]; then
+    print_step "Rebuilding API image..."
+    docker compose build api --no-cache
+elif ! docker images lrmcloud-api --format '{{.ID}}' | grep -q .; then
+    print_step "Building API image..."
+    docker compose build api
+fi
 
 # Start/restart containers
 print_step "Starting containers..."
@@ -345,13 +510,35 @@ docker exec lrmcloud-minio mc alias set local http://localhost:9000 lrmcloud "$M
 docker exec lrmcloud-minio mc mb local/lrmcloud --ignore-existing &> /dev/null
 print_success "MinIO bucket 'lrmcloud' ready"
 
+# Wait for nginx
+print_step "Waiting for nginx to be ready..."
+NGINX_RETRIES=0
+MAX_RETRIES=30
+while ! docker exec lrmcloud-nginx wget -q --spider http://localhost/health 2>/dev/null; do
+    NGINX_RETRIES=$((NGINX_RETRIES + 1))
+    if [ $NGINX_RETRIES -ge $MAX_RETRIES ]; then
+        print_error "nginx failed to start. Check logs: ./logs.sh nginx"
+        exit 1
+    fi
+    sleep 1
+done
+print_success "nginx is ready"
+
 echo ""
 echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}✓ Infrastructure setup complete!${NC}"
 echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
 echo ""
 echo "Services running:"
-echo "  • API:           http://localhost:${API_PORT}"
+if [ -n "$HTTPS_PORT" ]; then
+    echo "  • nginx (HTTPS): https://localhost:${HTTPS_PORT}"
+    echo "  • nginx (HTTP):  http://localhost:${NGINX_PORT} (redirects to HTTPS)"
+else
+    echo "  • nginx:         http://localhost:${NGINX_PORT}"
+fi
+if [ -n "$API_PORT" ]; then
+    echo "  • API (direct):  http://localhost:${API_PORT}"
+fi
 echo "  • PostgreSQL:    localhost:${POSTGRES_PORT}"
 echo "  • Redis:         localhost:${REDIS_PORT}"
 echo "  • MinIO API:     http://localhost:${MINIO_PORT}"
@@ -360,6 +547,6 @@ echo ""
 echo "Configuration: $CONFIG_FILE"
 echo ""
 echo "Commands:"
-echo "  docker compose logs -f      # View logs"
+echo "  ./logs.sh -f                # View logs"
 echo "  docker compose down         # Stop all services"
 echo "  docker compose restart      # Restart services"
