@@ -165,47 +165,60 @@ read -p "Mail From Name [$CURRENT_MAIL_NAME]: " MAIL_NAME
 MAIL_NAME=${MAIL_NAME:-$CURRENT_MAIL_NAME}
 
 echo ""
+echo "Security credentials (press Enter to use default/existing, or type custom value):"
+echo ""
 
-# Generate secrets only if not already set
-if [ -z "$CURRENT_DB_PASSWORD" ]; then
-    print_step "Generating PostgreSQL password..."
-    POSTGRES_PASSWORD=$(generate_password)
-else
-    POSTGRES_PASSWORD="$CURRENT_DB_PASSWORD"
-    print_info "Keeping existing PostgreSQL password"
-fi
+# Generate defaults for secrets if not already set
+DEFAULT_DB_PASSWORD=${CURRENT_DB_PASSWORD:-$(generate_password)}
+DEFAULT_REDIS_PASSWORD=${CURRENT_REDIS_PASSWORD:-$(generate_password)}
+DEFAULT_JWT_SECRET=${CURRENT_JWT:-$(generate_password)$(generate_password)}
+DEFAULT_ENCRYPTION_KEY=${CURRENT_ENCRYPTION:-$(generate_key)}
+DEFAULT_MINIO_PASSWORD=${CURRENT_MINIO_PASSWORD:-$(generate_password)}
 
-if [ -z "$CURRENT_REDIS_PASSWORD" ]; then
-    print_step "Generating Redis password..."
-    REDIS_PASSWORD=$(generate_password)
+# Prompt for PostgreSQL password
+if [ -n "$CURRENT_DB_PASSWORD" ]; then
+    print_info "PostgreSQL password exists (hidden)"
+    read -p "PostgreSQL Password [keep existing]: " INPUT_DB_PASSWORD
 else
-    REDIS_PASSWORD="$CURRENT_REDIS_PASSWORD"
-    print_info "Keeping existing Redis password"
+    read -p "PostgreSQL Password [$DEFAULT_DB_PASSWORD]: " INPUT_DB_PASSWORD
 fi
+POSTGRES_PASSWORD=${INPUT_DB_PASSWORD:-$DEFAULT_DB_PASSWORD}
 
-if [ -z "$CURRENT_JWT" ]; then
-    print_step "Generating JWT secret..."
-    JWT_SECRET=$(generate_password)$(generate_password)
+# Prompt for Redis password
+if [ -n "$CURRENT_REDIS_PASSWORD" ]; then
+    print_info "Redis password exists (hidden)"
+    read -p "Redis Password [keep existing]: " INPUT_REDIS_PASSWORD
 else
-    JWT_SECRET="$CURRENT_JWT"
-    print_info "Keeping existing JWT secret"
+    read -p "Redis Password [$DEFAULT_REDIS_PASSWORD]: " INPUT_REDIS_PASSWORD
 fi
+REDIS_PASSWORD=${INPUT_REDIS_PASSWORD:-$DEFAULT_REDIS_PASSWORD}
 
-if [ -z "$CURRENT_ENCRYPTION" ]; then
-    print_step "Generating encryption key..."
-    ENCRYPTION_KEY=$(generate_key)
+# Prompt for MinIO password
+if [ -n "$CURRENT_MINIO_PASSWORD" ]; then
+    print_info "MinIO password exists (hidden)"
+    read -p "MinIO Password [keep existing]: " INPUT_MINIO_PASSWORD
 else
-    ENCRYPTION_KEY="$CURRENT_ENCRYPTION"
-    print_info "Keeping existing encryption key"
+    read -p "MinIO Password [$DEFAULT_MINIO_PASSWORD]: " INPUT_MINIO_PASSWORD
 fi
+MINIO_PASSWORD=${INPUT_MINIO_PASSWORD:-$DEFAULT_MINIO_PASSWORD}
 
-if [ -z "$CURRENT_MINIO_PASSWORD" ]; then
-    print_step "Generating MinIO password..."
-    MINIO_PASSWORD=$(generate_password)
+# Prompt for JWT secret
+if [ -n "$CURRENT_JWT" ]; then
+    print_info "JWT secret exists (hidden)"
+    read -p "JWT Secret [keep existing]: " INPUT_JWT_SECRET
 else
-    MINIO_PASSWORD="$CURRENT_MINIO_PASSWORD"
-    print_info "Keeping existing MinIO password"
+    read -p "JWT Secret [$DEFAULT_JWT_SECRET]: " INPUT_JWT_SECRET
 fi
+JWT_SECRET=${INPUT_JWT_SECRET:-$DEFAULT_JWT_SECRET}
+
+# Prompt for encryption key
+if [ -n "$CURRENT_ENCRYPTION" ]; then
+    print_info "Encryption key exists (hidden)"
+    read -p "Encryption Key [keep existing]: " INPUT_ENCRYPTION_KEY
+else
+    read -p "Encryption Key [$DEFAULT_ENCRYPTION_KEY]: " INPUT_ENCRYPTION_KEY
+fi
+ENCRYPTION_KEY=${INPUT_ENCRYPTION_KEY:-$DEFAULT_ENCRYPTION_KEY}
 
 # Preserve other existing config values
 CURRENT_JWT_EXPIRY=$(config_get '.auth.jwtExpiryHours' '24')
