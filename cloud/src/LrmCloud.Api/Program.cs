@@ -5,6 +5,7 @@ using LrmCloud.Api.Services;
 using LrmCloud.Shared.Configuration;
 using Microsoft.EntityFrameworkCore;
 using HealthChecks.NpgSql;
+using Minio;
 using Serilog;
 using Serilog.Events;
 
@@ -108,12 +109,20 @@ public class Program
             // Redis (Caching & Sessions)
             // =============================================================================
 
-            // Redis will be added when we implement caching
-            // builder.Services.AddStackExchangeRedisCache(options =>
-            // {
-            //     options.Configuration = config.Redis.ConnectionString;
-            //     options.InstanceName = "LrmCloud:";
-            // });
+            builder.Services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = config.Redis.ConnectionString;
+                options.InstanceName = "LrmCloud:";
+            });
+
+            // =============================================================================
+            // MinIO (Object Storage)
+            // =============================================================================
+
+            builder.Services.AddMinio(configureClient => configureClient
+                .WithEndpoint(config.Storage.Endpoint)
+                .WithCredentials(config.Storage.AccessKey, config.Storage.SecretKey)
+                .WithSSL(config.Storage.UseSSL));
 
             // =============================================================================
             // Health Checks
