@@ -51,8 +51,8 @@ RUN cat > /app/entrypoint.sh << 'EOF'
 #!/bin/sh
 set -e
 # Fix ownership of log directory (mounted from host with unknown UID)
-if [ -d "/var/log/lrmcloud" ]; then
-    chown -R lrmcloud:lrmcloud /var/log/lrmcloud 2>/dev/null || true
+if [ -d "/var/log/lrmcloud/api" ]; then
+    chown -R lrmcloud:lrmcloud /var/log/lrmcloud/api 2>/dev/null || true
 fi
 # Drop to non-root user and run the app
 exec su-exec lrmcloud dotnet LrmCloud.Api.dll "$@"
@@ -60,7 +60,7 @@ EOF
 RUN chmod +x /app/entrypoint.sh
 
 # Create log directory
-RUN mkdir -p /var/log/lrmcloud /app/logs
+RUN mkdir -p /var/log/lrmcloud/api
 
 # Expose port (internal, mapped via docker-compose)
 EXPOSE 8080

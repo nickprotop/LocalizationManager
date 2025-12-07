@@ -16,9 +16,9 @@ public class Program
         // Serilog Bootstrap (before anything else)
         // =============================================================================
 
-        // Determine log path (Docker: /var/log/lrmcloud, Dev: ./logs)
+        // Determine log path (Docker: /var/log/lrmcloud/api, Dev: ./logs)
         var logPath = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Production"
-            ? "/var/log/lrmcloud/api-.log"
+            ? "/var/log/lrmcloud/api/api-.log"
             : Path.Combine(Directory.GetCurrentDirectory(), "logs", "api-.log");
 
         // Ensure log directory exists
