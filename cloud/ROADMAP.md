@@ -1248,12 +1248,55 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 - [x] Comprehensive unit tests (10 tests passing)
 
 ### Phase 3: CLI Sync (Week 7-8)
-- [ ] `lrm cloud login` - browser OAuth
-- [ ] `lrm cloud init` - create project
-- [ ] `lrm push` - upload with version check
-- [ ] `lrm pull` - download with conflict detection
-- [ ] Conflict resolution UI in CLI
-- [ ] API key authentication
+
+**CLI Commands (add to existing `lrm` binary)**:
+- [ ] `lrm push` - Upload local changes (resources + lrm.json)
+- [ ] `lrm pull` - Download remote changes with conflict detection
+- [ ] `lrm remote set <url>` - Configure remote URL (Git-style)
+- [ ] `lrm remote get` - Show current remote URL
+- [ ] `lrm remote unset` - Remove remote configuration
+- [ ] `lrm cloud login [url]` - Browser OAuth authentication
+- [ ] `lrm cloud logout` - Clear auth tokens
+- [ ] `lrm cloud status` - Show sync status and recent activity
+
+**Core Infrastructure**:
+- [ ] Remote URL parser (supports https://host/org/project and @username)
+- [ ] Cloud API client with URL-based routing
+- [ ] Configuration sync (lrm.json bidirectional sync)
+- [ ] Config conflict detection and resolution
+- [ ] Format validation (block format changes until resources match)
+- [ ] File backup system (.lrm/backups/)
+- [ ] Sync metadata tracking (.lrm/sync-metadata.json)
+
+**Conflict Resolution**:
+- [ ] Interactive terminal UI for conflicts
+- [ ] Strategies: local, remote, prompt, abort
+- [ ] Visual diff for config and resource changes
+- [ ] Batch resolution options
+
+**Configuration**:
+- [ ] lrm.json (git-tracked, team-shared remote URL)
+- [ ] .lrm/config.json (git-ignored, personal overrides + API keys)
+- [ ] Priority: .lrm/config.json > lrm.json
+
+**API Endpoints** (server-side):
+- [x] PUT /api/projects/{id}/configuration - Update lrm.json (with optimistic locking)
+- [x] GET /api/projects/{id}/configuration - Get lrm.json
+- [x] GET /api/projects/{id}/configuration/history - Get configuration history
+- [x] GET /api/projects/{id}/sync/status - Get project sync status
+- [ ] POST /api/sync/check-conflicts - Check version conflicts (for batch operations)
+- [ ] POST /api/sync/push - Upload files + config (bulk sync endpoint)
+- [ ] GET /api/sync/pull - Download files + config (bulk sync endpoint)
+
+**Database Changes**:
+- [x] Add config_json JSONB column to projects table
+- [x] Add config_version, config_updated_at, config_updated_by
+- [x] Use audit_log table for configuration history tracking
+
+**Testing**:
+- [ ] Unit tests for URL parser, config manager
+- [ ] Integration tests for push/pull with mock API
+- [ ] Config sync and conflict resolution tests
 
 ### Phase 4: GitHub App (Week 9-10)
 - [ ] Register GitHub App
@@ -1266,7 +1309,6 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 ### Phase 5: Blazor WebAssembly UI (Week 11-13)
 - [ ] Auth state provider
 - [ ] Dashboard (project list, stats)
-- [ ] Project settings page
 - [ ] Translation editor (virtualized grid)
 - [ ] Search/filter
 - [ ] Inline editing
@@ -1274,6 +1316,16 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 - [ ] Create PR button
 - [ ] Team management UI
 - [ ] PWA support (offline read-only)
+
+**Project Settings Page**:
+- [ ] Display current lrm.json configuration
+- [ ] Partial editing (safe settings only):
+  - [ ] ✅ Editable: Default language, validation rules, translation settings
+  - [ ] ❌ Read-only: Resource format, file paths, exclusions (with tooltip: "Edit in lrm.json via CLI")
+- [ ] Format change validation (block if resources don't match)
+- [ ] Show sync status and last sync info
+- [ ] Configuration history viewer
+- [ ] "Sync changes to CLI" prompt after editing
 
 ### Phase 6: Translation Service (Week 14)
 - [ ] API key hierarchy (project → user → org → platform)
