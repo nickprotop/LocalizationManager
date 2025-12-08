@@ -1220,19 +1220,32 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 - [x] Account deletion (soft delete with 30-day grace period)
 - [x] Comprehensive unit tests (72 tests passing)
 
-**Teams & Organizations (TODO - Next up)**
-- [ ] Organization CRUD
-- [ ] Team invitations
-- [ ] Role-based access control
+**Teams & Organizations (✅ COMPLETED)**
+- [x] Organization CRUD
+- [x] Team invitations
+- [x] Role-based access control
+- [x] Comprehensive unit tests (29 tests passing)
 
-### Phase 2: Core API (Week 5-6)
-- [ ] Project CRUD
-- [ ] Resource key CRUD
-- [ ] Translation CRUD
-- [ ] Validation endpoint
-- [ ] Stats endpoint
-- [ ] Version tracking for optimistic locking
-- [ ] Row-Level Security policies
+### Phase 2: Core API (Week 5-6) ✅ COMPLETED
+- [x] Project CRUD (personal + organization projects)
+- [x] Resource key CRUD
+- [x] Translation CRUD (with bulk updates)
+- [x] Validation endpoint (errors, warnings, info)
+- [x] Stats endpoint (per-language completion tracking)
+- [x] Version tracking for optimistic locking
+- [x] Authorization helpers (CanView, CanEdit, CanManage)
+- [x] Comprehensive unit tests (42 tests passing)
+  - ProjectService: 23 tests
+  - ResourceService: 19 tests
+
+**Storage Service (✅ COMPLETED)**
+- [x] IStorageService interface with MinIO implementation
+- [x] File upload/download/delete operations
+- [x] Project file listing and management
+- [x] Snapshot creation for sync history
+- [x] Storage structure: projects/{id}/current/ and projects/{id}/history/
+- [x] Service registration in DI container
+- [x] Comprehensive unit tests (10 tests passing)
 
 ### Phase 3: CLI Sync (Week 7-8)
 - [ ] `lrm cloud login` - browser OAuth
