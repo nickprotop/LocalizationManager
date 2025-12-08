@@ -641,7 +641,7 @@ public class OrganizationService : IOrganizationService
 </html>";
             }
 
-            await _mailService.SendEmailAsync(
+            await _mailService.TrySendEmailAsync(_logger, 
                 to: invitation.Email,
                 subject: $"You've been invited to join {org.Name} on LRM Cloud",
                 htmlBody: html
@@ -689,7 +689,7 @@ public class OrganizationService : IOrganizationService
 </html>";
             }
 
-            await _mailService.SendEmailAsync(
+            await _mailService.TrySendEmailAsync(_logger, 
                 to: user.Email!,
                 subject: $"Welcome to {org.Name}!",
                 htmlBody: html

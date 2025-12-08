@@ -93,7 +93,8 @@ public class AuthService : IAuthService
             verification_link = verificationLink
         });
 
-        await _mailService.SendEmailAsync(
+        await _mailService.TrySendEmailAsync(
+            _logger,
             to: user.Email!,
             subject: "Verify your LRM Cloud email address",
             htmlBody: html
@@ -116,7 +117,7 @@ public class AuthService : IAuthService
             reset_link = resetLink
         });
 
-        await _mailService.SendEmailAsync(
+        await _mailService.TrySendEmailAsync(_logger, 
             to: email,
             subject: "LRM Cloud registration attempt",
             htmlBody: html
@@ -210,7 +211,7 @@ public class AuthService : IAuthService
             reset_link = resetLink
         });
 
-        await _mailService.SendEmailAsync(
+        await _mailService.TrySendEmailAsync(_logger, 
             to: user.Email!,
             subject: "Reset your LRM Cloud password",
             htmlBody: html
@@ -271,7 +272,7 @@ public class AuthService : IAuthService
             login_link = loginLink
         });
 
-        await _mailService.SendEmailAsync(
+        await _mailService.TrySendEmailAsync(_logger, 
             to: user.Email!,
             subject: "Your LRM Cloud password has been changed",
             htmlBody: html
@@ -816,7 +817,7 @@ public class AuthService : IAuthService
 </body>
 </html>";
 
-        await _mailService.SendEmailAsync(newEmail, subject, htmlBody);
+        await _mailService.TrySendEmailAsync(_logger, newEmail, subject, htmlBody);
     }
 
     private async Task SendEmailChangeNotificationAsync(User user, string newEmail)
@@ -850,7 +851,7 @@ public class AuthService : IAuthService
 </body>
 </html>";
 
-        await _mailService.SendEmailAsync(user.Email!, subject, htmlBody);
+        await _mailService.TrySendEmailAsync(_logger, user.Email!, subject, htmlBody);
     }
 
     private async Task SendEmailChangeSuccessAsync(User user)
@@ -883,7 +884,7 @@ public class AuthService : IAuthService
 </body>
 </html>";
 
-        await _mailService.SendEmailAsync(user.Email!, subject, htmlBody);
+        await _mailService.TrySendEmailAsync(_logger, user.Email!, subject, htmlBody);
     }
 
     // ============================================================================
@@ -1089,6 +1090,6 @@ public class AuthService : IAuthService
 </body>
 </html>";
 
-        await _mailService.SendEmailAsync(user.Email, subject, body);
+        await _mailService.TrySendEmailAsync(_logger, user.Email, subject, body);
     }
 }
