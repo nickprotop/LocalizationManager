@@ -9,6 +9,9 @@ using HealthChecks.NpgSql;
 using Minio;
 using Serilog;
 using Serilog.Events;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 public class Program
 {
@@ -97,7 +100,10 @@ public class Program
             // Services
             // =============================================================================
 
+            builder.Services.AddHttpClient(); // Required for GitHub OAuth
             builder.Services.AddScoped<IMailService, SmtpMailService>();
+            builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddScoped<IGitHubAuthService, GitHubAuthService>();
 
             // =============================================================================
             // Database (PostgreSQL + EF Core)
@@ -136,6 +142,32 @@ public class Program
             // =============================================================================
             // API & Security
             // =============================================================================
+
+            // JWT Authentication
+            var jwtKey = Encoding.UTF8.GetBytes(config.Auth.JwtSecret);
+            builder.Services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(options =>
+            {
+                options.RequireHttpsMetadata = false; // Set to true in production with HTTPS
+                options.SaveToken = true;
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(jwtKey),
+                    ValidateIssuer = true,
+                    ValidIssuer = "lrmcloud",
+                    ValidateAudience = true,
+                    ValidAudience = "lrmcloud",
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero
+                };
+            });
+
+            builder.Services.AddAuthorization();
 
             builder.Services.AddControllers()
                 .AddJsonOptions(options =>
@@ -222,6 +254,9 @@ public class Program
             });
 
             app.UseCors();
+
+            app.UseAuthentication();
+            app.UseAuthorization();
 
             // Development-only features
             if (app.Environment.IsDevelopment())
