@@ -19,6 +19,7 @@ public static class JwtTokenGenerator
 
         var claims = new List<Claim>
         {
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()), // Unique token ID
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Email, user.Email!),
             new(ClaimTypes.Name, user.Username ?? user.Email!),
