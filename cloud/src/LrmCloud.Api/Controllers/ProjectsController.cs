@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using LrmCloud.Api.Services;
 using LrmCloud.Shared.Api;
 using LrmCloud.Shared.DTOs.Projects;
@@ -31,7 +32,7 @@ public class ProjectsController : ApiControllerBase
     [ProducesResponseType(typeof(ApiResponse<List<ProjectDto>>), 200)]
     public async Task<ActionResult<ApiResponse<List<ProjectDto>>>> GetProjects()
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var projects = await _projectService.GetUserProjectsAsync(userId);
         return Success(projects);
     }
@@ -46,7 +47,7 @@ public class ProjectsController : ApiControllerBase
     [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<ActionResult<ApiResponse<ProjectDto>>> GetProject(int id)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var project = await _projectService.GetProjectAsync(id, userId);
 
         if (project == null)
@@ -66,7 +67,7 @@ public class ProjectsController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<ProjectDto>>> CreateProject(
         [FromBody] CreateProjectRequest request)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var (success, project, errorMessage) = await _projectService.CreateProjectAsync(userId, request);
 
         if (!success)
@@ -89,7 +90,7 @@ public class ProjectsController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<ProjectDto>>> UpdateProject(
         int id, [FromBody] UpdateProjectRequest request)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var (success, project, errorMessage) = await _projectService.UpdateProjectAsync(id, userId, request);
 
         if (!success)
@@ -115,7 +116,7 @@ public class ProjectsController : ApiControllerBase
     [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<ActionResult<ApiResponse>> DeleteProject(int id)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var (success, errorMessage) = await _projectService.DeleteProjectAsync(id, userId);
 
         if (!success)
@@ -141,7 +142,7 @@ public class ProjectsController : ApiControllerBase
     [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<ActionResult<ApiResponse>> TriggerSync(int id)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var (success, errorMessage) = await _projectService.TriggerSyncAsync(id, userId);
 
         if (!success)
@@ -166,7 +167,7 @@ public class ProjectsController : ApiControllerBase
     [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<ActionResult<ApiResponse<ConfigurationDto>>> GetConfiguration(int id)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var configuration = await _projectService.GetConfigurationAsync(id, userId);
 
         if (configuration == null)
@@ -189,7 +190,7 @@ public class ProjectsController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<ConfigurationDto>>> UpdateConfiguration(
         int id, [FromBody] UpdateConfigurationRequest request)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var (success, configuration, errorMessage) = await _projectService.UpdateConfigurationAsync(id, userId, request);
 
         if (!success)
@@ -219,7 +220,7 @@ public class ProjectsController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<List<ConfigurationHistoryDto>>>> GetConfigurationHistory(
         int id, [FromQuery] int limit = 50)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var history = await _projectService.GetConfigurationHistoryAsync(id, userId, limit);
 
         if (history == null)
@@ -238,7 +239,7 @@ public class ProjectsController : ApiControllerBase
     [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<ActionResult<ApiResponse<SyncStatusDto>>> GetSyncStatus(int id)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var status = await _projectService.GetSyncStatusAsync(id, userId);
 
         if (status == null)

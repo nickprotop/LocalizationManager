@@ -68,4 +68,19 @@ public interface IResourceService
     /// Validates all resources in a project.
     /// </summary>
     Task<ValidationResultDto> ValidateProjectAsync(int projectId, int userId);
+
+    // ============================================================
+    // CLI Sync Operations
+    // ============================================================
+
+    /// <summary>
+    /// Gets all resources for a project (for CLI pull).
+    /// </summary>
+    Task<List<ResourceDto>> GetResourcesAsync(int projectId, string? languageCode, int userId);
+
+    /// <summary>
+    /// Pushes resources from CLI to cloud.
+    /// </summary>
+    Task<(bool Success, PushResourcesResponse? Response, string? ErrorMessage)> PushResourcesAsync(
+        int projectId, int userId, PushResourcesRequest request);
 }

@@ -108,6 +108,38 @@ public class ProjectService : IProjectService
         return MapToProjectDto(project, userId);
     }
 
+    public async Task<ProjectDto?> GetProjectByNameAsync(string username, string projectName, int userId)
+    {
+        try
+        {
+            // Look up user by username
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username);
+            if (user == null)
+                return null;
+
+            // Look up project by name for that user (personal projects only)
+            var project = await _db.Projects
+                .Include(p => p.Organization)
+                .Include(p => p.ResourceKeys)
+                    .ThenInclude(k => k.Translations)
+                .FirstOrDefaultAsync(p => p.Name == projectName && p.UserId == user.Id);
+
+            if (project == null)
+                return null;
+
+            // Verify access
+            if (!await CanViewProjectAsync(project.Id, userId))
+                return null;
+
+            return MapToProjectDto(project, userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting project by name {Username}/{ProjectName}", username, projectName);
+            return null;
+        }
+    }
+
     public async Task<List<ProjectDto>> GetUserProjectsAsync(int userId)
     {
         // Get personal projects

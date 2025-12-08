@@ -529,7 +529,7 @@ fi
 
 # Reload nginx to pick up any config changes
 print_step "Reloading nginx configuration..."
-docker compose restart nginx
+docker compose up -d nginx
 
 # Wait for PostgreSQL
 print_step "Waiting for PostgreSQL to be ready..."

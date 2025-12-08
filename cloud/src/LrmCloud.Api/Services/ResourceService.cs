@@ -560,4 +560,192 @@ public class ResourceService : IResourceService
             UpdatedAt = translation.UpdatedAt
         };
     }
+
+    // ============================================================
+    // CLI Sync Operations
+    // ============================================================
+
+    public async Task<List<ResourceDto>> GetResourcesAsync(int projectId, string? languageCode, int userId)
+    {
+        // Check permission
+        if (!await _projectService.CanViewProjectAsync(projectId, userId))
+            return new List<ResourceDto>();
+
+        var project = await _db.Projects.FindAsync(projectId);
+        if (project == null)
+            return new List<ResourceDto>();
+
+        // Get resource keys with translations
+        var query = _db.ResourceKeys
+            .Include(k => k.Translations)
+            .Where(k => k.ProjectId == projectId);
+
+        var keys = await query.ToListAsync();
+
+        // Convert to resource files (JSON format)
+        var resources = new List<ResourceDto>();
+
+        // Group translations by language
+        var languageGroups = keys
+            .SelectMany(k => k.Translations)
+            .Where(t => languageCode == null || t.LanguageCode == languageCode)
+            .GroupBy(t => t.LanguageCode);
+
+        foreach (var langGroup in languageGroups)
+        {
+            var lang = langGroup.Key;
+            var translationsDict = new Dictionary<string, string>();
+
+            // Build translations dictionary
+            foreach (var translation in langGroup)
+            {
+                var key = keys.FirstOrDefault(k => k.Id == translation.ResourceKeyId);
+                if (key != null && !string.IsNullOrWhiteSpace(translation.Value))
+                {
+                    translationsDict[key.KeyName] = translation.Value;
+                }
+            }
+
+            if (translationsDict.Any())
+            {
+                // Serialize to JSON
+                var content = System.Text.Json.JsonSerializer.Serialize(translationsDict, new System.Text.Json.JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+
+                resources.Add(new ResourceDto
+                {
+                    Path = $"strings.{lang}.json",
+                    Content = content,
+                    LanguageCode = lang
+                });
+            }
+        }
+
+        return resources;
+    }
+
+    public async Task<(bool Success, PushResourcesResponse? Response, string? ErrorMessage)> PushResourcesAsync(
+        int projectId, int userId, PushResourcesRequest request)
+    {
+        try
+        {
+            // Check permission
+            if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+                return (false, null, "You don't have permission to push resources to this project");
+
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null)
+                return (false, null, "Project not found");
+
+            int filesUpdated = 0;
+
+            // Process each resource file
+            foreach (var resource in request.Resources)
+            {
+                // Parse the JSON content
+                var translationsDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(resource.Content);
+                if (translationsDict == null)
+                    continue;
+
+                // Extract language code from filename (e.g., "strings.en.json" -> "en")
+                var languageCode = ExtractLanguageCode(resource.Path);
+                if (string.IsNullOrEmpty(languageCode))
+                    continue;
+
+                // Update or create resource keys and translations
+                foreach (var kvp in translationsDict)
+                {
+                    var keyName = kvp.Key;
+                    var value = kvp.Value;
+
+                    // Find or create resource key
+                    var resourceKey = await _db.ResourceKeys
+                        .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == keyName);
+
+                    if (resourceKey == null)
+                    {
+                        resourceKey = new ResourceKey
+                        {
+                            ProjectId = projectId,
+                            KeyName = keyName,
+                            Comment = null,
+                            Version = 1,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        _db.ResourceKeys.Add(resourceKey);
+                        await _db.SaveChangesAsync(); // Save to get the ID
+                    }
+
+                    // Find or create translation
+                    var translation = await _db.Translations
+                        .FirstOrDefaultAsync(t => t.ResourceKeyId == resourceKey.Id && t.LanguageCode == languageCode);
+
+                    if (translation == null)
+                    {
+                        translation = new Translation
+                        {
+                            ResourceKeyId = resourceKey.Id,
+                            LanguageCode = languageCode,
+                            Value = value,
+                            Status = TranslationStatus.Approved,
+                            Version = 1,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        _db.Translations.Add(translation);
+                    }
+                    else if (translation.Value != value)
+                    {
+                        translation.Value = value;
+                        translation.Status = TranslationStatus.Approved;
+                        translation.Version = translation.Version + 1;
+                        translation.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+
+                filesUpdated++;
+            }
+
+            await _db.SaveChangesAsync();
+
+            // Record sync history
+            _db.SyncHistory.Add(new SyncHistory
+            {
+                ProjectId = projectId,
+                SyncType = "push",
+                Direction = "to_cloud",
+                Status = "completed",
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} pushed {Count} resources to project {ProjectId}", userId, filesUpdated, projectId);
+
+            return (true, new PushResourcesResponse
+            {
+                Success = true,
+                Message = $"Successfully pushed {filesUpdated} resource file(s)",
+                FilesUpdated = filesUpdated,
+                PushedAt = DateTime.UtcNow
+            }, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error pushing resources to project {ProjectId}", projectId);
+            return (false, null, $"An error occurred while pushing resources: {ex.Message}");
+        }
+    }
+
+    private string? ExtractLanguageCode(string path)
+    {
+        // Extract language code from filename like "strings.en.json" -> "en"
+        var filename = System.IO.Path.GetFileNameWithoutExtension(path);
+        var parts = filename.Split('.');
+        if (parts.Length >= 2)
+            return parts[^1]; // Return last part before extension
+        return null;
+    }
 }

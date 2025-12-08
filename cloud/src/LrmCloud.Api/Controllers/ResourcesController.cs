@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using LrmCloud.Api.Services;
 using LrmCloud.Shared.Api;
 using LrmCloud.Shared.DTOs.Resources;
@@ -37,7 +38,7 @@ public class ResourcesController : ApiControllerBase
     [ProducesResponseType(typeof(ApiResponse<List<ResourceKeyDto>>), 200)]
     public async Task<ActionResult<ApiResponse<List<ResourceKeyDto>>>> GetResourceKeys(int projectId)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var keys = await _resourceService.GetResourceKeysAsync(projectId, userId);
         return Success(keys);
     }
@@ -54,7 +55,7 @@ public class ResourcesController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<ResourceKeyDetailDto>>> GetResourceKey(
         int projectId, string keyName)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var key = await _resourceService.GetResourceKeyAsync(projectId, keyName, userId);
 
         if (key == null)
@@ -75,7 +76,7 @@ public class ResourcesController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<ResourceKeyDto>>> CreateResourceKey(
         int projectId, [FromBody] CreateResourceKeyRequest request)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var (success, key, errorMessage) = await _resourceService.CreateResourceKeyAsync(projectId, userId, request);
 
         if (!success)
@@ -101,7 +102,7 @@ public class ResourcesController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<ResourceKeyDto>>> UpdateResourceKey(
         int projectId, string keyName, [FromBody] UpdateResourceKeyRequest request)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var (success, key, errorMessage) = await _resourceService.UpdateResourceKeyAsync(
             projectId, keyName, userId, request);
 
@@ -131,7 +132,7 @@ public class ResourcesController : ApiControllerBase
     [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<ActionResult<ApiResponse>> DeleteResourceKey(int projectId, string keyName)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var (success, errorMessage) = await _resourceService.DeleteResourceKeyAsync(projectId, keyName, userId);
 
         if (!success)
@@ -167,7 +168,7 @@ public class ResourcesController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<TranslationDto>>> UpdateTranslation(
         int projectId, string keyName, string languageCode, [FromBody] UpdateTranslationRequest request)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var (success, translation, errorMessage) = await _resourceService.UpdateTranslationAsync(
             projectId, keyName, languageCode, userId, request);
 
@@ -199,7 +200,7 @@ public class ResourcesController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<int>>> BulkUpdateTranslations(
         int projectId, string languageCode, [FromBody] List<BulkTranslationUpdate> updates)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var (success, updatedCount, errorMessage) = await _resourceService.BulkUpdateTranslationsAsync(
             projectId, languageCode, userId, updates);
 
@@ -226,7 +227,7 @@ public class ResourcesController : ApiControllerBase
     [ProducesResponseType(typeof(ApiResponse<ProjectStatsDto>), 200)]
     public async Task<ActionResult<ApiResponse<ProjectStatsDto>>> GetProjectStats(int projectId)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var stats = await _resourceService.GetProjectStatsAsync(projectId, userId);
         return Success(stats);
     }
@@ -240,7 +241,7 @@ public class ResourcesController : ApiControllerBase
     [ProducesResponseType(typeof(ApiResponse<ValidationResultDto>), 200)]
     public async Task<ActionResult<ApiResponse<ValidationResultDto>>> ValidateProject(int projectId)
     {
-        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var result = await _resourceService.ValidateProjectAsync(projectId, userId);
         return Success(result);
     }
