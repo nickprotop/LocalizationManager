@@ -90,6 +90,23 @@ public class Project
     [Column("sync_error")]
     public string? SyncError { get; set; }
 
+    // Configuration storage (lrm.json)
+    [Column("config_json", TypeName = "jsonb")]
+    public string? ConfigJson { get; set; }
+
+    [MaxLength(40)]
+    [Column("config_version")]
+    public string? ConfigVersion { get; set; }
+
+    [Column("config_updated_at")]
+    public DateTime? ConfigUpdatedAt { get; set; }
+
+    [Column("config_updated_by")]
+    public int? ConfigUpdatedBy { get; set; }
+
+    [ForeignKey(nameof(ConfigUpdatedBy))]
+    public User? ConfigUpdater { get; set; }
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

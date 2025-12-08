@@ -61,4 +61,29 @@ public interface IProjectService
     /// Checks if user can manage resources (member+ for org, owner for personal).
     /// </summary>
     Task<bool> CanManageResourcesAsync(int projectId, int userId);
+
+    // ============================================================
+    // Configuration Management
+    // ============================================================
+
+    /// <summary>
+    /// Gets the project configuration (lrm.json).
+    /// </summary>
+    Task<ConfigurationDto?> GetConfigurationAsync(int projectId, int userId);
+
+    /// <summary>
+    /// Updates the project configuration (lrm.json) with optimistic locking.
+    /// </summary>
+    Task<(bool Success, ConfigurationDto? Configuration, string? ErrorMessage)> UpdateConfigurationAsync(
+        int projectId, int userId, UpdateConfigurationRequest request);
+
+    /// <summary>
+    /// Gets the configuration history for a project.
+    /// </summary>
+    Task<List<ConfigurationHistoryDto>?> GetConfigurationHistoryAsync(int projectId, int userId, int limit);
+
+    /// <summary>
+    /// Gets the sync status for a project.
+    /// </summary>
+    Task<SyncStatusDto?> GetSyncStatusAsync(int projectId, int userId);
 }

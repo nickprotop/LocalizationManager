@@ -155,4 +155,95 @@ public class ProjectsController : ApiControllerBase
         _logger.LogInformation("User {UserId} triggered sync for project {ProjectId}", userId, id);
         return Success(errorMessage ?? "Sync triggered successfully");
     }
+
+    /// <summary>
+    /// Gets the project configuration (lrm.json).
+    /// </summary>
+    /// <param name="id">Project ID</param>
+    /// <returns>Project configuration</returns>
+    [HttpGet("{id}/configuration")]
+    [ProducesResponseType(typeof(ApiResponse<ConfigurationDto>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<ConfigurationDto>>> GetConfiguration(int id)
+    {
+        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var configuration = await _projectService.GetConfigurationAsync(id, userId);
+
+        if (configuration == null)
+            return NotFound("CFG_NOT_FOUND", "Configuration not found or access denied");
+
+        return Success(configuration);
+    }
+
+    /// <summary>
+    /// Updates the project configuration (lrm.json).
+    /// </summary>
+    /// <param name="id">Project ID</param>
+    /// <param name="request">Configuration update request</param>
+    /// <returns>Updated configuration</returns>
+    [HttpPut("{id}/configuration")]
+    [ProducesResponseType(typeof(ApiResponse<ConfigurationDto>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    [ProducesResponseType(typeof(ProblemDetails), 409)]
+    public async Task<ActionResult<ApiResponse<ConfigurationDto>>> UpdateConfiguration(
+        int id, [FromBody] UpdateConfigurationRequest request)
+    {
+        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var (success, configuration, errorMessage) = await _projectService.UpdateConfigurationAsync(id, userId, request);
+
+        if (!success)
+        {
+            if (errorMessage == "Configuration not found")
+                return NotFound("CFG_NOT_FOUND", errorMessage);
+
+            if (errorMessage == "Configuration conflict")
+                return Conflict("CFG_CONFLICT", "Configuration has been modified by another user. Please pull and merge changes.");
+
+            return BadRequest("CFG_UPDATE_FAILED", errorMessage!);
+        }
+
+        _logger.LogInformation("User {UserId} updated configuration for project {ProjectId}", userId, id);
+        return Success(configuration!);
+    }
+
+    /// <summary>
+    /// Gets the configuration history for a project.
+    /// </summary>
+    /// <param name="id">Project ID</param>
+    /// <param name="limit">Maximum number of history entries to return</param>
+    /// <returns>Configuration history</returns>
+    [HttpGet("{id}/configuration/history")]
+    [ProducesResponseType(typeof(ApiResponse<List<ConfigurationHistoryDto>>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<List<ConfigurationHistoryDto>>>> GetConfigurationHistory(
+        int id, [FromQuery] int limit = 50)
+    {
+        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var history = await _projectService.GetConfigurationHistoryAsync(id, userId, limit);
+
+        if (history == null)
+            return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
+
+        return Success(history);
+    }
+
+    /// <summary>
+    /// Gets the sync status for a project.
+    /// </summary>
+    /// <param name="id">Project ID</param>
+    /// <returns>Sync status</returns>
+    [HttpGet("{id}/sync/status")]
+    [ProducesResponseType(typeof(ApiResponse<SyncStatusDto>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<SyncStatusDto>>> GetSyncStatus(int id)
+    {
+        var userId = int.Parse(User.FindFirst("sub")!.Value);
+        var status = await _projectService.GetSyncStatusAsync(id, userId);
+
+        if (status == null)
+            return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
+
+        return Success(status);
+    }
 }

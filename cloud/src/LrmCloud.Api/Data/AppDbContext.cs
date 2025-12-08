@@ -143,6 +143,14 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.OrganizationId);
             entity.HasIndex(e => e.GitHubRepo);
+            entity.HasIndex(e => e.ConfigUpdatedBy);
+
+            // Configure ConfigUpdater relationship (who last updated config)
+            // Note: User relationship is already configured via [ForeignKey] attribute
+            entity.HasOne(e => e.ConfigUpdater)
+                .WithMany()
+                .HasForeignKey(e => e.ConfigUpdatedBy)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // Check constraint: must have either user_id or organization_id
             entity.ToTable(t => t.HasCheckConstraint(

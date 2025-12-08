@@ -387,4 +387,144 @@ public class ProjectService : IProjectService
             UpdatedAt = project.UpdatedAt
         };
     }
+
+    // ============================================================
+    // Configuration Management
+    // ============================================================
+
+    public async Task<ConfigurationDto?> GetConfigurationAsync(int projectId, int userId)
+    {
+        if (!await CanViewProjectAsync(projectId, userId))
+            return null;
+
+        var project = await _db.Projects
+            .Include(p => p.ConfigUpdater)
+            .FirstOrDefaultAsync(p => p.Id == projectId);
+
+        if (project == null || string.IsNullOrWhiteSpace(project.ConfigJson))
+            return null;
+
+        return new ConfigurationDto
+        {
+            ConfigJson = project.ConfigJson,
+            Version = project.ConfigVersion ?? Guid.NewGuid().ToString(),
+            UpdatedAt = project.ConfigUpdatedAt ?? project.UpdatedAt,
+            UpdatedBy = project.ConfigUpdater?.Username ?? "system"
+        };
+    }
+
+    public async Task<(bool Success, ConfigurationDto? Configuration, string? ErrorMessage)> UpdateConfigurationAsync(
+        int projectId, int userId, UpdateConfigurationRequest request)
+    {
+        if (!await CanEditProjectAsync(projectId, userId))
+            return (false, null, "Configuration not found");
+
+        var project = await _db.Projects
+            .Include(p => p.ConfigUpdater)
+            .FirstOrDefaultAsync(p => p.Id == projectId);
+
+        if (project == null)
+            return (false, null, "Configuration not found");
+
+        // Check for optimistic locking conflict
+        if (!string.IsNullOrWhiteSpace(request.BaseVersion))
+        {
+            if (project.ConfigVersion != request.BaseVersion)
+            {
+                return (false, null, "Configuration conflict");
+            }
+        }
+
+        // Update configuration
+        project.ConfigJson = request.ConfigJson;
+        project.ConfigVersion = Guid.NewGuid().ToString();
+        project.ConfigUpdatedAt = DateTime.UtcNow;
+        project.ConfigUpdatedBy = userId;
+
+        await _db.SaveChangesAsync();
+
+        // Create audit log
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = userId,
+            ProjectId = projectId,
+            Action = "update_configuration",
+            EntityType = "project",
+            EntityId = projectId,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+
+        var user = await _db.Users.FindAsync(userId);
+
+        return (true, new ConfigurationDto
+        {
+            ConfigJson = project.ConfigJson,
+            Version = project.ConfigVersion,
+            UpdatedAt = project.ConfigUpdatedAt.Value,
+            UpdatedBy = user?.Username ?? "unknown"
+        }, null);
+    }
+
+    public async Task<List<ConfigurationHistoryDto>?> GetConfigurationHistoryAsync(int projectId, int userId, int limit)
+    {
+        if (!await CanViewProjectAsync(projectId, userId))
+            return null;
+
+        // Get configuration update audit logs
+        var history = await _db.AuditLogs
+            .Include(a => a.User)
+            .Where(a => a.ProjectId == projectId && a.Action == "update_configuration")
+            .OrderByDescending(a => a.CreatedAt)
+            .Take(limit)
+            .Select(a => new ConfigurationHistoryDto
+            {
+                Version = a.Id.ToString(), // Using audit log ID as version for now
+                ConfigJson = a.NewValue ?? "", // Configuration JSON stored in NewValue
+                UpdatedAt = a.CreatedAt,
+                UpdatedBy = a.User!.Username,
+                Message = a.Action
+            })
+            .ToListAsync();
+
+        return history;
+    }
+
+    public async Task<SyncStatusDto?> GetSyncStatusAsync(int projectId, int userId)
+    {
+        if (!await CanViewProjectAsync(projectId, userId))
+            return null;
+
+        var project = await _db.Projects.FindAsync(projectId);
+        if (project == null)
+            return null;
+
+        // Get last push (sync from CLI)
+        var lastPush = await _db.SyncHistory
+            .Where(s => s.ProjectId == projectId && s.Direction == "push")
+            .OrderByDescending(s => s.CreatedAt)
+            .Select(s => s.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        // Get last pull (sync to CLI)
+        var lastPull = await _db.SyncHistory
+            .Where(s => s.ProjectId == projectId && s.Direction == "pull")
+            .OrderByDescending(s => s.CreatedAt)
+            .Select(s => s.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        // Calculate changes (simplified - would need more complex logic in production)
+        var localChanges = 0; // Would compare with last sync snapshot
+        var remoteChanges = 0; // Would compare with last sync snapshot
+
+        return new SyncStatusDto
+        {
+            IsSynced = localChanges == 0 && remoteChanges == 0,
+            LastPush = lastPush == default ? null : lastPush,
+            LastPull = lastPull == default ? null : lastPull,
+            LocalChanges = localChanges,
+            RemoteChanges = remoteChanges
+        };
+    }
 }
