@@ -45,6 +45,11 @@ public class ConfigurationModel
     /// Only applicable when ResourceFormat is "json".
     /// </summary>
     public JsonFormatConfiguration? Json { get; set; }
+
+    /// <summary>
+    /// Cloud synchronization configuration settings.
+    /// </summary>
+    public CloudConfiguration? Cloud { get; set; }
 }
 
 /// <summary>
@@ -553,4 +558,72 @@ public class JsonFormatConfiguration
     /// Default: false
     /// </summary>
     public bool I18nextCompatible { get; set; } = false;
+}
+
+/// <summary>
+/// Configuration settings for cloud synchronization.
+/// </summary>
+public class CloudConfiguration
+{
+    /// <summary>
+    /// Remote URL for cloud synchronization (e.g., "https://lrm.cloud/my-org/my-project").
+    /// Format: https://host[:port]/[org-or-@username]/project-name
+    /// Examples:
+    /// - "https://lrm.cloud/acme-corp/mobile-app" (organization project)
+    /// - "https://lrm.cloud/@john/personal-project" (personal project)
+    /// - "https://staging.lrm.cloud/acme-corp/mobile-app" (staging environment)
+    /// - "https://self-hosted.example.com:8080/team/api" (self-hosted instance)
+    /// </summary>
+    public string? Remote { get; set; }
+
+    /// <summary>
+    /// Whether cloud synchronization is enabled for this project.
+    /// Default: false
+    /// </summary>
+    public bool Enabled { get; set; } = false;
+
+    /// <summary>
+    /// Synchronization settings.
+    /// </summary>
+    public SyncConfiguration? Sync { get; set; }
+}
+
+/// <summary>
+/// Configuration settings for synchronization behavior.
+/// </summary>
+public class SyncConfiguration
+{
+    /// <summary>
+    /// Synchronization mode: "manual" (explicit push/pull) or "auto" (watch for changes).
+    /// Default: "manual"
+    /// </summary>
+    public string Mode { get; set; } = "manual";
+
+    /// <summary>
+    /// File paths to include in synchronization (glob patterns).
+    /// Example: ["Resources/**/*.resx", "locales/**/*.json"]
+    /// Default: ["Resources/**/*"]
+    /// </summary>
+    public List<string> Paths { get; set; } = new() { "Resources/**/*" };
+
+    /// <summary>
+    /// File patterns to exclude from synchronization.
+    /// Example: ["**/*.g.resx", "**/node_modules/**", "**/*.Designer.cs"]
+    /// Default: ["**/*.g.resx", "**/node_modules/**"]
+    /// </summary>
+    public List<string> Exclude { get; set; } = new() { "**/*.g.resx", "**/node_modules/**" };
+
+    /// <summary>
+    /// Whether to automatically translate missing keys during sync.
+    /// When enabled, missing translations will be auto-translated using the configured provider.
+    /// Default: false
+    /// </summary>
+    public bool AutoTranslate { get; set; } = false;
+
+    /// <summary>
+    /// Whether to automatically create pull requests for synced changes.
+    /// When enabled, push operations create PRs instead of direct commits.
+    /// Default: true
+    /// </summary>
+    public bool CreatePr { get; set; } = true;
 }

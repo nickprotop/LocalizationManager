@@ -22,7 +22,9 @@
 using System.Reflection;
 using LocalizationManager.Commands;
 using LocalizationManager.Commands.Backup;
+using LocalizationManager.Commands.Cloud;
 using LocalizationManager.Commands.Config;
+using LocalizationManager.Commands.Remote;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -246,6 +248,61 @@ app.Configure(config =>
             .WithExample(new[] { "backup", "prune", "--file", "SharedResource.resx", "--older-than", "30" })
             .WithExample(new[] { "backup", "prune", "--all", "--keep", "10", "--dry-run" })
             .WithExample(new[] { "backup", "prune", "--file", "SharedResource.resx", "--version", "1", "-y" });
+    });
+
+    config.AddBranch("remote", cfg =>
+    {
+        cfg.SetDescription("Remote URL configuration for cloud synchronization");
+
+        cfg.AddCommand<RemoteSetCommand>("set")
+            .WithDescription("Set the remote URL for cloud synchronization")
+            .WithExample(new[] { "remote", "set", "https://lrm.cloud/acme-corp/mobile-app" })
+            .WithExample(new[] { "remote", "set", "https://lrm.cloud/@john/personal-project" })
+            .WithExample(new[] { "remote", "set", "https://lrm.cloud/my-org/project", "--enable" })
+            .WithExample(new[] { "remote", "set", "https://staging.lrm.cloud/test-org/app" });
+
+        cfg.AddCommand<RemoteGetCommand>("get")
+            .WithDescription("Display the current remote URL configuration")
+            .WithExample(new[] { "remote", "get" })
+            .WithExample(new[] { "remote", "get", "--format", "json" })
+            .WithExample(new[] { "remote", "get", "--format", "simple" });
+
+        cfg.AddCommand<RemoteUnsetCommand>("unset")
+            .WithDescription("Remove the remote URL configuration")
+            .WithExample(new[] { "remote", "unset" })
+            .WithExample(new[] { "remote", "unset", "-y" });
+    });
+
+    config.AddBranch("cloud", cfg =>
+    {
+        cfg.SetDescription("Cloud synchronization commands");
+
+        cfg.AddCommand<PushCommand>("push")
+            .WithDescription("Push local changes (resources + lrm.json) to the cloud")
+            .WithExample(new[] { "cloud", "push" })
+            .WithExample(new[] { "cloud", "push", "-m", "Update translations" })
+            .WithExample(new[] { "cloud", "push", "--dry-run" })
+            .WithExample(new[] { "cloud", "push", "--config-only" })
+            .WithExample(new[] { "cloud", "push", "--resources-only" });
+
+        cfg.AddCommand<PullCommand>("pull")
+            .WithDescription("Pull remote changes (resources + lrm.json) from the cloud")
+            .WithExample(new[] { "cloud", "pull" })
+            .WithExample(new[] { "cloud", "pull", "--dry-run" })
+            .WithExample(new[] { "cloud", "pull", "--force" })
+            .WithExample(new[] { "cloud", "pull", "--strategy", "remote" })
+            .WithExample(new[] { "cloud", "pull", "--config-only" })
+            .WithExample(new[] { "cloud", "pull", "--resources-only" });
+
+        cfg.AddCommand<StatusCommand>("status")
+            .WithDescription("Show cloud sync status and recent activity")
+            .WithExample(new[] { "cloud", "status" })
+            .WithExample(new[] { "cloud", "status", "--format", "json" });
+
+        cfg.AddCommand<SetTokenCommand>("set-token")
+            .WithDescription("Manually set an authentication token for cloud access")
+            .WithExample(new[] { "cloud", "set-token", "--host", "lrm.cloud", "--token", "your-token" })
+            .WithExample(new[] { "cloud", "set-token" });
     });
 });
 
