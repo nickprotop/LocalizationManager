@@ -1203,11 +1203,24 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 - [x] Fix deploy.sh nginx configuration bug (regenerate config on each deploy)
 
 ### Phase 1: Auth & Teams (Week 3-4)
-- [ ] Email/password registration
-- [ ] Email verification flow
-- [ ] Password reset flow (with hashed tokens)
-- [ ] GitHub OAuth login
-- [ ] Account linking (email ↔ GitHub)
+
+**Authentication (✅ COMPLETED)**
+- [x] Email/password registration
+- [x] Email verification flow
+- [x] Password reset flow (with hashed tokens)
+- [x] Login with JWT + refresh tokens
+- [x] Refresh token rotation
+- [x] GitHub OAuth login
+- [x] Account linking (email ↔ GitHub)
+- [x] Get current user endpoint
+- [x] Update user profile
+- [x] Change email flow (with verification)
+- [x] Change password (with session revocation)
+- [x] Session management (view/revoke tokens)
+- [x] Account deletion (soft delete with 30-day grace period)
+- [x] Comprehensive unit tests (72 tests passing)
+
+**Teams & Organizations (TODO - Next up)**
 - [ ] Organization CRUD
 - [ ] Team invitations
 - [ ] Role-based access control
