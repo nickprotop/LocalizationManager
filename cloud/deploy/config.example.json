@@ -2,7 +2,8 @@
   "$schema": "./config.schema.json",
   "server": {
     "urls": "http://0.0.0.0:8080",
-    "environment": "Production"
+    "environment": "Production",
+    "baseUrl": "https://lrm.cloud"
   },
   "database": {
     "connectionString": "Host=lrmcloud-postgres;Port=5432;Database=lrmcloud;Username=lrm;Password=CHANGE_ME",
@@ -23,7 +24,19 @@
   },
   "auth": {
     "jwtSecret": "CHANGE_ME_LONG_RANDOM_STRING",
-    "jwtExpiryHours": 24
+    "jwtExpiryHours": 1,
+    "refreshTokenExpiryDays": 7,
+    "githubClientId": "",
+    "githubClientSecret": "",
+    "emailVerificationExpiryHours": 24,
+    "passwordResetExpiryHours": 1,
+    "passwordRequirements": {
+      "minLength": 12,
+      "requireUppercase": true,
+      "requireLowercase": true,
+      "requireDigit": true,
+      "requireSpecialChar": true
+    }
   },
   "mail": {
     "host": "localhost",

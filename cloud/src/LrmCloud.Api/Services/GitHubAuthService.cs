@@ -1,0 +1,335 @@
+using System.Text.Json;
+using LrmCloud.Api.Data;
+using LrmCloud.Api.Helpers;
+using LrmCloud.Shared.Api;
+using LrmCloud.Shared.Configuration;
+using LrmCloud.Shared.DTOs.Auth;
+using LrmCloud.Shared.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace LrmCloud.Api.Services;
+
+public class GitHubAuthService : IGitHubAuthService
+{
+    private readonly AppDbContext _db;
+    private readonly CloudConfiguration _config;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<GitHubAuthService> _logger;
+
+    private const string GitHubAuthorizeUrl = "https://github.com/login/oauth/authorize";
+    private const string GitHubTokenUrl = "https://github.com/login/oauth/access_token";
+    private const string GitHubUserApiUrl = "https://api.github.com/user";
+
+    public GitHubAuthService(
+        AppDbContext db,
+        CloudConfiguration config,
+        IHttpClientFactory httpClientFactory,
+        ILogger<GitHubAuthService> logger)
+    {
+        _db = db;
+        _config = config;
+        _httpClientFactory = httpClientFactory;
+        _logger = logger;
+    }
+
+    public (string AuthorizationUrl, string State) GetAuthorizationUrl()
+    {
+        if (string.IsNullOrEmpty(_config.Auth.GitHubClientId))
+            throw new InvalidOperationException("GitHub OAuth is not configured (GitHubClientId missing)");
+
+        // Generate secure random state for CSRF protection
+        var state = TokenGenerator.GenerateSecureToken(32);
+
+        var callbackUrl = $"{_config.Server.BaseUrl}/api/auth/github/callback";
+        var url = $"{GitHubAuthorizeUrl}?" +
+                  $"client_id={Uri.EscapeDataString(_config.Auth.GitHubClientId)}&" +
+                  $"redirect_uri={Uri.EscapeDataString(callbackUrl)}&" +
+                  $"scope=user:email&" +
+                  $"state={Uri.EscapeDataString(state)}";
+
+        return (url, state);
+    }
+
+    public async Task<(bool Success, LoginResponse? Response, string? ErrorMessage)> HandleCallbackAsync(
+        string code,
+        string state,
+        string expectedState,
+        string? ipAddress = null)
+    {
+        // Validate state parameter (CSRF protection)
+        if (state != expectedState)
+        {
+            _logger.LogWarning("GitHub OAuth state mismatch. Possible CSRF attack.");
+            return (false, null, "Invalid OAuth state parameter");
+        }
+
+        try
+        {
+            // Exchange code for access token
+            var accessToken = await ExchangeCodeForTokenAsync(code);
+            if (accessToken == null)
+                return (false, null, "Failed to obtain access token from GitHub");
+
+            // Fetch user profile from GitHub
+            var githubProfile = await FetchGitHubProfileAsync(accessToken);
+            if (githubProfile == null)
+                return (false, null, "Failed to fetch user profile from GitHub");
+
+            // Create or link user account
+            var (user, isNewUser) = await CreateOrLinkUserAsync(githubProfile, accessToken);
+
+            // Generate JWT and refresh tokens
+            var (token, expiresAt) = JwtTokenGenerator.GenerateToken(
+                user,
+                _config.Auth.JwtSecret,
+                _config.Auth.JwtExpiryHours);
+
+            var (refreshToken, refreshTokenExpiresAt) = await GenerateRefreshTokenAsync(user.Id, ipAddress);
+
+            // Update last login
+            user.LastLoginAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+
+            var response = new LoginResponse
+            {
+                User = new UserDto
+                {
+                    Id = user.Id,
+                    Email = user.Email!, // Email is always set (either from GitHub or generated)
+                    Username = user.Username,
+                    DisplayName = user.DisplayName,
+                    AvatarUrl = user.AvatarUrl,
+                    EmailVerified = user.EmailVerified,
+                    Plan = user.Plan
+                },
+                Token = token,
+                ExpiresAt = expiresAt,
+                RefreshToken = refreshToken,
+                RefreshTokenExpiresAt = refreshTokenExpiresAt
+            };
+
+            _logger.LogInformation("GitHub OAuth successful for user {UserId} (GitHub ID: {GitHubId}). New user: {IsNew}",
+                user.Id, user.GitHubId, isNewUser);
+
+            return (true, response, null);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP error during GitHub OAuth flow");
+            return (false, null, "Failed to communicate with GitHub");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during GitHub OAuth callback");
+            return (false, null, "An error occurred during GitHub authentication");
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> UnlinkGitHubAccountAsync(int userId, string? password = null)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null)
+            return (false, "User not found");
+
+        // Check if user has GitHub linked
+        if (user.AuthType != "github" && user.GitHubId == null)
+            return (false, "No GitHub account linked");
+
+        // If user only has GitHub auth and no password, they cannot unlink
+        if (user.AuthType == "github" && string.IsNullOrEmpty(user.PasswordHash))
+        {
+            return (false, "Cannot unlink GitHub account without setting up email/password authentication first");
+        }
+
+        // If user has email/password auth, require password verification
+        if (!string.IsNullOrEmpty(user.PasswordHash))
+        {
+            if (string.IsNullOrEmpty(password))
+                return (false, "Password is required to unlink GitHub account");
+
+            if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+                return (false, "Incorrect password");
+        }
+
+        // Unlink GitHub account
+        user.GitHubId = null;
+        user.GitHubAccessTokenEncrypted = null;
+        user.GitHubTokenExpiresAt = null;
+
+        // If primary auth was GitHub, switch to email
+        if (user.AuthType == "github")
+            user.AuthType = "email";
+
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("GitHub account unlinked for user {UserId}", userId);
+        return (true, null);
+    }
+
+    // ============================================================================
+    // Private Helper Methods
+    // ============================================================================
+
+    private async Task<string?> ExchangeCodeForTokenAsync(string code)
+    {
+        if (string.IsNullOrEmpty(_config.Auth.GitHubClientId) ||
+            string.IsNullOrEmpty(_config.Auth.GitHubClientSecret))
+        {
+            throw new InvalidOperationException("GitHub OAuth is not configured");
+        }
+
+        var client = _httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+
+        var requestData = new Dictionary<string, string>
+        {
+            ["client_id"] = _config.Auth.GitHubClientId,
+            ["client_secret"] = _config.Auth.GitHubClientSecret,
+            ["code"] = code
+        };
+
+        var response = await client.PostAsync(GitHubTokenUrl, new FormUrlEncodedContent(requestData));
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("GitHub token exchange failed with status {StatusCode}", response.StatusCode);
+            return null;
+        }
+
+        var json = await response.Content.ReadAsStringAsync();
+        var tokenResponse = JsonSerializer.Deserialize<GitHubOAuthTokenResponse>(json);
+
+        return tokenResponse?.AccessToken;
+    }
+
+    private async Task<GitHubUserProfile?> FetchGitHubProfileAsync(string accessToken)
+    {
+        var client = _httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+        client.DefaultRequestHeaders.Add("User-Agent", "LRM-Cloud");
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+
+        var response = await client.GetAsync(GitHubUserApiUrl);
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("GitHub user API failed with status {StatusCode}", response.StatusCode);
+            return null;
+        }
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<GitHubUserProfile>(json);
+    }
+
+    private async Task<(User User, bool IsNewUser)> CreateOrLinkUserAsync(
+        GitHubUserProfile githubProfile,
+        string accessToken)
+    {
+        // Check if user already exists with this GitHub ID
+        var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.GitHubId == githubProfile.Id);
+        if (existingUser != null)
+        {
+            // Update existing user's GitHub data
+            existingUser.GitHubAccessTokenEncrypted = EncryptToken(accessToken);
+            existingUser.GitHubTokenExpiresAt = null; // GitHub tokens don't expire by default
+            existingUser.AvatarUrl = githubProfile.AvatarUrl ?? existingUser.AvatarUrl;
+            existingUser.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+            return (existingUser, false);
+        }
+
+        // Check if user exists with same email (account linking)
+        if (!string.IsNullOrEmpty(githubProfile.Email))
+        {
+            var githubEmail = githubProfile.Email.ToLower();
+            var userByEmail = await _db.Users.FirstOrDefaultAsync(
+                u => u.Email!.ToLower() == githubEmail);
+
+            if (userByEmail != null)
+            {
+                // Link GitHub to existing email account
+                userByEmail.GitHubId = githubProfile.Id;
+                userByEmail.GitHubAccessTokenEncrypted = EncryptToken(accessToken);
+                userByEmail.GitHubTokenExpiresAt = null;
+                userByEmail.AvatarUrl = githubProfile.AvatarUrl ?? userByEmail.AvatarUrl;
+                userByEmail.EmailVerified = true; // GitHub email is verified
+                userByEmail.UpdatedAt = DateTime.UtcNow;
+
+                await _db.SaveChangesAsync();
+
+                _logger.LogInformation("Linked GitHub ID {GitHubId} to existing user {UserId}",
+                    githubProfile.Id, userByEmail.Id);
+
+                return (userByEmail, false);
+            }
+        }
+
+        // Create new user
+        var email = githubProfile.Email ?? $"github_{githubProfile.Id}@lrm.cloud";
+        var username = await GenerateUniqueUsernameAsync(githubProfile.Login);
+
+        var newUser = new User
+        {
+            AuthType = "github",
+            Email = email,
+            Username = username,
+            DisplayName = githubProfile.Name,
+            AvatarUrl = githubProfile.AvatarUrl,
+            EmailVerified = !string.IsNullOrEmpty(githubProfile.Email), // Verified if GitHub provided email
+            GitHubId = githubProfile.Id,
+            GitHubAccessTokenEncrypted = EncryptToken(accessToken),
+            GitHubTokenExpiresAt = null,
+            Plan = "free",
+            TranslationCharsLimit = _config.Limits.FreeTranslationChars,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _db.Users.Add(newUser);
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Created new user {UserId} from GitHub ID {GitHubId}", newUser.Id, githubProfile.Id);
+        return (newUser, true);
+    }
+
+    private async Task<string> GenerateUniqueUsernameAsync(string preferredUsername)
+    {
+        var username = preferredUsername;
+        var counter = 1;
+
+        while (await _db.Users.AnyAsync(u => u.Username == username))
+        {
+            username = $"{preferredUsername}{counter}";
+            counter++;
+        }
+
+        return username;
+    }
+
+    private string EncryptToken(string token)
+    {
+        return TokenEncryption.Encrypt(token, _config.Encryption.TokenKey);
+    }
+
+    private async Task<(string RefreshToken, DateTime ExpiresAt)> GenerateRefreshTokenAsync(
+        int userId,
+        string? ipAddress)
+    {
+        var refreshToken = TokenGenerator.GenerateSecureToken(32);
+        var tokenHash = BCrypt.Net.BCrypt.HashPassword(refreshToken, 12);
+        var expiresAt = DateTime.UtcNow.AddDays(_config.Auth.RefreshTokenExpiryDays);
+
+        var refreshTokenEntity = new RefreshToken
+        {
+            UserId = userId,
+            TokenHash = tokenHash,
+            ExpiresAt = expiresAt,
+            CreatedAt = DateTime.UtcNow,
+            CreatedByIp = ipAddress
+        };
+
+        _db.RefreshTokens.Add(refreshTokenEntity);
+        await _db.SaveChangesAsync();
+
+        return (refreshToken, expiresAt);
+    }
+}

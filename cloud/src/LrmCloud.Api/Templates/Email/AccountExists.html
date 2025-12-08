@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Already Exists</title>
+</head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h2>Registration Attempt Detected</h2>
+    <p>Someone tried to register an account with your email address ({{ email }}).</p>
+    <p>If this was you, your account already exists. You can:</p>
+    <ul>
+        <li><a href="{{ login_link }}">Log in to your account</a></li>
+        <li><a href="{{ reset_link }}">Reset your password</a> if you forgot it</li>
+    </ul>
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+        If you didn't attempt to register, you can safely ignore this email.
+    </p>
+</body>
+</html>

@@ -56,6 +56,12 @@ public sealed class ServerConfiguration
     /// </summary>
     [Required]
     public required string Environment { get; init; }
+
+    /// <summary>
+    /// Base URL for generating links in emails and redirects.
+    /// Example: "https://lrm.cloud" or "http://localhost:3000"
+    /// </summary>
+    public string BaseUrl { get; init; } = "http://localhost:3000";
 }
 
 /// <summary>
@@ -161,10 +167,17 @@ public sealed class AuthConfiguration
 
     /// <summary>
     /// JWT token expiry in hours.
-    /// Default: 24 hours.
+    /// Default: 1 hour (short-lived when using refresh tokens).
     /// </summary>
     [Range(1, 720)]
-    public int JwtExpiryHours { get; init; } = 24;
+    public int JwtExpiryHours { get; init; } = 1;
+
+    /// <summary>
+    /// Refresh token expiry in days.
+    /// Default: 7 days.
+    /// </summary>
+    [Range(1, 90)]
+    public int RefreshTokenExpiryDays { get; init; } = 7;
 
     /// <summary>
     /// Optional: GitHub OAuth App client ID.
@@ -204,6 +217,62 @@ public sealed class AuthConfiguration
     /// </summary>
     [Range(1, 1440)]
     public int LockoutDurationMinutes { get; init; } = 15;
+
+    /// <summary>
+    /// Email verification token expiry in hours.
+    /// Default: 24 hours.
+    /// </summary>
+    [Range(1, 168)]
+    public int EmailVerificationExpiryHours { get; init; } = 24;
+
+    /// <summary>
+    /// Password reset token expiry in hours.
+    /// Default: 1 hour.
+    /// </summary>
+    [Range(1, 24)]
+    public int PasswordResetExpiryHours { get; init; } = 1;
+
+    /// <summary>
+    /// Password requirements for registration.
+    /// </summary>
+    public PasswordRequirementsConfiguration PasswordRequirements { get; init; } = new();
+}
+
+/// <summary>
+/// Password requirements configuration.
+/// </summary>
+public sealed class PasswordRequirementsConfiguration
+{
+    /// <summary>
+    /// Minimum password length.
+    /// Default: 12 characters.
+    /// </summary>
+    [Range(8, 128)]
+    public int MinLength { get; init; } = 12;
+
+    /// <summary>
+    /// Require at least one uppercase letter.
+    /// Default: true.
+    /// </summary>
+    public bool RequireUppercase { get; init; } = true;
+
+    /// <summary>
+    /// Require at least one lowercase letter.
+    /// Default: true.
+    /// </summary>
+    public bool RequireLowercase { get; init; } = true;
+
+    /// <summary>
+    /// Require at least one digit.
+    /// Default: true.
+    /// </summary>
+    public bool RequireDigit { get; init; } = true;
+
+    /// <summary>
+    /// Require at least one special character.
+    /// Default: true.
+    /// </summary>
+    public bool RequireSpecialChar { get; init; } = true;
 }
 
 /// <summary>
