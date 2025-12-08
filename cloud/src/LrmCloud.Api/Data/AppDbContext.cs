@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<OrganizationMember> OrganizationMembers => Set<OrganizationMember>();
+    public DbSet<OrganizationInvitation> OrganizationInvitations => Set<OrganizationInvitation>();
 
     // Projects & Resources
     public DbSet<Project> Projects => Set<Project>();
@@ -108,6 +109,30 @@ public class AppDbContext : DbContext
 
             // Match parent's soft-delete filters (both org and user)
             entity.HasQueryFilter(e => e.Organization!.DeletedAt == null && e.User!.DeletedAt == null);
+        });
+
+        // =====================================================================
+        // Organization Invitations
+        // =====================================================================
+        modelBuilder.Entity<OrganizationInvitation>(entity =>
+        {
+            entity.HasIndex(e => new { e.OrganizationId, e.Email }).IsUnique();
+            entity.HasIndex(e => e.Email);
+            entity.HasIndex(e => e.TokenHash);
+            entity.HasIndex(e => e.ExpiresAt);
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Inviter)
+                .WithMany()
+                .HasForeignKey(e => e.InvitedBy)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Match parent's soft-delete filter
+            entity.HasQueryFilter(e => e.Organization!.DeletedAt == null);
         });
 
         // =====================================================================

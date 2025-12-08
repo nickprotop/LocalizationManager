@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to the Organization</title>
+</head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h2>Welcome to {{ organization_name }}, {{ username }}!</h2>
+    <p>You've successfully joined <strong>{{ organization_name }}</strong> on LRM Cloud as a <strong>{{ role }}</strong>.</p>
+    <div style="margin: 30px 0; padding: 20px; background-color: #f8f9fa; border-radius: 4px;">
+        <p style="margin: 0 0 15px 0; font-size: 16px;"><strong>You can now:</strong></p>
+        <ul style="margin: 0; font-size: 14px; line-height: 1.8;">
+            <li>View organization projects</li>
+            {{- if role == "admin" || role == "owner" }}
+            <li>Manage team members</li>
+            <li>Create and configure projects</li>
+            {{- end }}
+            {{- if role != "viewer" }}
+            <li>Edit and translate resources</li>
+            {{- end }}
+            <li>Collaborate with team members</li>
+            {{- if role == "owner" }}
+            <li>Manage organization settings</li>
+            {{- end }}
+        </ul>
+    </div>
+    <p style="margin: 30px 0;">
+        <a href="{{ dashboard_link }}"
+           style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+            Go to Dashboard
+        </a>
+    </p>
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+        If you have any questions, feel free to reach out to your organization administrator.<br>
+        Happy collaborating!
+    </p>
+</body>
+</html>

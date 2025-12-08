@@ -28,7 +28,7 @@ public class OrganizationMember
     [Required]
     [MaxLength(50)]
     [Column("role")]
-    public string Role { get; set; } = "member"; // owner, admin, member, viewer
+    public string Role { get; set; } = Constants.OrganizationRole.Member;
 
     [Column("invited_by")]
     public int? InvitedById { get; set; }
@@ -39,8 +39,8 @@ public class OrganizationMember
     [Column("invited_at")]
     public DateTime? InvitedAt { get; set; }
 
-    [Column("accepted_at")]
-    public DateTime? AcceptedAt { get; set; }
+    [Column("joined_at")]
+    public DateTime? JoinedAt { get; set; }
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

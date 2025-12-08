@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organization Invitation</title>
+</head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h2>You've been invited to join {{ organization_name }}</h2>
+    <p>Hello!</p>
+    <p>{{ inviter_name }} has invited you to join <strong>{{ organization_name }}</strong> on LRM Cloud as a <strong>{{ role }}</strong>.</p>
+    <p style="margin: 30px 0;">
+        <a href="{{ invitation_link }}"
+           style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+            Accept Invitation
+        </a>
+    </p>
+    <p>Or copy and paste this link into your browser:</p>
+    <p style="word-break: break-all; color: #666;">{{ invitation_link }}</p>
+    <div style="margin-top: 30px; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px;">
+        <p style="margin: 0; font-size: 14px;"><strong>What you can do as a {{ role }}:</strong></p>
+        <ul style="margin: 10px 0; font-size: 14px;">
+            {{- if role == "admin" }}
+            <li>Manage organization members</li>
+            <li>Create and manage projects</li>
+            <li>Edit translations</li>
+            {{- else if role == "member" }}
+            <li>View organization projects</li>
+            <li>Edit translations</li>
+            {{- else if role == "viewer" }}
+            <li>View organization projects (read-only)</li>
+            {{- end }}
+        </ul>
+    </div>
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+        This invitation expires in {{ expires_days }} days.<br>
+        If you don't have an account yet, you'll be able to create one when you click the link.<br>
+        If you didn't expect this invitation, you can safely ignore this email.
+    </p>
+</body>
+</html>

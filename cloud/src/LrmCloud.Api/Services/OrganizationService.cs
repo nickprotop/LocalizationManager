@@ -1,0 +1,705 @@
+using LrmCloud.Api.Data;
+using LrmCloud.Api.Helpers;
+using LrmCloud.Shared.Configuration;
+using LrmCloud.Shared.Constants;
+using LrmCloud.Shared.DTOs.Organizations;
+using LrmCloud.Shared.Entities;
+using Microsoft.EntityFrameworkCore;
+using Scriban;
+using System.Text.RegularExpressions;
+
+namespace LrmCloud.Api.Services;
+
+public class OrganizationService : IOrganizationService
+{
+    private readonly AppDbContext _db;
+    private readonly IMailService _mailService;
+    private readonly CloudConfiguration _config;
+    private readonly ILogger<OrganizationService> _logger;
+
+    public OrganizationService(
+        AppDbContext db,
+        IMailService mailService,
+        CloudConfiguration config,
+        ILogger<OrganizationService> logger)
+    {
+        _db = db;
+        _mailService = mailService;
+        _config = config;
+        _logger = logger;
+    }
+
+    // ============================================================
+    // Organization CRUD
+    // ============================================================
+
+    public async Task<(bool Success, OrganizationDto? Organization, string? ErrorMessage)> CreateOrganizationAsync(
+        int userId, CreateOrganizationRequest request)
+    {
+        try
+        {
+            // Generate slug if not provided
+            var slug = string.IsNullOrWhiteSpace(request.Slug)
+                ? GenerateSlug(request.Name)
+                : NormalizeSlug(request.Slug);
+
+            // Check for duplicate slug
+            var existingOrg = await _db.Organizations
+                .FirstOrDefaultAsync(o => o.Slug == slug);
+
+            if (existingOrg != null)
+            {
+                // Try with a random suffix
+                slug = $"{slug}-{Guid.NewGuid().ToString()[..8]}";
+
+                // Check again
+                existingOrg = await _db.Organizations
+                    .FirstOrDefaultAsync(o => o.Slug == slug);
+
+                if (existingOrg != null)
+                    return (false, null, "Organization slug is already in use. Please try a different name.");
+            }
+
+            // Create organization
+            var organization = new Organization
+            {
+                Name = request.Name,
+                Slug = slug,
+                Description = request.Description,
+                OwnerId = userId,
+                Plan = "free",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _db.Organizations.Add(organization);
+            await _db.SaveChangesAsync();
+
+            // Automatically add owner as member with owner role
+            var ownerMembership = new OrganizationMember
+            {
+                OrganizationId = organization.Id,
+                UserId = userId,
+                Role = OrganizationRole.Owner,
+                InvitedAt = DateTime.UtcNow,
+                JoinedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.OrganizationMembers.Add(ownerMembership);
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("Organization created: {OrgId} by user {UserId}", organization.Id, userId);
+
+            // Return DTO
+            var dto = new OrganizationDto
+            {
+                Id = organization.Id,
+                Name = organization.Name,
+                Slug = organization.Slug,
+                Description = organization.Description,
+                OwnerId = organization.OwnerId,
+                Plan = organization.Plan,
+                MemberCount = 1,
+                UserRole = OrganizationRole.Owner,
+                CreatedAt = organization.CreatedAt
+            };
+
+            return (true, dto, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating organization for user {UserId}", userId);
+            return (false, null, "An error occurred while creating the organization.");
+        }
+    }
+
+    public async Task<OrganizationDto?> GetOrganizationAsync(int organizationId, int userId)
+    {
+        var org = await _db.Organizations
+            .Include(o => o.Members)
+            .FirstOrDefaultAsync(o => o.Id == organizationId);
+
+        if (org == null)
+            return null;
+
+        // Check if user is a member
+        var membership = org.Members.FirstOrDefault(m => m.UserId == userId);
+        if (membership == null)
+            return null;
+
+        return new OrganizationDto
+        {
+            Id = org.Id,
+            Name = org.Name,
+            Slug = org.Slug,
+            Description = org.Description,
+            OwnerId = org.OwnerId,
+            Plan = org.Plan,
+            MemberCount = org.Members.Count,
+            UserRole = membership.Role,
+            CreatedAt = org.CreatedAt
+        };
+    }
+
+    public async Task<List<OrganizationDto>> GetUserOrganizationsAsync(int userId)
+    {
+        var memberships = await _db.OrganizationMembers
+            .Include(m => m.Organization)
+                .ThenInclude(o => o!.Members)
+            .Where(m => m.UserId == userId)
+            .ToListAsync();
+
+        return memberships.Select(m => new OrganizationDto
+        {
+            Id = m.Organization!.Id,
+            Name = m.Organization.Name,
+            Slug = m.Organization.Slug,
+            Description = m.Organization.Description,
+            OwnerId = m.Organization.OwnerId,
+            Plan = m.Organization.Plan,
+            MemberCount = m.Organization.Members.Count,
+            UserRole = m.Role,
+            CreatedAt = m.Organization.CreatedAt
+        }).ToList();
+    }
+
+    public async Task<(bool Success, OrganizationDto? Organization, string? ErrorMessage)> UpdateOrganizationAsync(
+        int organizationId, int userId, UpdateOrganizationRequest request)
+    {
+        try
+        {
+            // Check if user is owner
+            if (!await IsOwnerAsync(organizationId, userId))
+                return (false, null, "Only the organization owner can update organization details.");
+
+            var org = await _db.Organizations
+                .Include(o => o.Members)
+                .FirstOrDefaultAsync(o => o.Id == organizationId);
+
+            if (org == null)
+                return (false, null, "Organization not found.");
+
+            // Update fields
+            if (!string.IsNullOrWhiteSpace(request.Name))
+                org.Name = request.Name;
+
+            if (request.Description != null)
+                org.Description = request.Description;
+
+            org.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("Organization {OrgId} updated by user {UserId}", organizationId, userId);
+
+            var dto = new OrganizationDto
+            {
+                Id = org.Id,
+                Name = org.Name,
+                Slug = org.Slug,
+                Description = org.Description,
+                OwnerId = org.OwnerId,
+                Plan = org.Plan,
+                MemberCount = org.Members.Count,
+                UserRole = OrganizationRole.Owner,
+                CreatedAt = org.CreatedAt
+            };
+
+            return (true, dto, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating organization {OrgId}", organizationId);
+            return (false, null, "An error occurred while updating the organization.");
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> DeleteOrganizationAsync(int organizationId, int userId)
+    {
+        try
+        {
+            // Check if user is owner
+            if (!await IsOwnerAsync(organizationId, userId))
+                return (false, "Only the organization owner can delete the organization.");
+
+            var org = await _db.Organizations
+                .FirstOrDefaultAsync(o => o.Id == organizationId);
+
+            if (org == null)
+                return (false, "Organization not found.");
+
+            // Soft delete
+            org.DeletedAt = DateTime.UtcNow;
+            org.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("Organization {OrgId} soft deleted by user {UserId}", organizationId, userId);
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting organization {OrgId}", organizationId);
+            return (false, "An error occurred while deleting the organization.");
+        }
+    }
+
+    // ============================================================
+    // Member Management
+    // ============================================================
+
+    public async Task<List<OrganizationMemberDto>> GetMembersAsync(int organizationId, int userId)
+    {
+        // Check if user is a member
+        if (!await IsMemberAsync(organizationId, userId))
+            return new List<OrganizationMemberDto>();
+
+        var members = await _db.OrganizationMembers
+            .Include(m => m.User)
+            .Include(m => m.InvitedBy)
+            .Where(m => m.OrganizationId == organizationId)
+            .OrderBy(m => m.Role == OrganizationRole.Owner ? 0 : 1)
+            .ThenBy(m => m.CreatedAt)
+            .ToListAsync();
+
+        return members.Select(m => new OrganizationMemberDto
+        {
+            Id = m.Id,
+            UserId = m.UserId,
+            Email = m.User!.Email!,
+            Username = m.User.Username,
+            DisplayName = m.User.DisplayName,
+            AvatarUrl = m.User.AvatarUrl,
+            Role = m.Role,
+            JoinedAt = m.JoinedAt,
+            InvitedByUsername = m.InvitedBy?.Username
+        }).ToList();
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> InviteMemberAsync(
+        int organizationId, int userId, InviteMemberRequest request)
+    {
+        try
+        {
+            // Check if user is admin or owner
+            if (!await IsAdminOrOwnerAsync(organizationId, userId))
+                return (false, "Only organization admins and owners can invite members.");
+
+            // Validate role
+            if (!OrganizationRole.IsValid(request.Role))
+                return (false, "Invalid role specified.");
+
+            // Don't allow inviting as owner
+            if (request.Role == OrganizationRole.Owner)
+                return (false, "Cannot invite someone as owner. Transfer ownership instead.");
+
+            var org = await _db.Organizations
+                .FirstOrDefaultAsync(o => o.Id == organizationId);
+
+            if (org == null)
+                return (false, "Organization not found.");
+
+            var normalizedEmail = request.Email.ToLowerInvariant();
+
+            // Check if user is already a member
+            var existingMember = await _db.OrganizationMembers
+                .Include(m => m.User)
+                .FirstOrDefaultAsync(m =>
+                    m.OrganizationId == organizationId &&
+                    m.User!.Email == normalizedEmail);
+
+            if (existingMember != null)
+                return (false, "This user is already a member of the organization.");
+
+            // Check if there's a pending invitation
+            var existingInvitation = await _db.OrganizationInvitations
+                .FirstOrDefaultAsync(i =>
+                    i.OrganizationId == organizationId &&
+                    i.Email == normalizedEmail &&
+                    i.AcceptedAt == null &&
+                    i.ExpiresAt > DateTime.UtcNow);
+
+            if (existingInvitation != null)
+                return (false, "There is already a pending invitation for this email address.");
+
+            // Generate invitation token
+            var invitationToken = TokenGenerator.GenerateSecureToken(32);
+            var tokenHash = BCrypt.Net.BCrypt.HashPassword(invitationToken, 12);
+
+            // Create invitation
+            var invitation = new OrganizationInvitation
+            {
+                OrganizationId = organizationId,
+                Email = normalizedEmail,
+                Role = request.Role,
+                TokenHash = tokenHash,
+                InvitedBy = userId,
+                ExpiresAt = DateTime.UtcNow.AddDays(7),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.OrganizationInvitations.Add(invitation);
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("Invitation created for {Email} to organization {OrgId}", normalizedEmail, organizationId);
+
+            // Send invitation email
+            await SendInvitationEmailAsync(org, invitation, invitationToken, userId);
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error inviting member to organization {OrgId}", organizationId);
+            return (false, "An error occurred while sending the invitation.");
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> AcceptInvitationAsync(int userId, string token)
+    {
+        try
+        {
+            // Find invitations for the user's email
+            var user = await _db.Users.FindAsync(userId);
+            if (user == null || string.IsNullOrEmpty(user.Email))
+                return (false, "User not found.");
+
+            var invitations = await _db.OrganizationInvitations
+                .Include(i => i.Organization)
+                .Where(i =>
+                    i.Email == user.Email.ToLowerInvariant() &&
+                    i.AcceptedAt == null &&
+                    i.ExpiresAt > DateTime.UtcNow)
+                .ToListAsync();
+
+            if (invitations.Count == 0)
+                return (false, "No valid invitation found.");
+
+            // Find the invitation that matches the token
+            OrganizationInvitation? matchingInvitation = null;
+            foreach (var inv in invitations)
+            {
+                if (BCrypt.Net.BCrypt.Verify(token, inv.TokenHash))
+                {
+                    matchingInvitation = inv;
+                    break;
+                }
+            }
+
+            if (matchingInvitation == null)
+                return (false, "Invalid or expired invitation token.");
+
+            // Check if already a member (race condition protection)
+            var existingMember = await _db.OrganizationMembers
+                .FirstOrDefaultAsync(m =>
+                    m.OrganizationId == matchingInvitation.OrganizationId &&
+                    m.UserId == userId);
+
+            if (existingMember != null)
+            {
+                // Already a member, just mark invitation as accepted
+                matchingInvitation.AcceptedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+                return (false, "You are already a member of this organization.");
+            }
+
+            // Add user as member
+            var member = new OrganizationMember
+            {
+                OrganizationId = matchingInvitation.OrganizationId,
+                UserId = userId,
+                Role = matchingInvitation.Role,
+                InvitedById = matchingInvitation.InvitedBy,
+                InvitedAt = matchingInvitation.CreatedAt,
+                JoinedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.OrganizationMembers.Add(member);
+
+            // Mark invitation as accepted
+            matchingInvitation.AcceptedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} accepted invitation to organization {OrgId}",
+                userId, matchingInvitation.OrganizationId);
+
+            // Send welcome email
+            await SendWelcomeEmailAsync(user, matchingInvitation.Organization!, matchingInvitation.Role);
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error accepting invitation for user {UserId}", userId);
+            return (false, "An error occurred while accepting the invitation.");
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> RemoveMemberAsync(
+        int organizationId, int userId, int memberUserId)
+    {
+        try
+        {
+            // Check if user is admin or owner
+            if (!await IsAdminOrOwnerAsync(organizationId, userId))
+                return (false, "Only organization admins and owners can remove members.");
+
+            // Cannot remove the owner
+            var org = await _db.Organizations
+                .FirstOrDefaultAsync(o => o.Id == organizationId);
+
+            if (org == null)
+                return (false, "Organization not found.");
+
+            if (org.OwnerId == memberUserId)
+                return (false, "Cannot remove the organization owner.");
+
+            // Find member
+            var member = await _db.OrganizationMembers
+                .FirstOrDefaultAsync(m =>
+                    m.OrganizationId == organizationId &&
+                    m.UserId == memberUserId);
+
+            if (member == null)
+                return (false, "Member not found.");
+
+            _db.OrganizationMembers.Remove(member);
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("User {MemberUserId} removed from organization {OrgId} by {UserId}",
+                memberUserId, organizationId, userId);
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing member {MemberUserId} from organization {OrgId}",
+                memberUserId, organizationId);
+            return (false, "An error occurred while removing the member.");
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> UpdateMemberRoleAsync(
+        int organizationId, int userId, int memberUserId, string newRole)
+    {
+        try
+        {
+            // Check if user is owner
+            if (!await IsOwnerAsync(organizationId, userId))
+                return (false, "Only the organization owner can update member roles.");
+
+            // Validate role
+            if (!OrganizationRole.IsValid(newRole))
+                return (false, "Invalid role specified.");
+
+            // Cannot change owner's role
+            var org = await _db.Organizations
+                .FirstOrDefaultAsync(o => o.Id == organizationId);
+
+            if (org == null)
+                return (false, "Organization not found.");
+
+            if (org.OwnerId == memberUserId && newRole != OrganizationRole.Owner)
+                return (false, "Cannot change the owner's role. Transfer ownership first.");
+
+            // Cannot promote someone to owner (use transfer ownership instead)
+            if (newRole == OrganizationRole.Owner)
+                return (false, "Cannot promote to owner. Use transfer ownership instead.");
+
+            // Find member
+            var member = await _db.OrganizationMembers
+                .FirstOrDefaultAsync(m =>
+                    m.OrganizationId == organizationId &&
+                    m.UserId == memberUserId);
+
+            if (member == null)
+                return (false, "Member not found.");
+
+            member.Role = newRole;
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("Member {MemberUserId} role updated to {NewRole} in organization {OrgId} by {UserId}",
+                memberUserId, newRole, organizationId, userId);
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating role for member {MemberUserId} in organization {OrgId}",
+                memberUserId, organizationId);
+            return (false, "An error occurred while updating the member's role.");
+        }
+    }
+
+    // ============================================================
+    // Authorization Helpers
+    // ============================================================
+
+    public async Task<bool> IsOwnerAsync(int organizationId, int userId)
+    {
+        var org = await _db.Organizations
+            .FirstOrDefaultAsync(o => o.Id == organizationId);
+
+        return org?.OwnerId == userId;
+    }
+
+    public async Task<bool> IsAdminOrOwnerAsync(int organizationId, int userId)
+    {
+        var role = await GetUserRoleAsync(organizationId, userId);
+        return role != null && OrganizationRole.IsAdminOrOwner(role);
+    }
+
+    public async Task<bool> IsMemberAsync(int organizationId, int userId)
+    {
+        var role = await GetUserRoleAsync(organizationId, userId);
+        return role != null;
+    }
+
+    public async Task<string?> GetUserRoleAsync(int organizationId, int userId)
+    {
+        var member = await _db.OrganizationMembers
+            .FirstOrDefaultAsync(m =>
+                m.OrganizationId == organizationId &&
+                m.UserId == userId);
+
+        return member?.Role;
+    }
+
+    // ============================================================
+    // Helper Methods
+    // ============================================================
+
+    private static string GenerateSlug(string name)
+    {
+        // Convert to lowercase
+        var slug = name.ToLowerInvariant();
+
+        // Replace spaces with hyphens
+        slug = Regex.Replace(slug, @"\s+", "-");
+
+        // Remove invalid characters
+        slug = Regex.Replace(slug, @"[^a-z0-9\-]", "");
+
+        // Remove multiple consecutive hyphens
+        slug = Regex.Replace(slug, @"\-{2,}", "-");
+
+        // Trim hyphens from start and end
+        slug = slug.Trim('-');
+
+        // Limit length
+        if (slug.Length > 100)
+            slug = slug[..100].TrimEnd('-');
+
+        return slug;
+    }
+
+    private static string NormalizeSlug(string slug)
+    {
+        return GenerateSlug(slug);
+    }
+
+    private async Task SendInvitationEmailAsync(
+        Organization org, OrganizationInvitation invitation, string plainToken, int invitedByUserId)
+    {
+        try
+        {
+            var inviter = await _db.Users.FindAsync(invitedByUserId);
+            var invitationLink = $"{_config.Server.BaseUrl}/accept-invitation?token={plainToken}";
+
+            var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "OrganizationInvitation.html");
+
+            // Check if template exists, if not use simple fallback
+            string html;
+            if (File.Exists(templatePath))
+            {
+                var templateText = await File.ReadAllTextAsync(templatePath);
+                var template = Template.Parse(templateText);
+                html = await template.RenderAsync(new
+                {
+                    organization_name = org.Name,
+                    inviter_name = inviter?.Username ?? "Someone",
+                    role = invitation.Role,
+                    invitation_link = invitationLink,
+                    expires_days = 7
+                });
+            }
+            else
+            {
+                html = $@"
+<html>
+<body>
+<h2>You've been invited to join {org.Name}</h2>
+<p>{inviter?.Username ?? "Someone"} has invited you to join {org.Name} on LRM Cloud as a {invitation.Role}.</p>
+<p><a href=""{invitationLink}"">Accept Invitation</a></p>
+<p>This invitation expires in 7 days.</p>
+<p>If you don't have an account yet, you'll be able to create one when you click the link.</p>
+</body>
+</html>";
+            }
+
+            await _mailService.SendEmailAsync(
+                to: invitation.Email,
+                subject: $"You've been invited to join {org.Name} on LRM Cloud",
+                htmlBody: html
+            );
+
+            _logger.LogInformation("Invitation email sent to {Email} for organization {OrgId}", invitation.Email, org.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending invitation email to {Email}", invitation.Email);
+        }
+    }
+
+    private async Task SendWelcomeEmailAsync(User user, Organization org, string role)
+    {
+        try
+        {
+            var dashboardLink = $"{_config.Server.BaseUrl}/dashboard";
+
+            var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "OrganizationWelcome.html");
+
+            // Check if template exists, if not use simple fallback
+            string html;
+            if (File.Exists(templatePath))
+            {
+                var templateText = await File.ReadAllTextAsync(templatePath);
+                var template = Template.Parse(templateText);
+                html = await template.RenderAsync(new
+                {
+                    username = user.Username,
+                    organization_name = org.Name,
+                    role = role,
+                    dashboard_link = dashboardLink
+                });
+            }
+            else
+            {
+                html = $@"
+<html>
+<body>
+<h2>Welcome to {org.Name}!</h2>
+<p>You've successfully joined {org.Name} as a {role}.</p>
+<p><a href=""{dashboardLink}"">Go to Dashboard</a></p>
+</body>
+</html>";
+            }
+
+            await _mailService.SendEmailAsync(
+                to: user.Email!,
+                subject: $"Welcome to {org.Name}!",
+                htmlBody: html
+            );
+
+            _logger.LogInformation("Welcome email sent to {Email} for organization {OrgId}", user.Email, org.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending welcome email to {Email}", user.Email);
+        }
+    }
+}

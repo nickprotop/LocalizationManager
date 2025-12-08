@@ -23,6 +23,9 @@ public class Organization
     [Column("slug")]
     public required string Slug { get; set; }
 
+    [Column("description")]
+    public string? Description { get; set; }
+
     [Column("owner_id")]
     public int OwnerId { get; set; }
 
