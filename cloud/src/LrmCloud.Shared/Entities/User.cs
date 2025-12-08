@@ -83,6 +83,20 @@ public class User
     [Column("email_verification_token_hash")]
     public string? EmailVerificationTokenHash { get; set; }
 
+    [Column("email_verification_expires_at")]
+    public DateTime? EmailVerificationExpiresAt { get; set; }
+
+    [MaxLength(255)]
+    [Column("pending_email")]
+    public string? PendingEmail { get; set; }
+
+    [MaxLength(255)]
+    [Column("pending_email_token_hash")]
+    public string? PendingEmailTokenHash { get; set; }
+
+    [Column("pending_email_expires_at")]
+    public DateTime? PendingEmailExpiresAt { get; set; }
+
     [Column("last_login_at")]
     public DateTime? LastLoginAt { get; set; }
 

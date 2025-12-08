@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
 
     // Users & Auth
     public DbSet<User> Users => Set<User>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<OrganizationMember> OrganizationMembers => Set<OrganizationMember>();
 
@@ -48,6 +49,24 @@ public class AppDbContext : DbContext
 
             // Soft delete filter
             entity.HasQueryFilter(e => e.DeletedAt == null);
+        });
+
+        // =====================================================================
+        // Refresh Tokens
+        // =====================================================================
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.ExpiresAt);
+            entity.HasIndex(e => e.TokenHash);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Match parent's soft-delete filter
+            entity.HasQueryFilter(e => e.User!.DeletedAt == null);
         });
 
         // =====================================================================

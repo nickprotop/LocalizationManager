@@ -3,6 +3,7 @@ using System;
 using LrmCloud.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LrmCloud.Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251208070652_AddRefreshTokens")]
+    partial class AddRefreshTokens
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -486,10 +489,6 @@ namespace LrmCloud.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
 
-                    b.Property<DateTime?>("LastUsedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_used_at");
-
                     b.Property<string>("ReplacedByTokenHash")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
@@ -877,20 +876,6 @@ namespace LrmCloud.Api.Data.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("password_reset_token_hash");
-
-                    b.Property<string>("PendingEmail")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("pending_email");
-
-                    b.Property<DateTime?>("PendingEmailExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("pending_email_expires_at");
-
-                    b.Property<string>("PendingEmailTokenHash")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("pending_email_token_hash");
 
                     b.Property<string>("Plan")
                         .IsRequired()

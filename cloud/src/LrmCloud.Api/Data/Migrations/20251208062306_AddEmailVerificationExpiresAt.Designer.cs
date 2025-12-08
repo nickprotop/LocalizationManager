@@ -3,6 +3,7 @@ using System;
 using LrmCloud.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LrmCloud.Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251208062306_AddEmailVerificationExpiresAt")]
+    partial class AddEmailVerificationExpiresAt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -464,67 +467,6 @@ namespace LrmCloud.Api.Data.Migrations
                     b.ToTable("project_api_keys");
                 });
 
-            modelBuilder.Entity("LrmCloud.Shared.Entities.RefreshToken", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("CreatedByIp")
-                        .HasMaxLength(45)
-                        .HasColumnType("character varying(45)")
-                        .HasColumnName("created_by_ip");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<DateTime?>("LastUsedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_used_at");
-
-                    b.Property<string>("ReplacedByTokenHash")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("replaced_by_token_hash");
-
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("revoked_at");
-
-                    b.Property<string>("RevokedByIp")
-                        .HasMaxLength(45)
-                        .HasColumnType("character varying(45)")
-                        .HasColumnName("revoked_by_ip");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("token_hash");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExpiresAt");
-
-                    b.HasIndex("TokenHash");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("refresh_tokens");
-                });
-
             modelBuilder.Entity("LrmCloud.Shared.Entities.ResourceKey", b =>
                 {
                     b.Property<int>("Id")
@@ -878,20 +820,6 @@ namespace LrmCloud.Api.Data.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("password_reset_token_hash");
 
-                    b.Property<string>("PendingEmail")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("pending_email");
-
-                    b.Property<DateTime?>("PendingEmailExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("pending_email_expires_at");
-
-                    b.Property<string>("PendingEmailTokenHash")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("pending_email_token_hash");
-
                     b.Property<string>("Plan")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -1078,17 +1006,6 @@ namespace LrmCloud.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Project");
-                });
-
-            modelBuilder.Entity("LrmCloud.Shared.Entities.RefreshToken", b =>
-                {
-                    b.HasOne("LrmCloud.Shared.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("LrmCloud.Shared.Entities.ResourceKey", b =>
