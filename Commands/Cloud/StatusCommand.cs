@@ -89,6 +89,7 @@ public class StatusCommand : Command<StatusCommandSettings>
 
             using var apiClient = new CloudApiClient(remoteUrl);
             apiClient.SetAccessToken(token);
+            apiClient.EnableAutoRefresh(projectDirectory);
 
             // Fetch sync status
             SyncStatus? syncStatus = null;

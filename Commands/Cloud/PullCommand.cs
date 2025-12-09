@@ -120,6 +120,7 @@ public class PullCommand : Command<PullCommandSettings>
             // Create API client
             using var apiClient = new CloudApiClient(remoteUrl);
             apiClient.SetAccessToken(token);
+            apiClient.EnableAutoRefresh(projectDirectory);
 
             // Fetch remote data (V2 - pull files from database)
             PullResponse? pullResponse = null;
@@ -440,8 +441,7 @@ public class PullCommand : Command<PullCommandSettings>
         List<ConflictDetector.Conflict> conflicts,
         CancellationToken cancellationToken)
     {
-        var resourcesPath = Path.Combine(projectDirectory, "Resources");
-
+        // projectDirectory already points to the correct resource directory
         foreach (var resource in remoteResources)
         {
             var conflict = conflicts.FirstOrDefault(c => c.Path == resource.Path);
@@ -452,7 +452,7 @@ public class PullCommand : Command<PullCommandSettings>
                 continue;
             }
 
-            var fullPath = Path.Combine(resourcesPath, resource.Path);
+            var fullPath = Path.Combine(projectDirectory, resource.Path);
             var directory = Path.GetDirectoryName(fullPath);
 
             if (directory != null && !Directory.Exists(directory))
@@ -479,10 +479,10 @@ public class PullCommand : Command<PullCommandSettings>
 
     private string GetRelativePath(string fullPath, string projectDirectory)
     {
-        var resourcesPath = Path.Combine(projectDirectory, "Resources");
-        if (fullPath.StartsWith(resourcesPath))
+        // projectDirectory already points to the correct resource directory
+        if (fullPath.StartsWith(projectDirectory))
         {
-            return fullPath.Substring(resourcesPath.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return fullPath.Substring(projectDirectory.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         }
         return Path.GetFileName(fullPath);
     }

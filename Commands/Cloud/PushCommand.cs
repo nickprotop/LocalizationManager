@@ -132,6 +132,7 @@ public class PushCommand : Command<PushCommandSettings>
             // Create API client
             using var apiClient = new CloudApiClient(remoteUrl);
             apiClient.SetAccessToken(token);
+            apiClient.EnableAutoRefresh(projectDirectory);
 
             // Collect items to push
             var itemsToPush = new List<string>();
