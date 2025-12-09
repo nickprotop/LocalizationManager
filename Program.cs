@@ -254,6 +254,12 @@ app.Configure(config =>
     {
         cfg.SetDescription("Cloud synchronization commands");
 
+        cfg.AddCommand<CloudInitCommand>("init")
+            .WithDescription("Connect local project to cloud (authenticate and link/create project)")
+            .WithExample(new[] { "cloud", "init" })
+            .WithExample(new[] { "cloud", "init", "--host", "staging.lrm.cloud" })
+            .WithExample(new[] { "cloud", "init", "--name", "my-project" });
+
         cfg.AddCommand<PushCommand>("push")
             .WithDescription("Push local changes (resources + lrm.json) to the cloud")
             .WithExample(new[] { "cloud", "push" })

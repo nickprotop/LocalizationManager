@@ -1254,7 +1254,8 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 - [x] `lrm pull` - Download remote changes with conflict detection ✅
 - [x] `lrm remote set <url>` - Configure remote URL (Git-style) ✅
 - [x] `lrm remote get` - Show current remote URL ✅
-- [ ] `lrm remote unset` - Remove remote configuration
+- [x] `lrm remote unset` - Remove remote configuration ✅
+- [x] `lrm cloud init` - Interactive project setup (auth + link/create project) ✅
 - [x] `lrm cloud login` - Email/password authentication with auto-refresh ✅
 - [ ] `lrm cloud logout` - Clear auth tokens
 - [x] `lrm cloud status` - Show sync status and recent activity ✅

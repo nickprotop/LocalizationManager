@@ -60,6 +60,16 @@ public class CloudApiClient : IDisposable
     #region Project API
 
     /// <summary>
+    /// Gets all projects accessible by the current user.
+    /// </summary>
+    public async Task<List<CloudProject>> GetUserProjectsAsync(CancellationToken cancellationToken = default)
+    {
+        var url = $"{_remoteUrl.ApiBaseUrl}/projects";
+        var response = await GetAsync<List<CloudProject>>(url, cancellationToken);
+        return response ?? new List<CloudProject>();
+    }
+
+    /// <summary>
     /// Gets project information from the cloud.
     /// </summary>
     public async Task<CloudProject> GetProjectAsync(CancellationToken cancellationToken = default)
@@ -368,11 +378,12 @@ internal class ApiMeta
 /// </summary>
 public class CloudProject
 {
-    public string Id { get; set; } = string.Empty;
+    public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public string? OrganizationId { get; set; }
-    public string? OwnerId { get; set; }
+    public int? UserId { get; set; }
+    public int? OrganizationId { get; set; }
+    public string? OrganizationName { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
