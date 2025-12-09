@@ -1311,42 +1311,75 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 - [x] CloudSyncValidator format validation tests ✅
 - [x] ConflictDetector and PullBackupManager tests ✅
 
-### Phase 4: GitHub App (Week 9-10)
-- [ ] Register GitHub App
-- [ ] Webhook handler with signature verification
-- [ ] Installation event handler
-- [ ] Push event → sync
-- [ ] Create PR with translations
-- [ ] Rate limit handling
+### Phase 4: Blazor WebAssembly UI + Translation Service (Week 9-12)
 
-### Phase 5: Blazor WebAssembly UI (Week 11-13)
-- [ ] Auth state provider
-- [ ] Dashboard (project list, stats)
-- [ ] Translation editor (virtualized grid)
-- [ ] Search/filter
-- [ ] Inline editing
-- [ ] Translate missing button
-- [ ] Create PR button
-- [ ] Team management UI
-- [ ] PWA support (offline read-only)
+**Phase 4A - Foundation (Week 9)**:
+- [ ] Add MudBlazor NuGet package + theming (light/dark toggle)
+- [ ] Layout: Top navbar + sidebar + main content area
+- [ ] Auth pages: Login, Register, Forgot Password, Reset Password
+- [ ] JWT AuthenticationStateProvider + HttpClient auth interceptor
+- [ ] Protected route handling (redirect to login if not authenticated)
 
-**Project Settings Page**:
-- [ ] Display current lrm.json configuration
-- [ ] Partial editing (safe settings only):
-  - [ ] ✅ Editable: Default language, validation rules, translation settings
-  - [ ] ❌ Read-only: Resource format, file paths, exclusions (with tooltip: "Edit in lrm.json via CLI")
-- [ ] Format change validation (block if resources don't match)
-- [ ] Show sync status and last sync info
-- [ ] Configuration history viewer
-- [ ] "Sync changes to CLI" prompt after editing
+**Phase 4B - Dashboard (Week 9)**:
+- [ ] Project cards grid with stats (key count, completion %)
+- [ ] Create/Edit project modal
+- [ ] Organization dropdown/selector
+- [ ] Recent sync activity feed
 
-### Phase 6: Translation Service (Week 14)
-- [ ] API key hierarchy (project → user → org → platform)
-- [ ] Translation with fallback providers
-- [ ] Usage tracking and limits
-- [ ] Batch translation endpoint
+**Phase 4C - Translation Editor Core (Week 10)**:
+- [ ] MudDataGrid with virtualization (10K+ keys)
+- [ ] Key column (frozen/sticky)
+- [ ] Dynamic language columns (based on project languages)
+- [ ] Row status indicator (complete/missing/partial)
+- [ ] Basic inline cell editing (click to edit)
 
-### Phase 7: Billing & Compliance (Week 15-16)
+**Phase 4D - Editor Features (Week 10-11)**:
+- [ ] Search/filter bar (by key, value, status)
+- [ ] Detail drawer component (double-click row to open):
+  - [ ] All translations with full textareas
+  - [ ] Comment field
+  - [ ] Character count per translation
+  - [ ] Per-language translate button
+- [ ] Bulk actions: Select rows → Translate selected
+- [ ] Add/Delete key functionality
+- [ ] Keyboard shortcuts (Ctrl+S save, arrows navigate)
+
+**Phase 4E - Translation Service Integration (Week 11)**:
+- [ ] API key hierarchy (project → user → org → platform fallback)
+- [ ] Translation with fallback providers (if primary fails, try next)
+- [ ] Usage tracking and limits (per user/org, shown in UI)
+- [ ] Batch translation endpoint (POST /api/projects/:id/translate)
+- [ ] Translation provider settings UI (add/remove API keys)
+- [ ] Translation progress indicator (for bulk operations)
+- [ ] Free provider support (MyMemory, Lingva as fallbacks)
+
+**Phase 4F - Settings & Teams (Week 11-12)**:
+- [ ] Project settings page:
+  - [ ] Display current lrm.json configuration
+  - [ ] Editable: Default language, validation rules, translation settings
+  - [ ] Read-only: Resource format, file paths (tooltip: "Edit in lrm.json via CLI")
+  - [ ] Show sync status and last sync info
+  - [ ] Configuration history viewer
+- [ ] Team management (invite members, roles)
+- [ ] User profile settings
+- [ ] Translation provider API key management
+
+**Phase 4G - Polish (Week 12)**:
+- [ ] Loading skeletons and spinners
+- [ ] Error boundaries and toast notifications
+- [ ] Responsive design (mobile-friendly)
+- [ ] PWA manifest + service worker (cache static assets + read-only project data)
+
+### Phase 5: GitHub App Integration (Week 13-14)
+- [ ] GitHub App registration and configuration
+- [ ] Installation flow UI in Blazor
+- [ ] Webhook handling (push events, installation events)
+- [ ] Auto-sync on push to connected repos
+- [ ] PR creation for translation changes
+- [ ] Sync status display in project dashboard
+- [ ] Repository connection/disconnection UI
+
+### Phase 6: Billing & Compliance (Week 15-16)
 - [ ] Stripe integration
 - [ ] Subscription management
 - [ ] Usage metering
@@ -1356,7 +1389,7 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 - [ ] Account deletion flow
 - [ ] Audit log UI
 
-### Phase 8: Launch Prep (Week 17)
+### Phase 7: Launch Prep (Week 17)
 - [ ] Landing page
 - [ ] Documentation
 - [ ] Load testing (k6)
