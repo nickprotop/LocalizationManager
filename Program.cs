@@ -250,29 +250,6 @@ app.Configure(config =>
             .WithExample(new[] { "backup", "prune", "--file", "SharedResource.resx", "--version", "1", "-y" });
     });
 
-    config.AddBranch("remote", cfg =>
-    {
-        cfg.SetDescription("Remote URL configuration for cloud synchronization");
-
-        cfg.AddCommand<RemoteSetCommand>("set")
-            .WithDescription("Set the remote URL for cloud synchronization")
-            .WithExample(new[] { "remote", "set", "https://lrm.cloud/acme-corp/mobile-app" })
-            .WithExample(new[] { "remote", "set", "https://lrm.cloud/@john/personal-project" })
-            .WithExample(new[] { "remote", "set", "https://lrm.cloud/my-org/project", "--enable" })
-            .WithExample(new[] { "remote", "set", "https://staging.lrm.cloud/test-org/app" });
-
-        cfg.AddCommand<RemoteGetCommand>("get")
-            .WithDescription("Display the current remote URL configuration")
-            .WithExample(new[] { "remote", "get" })
-            .WithExample(new[] { "remote", "get", "--format", "json" })
-            .WithExample(new[] { "remote", "get", "--format", "simple" });
-
-        cfg.AddCommand<RemoteUnsetCommand>("unset")
-            .WithDescription("Remove the remote URL configuration")
-            .WithExample(new[] { "remote", "unset" })
-            .WithExample(new[] { "remote", "unset", "-y" });
-    });
-
     config.AddBranch("cloud", cfg =>
     {
         cfg.SetDescription("Cloud synchronization commands");
@@ -303,6 +280,29 @@ app.Configure(config =>
             .WithDescription("Manually set an authentication token for cloud access")
             .WithExample(new[] { "cloud", "set-token", "--host", "lrm.cloud", "--token", "your-token" })
             .WithExample(new[] { "cloud", "set-token" });
+
+        cfg.AddBranch("remote", remoteCfg =>
+        {
+            remoteCfg.SetDescription("Remote URL configuration for cloud synchronization");
+
+            remoteCfg.AddCommand<RemoteSetCommand>("set")
+                .WithDescription("Set the remote URL for cloud synchronization")
+                .WithExample(new[] { "cloud", "remote", "set", "https://lrm.cloud/acme-corp/mobile-app" })
+                .WithExample(new[] { "cloud", "remote", "set", "https://lrm.cloud/@john/personal-project" })
+                .WithExample(new[] { "cloud", "remote", "set", "https://lrm.cloud/my-org/project", "--enable" })
+                .WithExample(new[] { "cloud", "remote", "set", "https://staging.lrm.cloud/test-org/app" });
+
+            remoteCfg.AddCommand<RemoteGetCommand>("get")
+                .WithDescription("Display the current remote URL configuration")
+                .WithExample(new[] { "cloud", "remote", "get" })
+                .WithExample(new[] { "cloud", "remote", "get", "--format", "json" })
+                .WithExample(new[] { "cloud", "remote", "get", "--format", "simple" });
+
+            remoteCfg.AddCommand<RemoteUnsetCommand>("unset")
+                .WithDescription("Remove the remote URL configuration")
+                .WithExample(new[] { "cloud", "remote", "unset" })
+                .WithExample(new[] { "cloud", "remote", "unset", "-y" });
+        });
     });
 });
 
