@@ -173,14 +173,18 @@ public class PushCommand : Command<PushCommandSettings>
             // Push resources
             if (!settings.ConfigOnly)
             {
+                PushResponse? result = null;
                 AnsiConsole.Status()
                     .Start("Pushing resources...", ctx =>
                     {
-                        var result = PushResources(projectDirectory, settings, apiClient, settings.Message, cancellationToken);
-                        ctx.Status($"Pushed {result.FilesUpdated} file(s)");
+                        result = PushResources(projectDirectory, settings, apiClient, settings.Message, cancellationToken);
+                        ctx.Status($"Modified: {result.ModifiedCount}, Deleted: {result.DeletedCount}");
                     });
 
-                AnsiConsole.MarkupLine("[green]✓ Resources pushed successfully[/]");
+                if (result != null && (result.ModifiedCount > 0 || result.DeletedCount > 0))
+                {
+                    AnsiConsole.MarkupLine("[green]✓ Resources pushed successfully[/]");
+                }
             }
 
             AnsiConsole.WriteLine();
@@ -249,50 +253,109 @@ public class PushCommand : Command<PushCommandSettings>
         apiClient.UpdateConfigurationAsync(configJsonString, baseVersion, cancellationToken).GetAwaiter().GetResult();
     }
 
-    private PushResult PushResources(
+    private PushResponse PushResources(
         string projectDirectory,
         PushCommandSettings settings,
         CloudApiClient apiClient,
         string? message,
         CancellationToken cancellationToken)
     {
-        // Discover languages
-        var languages = settings.DiscoverLanguages();
+        // Load sync state (file hashes from last push)
+        var syncState = Core.Cloud.SyncStateManager.LoadAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
+        var lastPushFiles = syncState?.Files ?? new Dictionary<string, string>();
 
-        if (!languages.Any())
+        // Load configuration JSON (if exists)
+        var configPath = Path.Combine(projectDirectory, "lrm.json");
+        string? configJson = null;
+        string? configHash = null;
+
+        if (File.Exists(configPath))
         {
-            throw new InvalidOperationException("No resource files found!");
+            configJson = File.ReadAllText(configPath);
+            configHash = ComputeHash(configJson);
         }
 
-        var resourceFiles = new List<Core.Cloud.ResourceFile>();
+        // Check if configuration changed
+        bool configChanged = configHash != syncState?.ConfigHash;
 
-        // Read all resource files
+        // Discover current resource files
+        var languages = settings.DiscoverLanguages();
+        var currentFiles = new Dictionary<string, (string Path, string Content, string Hash)>();
+
         foreach (var lang in languages)
         {
-            var resourceFile = settings.ReadResourceFile(lang);
-            var content = SerializeResourceFile(resourceFile);
+            var relativePath = GetResourcePath(lang, settings);
+            var content = File.ReadAllText(lang.FilePath);  // Read raw file content
             var hash = ComputeHash(content);
 
-            resourceFiles.Add(new Core.Cloud.ResourceFile
-            {
-                Path = GetResourcePath(lang, settings),
-                Content = content,
-                Hash = hash
-            });
+            currentFiles[relativePath] = (relativePath, content, hash);
         }
 
-        // Push resources
-        return apiClient.PushResourcesAsync(resourceFiles, message, cancellationToken).GetAwaiter().GetResult();
-    }
+        // Detect changes
+        var modifiedFiles = new List<Core.Cloud.FileDto>();
+        var deletedFiles = new List<string>();
 
-    private string SerializeResourceFile(Core.Models.ResourceFile resourceFile)
-    {
-        // Serialize to JSON format for cloud storage
-        var entries = resourceFile.Entries.ToDictionary(e => e.Key, e => e.Value);
-        return System.Text.Json.JsonSerializer.Serialize(entries, new System.Text.Json.JsonSerializerOptions
+        // Check for new/modified files
+        foreach (var (path, (filePath, content, hash)) in currentFiles)
         {
-            WriteIndented = true
-        });
+            if (!lastPushFiles.ContainsKey(path) || lastPushFiles[path] != hash)
+            {
+                modifiedFiles.Add(new Core.Cloud.FileDto
+                {
+                    Path = path,
+                    Content = content,
+                    Hash = hash
+                });
+            }
+        }
+
+        // Check for deleted files
+        foreach (var path in lastPushFiles.Keys)
+        {
+            if (!currentFiles.ContainsKey(path))
+            {
+                deletedFiles.Add(path);
+            }
+        }
+
+        // Early exit if no changes
+        if (modifiedFiles.Count == 0 && deletedFiles.Count == 0 && !configChanged)
+        {
+            AnsiConsole.MarkupLine("[yellow]No changes to push[/]");
+            return new PushResponse { Success = true, ModifiedCount = 0, DeletedCount = 0, Message = "No changes" };
+        }
+
+        // Show summary
+        if (modifiedFiles.Count > 0)
+            AnsiConsole.MarkupLine($"[green]Modified files: {modifiedFiles.Count}[/]");
+        if (deletedFiles.Count > 0)
+            AnsiConsole.MarkupLine($"[red]Deleted files: {deletedFiles.Count}[/]");
+        if (configChanged)
+            AnsiConsole.MarkupLine("[blue]Configuration changed[/]");
+        AnsiConsole.WriteLine();
+
+        // Create push request
+        var request = new Core.Cloud.PushRequest
+        {
+            Configuration = configChanged ? configJson : null,
+            ModifiedFiles = modifiedFiles,
+            DeletedFiles = deletedFiles
+        };
+
+        // Push to server
+        var response = apiClient.PushResourcesAsync(request, cancellationToken).GetAwaiter().GetResult();
+
+        // Update sync state
+        var newSyncState = new Core.Cloud.Models.SyncState
+        {
+            Timestamp = DateTime.UtcNow,
+            ConfigHash = configHash,
+            Files = currentFiles.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Hash)
+        };
+
+        Core.Cloud.SyncStateManager.SaveAsync(projectDirectory, newSyncState, cancellationToken).GetAwaiter().GetResult();
+
+        return response;
     }
 
     private string GetResourcePath(Core.Models.LanguageInfo language, PushCommandSettings settings)

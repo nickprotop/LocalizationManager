@@ -121,59 +121,46 @@ public class PullCommand : Command<PullCommandSettings>
             using var apiClient = new CloudApiClient(remoteUrl);
             apiClient.SetAccessToken(token);
 
-            // Fetch remote data
-            ConfigurationSnapshot? remoteConfig = null;
-            List<ResourceFile>? remoteResources = null;
+            // Fetch remote data (V2 - pull files from database)
+            PullResponse? pullResponse = null;
 
             AnsiConsole.Status()
                 .Start("Fetching remote data...", ctx =>
                 {
-                    if (!settings.ResourcesOnly)
-                    {
-                        ctx.Status("Fetching configuration...");
-                        try
-                        {
-                            remoteConfig = apiClient.GetConfigurationAsync(cancellationToken).GetAwaiter().GetResult();
-                        }
-                        catch (CloudApiException ex) when (ex.StatusCode == 404)
-                        {
-                            // No remote config yet
-                        }
-                    }
-
-                    if (!settings.ConfigOnly)
-                    {
-                        ctx.Status("Fetching resources...");
-                        remoteResources = apiClient.GetResourcesAsync(cancellationToken).GetAwaiter().GetResult();
-                    }
+                    pullResponse = apiClient.PullResourcesAsync(cancellationToken).GetAwaiter().GetResult();
                 });
+
+            if (pullResponse == null)
+            {
+                throw new InvalidOperationException("Failed to pull resources from server");
+            }
 
             // Detect conflicts and show diff
             var conflictDetector = new ConflictDetector();
             var conflicts = new List<ConflictDetector.Conflict>();
 
             // Check configuration conflict
-            if (!settings.ResourcesOnly && remoteConfig != null)
+            if (!settings.ResourcesOnly && pullResponse.Configuration != null)
             {
-                var localConfigJson = Core.Configuration.ConfigurationManager
-                    .LoadTeamConfigurationAsync(projectDirectory, cancellationToken)
-                    .GetAwaiter()
-                    .GetResult();
-
-                var localConfigJsonString = JsonSerializer.Serialize(localConfigJson);
-                var configConflict = conflictDetector.DetectConfigurationConflict(localConfigJsonString, remoteConfig.ConfigJson);
-
-                if (configConflict != null)
+                var localConfigPath = Path.Combine(projectDirectory, "lrm.json");
+                if (File.Exists(localConfigPath))
                 {
-                    conflicts.Add(configConflict);
+                    var localConfigJson = File.ReadAllText(localConfigPath);
+                    var configConflict = conflictDetector.DetectConfigurationConflict(localConfigJson, pullResponse.Configuration);
+
+                    if (configConflict != null)
+                    {
+                        conflicts.Add(configConflict);
+                    }
                 }
             }
 
             // Check resource conflicts
             ConflictDetector.DiffSummary? diffSummary = null;
-            if (!settings.ConfigOnly && remoteResources != null)
+            if (!settings.ConfigOnly && pullResponse.Files.Count > 0)
             {
                 var localResources = GetLocalResources(settings, projectDirectory);
+                var remoteResources = pullResponse.Files;
                 var resourceConflicts = conflictDetector.DetectResourceConflicts(localResources, remoteResources);
                 conflicts.AddRange(resourceConflicts);
 
@@ -257,22 +244,38 @@ public class PullCommand : Command<PullCommandSettings>
                 AnsiConsole.Status()
                     .Start("Applying changes...", ctx =>
                     {
-                        if (!settings.ResourcesOnly && remoteConfig != null)
+                        if (!settings.ResourcesOnly && pullResponse.Configuration != null)
                         {
                             var configConflict = conflicts.FirstOrDefault(c => c.Type == ConflictDetector.ConflictType.ConfigurationConflict);
                             if (configConflict?.Resolution != ConflictDetector.ResolutionStrategy.Local)
                             {
                                 ctx.Status("Updating configuration...");
-                                ApplyConfigurationChanges(projectDirectory, remoteConfig.ConfigJson, cancellationToken);
+                                ApplyConfigurationChanges(projectDirectory, pullResponse.Configuration, cancellationToken);
                             }
                         }
 
-                        if (!settings.ConfigOnly && remoteResources != null)
+                        if (!settings.ConfigOnly && pullResponse.Files.Count > 0)
                         {
                             ctx.Status("Updating resources...");
-                            ApplyResourceChanges(projectDirectory, remoteResources, conflicts, cancellationToken);
+                            ApplyResourceChanges(projectDirectory, pullResponse.Files, conflicts, cancellationToken);
                         }
                     });
+
+                // Update sync state with pulled files
+                var syncStateFiles = new Dictionary<string, string>();
+                foreach (var file in pullResponse.Files)
+                {
+                    syncStateFiles[file.Path] = file.Hash ?? ComputeHash(file.Content);
+                }
+
+                var newSyncState = new Core.Cloud.Models.SyncState
+                {
+                    Timestamp = DateTime.UtcNow,
+                    ConfigHash = pullResponse.Configuration != null ? ComputeHash(pullResponse.Configuration) : null,
+                    Files = syncStateFiles
+                };
+
+                Core.Cloud.SyncStateManager.SaveAsync(projectDirectory, newSyncState, cancellationToken).GetAwaiter().GetResult();
 
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine("[green bold]✓ Pull completed successfully![/]");
@@ -325,20 +328,20 @@ public class PullCommand : Command<PullCommandSettings>
         }
     }
 
-    private List<ResourceFile> GetLocalResources(PullCommandSettings settings, string projectDirectory)
+    private List<FileDto> GetLocalResources(PullCommandSettings settings, string projectDirectory)
     {
         var languages = settings.DiscoverLanguages();
-        var localResources = new List<ResourceFile>();
+        var localResources = new List<FileDto>();
 
         foreach (var lang in languages)
         {
-            var resourceFile = settings.ReadResourceFile(lang);
-            var content = SerializeResourceFile(resourceFile);
+            var relativePath = GetRelativePath(lang.FilePath, projectDirectory);
+            var content = File.ReadAllText(lang.FilePath);  // Read raw file content
             var hash = ComputeHash(content);
 
-            localResources.Add(new ResourceFile
+            localResources.Add(new FileDto
             {
-                Path = GetRelativePath(lang.FilePath, projectDirectory),
+                Path = relativePath,
                 Content = content,
                 Hash = hash
             });
@@ -433,7 +436,7 @@ public class PullCommand : Command<PullCommandSettings>
 
     private void ApplyResourceChanges(
         string projectDirectory,
-        List<ResourceFile> remoteResources,
+        List<FileDto> remoteResources,
         List<ConflictDetector.Conflict> conflicts,
         CancellationToken cancellationToken)
     {
@@ -457,7 +460,7 @@ public class PullCommand : Command<PullCommandSettings>
                 Directory.CreateDirectory(directory);
             }
 
-            // Write resource content
+            // Write raw file content (preserves original format)
             File.WriteAllText(fullPath, resource.Content);
         }
     }
@@ -472,12 +475,6 @@ public class PullCommand : Command<PullCommandSettings>
             "abort" => ConflictDetector.ResolutionStrategy.Abort,
             _ => null
         };
-    }
-
-    private string SerializeResourceFile(Core.Models.ResourceFile resourceFile)
-    {
-        var entries = resourceFile.Entries.ToDictionary(e => e.Key, e => e.Value);
-        return JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
     }
 
     private string GetRelativePath(string fullPath, string projectDirectory)
