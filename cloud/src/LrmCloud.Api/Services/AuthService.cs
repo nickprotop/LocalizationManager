@@ -81,47 +81,65 @@ public class AuthService : IAuthService
 
     private async Task SendVerificationEmailAsync(User user, string plainToken)
     {
-        var verificationLink = $"{_config.Server.BaseUrl}/verify-email?token={plainToken}&email={Uri.EscapeDataString(user.Email!)}";
-
-        var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "EmailVerification.html");
-        var templateText = await File.ReadAllTextAsync(templatePath);
-        var template = Template.Parse(templateText);
-
-        var html = await template.RenderAsync(new
+        try
         {
-            username = user.Username,
-            verification_link = verificationLink
-        });
+            var verificationLink = $"{_config.Server.BaseUrl}/verify-email?token={plainToken}&email={Uri.EscapeDataString(user.Email!)}";
 
-        await _mailService.TrySendEmailAsync(
-            _logger,
-            to: user.Email!,
-            subject: "Verify your LRM Cloud email address",
-            htmlBody: html
-        );
+            var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "EmailVerification.html");
+            var templateText = await File.ReadAllTextAsync(templatePath);
+            var template = Template.Parse(templateText);
+
+            var html = await template.RenderAsync(new
+            {
+                username = user.Username,
+                verification_link = verificationLink
+            });
+
+            await _mailService.TrySendEmailAsync(
+                _logger,
+                to: user.Email!,
+                subject: "Verify your LRM Cloud email address",
+                htmlBody: html
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to send verification email to {Email}. User registration succeeded but email notification failed.",
+                user.Email);
+        }
     }
 
     private async Task SendAccountExistsEmailAsync(string email)
     {
-        var loginLink = $"{_config.Server.BaseUrl}/login";
-        var resetLink = $"{_config.Server.BaseUrl}/forgot-password";
-
-        var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "AccountExists.html");
-        var templateText = await File.ReadAllTextAsync(templatePath);
-        var template = Template.Parse(templateText);
-
-        var html = await template.RenderAsync(new
+        try
         {
-            email = email,
-            login_link = loginLink,
-            reset_link = resetLink
-        });
+            var loginLink = $"{_config.Server.BaseUrl}/login";
+            var resetLink = $"{_config.Server.BaseUrl}/forgot-password";
 
-        await _mailService.TrySendEmailAsync(_logger, 
-            to: email,
-            subject: "LRM Cloud registration attempt",
-            htmlBody: html
-        );
+            var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "AccountExists.html");
+            var templateText = await File.ReadAllTextAsync(templatePath);
+            var template = Template.Parse(templateText);
+
+            var html = await template.RenderAsync(new
+            {
+                email = email,
+                login_link = loginLink,
+                reset_link = resetLink
+            });
+
+            await _mailService.TrySendEmailAsync(_logger,
+                to: email,
+                subject: "LRM Cloud registration attempt",
+                htmlBody: html
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to send account exists email to {Email}. Registration handling succeeded but email notification failed.",
+                email);
+        }
     }
 
     public async Task<(bool Success, string? ErrorMessage)> VerifyEmailAsync(string email, string token)
@@ -199,23 +217,32 @@ public class AuthService : IAuthService
 
     private async Task SendPasswordResetEmailAsync(User user, string plainToken)
     {
-        var resetLink = $"{_config.Server.BaseUrl}/reset-password?token={plainToken}&email={Uri.EscapeDataString(user.Email!)}";
-
-        var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "PasswordReset.html");
-        var templateText = await File.ReadAllTextAsync(templatePath);
-        var template = Template.Parse(templateText);
-
-        var html = await template.RenderAsync(new
+        try
         {
-            username = user.Username,
-            reset_link = resetLink
-        });
+            var resetLink = $"{_config.Server.BaseUrl}/reset-password?token={plainToken}&email={Uri.EscapeDataString(user.Email!)}";
 
-        await _mailService.TrySendEmailAsync(_logger, 
-            to: user.Email!,
-            subject: "Reset your LRM Cloud password",
-            htmlBody: html
-        );
+            var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "PasswordReset.html");
+            var templateText = await File.ReadAllTextAsync(templatePath);
+            var template = Template.Parse(templateText);
+
+            var html = await template.RenderAsync(new
+            {
+                username = user.Username,
+                reset_link = resetLink
+            });
+
+            await _mailService.TrySendEmailAsync(_logger,
+                to: user.Email!,
+                subject: "Reset your LRM Cloud password",
+                htmlBody: html
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to send password reset email to {Email}. Password reset token generated but email notification failed.",
+                user.Email);
+        }
     }
 
     public async Task<(bool Success, string? ErrorMessage)> ResetPasswordAsync(ResetPasswordRequest request)
@@ -260,23 +287,32 @@ public class AuthService : IAuthService
 
     private async Task SendPasswordResetSuccessEmailAsync(User user)
     {
-        var loginLink = $"{_config.Server.BaseUrl}/login";
-
-        var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "PasswordResetSuccess.html");
-        var templateText = await File.ReadAllTextAsync(templatePath);
-        var template = Template.Parse(templateText);
-
-        var html = await template.RenderAsync(new
+        try
         {
-            username = user.Username,
-            login_link = loginLink
-        });
+            var loginLink = $"{_config.Server.BaseUrl}/login";
 
-        await _mailService.TrySendEmailAsync(_logger, 
-            to: user.Email!,
-            subject: "Your LRM Cloud password has been changed",
-            htmlBody: html
-        );
+            var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "PasswordResetSuccess.html");
+            var templateText = await File.ReadAllTextAsync(templatePath);
+            var template = Template.Parse(templateText);
+
+            var html = await template.RenderAsync(new
+            {
+                username = user.Username,
+                login_link = loginLink
+            });
+
+            await _mailService.TrySendEmailAsync(_logger,
+                to: user.Email!,
+                subject: "Your LRM Cloud password has been changed",
+                htmlBody: html
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to send password reset confirmation email to {Email}. Password was changed but email notification failed.",
+                user.Email);
+        }
     }
 
     public async Task<(bool Success, LoginResponse? Response, string? ErrorMessage)> LoginAsync(LoginRequest request, string? ipAddress = null)
@@ -784,10 +820,12 @@ public class AuthService : IAuthService
 
     private async Task SendNewEmailVerificationAsync(User user, string newEmail, string token)
     {
-        var verificationLink = $"{_config.Server.BaseUrl}/verify-new-email?token={Uri.EscapeDataString(token)}";
+        try
+        {
+            var verificationLink = $"{_config.Server.BaseUrl}/verify-new-email?token={Uri.EscapeDataString(token)}";
 
-        var subject = "Verify Your New Email Address";
-        var htmlBody = $@"
+            var subject = "Verify Your New Email Address";
+            var htmlBody = $@"
 <!DOCTYPE html>
 <html>
 <head>
@@ -817,13 +855,22 @@ public class AuthService : IAuthService
 </body>
 </html>";
 
-        await _mailService.TrySendEmailAsync(_logger, newEmail, subject, htmlBody);
+            await _mailService.TrySendEmailAsync(_logger, newEmail, subject, htmlBody);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to send new email verification to {NewEmail}. Email change request recorded but email notification failed.",
+                newEmail);
+        }
     }
 
     private async Task SendEmailChangeNotificationAsync(User user, string newEmail)
     {
-        var subject = "Email Change Request";
-        var htmlBody = $@"
+        try
+        {
+            var subject = "Email Change Request";
+            var htmlBody = $@"
 <!DOCTYPE html>
 <html>
 <head>
@@ -851,13 +898,22 @@ public class AuthService : IAuthService
 </body>
 </html>";
 
-        await _mailService.TrySendEmailAsync(_logger, user.Email!, subject, htmlBody);
+            await _mailService.TrySendEmailAsync(_logger, user.Email!, subject, htmlBody);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to send email change notification to old email {OldEmail}. Email change request recorded but notification to old address failed.",
+                user.Email);
+        }
     }
 
     private async Task SendEmailChangeSuccessAsync(User user)
     {
-        var subject = "Email Address Changed Successfully";
-        var htmlBody = $@"
+        try
+        {
+            var subject = "Email Address Changed Successfully";
+            var htmlBody = $@"
 <!DOCTYPE html>
 <html>
 <head>
@@ -884,7 +940,14 @@ public class AuthService : IAuthService
 </body>
 </html>";
 
-        await _mailService.TrySendEmailAsync(_logger, user.Email!, subject, htmlBody);
+            await _mailService.TrySendEmailAsync(_logger, user.Email!, subject, htmlBody);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to send email change success confirmation to {NewEmail}. Email was changed but confirmation email failed.",
+                user.Email);
+        }
     }
 
     // ============================================================================
@@ -1042,8 +1105,10 @@ public class AuthService : IAuthService
         if (string.IsNullOrEmpty(user.Email))
             return;
 
-        var subject = "Your account has been deleted";
-        var body = $@"
+        try
+        {
+            var subject = "Your account has been deleted";
+            var body = $@"
 <!DOCTYPE html>
 <html>
 <head>
@@ -1090,6 +1155,13 @@ public class AuthService : IAuthService
 </body>
 </html>";
 
-        await _mailService.TrySendEmailAsync(_logger, user.Email, subject, body);
+            await _mailService.TrySendEmailAsync(_logger, user.Email, subject, body);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to send account deletion confirmation to {Email}. Account was deleted but confirmation email failed.",
+                user.Email);
+        }
     }
 }

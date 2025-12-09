@@ -3,6 +3,7 @@ using LrmCloud.Api.Services;
 using LrmCloud.Shared.Api;
 using LrmCloud.Shared.DTOs.Projects;
 using LrmCloud.Shared.DTOs.Resources;
+using LrmCloud.Shared.DTOs.Sync;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -127,16 +128,16 @@ public class UserProjectsController : ApiControllerBase
     }
 
     /// <summary>
-    /// Push resources to the project.
+    /// Push files to the project with incremental changes.
     /// </summary>
-    [HttpPost("resources/push")]
-    [ProducesResponseType(typeof(ApiResponse<PushResourcesResponse>), 200)]
+    [HttpPost("sync/push")]
+    [ProducesResponseType(typeof(ApiResponse<PushResponse>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 400)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
-    public async Task<ActionResult<ApiResponse<PushResourcesResponse>>> PushResources(
+    public async Task<ActionResult<ApiResponse<PushResponse>>> PushFiles(
         string username,
         string projectName,
-        [FromBody] PushResourcesRequest request)
+        [FromBody] PushRequest request)
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var project = await _projectService.GetProjectByNameAsync(username, projectName, userId);
@@ -149,8 +150,32 @@ public class UserProjectsController : ApiControllerBase
         if (!success)
             return BadRequest("RES_PUSH_FAILED", errorMessage!);
 
-        _logger.LogInformation("User {UserId} pushed {Count} resources to project {ProjectId}", userId, request.Resources.Count, project.Id);
-        return Success(response!);
+        _logger.LogInformation("User {UserId} pushed {ModifiedCount} modified and {DeletedCount} deleted files to project {ProjectId}",
+            userId, response!.ModifiedCount, response.DeletedCount, project.Id);
+        return Success(response);
+    }
+
+    /// <summary>
+    /// Pull files from the project - generates files from database.
+    /// </summary>
+    [HttpGet("sync/pull")]
+    [ProducesResponseType(typeof(ApiResponse<PullResponse>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<PullResponse>>> PullFiles(string username, string projectName)
+    {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var project = await _projectService.GetProjectByNameAsync(username, projectName, userId);
+
+        if (project == null)
+            return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
+
+        var (success, response, errorMessage) = await _resourceService.PullResourcesAsync(project.Id, userId);
+
+        if (!success)
+            return BadRequest("RES_PULL_FAILED", errorMessage!);
+
+        _logger.LogInformation("User {UserId} pulled {Count} files from project {ProjectId}", userId, response!.Files.Count, project.Id);
+        return Success(response);
     }
 
     /// <summary>
