@@ -29,11 +29,11 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
             var projectDirectory = settings.GetResourcePath();
             var format = settings.GetOutputFormat();
 
-            // Load current configuration
-            var config = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(projectDirectory).GetAwaiter().GetResult();
+            // Load remotes configuration
+            var remotesConfig = Core.Configuration.ConfigurationManager.LoadRemotesConfigurationAsync(projectDirectory).GetAwaiter().GetResult();
 
-            // Check if cloud configuration exists
-            if (config.Cloud == null || string.IsNullOrWhiteSpace(config.Cloud.Remote))
+            // Check if remote is configured
+            if (string.IsNullOrWhiteSpace(remotesConfig.Remote))
             {
                 if (format == Core.Enums.OutputFormat.Json)
                 {
@@ -49,21 +49,21 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
             }
 
             // Parse the remote URL
-            if (!RemoteUrlParser.TryParse(config.Cloud.Remote, out var remoteUrl))
+            if (!RemoteUrlParser.TryParse(remotesConfig.Remote, out var remoteUrl))
             {
                 if (format == Core.Enums.OutputFormat.Json)
                 {
                     Console.WriteLine(OutputFormatter.FormatJson(new
                     {
-                        remote = config.Cloud.Remote,
-                        enabled = config.Cloud.Enabled,
+                        remote = remotesConfig.Remote,
+                        enabled = remotesConfig.Enabled,
                         configured = true,
                         error = "Invalid URL format"
                     }));
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL:[/] {config.Cloud.Remote.EscapeMarkup()}");
+                    AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL:[/] {remotesConfig.Remote.EscapeMarkup()}");
                 }
                 return 1;
             }
@@ -72,14 +72,14 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
             switch (format)
             {
                 case Core.Enums.OutputFormat.Json:
-                    DisplayJson(remoteUrl!, config.Cloud);
+                    DisplayJson(remoteUrl!, remotesConfig);
                     break;
                 case Core.Enums.OutputFormat.Simple:
-                    DisplaySimple(remoteUrl!, config.Cloud);
+                    DisplaySimple(remoteUrl!, remotesConfig);
                     break;
                 case Core.Enums.OutputFormat.Table:
                 default:
-                    DisplayTable(remoteUrl!, config.Cloud);
+                    DisplayTable(remoteUrl!, remotesConfig);
                     break;
             }
 
@@ -92,7 +92,7 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
         }
     }
 
-    private void DisplayTable(RemoteUrl remoteUrl, CloudConfiguration cloudConfig)
+    private void DisplayTable(RemoteUrl remoteUrl, RemotesConfiguration remotesConfig)
     {
         AnsiConsole.MarkupLine("[blue]Remote Configuration:[/]");
         AnsiConsole.WriteLine();
@@ -116,13 +116,13 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
         table.AddRow("API Base URL", remoteUrl.ApiBaseUrl.EscapeMarkup());
         table.AddRow("Project API URL", remoteUrl.ProjectApiUrl.EscapeMarkup());
 
-        var statusColor = cloudConfig.Enabled ? "green" : "yellow";
-        var statusText = cloudConfig.Enabled ? "Enabled" : "Disabled";
+        var statusColor = remotesConfig.Enabled ? "green" : "yellow";
+        var statusText = remotesConfig.Enabled ? "Enabled" : "Disabled";
         table.AddRow("Status", $"[{statusColor}]{statusText}[/]");
 
         AnsiConsole.Write(table);
 
-        if (!cloudConfig.Enabled)
+        if (!remotesConfig.Enabled)
         {
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("[yellow]💡 Use 'lrm remote set <url> --enable' to enable cloud synchronization[/]");
@@ -136,7 +136,7 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
         }
     }
 
-    private void DisplaySimple(RemoteUrl remoteUrl, CloudConfiguration cloudConfig)
+    private void DisplaySimple(RemoteUrl remoteUrl, RemotesConfiguration remotesConfig)
     {
         Console.WriteLine($"Remote URL: {remoteUrl}");
         Console.WriteLine($"Type: {(remoteUrl.IsPersonalProject ? $"Personal (@{remoteUrl.Username})" : $"Organization ({remoteUrl.Organization})")}");
@@ -149,10 +149,10 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
         }
         Console.WriteLine($"API Base URL: {remoteUrl.ApiBaseUrl}");
         Console.WriteLine($"Project API URL: {remoteUrl.ProjectApiUrl}");
-        Console.WriteLine($"Status: {(cloudConfig.Enabled ? "Enabled" : "Disabled")}");
+        Console.WriteLine($"Status: {(remotesConfig.Enabled ? "Enabled" : "Disabled")}");
     }
 
-    private void DisplayJson(RemoteUrl remoteUrl, CloudConfiguration cloudConfig)
+    private void DisplayJson(RemoteUrl remoteUrl, RemotesConfiguration remotesConfig)
     {
         var output = new
         {
@@ -165,7 +165,7 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
             protocol = remoteUrl.UseHttps ? "https" : "http",
             apiBaseUrl = remoteUrl.ApiBaseUrl,
             projectApiUrl = remoteUrl.ProjectApiUrl,
-            enabled = cloudConfig.Enabled,
+            enabled = remotesConfig.Enabled,
             configured = true
         };
 

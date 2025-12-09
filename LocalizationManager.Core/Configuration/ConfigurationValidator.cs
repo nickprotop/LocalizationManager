@@ -1,8 +1,6 @@
 // Copyright (c) 2025 Nikolaos Protopapas
 // Licensed under the MIT License
 
-using LocalizationManager.Core.Cloud;
-
 namespace LocalizationManager.Core.Configuration;
 
 /// <summary>
@@ -38,7 +36,6 @@ public class ConfigurationValidator
         var result = new ValidationResult();
 
         ValidateResourceFormat(config, result);
-        ValidateCloudConfiguration(config, result);
         ValidateTranslationConfiguration(config, result);
         ValidateValidationConfiguration(config, result);
 
@@ -107,60 +104,6 @@ public class ConfigurationValidator
             if (resxFiles.Length > 0)
             {
                 result.AddWarning($"ResourceFormat is 'json' but {resxFiles.Length} .resx files found. Consider migration.");
-            }
-        }
-
-        return result;
-    }
-
-    /// <summary>
-    /// Validates cloud synchronization configuration.
-    /// </summary>
-    public ValidationResult ValidateCloudConfiguration(ConfigurationModel config, ValidationResult? result = null)
-    {
-        result ??= new ValidationResult();
-
-        if (config.Cloud == null)
-        {
-            return result; // Cloud sync not configured - that's valid
-        }
-
-        // If cloud sync is enabled, remote URL must be set
-        if (config.Cloud.Enabled && string.IsNullOrWhiteSpace(config.Cloud.Remote))
-        {
-            result.AddError("Cloud synchronization is enabled but Remote URL is not set.");
-            return result;
-        }
-
-        // Validate remote URL format if set
-        if (!string.IsNullOrWhiteSpace(config.Cloud.Remote))
-        {
-            if (!RemoteUrlParser.TryParse(config.Cloud.Remote, out var remoteUrl))
-            {
-                result.AddError($"Invalid Remote URL format: '{config.Cloud.Remote}'. Expected: https://host/org/project or https://host/@username/project");
-            }
-            else
-            {
-                // Validate HTTPS for non-localhost
-                if (!remoteUrl!.UseHttps && !IsLocalhost(remoteUrl.Host))
-                {
-                    result.AddWarning($"Remote URL uses HTTP instead of HTTPS. This is insecure for non-localhost connections.");
-                }
-            }
-        }
-
-        // Validate sync configuration
-        if (config.Cloud.Sync != null)
-        {
-            var mode = config.Cloud.Sync.Mode?.ToLowerInvariant();
-            if (mode != null && mode != "manual" && mode != "auto")
-            {
-                result.AddError($"Invalid Sync.Mode: '{config.Cloud.Sync.Mode}'. Must be 'manual' or 'auto'.");
-            }
-
-            if (config.Cloud.Sync.Paths == null || config.Cloud.Sync.Paths.Count == 0)
-            {
-                result.AddWarning("Sync.Paths is empty. No files will be synchronized.");
             }
         }
 
@@ -280,14 +223,5 @@ public class ConfigurationValidator
         }
 
         return result;
-    }
-
-    /// <summary>
-    /// Checks if a hostname is localhost.
-    /// </summary>
-    private static bool IsLocalhost(string host)
-    {
-        var lower = host.ToLowerInvariant();
-        return lower == "localhost" || lower == "127.0.0.1" || lower == "::1";
     }
 }

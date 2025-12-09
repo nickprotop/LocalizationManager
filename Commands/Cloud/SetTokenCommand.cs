@@ -42,9 +42,9 @@ public class SetTokenCommand : Command<SetTokenCommandSettings>
 
             if (string.IsNullOrWhiteSpace(host))
             {
-                var config = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
+                var remotesConfig = Core.Configuration.ConfigurationManager.LoadRemotesConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
 
-                if (config.Cloud == null || string.IsNullOrWhiteSpace(config.Cloud.Remote))
+                if (string.IsNullOrWhiteSpace(remotesConfig.Remote))
                 {
                     AnsiConsole.MarkupLine("[red]✗ No remote URL configured and --host not provided![/]");
                     AnsiConsole.WriteLine();
@@ -53,9 +53,9 @@ public class SetTokenCommand : Command<SetTokenCommandSettings>
                     return 1;
                 }
 
-                if (!RemoteUrlParser.TryParse(config.Cloud.Remote, out var remoteUrl))
+                if (!RemoteUrlParser.TryParse(remotesConfig.Remote, out var remoteUrl))
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL in configuration:[/] {config.Cloud.Remote.EscapeMarkup()}");
+                    AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL in configuration:[/] {remotesConfig.Remote.EscapeMarkup()}");
                     return 1;
                 }
 

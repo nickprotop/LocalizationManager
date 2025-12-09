@@ -27,11 +27,11 @@ public class StatusCommand : Command<StatusCommandSettings>
             var projectDirectory = settings.GetResourcePath();
             var format = settings.GetOutputFormat();
 
-            // Load configuration
-            var config = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
+            // Load remotes configuration
+            var remotesConfig = Core.Configuration.ConfigurationManager.LoadRemotesConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
 
-            // Check if cloud is configured
-            if (config.Cloud == null || string.IsNullOrWhiteSpace(config.Cloud.Remote))
+            // Check if remote is configured
+            if (string.IsNullOrWhiteSpace(remotesConfig.Remote))
             {
                 if (format == Core.Enums.OutputFormat.Json)
                 {
@@ -47,7 +47,7 @@ public class StatusCommand : Command<StatusCommandSettings>
             }
 
             // Parse remote URL
-            if (!RemoteUrlParser.TryParse(config.Cloud.Remote, out var remoteUrl))
+            if (!RemoteUrlParser.TryParse(remotesConfig.Remote, out var remoteUrl))
             {
                 if (format == Core.Enums.OutputFormat.Json)
                 {
@@ -55,7 +55,7 @@ public class StatusCommand : Command<StatusCommandSettings>
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL:[/] {config.Cloud.Remote.EscapeMarkup()}");
+                    AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL:[/] {remotesConfig.Remote.EscapeMarkup()}");
                 }
                 return 1;
             }
@@ -72,7 +72,7 @@ public class StatusCommand : Command<StatusCommandSettings>
                         configured = true,
                         authenticated = false,
                         remote = remoteUrl.ToString(),
-                        enabled = config.Cloud.Enabled
+                        enabled = remotesConfig.Enabled
                     }));
                 }
                 else
@@ -105,7 +105,7 @@ public class StatusCommand : Command<StatusCommandSettings>
                         configured = true,
                         authenticated = true,
                         remote = remoteUrl.ToString(),
-                        enabled = config.Cloud.Enabled,
+                        enabled = remotesConfig.Enabled,
                         error = ex.Message
                     }));
                 }
@@ -120,14 +120,14 @@ public class StatusCommand : Command<StatusCommandSettings>
             switch (format)
             {
                 case Core.Enums.OutputFormat.Json:
-                    DisplayJson(remoteUrl, config.Cloud, syncStatus);
+                    DisplayJson(remoteUrl, remotesConfig, syncStatus);
                     break;
                 case Core.Enums.OutputFormat.Simple:
-                    DisplaySimple(remoteUrl, config.Cloud, syncStatus);
+                    DisplaySimple(remoteUrl, remotesConfig, syncStatus);
                     break;
                 case Core.Enums.OutputFormat.Table:
                 default:
-                    DisplayTable(remoteUrl, config.Cloud, syncStatus);
+                    DisplayTable(remoteUrl, remotesConfig, syncStatus);
                     break;
             }
 
@@ -140,7 +140,7 @@ public class StatusCommand : Command<StatusCommandSettings>
         }
     }
 
-    private void DisplayTable(RemoteUrl remoteUrl, Core.Configuration.CloudConfiguration cloudConfig, SyncStatus syncStatus)
+    private void DisplayTable(RemoteUrl remoteUrl, Core.Configuration.RemotesConfiguration remotesConfig, SyncStatus syncStatus)
     {
         AnsiConsole.MarkupLine("[blue bold]Cloud Sync Status[/]");
         AnsiConsole.WriteLine();
@@ -153,8 +153,8 @@ public class StatusCommand : Command<StatusCommandSettings>
         table.AddRow("Remote URL", remoteUrl.ToString().EscapeMarkup());
         table.AddRow("Project", remoteUrl.ProjectName);
 
-        var statusColor = cloudConfig.Enabled ? "green" : "yellow";
-        var statusText = cloudConfig.Enabled ? "Enabled" : "Disabled";
+        var statusColor = remotesConfig.Enabled ? "green" : "yellow";
+        var statusText = remotesConfig.Enabled ? "Enabled" : "Disabled";
         table.AddRow("Status", $"[{statusColor}]{statusText}[/]");
 
         var syncColor = syncStatus.IsSynced ? "green" : "yellow";
@@ -197,11 +197,11 @@ public class StatusCommand : Command<StatusCommandSettings>
         }
     }
 
-    private void DisplaySimple(RemoteUrl remoteUrl, Core.Configuration.CloudConfiguration cloudConfig, SyncStatus syncStatus)
+    private void DisplaySimple(RemoteUrl remoteUrl, Core.Configuration.RemotesConfiguration remotesConfig, SyncStatus syncStatus)
     {
         Console.WriteLine($"Remote URL: {remoteUrl}");
         Console.WriteLine($"Project: {remoteUrl.ProjectName}");
-        Console.WriteLine($"Status: {(cloudConfig.Enabled ? "Enabled" : "Disabled")}");
+        Console.WriteLine($"Status: {(remotesConfig.Enabled ? "Enabled" : "Disabled")}");
         Console.WriteLine($"Sync: {(syncStatus.IsSynced ? "In sync" : "Out of sync")}");
 
         if (syncStatus.LastPush.HasValue)
@@ -225,7 +225,7 @@ public class StatusCommand : Command<StatusCommandSettings>
         }
     }
 
-    private void DisplayJson(RemoteUrl remoteUrl, Core.Configuration.CloudConfiguration cloudConfig, SyncStatus syncStatus)
+    private void DisplayJson(RemoteUrl remoteUrl, Core.Configuration.RemotesConfiguration remotesConfig, SyncStatus syncStatus)
     {
         var output = new
         {
@@ -233,7 +233,7 @@ public class StatusCommand : Command<StatusCommandSettings>
             authenticated = true,
             remote = remoteUrl.ToString(),
             project = remoteUrl.ProjectName,
-            enabled = cloudConfig.Enabled,
+            enabled = remotesConfig.Enabled,
             synced = syncStatus.IsSynced,
             lastPush = syncStatus.LastPush,
             lastPull = syncStatus.LastPull,

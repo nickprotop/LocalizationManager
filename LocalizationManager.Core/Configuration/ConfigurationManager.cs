@@ -14,6 +14,7 @@ public static class ConfigurationManager
     private const string DefaultConfigFileName = "lrm.json";
     private const string PersonalConfigDirectory = ".lrm";
     private const string PersonalConfigFileName = "config.json";
+    private const string RemotesFileName = "remotes.json";
 
     private static readonly JsonSerializerOptions ReadOptions = new()
     {
@@ -87,7 +88,7 @@ public static class ConfigurationManager
     }
 
     /// <summary>
-    /// Loads configuration with hybrid support (team + personal overrides).
+    /// Loads configuration with hybrid support (team + personal overrides + remotes).
     /// </summary>
     public static async Task<ConfigurationModel> LoadConfigurationAsync(
         string projectDirectory,
@@ -103,12 +104,11 @@ public static class ConfigurationManager
         var personalConfig = await LoadPersonalConfigurationAsync(projectDirectory, cancellationToken);
 
         // Merge: personal overrides team
-        if (personalConfig != null)
-        {
-            return MergeConfigurations(teamConfig, personalConfig);
-        }
+        var mergedConfig = personalConfig != null
+            ? MergeConfigurations(teamConfig, personalConfig)
+            : teamConfig;
 
-        return teamConfig;
+        return mergedConfig;
     }
 
     /// <summary>
@@ -200,6 +200,58 @@ public static class ConfigurationManager
     }
 
     /// <summary>
+    /// Loads remotes configuration from .lrm/remotes.json with fallback to lrm.json cloud settings.
+    /// </summary>
+    public static async Task<RemotesConfiguration> LoadRemotesConfigurationAsync(
+        string projectDirectory,
+        CancellationToken cancellationToken = default)
+    {
+        // First, try to load from .lrm/remotes.json
+        var remotesPath = Path.Combine(projectDirectory, PersonalConfigDirectory, RemotesFileName);
+        if (File.Exists(remotesPath))
+        {
+            try
+            {
+                var json = await File.ReadAllTextAsync(remotesPath, cancellationToken);
+                var remotes = JsonSerializer.Deserialize<RemotesConfiguration>(json, ReadOptions);
+                if (remotes != null)
+                {
+                    return remotes;
+                }
+            }
+            catch (JsonException ex)
+            {
+                throw new ConfigurationException($"Failed to parse {RemotesFileName}: {ex.Message}", ex);
+            }
+        }
+
+        // No remote configured
+        return new RemotesConfiguration();
+    }
+
+    /// <summary>
+    /// Saves remotes configuration to .lrm/remotes.json.
+    /// </summary>
+    public static async Task SaveRemotesConfigurationAsync(
+        string projectDirectory,
+        RemotesConfiguration remotes,
+        CancellationToken cancellationToken = default)
+    {
+        if (remotes == null)
+            throw new ArgumentNullException(nameof(remotes));
+
+        var directory = Path.Combine(projectDirectory, PersonalConfigDirectory);
+        if (!Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var path = Path.Combine(directory, RemotesFileName);
+        var json = JsonSerializer.Serialize(remotes, WriteOptions);
+        await File.WriteAllTextAsync(path, json, cancellationToken);
+    }
+
+    /// <summary>
     /// Ensures .lrm directory is in .gitignore.
     /// </summary>
     public static async Task EnsureGitIgnoreAsync(
@@ -241,8 +293,7 @@ public static class ConfigurationManager
             Scanning = personal.Scanning ?? team.Scanning,
             Validation = personal.Validation ?? team.Validation,
             Web = personal.Web ?? team.Web,
-            Json = personal.Json ?? team.Json,
-            Cloud = personal.Cloud ?? team.Cloud // Personal cloud config overrides team
+            Json = personal.Json ?? team.Json
         };
     }
 }

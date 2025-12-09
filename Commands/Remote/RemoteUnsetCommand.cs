@@ -30,17 +30,17 @@ public class RemoteUnsetCommand : Command<RemoteUnsetCommandSettings>
         {
             var projectDirectory = settings.GetResourcePath();
 
-            // Load current configuration
-            var config = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(projectDirectory).GetAwaiter().GetResult();
+            // Load remotes configuration
+            var remotesConfig = Core.Configuration.ConfigurationManager.LoadRemotesConfigurationAsync(projectDirectory).GetAwaiter().GetResult();
 
-            // Check if cloud configuration exists
-            if (config.Cloud == null || string.IsNullOrWhiteSpace(config.Cloud.Remote))
+            // Check if remote is configured
+            if (string.IsNullOrWhiteSpace(remotesConfig.Remote))
             {
                 AnsiConsole.MarkupLine("[yellow]No remote URL configured[/]");
                 return 0;
             }
 
-            var remoteUrl = config.Cloud.Remote;
+            var remoteUrl = remotesConfig.Remote;
 
             // Ask for confirmation unless --yes is provided
             if (!settings.SkipConfirmation)
@@ -56,12 +56,12 @@ public class RemoteUnsetCommand : Command<RemoteUnsetCommandSettings>
                 }
             }
 
-            // Clear cloud configuration
-            config.Cloud.Remote = null;
-            config.Cloud.Enabled = false;
+            // Clear remotes configuration
+            remotesConfig.Remote = null;
+            remotesConfig.Enabled = false;
 
             // Save configuration
-            Core.Configuration.ConfigurationManager.SaveTeamConfigurationAsync(projectDirectory, config).GetAwaiter().GetResult();
+            Core.Configuration.ConfigurationManager.SaveRemotesConfigurationAsync(projectDirectory, remotesConfig).GetAwaiter().GetResult();
 
             AnsiConsole.MarkupLine("[green]✓ Remote URL removed[/]");
             AnsiConsole.WriteLine();

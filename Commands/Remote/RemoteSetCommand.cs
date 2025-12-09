@@ -51,17 +51,11 @@ public class RemoteSetCommand : Command<RemoteSetCommandSettings>
                 return 1;
             }
 
-            // Load current configuration
-            var config = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(projectDirectory).GetAwaiter().GetResult();
-
-            // Initialize cloud configuration if not present
-            if (config.Cloud == null)
-            {
-                config.Cloud = new CloudConfiguration();
-            }
+            // Load current remotes configuration
+            var remotesConfig = Core.Configuration.ConfigurationManager.LoadRemotesConfigurationAsync(projectDirectory).GetAwaiter().GetResult();
 
             // Set the remote URL
-            config.Cloud.Remote = remoteUrl!.ToString();
+            remotesConfig.Remote = remoteUrl!.ToString();
 
             // Handle enable/disable flags
             if (settings.Enable && settings.Disable)
@@ -72,15 +66,20 @@ public class RemoteSetCommand : Command<RemoteSetCommandSettings>
 
             if (settings.Enable)
             {
-                config.Cloud.Enabled = true;
+                remotesConfig.Enabled = true;
             }
             else if (settings.Disable)
             {
-                config.Cloud.Enabled = false;
+                remotesConfig.Enabled = false;
+            }
+            else
+            {
+                // Default: enable when setting a remote
+                remotesConfig.Enabled = true;
             }
 
-            // Save configuration
-            Core.Configuration.ConfigurationManager.SaveTeamConfigurationAsync(projectDirectory, config).GetAwaiter().GetResult();
+            // Save remotes configuration to .lrm/remotes.json
+            Core.Configuration.ConfigurationManager.SaveRemotesConfigurationAsync(projectDirectory, remotesConfig).GetAwaiter().GetResult();
 
             // Display success message
             AnsiConsole.MarkupLine($"[green]✓ Remote URL set to:[/] {remoteUrl.ToString().EscapeMarkup()}");
@@ -96,11 +95,12 @@ public class RemoteSetCommand : Command<RemoteSetCommandSettings>
 
             AnsiConsole.MarkupLine($"[dim]  Project: {remoteUrl.ProjectName}[/]");
             AnsiConsole.MarkupLine($"[dim]  API URL: {remoteUrl.ApiBaseUrl.EscapeMarkup()}[/]");
+            AnsiConsole.MarkupLine($"[dim]  Saved to: .lrm/remotes.json[/]");
 
-            var statusText = config.Cloud.Enabled ? "[green]enabled[/]" : "[yellow]disabled[/]";
+            var statusText = remotesConfig.Enabled ? "[green]enabled[/]" : "[yellow]disabled[/]";
             AnsiConsole.MarkupLine($"[dim]  Status: Cloud sync is {statusText}[/]");
 
-            if (!config.Cloud.Enabled)
+            if (!remotesConfig.Enabled)
             {
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine("[yellow]💡 Use 'lrm remote set <url> --enable' to enable cloud synchronization[/]");

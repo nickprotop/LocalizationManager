@@ -45,11 +45,6 @@ public class ConfigurationModel
     /// Only applicable when ResourceFormat is "json".
     /// </summary>
     public JsonFormatConfiguration? Json { get; set; }
-
-    /// <summary>
-    /// Cloud synchronization configuration settings.
-    /// </summary>
-    public CloudConfiguration? Cloud { get; set; }
 }
 
 /// <summary>
@@ -561,31 +556,21 @@ public class JsonFormatConfiguration
 }
 
 /// <summary>
-/// Configuration settings for cloud synchronization.
+/// Configuration for cloud remotes stored in .lrm/remotes.json
+/// Separates deployment/cloud settings from project configuration.
 /// </summary>
-public class CloudConfiguration
+public class RemotesConfiguration
 {
     /// <summary>
-    /// Remote URL for cloud synchronization (e.g., "https://lrm.cloud/my-org/my-project").
-    /// Format: https://host[:port]/[org-or-@username]/project-name
-    /// Examples:
-    /// - "https://lrm.cloud/acme-corp/mobile-app" (organization project)
-    /// - "https://lrm.cloud/@john/personal-project" (personal project)
-    /// - "https://staging.lrm.cloud/acme-corp/mobile-app" (staging environment)
-    /// - "https://self-hosted.example.com:8080/team/api" (self-hosted instance)
+    /// The active remote URL for cloud synchronization.
     /// </summary>
     public string? Remote { get; set; }
 
     /// <summary>
-    /// Whether cloud synchronization is enabled for this project.
-    /// Default: false
+    /// Whether cloud synchronization is enabled.
+    /// Default: true
     /// </summary>
-    public bool Enabled { get; set; } = false;
-
-    /// <summary>
-    /// Synchronization settings.
-    /// </summary>
-    public SyncConfiguration? Sync { get; set; }
+    public bool Enabled { get; set; } = true;
 }
 
 /// <summary>

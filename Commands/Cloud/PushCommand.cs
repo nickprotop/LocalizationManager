@@ -55,11 +55,11 @@ public class PushCommand : Command<PushCommandSettings>
             AnsiConsole.MarkupLine("[blue]Preparing to push to cloud...[/]");
             AnsiConsole.WriteLine();
 
-            // Load configuration
-            var config = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
+            // Load remotes configuration
+            var remotesConfig = Core.Configuration.ConfigurationManager.LoadRemotesConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
 
-            // Validate cloud configuration
-            if (config.Cloud == null || string.IsNullOrWhiteSpace(config.Cloud.Remote))
+            // Validate remote configuration
+            if (string.IsNullOrWhiteSpace(remotesConfig.Remote))
             {
                 AnsiConsole.MarkupLine("[red]✗ No remote URL configured![/]");
                 AnsiConsole.WriteLine();
@@ -67,7 +67,7 @@ public class PushCommand : Command<PushCommandSettings>
                 return 1;
             }
 
-            if (!config.Cloud.Enabled)
+            if (!remotesConfig.Enabled)
             {
                 AnsiConsole.MarkupLine("[yellow]⚠ Cloud synchronization is disabled[/]");
                 AnsiConsole.WriteLine();
@@ -76,9 +76,9 @@ public class PushCommand : Command<PushCommandSettings>
             }
 
             // Parse remote URL
-            if (!RemoteUrlParser.TryParse(config.Cloud.Remote, out var remoteUrl))
+            if (!RemoteUrlParser.TryParse(remotesConfig.Remote, out var remoteUrl))
             {
-                AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL:[/] {config.Cloud.Remote.EscapeMarkup()}");
+                AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL:[/] {remotesConfig.Remote.EscapeMarkup()}");
                 return 1;
             }
 
@@ -92,7 +92,8 @@ public class PushCommand : Command<PushCommandSettings>
                 return 1;
             }
 
-            // Validate configuration
+            // Load and validate configuration (lrm.json)
+            var config = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
             var validator = new ConfigurationValidator(projectDirectory);
             var validationResult = validator.Validate(config);
 
