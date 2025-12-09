@@ -131,9 +131,13 @@ public class JsonResourceDiscovery : IResourceDiscovery
 
             foreach (var file in filesInGroup)
             {
-                // In standard format, empty culture code means default
-                var isDefault = string.IsNullOrEmpty(file!.Value.CultureCode);
-                var cultureCode = file.Value.CultureCode;
+                // In standard format, a file is default if:
+                // 1. It has no culture code (e.g., strings.json), OR
+                // 2. Its culture code matches the defaultLanguageCode from lrm.json
+                var cultureCode = file!.Value.CultureCode;
+                var isDefault = string.IsNullOrEmpty(cultureCode) ||
+                               (!string.IsNullOrEmpty(configDefaultLanguage) &&
+                                cultureCode.Equals(configDefaultLanguage, StringComparison.OrdinalIgnoreCase));
                 var displayName = isDefault ? "Default" : GetCultureDisplayName(cultureCode);
 
                 result.Add(new LanguageInfo

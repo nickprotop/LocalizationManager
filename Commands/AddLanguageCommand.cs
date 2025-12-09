@@ -5,6 +5,7 @@ using System.ComponentModel;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Models;
 
 namespace LocalizationManager.Commands;
 
@@ -106,36 +107,38 @@ public class AddLanguageCommand : Command<AddLanguageCommandSettings>
             // Step 4: Check if language already exists
             if (manager.LanguageFileExists(baseName, settings.Culture, settings.GetResourcePath()))
             {
+                var extension = settings.GetBackendExtension();
                 AnsiConsole.MarkupLine($"[red]✗ Language '{settings.Culture}' already exists[/]");
-                AnsiConsole.MarkupLine($"[grey]File: {baseName}.{settings.Culture}.resx[/]");
+                AnsiConsole.MarkupLine($"[grey]File: {baseName}.{settings.Culture}{extension}[/]");
                 AnsiConsole.MarkupLine($"[grey]Use 'lrm update' to modify existing languages[/]");
                 return 1;
             }
 
             // Step 5: Load source language file
-            string sourceCultureCode;
+            LanguageInfo? sourceLanguage;
             if (!string.IsNullOrEmpty(settings.CopyFrom))
             {
-                sourceCultureCode = settings.CopyFrom;
+                // Use specified source language
+                sourceLanguage = languages.FirstOrDefault(l =>
+                    l.BaseName == baseName && l.Code == settings.CopyFrom);
             }
             else
             {
-                // Use default language (no culture code)
-                sourceCultureCode = "";
+                // Use default language (detected via IsDefault flag)
+                sourceLanguage = languages.FirstOrDefault(l =>
+                    l.BaseName == baseName && l.IsDefault);
             }
 
-            var sourceLanguage = languages.FirstOrDefault(l =>
-                l.BaseName == baseName && l.Code == sourceCultureCode);
-
-            if (sourceLanguage == null && !settings.Empty)
+            if (sourceLanguage is null && !settings.Empty)
             {
+                var extension = settings.GetBackendExtension();
                 if (!string.IsNullOrEmpty(settings.CopyFrom))
                 {
                     AnsiConsole.MarkupLine($"[red]✗ Source language '{settings.CopyFrom}' not found[/]");
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ Default language file not found ({baseName}.resx)[/]");
+                    AnsiConsole.MarkupLine($"[red]✗ Default language file not found ({baseName}{extension})[/]");
                 }
 
                 AnsiConsole.MarkupLine("[grey]Available languages:[/]");
@@ -149,7 +152,7 @@ public class AddLanguageCommand : Command<AddLanguageCommandSettings>
             }
 
             // Parse source file if copying
-            var sourceFile = sourceLanguage != null ? settings.ReadResourceFile(sourceLanguage) : null;
+            var sourceFile = sourceLanguage is not null ? settings.ReadResourceFile(sourceLanguage) : null;
 
             // Step 6: Create new language file
             var copyEntries = !settings.Empty && sourceFile != null;
@@ -157,7 +160,8 @@ public class AddLanguageCommand : Command<AddLanguageCommandSettings>
 
             if (copyEntries)
             {
-                var sourceName = string.IsNullOrEmpty(sourceCultureCode)
+                var sourceCultureCode = sourceLanguage?.Code ?? "";
+                var sourceName = sourceLanguage?.IsDefault == true
                     ? "default language"
                     : $"{sourceCultureCode} language";
                 AnsiConsole.MarkupLine($"[yellow]►[/] Copying {entryCount} entries from {sourceName}...");
