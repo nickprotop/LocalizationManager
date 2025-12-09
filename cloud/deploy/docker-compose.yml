@@ -29,8 +29,8 @@ services:
   # ==========================================================================
   api:
     build:
-      context: ../src
-      dockerfile: ../deploy/Dockerfile.api
+      context: ../..
+      dockerfile: cloud/deploy/Dockerfile.api
     container_name: lrmcloud-api
     restart: unless-stopped
     # Port exposed in docker-compose.override.yml if direct API access enabled

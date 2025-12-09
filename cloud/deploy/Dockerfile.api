@@ -1,6 +1,6 @@
 # LRM Cloud API - Multi-stage Docker build
 # Location: cloud/deploy/Dockerfile.api
-# Build context: cloud/src (set in docker-compose.yml)
+# Build context: repository root (set in docker-compose.yml)
 # Build: cd cloud/deploy && docker compose build api
 # Run: cd cloud/deploy && docker compose up -d api
 
@@ -12,20 +12,24 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 WORKDIR /src
 
 # Copy project files first (for layer caching)
-COPY LrmCloud.Shared/LrmCloud.Shared.csproj LrmCloud.Shared/
-COPY LrmCloud.Api/LrmCloud.Api.csproj LrmCloud.Api/
+COPY LocalizationManager.Shared/LocalizationManager.Shared.csproj LocalizationManager.Shared/
+COPY LocalizationManager.Core/LocalizationManager.Core.csproj LocalizationManager.Core/
+COPY cloud/src/LrmCloud.Shared/LrmCloud.Shared.csproj cloud/src/LrmCloud.Shared/
+COPY cloud/src/LrmCloud.Api/LrmCloud.Api.csproj cloud/src/LrmCloud.Api/
 
 # Restore dependencies
-WORKDIR /src/LrmCloud.Api
+WORKDIR /src/cloud/src/LrmCloud.Api
 RUN dotnet restore
 
 # Copy source code
 WORKDIR /src
-COPY LrmCloud.Shared/ LrmCloud.Shared/
-COPY LrmCloud.Api/ LrmCloud.Api/
+COPY LocalizationManager.Shared/ LocalizationManager.Shared/
+COPY LocalizationManager.Core/ LocalizationManager.Core/
+COPY cloud/src/LrmCloud.Shared/ cloud/src/LrmCloud.Shared/
+COPY cloud/src/LrmCloud.Api/ cloud/src/LrmCloud.Api/
 
 # Build and publish
-WORKDIR /src/LrmCloud.Api
+WORKDIR /src/cloud/src/LrmCloud.Api
 RUN dotnet publish \
     --configuration Release \
     --output /app/publish
