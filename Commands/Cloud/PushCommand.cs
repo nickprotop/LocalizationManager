@@ -134,6 +134,46 @@ public class PushCommand : Command<PushCommandSettings>
             apiClient.SetAccessToken(token);
             apiClient.EnableAutoRefresh(projectDirectory);
 
+            // Fetch remote project info and validate format compatibility
+            CloudProject? remoteProject = null;
+            try
+            {
+                AnsiConsole.Status()
+                    .Start("Checking remote project...", ctx =>
+                    {
+                        remoteProject = apiClient.GetProjectAsync(cancellationToken).GetAwaiter().GetResult();
+                    });
+            }
+            catch (CloudApiException ex) when (ex.StatusCode == 404)
+            {
+                AnsiConsole.MarkupLine("[red]✗ Remote project not found![/]");
+                AnsiConsole.MarkupLine("[dim]The project may have been deleted or you don't have access.[/]");
+                return 1;
+            }
+
+            // Validate format compatibility
+            var syncValidator = new CloudSyncValidator(projectDirectory);
+            var syncValidation = syncValidator.ValidateForPush(config, remoteProject!);
+
+            if (syncValidation.Warnings.Any())
+            {
+                foreach (var warning in syncValidation.Warnings)
+                {
+                    AnsiConsole.MarkupLine($"[yellow]⚠ {warning.EscapeMarkup()}[/]");
+                }
+                AnsiConsole.WriteLine();
+            }
+
+            if (!syncValidation.CanSync)
+            {
+                AnsiConsole.MarkupLine("[red]✗ Cannot push due to compatibility issues:[/]");
+                foreach (var error in syncValidation.Errors)
+                {
+                    AnsiConsole.MarkupLine($"  [red]• {error.EscapeMarkup()}[/]");
+                }
+                return 1;
+            }
+
             // Collect items to push
             var itemsToPush = new List<string>();
             if (!settings.ResourcesOnly)

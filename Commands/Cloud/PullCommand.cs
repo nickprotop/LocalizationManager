@@ -122,6 +122,54 @@ public class PullCommand : Command<PullCommandSettings>
             apiClient.SetAccessToken(token);
             apiClient.EnableAutoRefresh(projectDirectory);
 
+            // Fetch remote project info and validate format compatibility
+            CloudProject? remoteProject = null;
+            try
+            {
+                AnsiConsole.Status()
+                    .Start("Checking remote project...", ctx =>
+                    {
+                        remoteProject = apiClient.GetProjectAsync(cancellationToken).GetAwaiter().GetResult();
+                    });
+            }
+            catch (CloudApiException ex) when (ex.StatusCode == 404)
+            {
+                AnsiConsole.MarkupLine("[red]✗ Remote project not found![/]");
+                AnsiConsole.MarkupLine("[dim]The project may have been deleted or you don't have access.[/]");
+                return 1;
+            }
+
+            // Load local config if exists
+            ConfigurationModel? localConfig = null;
+            var localConfigPath = Path.Combine(projectDirectory, "lrm.json");
+            if (File.Exists(localConfigPath))
+            {
+                localConfig = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
+            }
+
+            // Validate format compatibility
+            var syncValidator = new CloudSyncValidator(projectDirectory);
+            var syncValidation = syncValidator.ValidateForPull(localConfig, remoteProject!);
+
+            if (syncValidation.Warnings.Any())
+            {
+                foreach (var warning in syncValidation.Warnings)
+                {
+                    AnsiConsole.MarkupLine($"[yellow]⚠ {warning.EscapeMarkup()}[/]");
+                }
+                AnsiConsole.WriteLine();
+            }
+
+            if (!syncValidation.CanSync)
+            {
+                AnsiConsole.MarkupLine("[red]✗ Cannot pull due to compatibility issues:[/]");
+                foreach (var error in syncValidation.Errors)
+                {
+                    AnsiConsole.MarkupLine($"  [red]• {error.EscapeMarkup()}[/]");
+                }
+                return 1;
+            }
+
             // Fetch remote data (V2 - pull files from database)
             PullResponse? pullResponse = null;
 
@@ -143,7 +191,6 @@ public class PullCommand : Command<PullCommandSettings>
             // Check configuration conflict
             if (!settings.ResourcesOnly && pullResponse.Configuration != null)
             {
-                var localConfigPath = Path.Combine(projectDirectory, "lrm.json");
                 if (File.Exists(localConfigPath))
                 {
                     var localConfigJson = File.ReadAllText(localConfigPath);

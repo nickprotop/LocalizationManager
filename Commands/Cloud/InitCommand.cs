@@ -81,8 +81,9 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
                 if (selectedProject == null)
                 {
                     // Create new project with provided name
+                    var (format, defaultLanguage) = DetectProjectSettings(projectDirectory, cancellationToken);
                     selectedProject = CreateNewProject(host, port, useHttps, projectDirectory,
-                        settings.ProjectName, null, settings.Organization, cancellationToken);
+                        settings.ProjectName, null, settings.Organization, format, defaultLanguage, cancellationToken);
 
                     if (selectedProject == null)
                         return 1;
@@ -301,11 +302,12 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
             return PromptCreateNewProject(host, port, useHttps, projectDirectory, username, cancellationToken);
         }
 
-        // Show project selection
+        // Show project selection with format info
         var projectChoices = projects.Select(p =>
         {
             var owner = p.OrganizationName ?? $"@{username}";
-            return $"{p.Name} ({owner}/{p.Name})";
+            var format = !string.IsNullOrEmpty(p.Format) ? $" [{p.Format}]" : "";
+            return $"{p.Name} ({owner}/{p.Name}){format}";
         }).ToList();
 
         var selectedChoice = AnsiConsole.Prompt(
@@ -316,7 +318,36 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
 
         // Find the selected project
         var selectedIndex = projectChoices.IndexOf(selectedChoice);
-        return projects[selectedIndex];
+        var selectedProject = projects[selectedIndex];
+
+        // Validate format compatibility
+        var syncValidator = new CloudSyncValidator(projectDirectory);
+        var validation = syncValidator.ValidateForLink(selectedProject);
+
+        if (validation.Warnings.Any())
+        {
+            foreach (var warning in validation.Warnings)
+            {
+                AnsiConsole.MarkupLine($"[yellow]⚠ {warning.EscapeMarkup()}[/]");
+            }
+        }
+
+        if (!validation.CanSync)
+        {
+            AnsiConsole.MarkupLine("[red]✗ Cannot link to this project:[/]");
+            foreach (var error in validation.Errors)
+            {
+                AnsiConsole.MarkupLine($"  [red]• {error.EscapeMarkup()}[/]");
+            }
+            AnsiConsole.WriteLine();
+
+            if (!AnsiConsole.Confirm("Link anyway? (sync operations will fail)", false))
+            {
+                return null;
+            }
+        }
+
+        return selectedProject;
     }
 
     private CloudProject? PromptCreateNewProject(
@@ -331,14 +362,57 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
         if (string.IsNullOrWhiteSpace(description))
             description = null;
 
+        // Detect format from local files or lrm.json
+        var (format, defaultLanguage) = DetectProjectSettings(projectDirectory, cancellationToken);
+
+        AnsiConsole.MarkupLine($"[dim]Detected format: {format}, default language: {defaultLanguage}[/]");
+
         // For now, create as personal project
         // TODO: Add organization selection if user belongs to organizations
-        return CreateNewProject(host, port, useHttps, projectDirectory, name, description, null, cancellationToken);
+        return CreateNewProject(host, port, useHttps, projectDirectory, name, description, null, format, defaultLanguage, cancellationToken);
+    }
+
+    private (string format, string defaultLanguage) DetectProjectSettings(string projectDirectory, CancellationToken cancellationToken)
+    {
+        var format = "json"; // Default
+        var defaultLanguage = "en"; // Default
+
+        // Try to load from lrm.json first
+        try
+        {
+            var config = LrmConfigurationManager.LoadConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
+            if (!string.IsNullOrEmpty(config.ResourceFormat))
+            {
+                format = config.ResourceFormat.ToLowerInvariant();
+            }
+            if (!string.IsNullOrEmpty(config.DefaultLanguageCode))
+            {
+                defaultLanguage = config.DefaultLanguageCode;
+            }
+        }
+        catch
+        {
+            // Config doesn't exist, try to detect from files
+        }
+
+        // If format still not set, try to detect from files
+        if (format == "json")
+        {
+            var syncValidator = new CloudSyncValidator(projectDirectory);
+            var detectedFormat = syncValidator.DetectLocalFormat();
+            if (detectedFormat != null)
+            {
+                format = detectedFormat;
+            }
+        }
+
+        return (format, defaultLanguage);
     }
 
     private CloudProject? CreateNewProject(
         string host, int port, bool useHttps, string projectDirectory,
-        string name, string? description, string? organization, CancellationToken cancellationToken)
+        string name, string? description, string? organization,
+        string format, string defaultLanguage, CancellationToken cancellationToken)
     {
         var remoteUrl = CreateAuthRemoteUrl(host, port, useHttps);
         var token = AuthTokenManager.GetTokenAsync(projectDirectory, host, cancellationToken)
@@ -356,7 +430,9 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
                 var request = new CreateProjectRequest
                 {
                     Name = name,
-                    Description = description
+                    Description = description,
+                    Format = format,
+                    DefaultLanguage = defaultLanguage
                 };
 
                 project = apiClient.CreateProjectAsync(request, cancellationToken).GetAwaiter().GetResult();
@@ -368,7 +444,7 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
             return null;
         }
 
-        AnsiConsole.MarkupLine($"[green]✓ Project '{name.EscapeMarkup()}' created[/]");
+        AnsiConsole.MarkupLine($"[green]✓ Project '{name.EscapeMarkup()}' created (format: {format})[/]");
         return project;
     }
 

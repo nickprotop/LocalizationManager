@@ -384,6 +384,12 @@ public class CloudProject
     public int? UserId { get; set; }
     public int? OrganizationId { get; set; }
     public string? OrganizationName { get; set; }
+
+    // Format and sync settings
+    public string Format { get; set; } = string.Empty;
+    public string DefaultLanguage { get; set; } = "en";
+    public string LocalizationPath { get; set; } = ".";
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
@@ -395,6 +401,8 @@ public class CreateProjectRequest
 {
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string Format { get; set; } = "json";
+    public string DefaultLanguage { get; set; } = "en";
 }
 
 /// <summary>

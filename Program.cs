@@ -288,6 +288,12 @@ app.Configure(config =>
             .WithExample(new[] { "cloud", "login", "--email", "user@example.com" })
             .WithExample(new[] { "cloud", "login", "--host", "staging.lrm.cloud" });
 
+        cfg.AddCommand<LogoutCommand>("logout")
+            .WithDescription("Clear stored authentication tokens")
+            .WithExample(new[] { "cloud", "logout" })
+            .WithExample(new[] { "cloud", "logout", "--host", "staging.lrm.cloud" })
+            .WithExample(new[] { "cloud", "logout", "--all" });
+
         cfg.AddCommand<SetTokenCommand>("set-token")
             .WithDescription("Manually set an authentication token for cloud access")
             .WithExample(new[] { "cloud", "set-token", "--host", "lrm.cloud", "--token", "your-token" })

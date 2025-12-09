@@ -89,7 +89,7 @@ public class PullBackupManagerTests : IDisposable
         using var stream = metadataEntry.Open();
         using var reader = new StreamReader(stream);
         var metadata = await reader.ReadToEndAsync();
-        Assert.Contains("timestamp", metadata);
+        Assert.Contains("Timestamp", metadata);
     }
 
     [Fact]
@@ -100,10 +100,8 @@ public class PullBackupManagerTests : IDisposable
         var backupDir = Path.Combine(_testDirectory, ".lrm", "pull-backups");
         Directory.CreateDirectory(backupDir);
 
-        var backup1 = Path.Combine(backupDir, "pull-backup-20231201-120000.zip");
-        var backup2 = Path.Combine(backupDir, "pull-backup-20231202-120000.zip");
-        File.WriteAllText(backup1, "test");
-        File.WriteAllText(backup2, "test");
+        CreateValidBackupZip(backupDir, "pull-backup-20231201-120000", new DateTime(2023, 12, 1, 12, 0, 0));
+        CreateValidBackupZip(backupDir, "pull-backup-20231202-120000", new DateTime(2023, 12, 2, 12, 0, 0));
 
         // Act
         var backups = _backupManager.ListBackups();
@@ -121,12 +119,9 @@ public class PullBackupManagerTests : IDisposable
         var backupDir = Path.Combine(_testDirectory, ".lrm", "pull-backups");
         Directory.CreateDirectory(backupDir);
 
-        var backup1 = Path.Combine(backupDir, "pull-backup-20231201-120000.zip");
-        var backup2 = Path.Combine(backupDir, "pull-backup-20231202-120000.zip");
-        var backup3 = Path.Combine(backupDir, "pull-backup-20231203-120000.zip");
-        File.WriteAllText(backup1, "test");
-        File.WriteAllText(backup2, "test");
-        File.WriteAllText(backup3, "test");
+        CreateValidBackupZip(backupDir, "pull-backup-20231201-120000", new DateTime(2023, 12, 1, 12, 0, 0));
+        CreateValidBackupZip(backupDir, "pull-backup-20231202-120000", new DateTime(2023, 12, 2, 12, 0, 0));
+        CreateValidBackupZip(backupDir, "pull-backup-20231203-120000", new DateTime(2023, 12, 3, 12, 0, 0));
 
         // Act
         var backups = _backupManager.ListBackups();
@@ -169,11 +164,11 @@ public class PullBackupManagerTests : IDisposable
         var backupDir = Path.Combine(_testDirectory, ".lrm", "pull-backups");
         Directory.CreateDirectory(backupDir);
 
-        // Create 15 backups
+        // Create 15 backups with different timestamps
         for (int i = 0; i < 15; i++)
         {
-            var backup = Path.Combine(backupDir, $"pull-backup-2023120{i:00}-120000.zip");
-            File.WriteAllText(backup, "test");
+            var day = i + 1;
+            CreateValidBackupZip(backupDir, $"pull-backup-202312{day:00}-120000", new DateTime(2023, 12, day, 12, 0, 0));
         }
 
         // Act
@@ -192,11 +187,13 @@ public class PullBackupManagerTests : IDisposable
         var backupDir = Path.Combine(_testDirectory, ".lrm", "pull-backups");
         Directory.CreateDirectory(backupDir);
 
-        var oldBackup = Path.Combine(backupDir, "pull-backup-20231201-120000.zip");
-        var newBackup = Path.Combine(backupDir, "pull-backup-20231210-120000.zip");
-        File.WriteAllText(oldBackup, "test");
-        Thread.Sleep(10);
-        File.WriteAllText(newBackup, "test");
+        var oldBackupName = "pull-backup-20231201-120000";
+        var newBackupName = "pull-backup-20231210-120000";
+        CreateValidBackupZip(backupDir, oldBackupName, new DateTime(2023, 12, 1, 12, 0, 0));
+        CreateValidBackupZip(backupDir, newBackupName, new DateTime(2023, 12, 10, 12, 0, 0));
+
+        var oldBackup = Path.Combine(backupDir, $"{oldBackupName}.zip");
+        var newBackup = Path.Combine(backupDir, $"{newBackupName}.zip");
 
         // Act
         _backupManager.PruneBackups(keepCount: 1);
@@ -210,5 +207,22 @@ public class PullBackupManagerTests : IDisposable
     {
         var lrmDir = Path.Combine(_testDirectory, ".lrm");
         Directory.CreateDirectory(lrmDir);
+    }
+
+    private void CreateValidBackupZip(string backupDir, string backupName, DateTime timestamp)
+    {
+        var zipPath = Path.Combine(backupDir, $"{backupName}.zip");
+
+        using var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create);
+        var metadataEntry = archive.CreateEntry("backup-metadata.json");
+        using var writer = new StreamWriter(metadataEntry.Open());
+        var metadata = new
+        {
+            BackupName = backupName,
+            Timestamp = timestamp,
+            ProjectDirectory = _testDirectory
+        };
+        var json = System.Text.Json.JsonSerializer.Serialize(metadata, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        writer.Write(json);
     }
 }

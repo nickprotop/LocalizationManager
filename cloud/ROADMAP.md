@@ -1257,7 +1257,7 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 - [x] `lrm remote unset` - Remove remote configuration ✅
 - [x] `lrm cloud init` - Interactive project setup (auth + link/create project) ✅
 - [x] `lrm cloud login` - Email/password authentication with auto-refresh ✅
-- [ ] `lrm cloud logout` - Clear auth tokens
+- [x] `lrm cloud logout` - Clear stored auth tokens ✅
 - [x] `lrm cloud status` - Show sync status and recent activity ✅
 - [x] `lrm cloud set-token` - Manual token configuration ✅
 
@@ -1269,7 +1269,7 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 - [x] Token storage with expiration tracking (.lrm/auth.json) ✅
 - [x] Configuration sync (lrm.json bidirectional sync) ✅
 - [x] Config conflict detection and resolution ✅
-- [ ] Format validation (block format changes until resources match)
+- [x] Format validation (block push/pull if local format doesn't match remote) ✅
 - [x] File backup system (PullBackupManager) ✅
 - [x] Sync metadata tracking (SyncStateManager) ✅
 
