@@ -17,6 +17,8 @@ public class CloudApiClient : IDisposable
     private readonly RemoteUrl _remoteUrl;
     private readonly JsonSerializerOptions _jsonOptions;
     private string? _accessToken;
+    private string? _projectDirectory;
+    private Func<Task<bool>>? _onTokenRefreshed;
 
     public CloudApiClient(RemoteUrl remoteUrl, HttpClient? httpClient = null)
     {
@@ -171,6 +173,88 @@ public class CloudApiClient : IDisposable
 
     #endregion
 
+    #region Auth API
+
+    /// <summary>
+    /// Authenticates with email and password.
+    /// </summary>
+    public async Task<LoginResponse> LoginAsync(
+        string email,
+        string password,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"{_remoteUrl.ApiBaseUrl}/auth/login";
+        var request = new LoginRequest { Email = email, Password = password };
+
+        var response = await PostAsync<LoginResponse>(url, request, cancellationToken);
+        return response ?? throw new CloudApiException("Login failed");
+    }
+
+    /// <summary>
+    /// Refreshes the access token using a refresh token.
+    /// </summary>
+    public async Task<LoginResponse> RefreshTokenAsync(
+        string refreshToken,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"{_remoteUrl.ApiBaseUrl}/auth/refresh";
+        var request = new RefreshTokenRequest { RefreshToken = refreshToken };
+
+        var response = await PostAsync<LoginResponse>(url, request, cancellationToken);
+        return response ?? throw new CloudApiException("Token refresh failed");
+    }
+
+    /// <summary>
+    /// Enables automatic token refresh when JWT expires.
+    /// </summary>
+    public void EnableAutoRefresh(string projectDirectory, Func<Task<bool>>? onTokenRefreshed = null)
+    {
+        _projectDirectory = projectDirectory;
+        _onTokenRefreshed = onTokenRefreshed;
+    }
+
+    private async Task<bool> TryRefreshTokenAsync(CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(_projectDirectory))
+            return false;
+
+        try
+        {
+            var refreshToken = await AuthTokenManager.GetRefreshTokenAsync(
+                _projectDirectory, _remoteUrl.Host, cancellationToken);
+
+            if (string.IsNullOrEmpty(refreshToken))
+                return false;
+
+            var response = await RefreshTokenAsync(refreshToken, cancellationToken);
+
+            // Save new tokens
+            await AuthTokenManager.SetAuthenticationAsync(
+                _projectDirectory,
+                _remoteUrl.Host,
+                response.Token,
+                response.ExpiresAt,
+                response.RefreshToken,
+                response.RefreshTokenExpiresAt,
+                cancellationToken);
+
+            // Update client
+            SetAccessToken(response.Token);
+
+            // Notify callback
+            if (_onTokenRefreshed != null)
+                await _onTokenRefreshed();
+
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    #endregion
+
     #region HTTP Helpers
 
     private async Task<T?> GetAsync<T>(string url, CancellationToken cancellationToken)
@@ -178,8 +262,9 @@ public class CloudApiClient : IDisposable
         try
         {
             var response = await _httpClient.GetAsync(url, cancellationToken);
-            await EnsureSuccessAsync(response);
-            return await response.Content.ReadFromJsonAsync<T>(_jsonOptions, cancellationToken);
+            await EnsureSuccessAsync(response, cancellationToken);
+            var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<T>>(_jsonOptions, cancellationToken);
+            return apiResponse != null ? apiResponse.Data : default;
         }
         catch (HttpRequestException ex)
         {
@@ -192,8 +277,9 @@ public class CloudApiClient : IDisposable
         try
         {
             var response = await _httpClient.PostAsJsonAsync(url, request, _jsonOptions, cancellationToken);
-            await EnsureSuccessAsync(response);
-            return await response.Content.ReadFromJsonAsync<T>(_jsonOptions, cancellationToken);
+            await EnsureSuccessAsync(response, cancellationToken);
+            var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<T>>(_jsonOptions, cancellationToken);
+            return apiResponse != null ? apiResponse.Data : default;
         }
         catch (HttpRequestException ex)
         {
@@ -206,8 +292,9 @@ public class CloudApiClient : IDisposable
         try
         {
             var response = await _httpClient.PutAsJsonAsync(url, request, _jsonOptions, cancellationToken);
-            await EnsureSuccessAsync(response);
-            return await response.Content.ReadFromJsonAsync<T>(_jsonOptions, cancellationToken);
+            await EnsureSuccessAsync(response, cancellationToken);
+            var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<T>>(_jsonOptions, cancellationToken);
+            return apiResponse != null ? apiResponse.Data : default;
         }
         catch (HttpRequestException ex)
         {
@@ -215,10 +302,22 @@ public class CloudApiClient : IDisposable
         }
     }
 
-    private async Task EnsureSuccessAsync(HttpResponseMessage response)
+    private async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken = default)
     {
         if (!response.IsSuccessStatusCode)
         {
+            // If 401 and auto-refresh is enabled, try to refresh token
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                && !string.IsNullOrEmpty(_projectDirectory))
+            {
+                var refreshed = await TryRefreshTokenAsync(cancellationToken);
+                if (refreshed)
+                {
+                    // Token refreshed - throw special exception so caller can retry
+                    throw new CloudApiException("Token expired and refreshed", 401);
+                }
+            }
+
             var errorContent = await response.Content.ReadAsStringAsync();
             var statusCode = (int)response.StatusCode;
 
@@ -243,6 +342,23 @@ public class CloudApiClient : IDisposable
     {
         _httpClient?.Dispose();
     }
+}
+
+/// <summary>
+/// API response wrapper matching the cloud API structure.
+/// </summary>
+internal class ApiResponse<T>
+{
+    public T Data { get; set; } = default!;
+    public ApiMeta? Meta { get; set; }
+}
+
+/// <summary>
+/// Metadata for API responses.
+/// </summary>
+internal class ApiMeta
+{
+    public DateTime Timestamp { get; set; }
 }
 
 #region Models
@@ -371,6 +487,47 @@ public class ErrorResponse
     public string Message { get; set; } = string.Empty;
     public string? Code { get; set; }
     public Dictionary<string, string[]>? Errors { get; set; }
+}
+
+/// <summary>
+/// Request for email/password login.
+/// </summary>
+public class LoginRequest
+{
+    public string Email { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response from login operation.
+/// </summary>
+public class LoginResponse
+{
+    public UserInfo User { get; set; } = new();
+    public string Token { get; set; } = string.Empty;
+    public DateTime ExpiresAt { get; set; }
+    public string RefreshToken { get; set; } = string.Empty;
+    public DateTime RefreshTokenExpiresAt { get; set; }
+}
+
+/// <summary>
+/// User information returned from authentication.
+/// </summary>
+public class UserInfo
+{
+    public int Id { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
+    public string? DisplayName { get; set; }
+    public bool EmailVerified { get; set; }
+}
+
+/// <summary>
+/// Request for token refresh.
+/// </summary>
+public class RefreshTokenRequest
+{
+    public string RefreshToken { get; set; } = string.Empty;
 }
 
 #endregion
