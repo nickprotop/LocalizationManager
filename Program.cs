@@ -276,6 +276,12 @@ app.Configure(config =>
             .WithExample(new[] { "cloud", "status" })
             .WithExample(new[] { "cloud", "status", "--format", "json" });
 
+        cfg.AddCommand<LoginCommand>("login")
+            .WithDescription("Authenticate with the cloud using email and password")
+            .WithExample(new[] { "cloud", "login" })
+            .WithExample(new[] { "cloud", "login", "--email", "user@example.com" })
+            .WithExample(new[] { "cloud", "login", "--host", "staging.lrm.cloud" });
+
         cfg.AddCommand<SetTokenCommand>("set-token")
             .WithDescription("Manually set an authentication token for cloud access")
             .WithExample(new[] { "cloud", "set-token", "--host", "lrm.cloud", "--token", "your-token" })
