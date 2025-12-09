@@ -1,7 +1,69 @@
-﻿@page "/"
+@page "/"
+@attribute [Authorize]
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard - LRM Cloud</PageTitle>
 
-<h1>Hello, world!</h1>
+<MudText Typo="Typo.h4" GutterBottom="true">Dashboard</MudText>
 
-Welcome to your new app.
+<MudGrid>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <div>
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Projects</MudText>
+                    <MudText Typo="Typo.h4">0</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Size="Size.Large" />
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <div>
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Keys</MudText>
+                    <MudText Typo="Typo.h4">0</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Key" Color="Color.Info" Size="Size.Large" />
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <div>
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Translations</MudText>
+                    <MudText Typo="Typo.h4">0%</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Translate" Color="Color.Success" Size="Size.Large" />
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <div>
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Usage</MudText>
+                    <MudText Typo="Typo.h4">0 / 10K</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Analytics" Color="Color.Warning" Size="Size.Large" />
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudText Typo="Typo.h5" Class="mt-6 mb-4">Recent Projects</MudText>
+
+<MudPaper Class="pa-4" Elevation="2">
+    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="py-8">
+        <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Size="Size.Large" Color="Color.Secondary" />
+        <MudText Typo="Typo.subtitle1" Color="Color.Secondary">No projects yet</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/projects/new" Class="mt-2">
+            Create Your First Project
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@code {
+    // TODO: Load actual data from ProjectService
+}

@@ -1,0 +1,120 @@
+@page "/login"
+@layout AuthLayout
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Login - LRM Cloud</PageTitle>
+
+<MudPaper Class="pa-8" Elevation="3" Style="max-width: 400px; margin: auto;">
+    <MudStack Spacing="4">
+        <div style="text-align: center;">
+            <MudIcon Icon="@Icons.Material.Filled.Language" Size="Size.Large" Color="Color.Primary" />
+            <MudText Typo="Typo.h4" Class="mt-2">LRM Cloud</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Sign in to your account</MudText>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">@_errorMessage</MudAlert>
+        }
+
+        <EditForm Model="_model" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+
+            <MudTextField @bind-Value="_model.Email"
+                          Label="Email"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Email"
+                          For="@(() => _model.Email)"
+                          Disabled="_isLoading" />
+
+            <MudTextField @bind-Value="_model.Password"
+                          Label="Password"
+                          Variant="Variant.Outlined"
+                          InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                          OnAdornmentClick="@(() => _showPassword = !_showPassword)"
+                          For="@(() => _model.Password)"
+                          Disabled="_isLoading" />
+
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudLink Href="/forgot-password" Typo="Typo.body2">Forgot password?</MudLink>
+            </MudStack>
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Disabled="_isLoading"
+                       Class="mt-4">
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                    <MudText Class="ms-2">Signing in...</MudText>
+                }
+                else
+                {
+                    <MudText>Sign In</MudText>
+                }
+            </MudButton>
+        </EditForm>
+
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="my-2">
+            <MudDivider />
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="px-2">or</MudText>
+            <MudDivider />
+        </MudStack>
+
+        <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Custom.Brands.GitHub"
+                   FullWidth="true"
+                   Href="/api/auth/github"
+                   Disabled="_isLoading">
+            Continue with GitHub
+        </MudButton>
+
+        <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-4">
+            Don't have an account? <MudLink Href="/register">Sign up</MudLink>
+        </MudText>
+    </MudStack>
+</MudPaper>
+
+@code {
+    private readonly LoginRequest _model = new();
+    private bool _isLoading;
+    private bool _showPassword;
+    private string? _errorMessage;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    private async Task HandleLogin()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await AuthService.LoginAsync(_model);
+
+            if (result.IsSuccess)
+            {
+                Navigation.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

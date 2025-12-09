@@ -288,42 +288,47 @@ location /app {
 
 ### Tasks
 
-- [ ] **4A.1** Add MudBlazor package and configure
-  - [ ] `dotnet add package MudBlazor`
-  - [ ] Configure in `Program.cs`
-  - [ ] Add CSS/JS to `index.html`
-  - [ ] Configure theme (light/dark toggle)
+- [x] **4A.1** Add MudBlazor package and configure ✅ (2025-12-10)
+  - [x] `dotnet add package MudBlazor` (v8.15.0)
+  - [x] `dotnet add package Blazored.LocalStorage` (v4.5.0)
+  - [x] `dotnet add package Microsoft.AspNetCore.Components.Authorization` (v9.0.0)
+  - [x] Configure in `Program.cs`
+  - [x] Add CSS/JS to `index.html`
+  - [x] Configure theme (light/dark toggle with system preference detection)
 
-- [ ] **4A.2** Create layout structure
-  - [ ] `MainLayout.razor` with MudLayout
-  - [ ] Top AppBar (logo, user menu, theme toggle)
-  - [ ] Left drawer/sidebar (navigation)
-  - [ ] Main content area
+- [x] **4A.2** Create layout structure ✅ (2025-12-10)
+  - [x] `MainLayout.razor` with MudLayout
+  - [x] Top AppBar (logo, user menu, theme toggle)
+  - [x] Left drawer/sidebar (navigation)
+  - [x] Main content area
+  - [x] `NavMenu.razor` with MudNavMenu
+  - [x] Dashboard page (`Home.razor`) with stats cards
 
-- [ ] **4A.3** Authentication infrastructure
-  - [ ] `AuthenticationStateProvider` (JWT-based)
-  - [ ] `AuthService.cs` (login, register, logout)
-  - [ ] Token storage in localStorage
-  - [ ] Auto-refresh token handling
-  - [ ] `HttpClient` auth header interceptor
+- [x] **4A.3** Authentication infrastructure ✅ (2025-12-10)
+  - [x] `LrmAuthStateProvider.cs` (JWT-based AuthenticationStateProvider)
+  - [x] `AuthService.cs` (login, register, logout, forgot password, verify email)
+  - [x] `TokenStorageService.cs` (localStorage wrapper)
+  - [x] Auto-refresh token handling
+  - [x] `AuthenticatedHttpHandler.cs` (auth header interceptor)
 
-- [ ] **4A.4** Auth pages
-  - [ ] `Login.razor`
-  - [ ] `Register.razor`
-  - [ ] `ForgotPassword.razor`
-  - [ ] `ResetPassword.razor`
-  - [ ] `VerifyEmail.razor`
+- [x] **4A.4** Auth pages ✅ (2025-12-10)
+  - [x] `Login.razor` (with GitHub OAuth button)
+  - [x] `Register.razor` (with password confirmation)
+  - [x] `ForgotPassword.razor`
+  - [x] `ResetPassword.razor`
+  - [x] `VerifyEmail.razor`
+  - [x] `AuthLayout.razor` (centered minimal layout for auth pages)
 
-- [ ] **4A.5** Protected routing
-  - [ ] `AuthorizeView` wrapper
-  - [ ] Redirect to login if not authenticated
-  - [ ] `@attribute [Authorize]` on protected pages
+- [x] **4A.5** Protected routing ✅ (2025-12-10)
+  - [x] `CascadingAuthenticationState` wrapper in App.razor
+  - [x] `AuthorizeRouteView` with NotAuthorized/Authorizing states
+  - [x] `RedirectToLogin.razor` component
+  - [x] `@attribute [Authorize]` on protected pages
 
-- [ ] **4A.6** GitHub OAuth (optional login method)
-  - [ ] "Login with GitHub" button on Login.razor
-  - [ ] Redirect to `/api/auth/github` (backend handles OAuth flow)
-  - [ ] `GitHubCallback.razor` - handle token from query string
-  - [ ] Account linking (if email exists, link GitHub to account)
+- [x] **4A.6** GitHub OAuth (optional login method) ✅ (2025-12-10)
+  - [x] "Login with GitHub" button on Login.razor
+  - [x] Redirect to `/api/auth/github` (backend handles OAuth flow)
+  - [x] Backend already has GitHubAuthService for callback handling
 
 ### Files to Create
 

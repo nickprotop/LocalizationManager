@@ -1,0 +1,148 @@
+@page "/register"
+@layout AuthLayout
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Register - LRM Cloud</PageTitle>
+
+<MudPaper Class="pa-8" Elevation="3" Style="max-width: 450px; margin: auto;">
+    <MudStack Spacing="4">
+        <div style="text-align: center;">
+            <MudIcon Icon="@Icons.Material.Filled.Language" Size="Size.Large" Color="Color.Primary" />
+            <MudText Typo="Typo.h4" Class="mt-2">LRM Cloud</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Create your account</MudText>
+        </div>
+
+        @if (_successMessage != null)
+        {
+            <MudAlert Severity="Severity.Success" Dense="true">
+                @_successMessage
+                <br />
+                <MudLink Href="/login">Go to login</MudLink>
+            </MudAlert>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">@_errorMessage</MudAlert>
+            }
+
+            <EditForm Model="_model" OnValidSubmit="HandleRegister">
+                <DataAnnotationsValidator />
+
+                <MudTextField @bind-Value="_model.Email"
+                              Label="Email"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Email"
+                              For="@(() => _model.Email)"
+                              Disabled="_isLoading"
+                              HelperText="We'll send a verification email" />
+
+                <MudTextField @bind-Value="_model.Username"
+                              Label="Username"
+                              Variant="Variant.Outlined"
+                              For="@(() => _model.Username)"
+                              Disabled="_isLoading"
+                              HelperText="3-50 characters, letters, numbers, - and _" />
+
+                <MudTextField @bind-Value="_model.Password"
+                              Label="Password"
+                              Variant="Variant.Outlined"
+                              InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                              OnAdornmentClick="@(() => _showPassword = !_showPassword)"
+                              For="@(() => _model.Password)"
+                              Disabled="_isLoading"
+                              HelperText="Minimum 12 characters" />
+
+                <MudTextField @bind-Value="_confirmPassword"
+                              Label="Confirm Password"
+                              Variant="Variant.Outlined"
+                              InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                              Disabled="_isLoading"
+                              Error="@(_confirmPassword != _model.Password && !string.IsNullOrEmpty(_confirmPassword))"
+                              ErrorText="Passwords do not match" />
+
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Disabled="_isLoading || _confirmPassword != _model.Password"
+                           Class="mt-4">
+                    @if (_isLoading)
+                    {
+                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                        <MudText Class="ms-2">Creating account...</MudText>
+                    }
+                    else
+                    {
+                        <MudText>Create Account</MudText>
+                    }
+                </MudButton>
+            </EditForm>
+
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="my-2">
+                <MudDivider />
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="px-2">or</MudText>
+                <MudDivider />
+            </MudStack>
+
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Custom.Brands.GitHub"
+                       FullWidth="true"
+                       Href="/api/auth/github"
+                       Disabled="_isLoading">
+                Continue with GitHub
+            </MudButton>
+
+            <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-4">
+                Already have an account? <MudLink Href="/login">Sign in</MudLink>
+            </MudText>
+        }
+    </MudStack>
+</MudPaper>
+
+@code {
+    private readonly RegisterRequest _model = new();
+    private string _confirmPassword = string.Empty;
+    private bool _isLoading;
+    private bool _showPassword;
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    private async Task HandleRegister()
+    {
+        if (_confirmPassword != _model.Password)
+        {
+            _errorMessage = "Passwords do not match";
+            return;
+        }
+
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await AuthService.RegisterAsync(_model);
+
+            if (result.IsSuccess)
+            {
+                _successMessage = result.SuccessMessage ?? "Registration successful! Please check your email to verify your account.";
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
