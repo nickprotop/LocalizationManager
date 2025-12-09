@@ -119,6 +119,114 @@ public static class AuthTokenManager
     }
 
     /// <summary>
+    /// Sets complete authentication information including refresh token.
+    /// </summary>
+    public static async Task SetAuthenticationAsync(
+        string projectDirectory,
+        string host,
+        string accessToken,
+        DateTime? expiresAt,
+        string? refreshToken,
+        DateTime? refreshTokenExpiresAt,
+        CancellationToken cancellationToken = default)
+    {
+        var tokenPath = GetTokenPath(projectDirectory);
+        var directory = Path.GetDirectoryName(tokenPath);
+
+        if (directory != null && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        Dictionary<string, TokenInfo> tokens;
+
+        // Load existing tokens if file exists
+        if (File.Exists(tokenPath))
+        {
+            try
+            {
+                var json = await File.ReadAllTextAsync(tokenPath, cancellationToken);
+                tokens = JsonSerializer.Deserialize<Dictionary<string, TokenInfo>>(json) ?? new Dictionary<string, TokenInfo>();
+            }
+            catch (JsonException)
+            {
+                tokens = new Dictionary<string, TokenInfo>();
+            }
+        }
+        else
+        {
+            tokens = new Dictionary<string, TokenInfo>();
+        }
+
+        // Update or add token with refresh token
+        tokens[host] = new TokenInfo
+        {
+            AccessToken = accessToken,
+            ExpiresAt = expiresAt,
+            RefreshToken = refreshToken,
+            RefreshTokenExpiresAt = refreshTokenExpiresAt,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        // Save tokens
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true
+        };
+
+        var updatedJson = JsonSerializer.Serialize(tokens, options);
+        await File.WriteAllTextAsync(tokenPath, updatedJson, cancellationToken);
+
+        // Set file permissions to user-only (Unix-like systems)
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+        {
+            try
+            {
+                File.SetUnixFileMode(tokenPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+            catch
+            {
+                // Ignore errors setting permissions
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the refresh token for the specified remote host.
+    /// </summary>
+    public static async Task<string?> GetRefreshTokenAsync(string projectDirectory, string host, CancellationToken cancellationToken = default)
+    {
+        var tokenPath = GetTokenPath(projectDirectory);
+        if (!File.Exists(tokenPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(tokenPath, cancellationToken);
+            var tokens = JsonSerializer.Deserialize<Dictionary<string, TokenInfo>>(json);
+
+            if (tokens != null && tokens.TryGetValue(host, out var tokenInfo))
+            {
+                // Check if refresh token is expired
+                if (tokenInfo.RefreshTokenExpiresAt.HasValue && tokenInfo.RefreshTokenExpiresAt.Value < DateTime.UtcNow)
+                {
+                    return null; // Refresh token expired
+                }
+
+                return tokenInfo.RefreshToken;
+            }
+        }
+        catch (JsonException)
+        {
+            // Invalid token file, return null
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Removes the authentication token for the specified remote host.
     /// </summary>
     public static async Task RemoveTokenAsync(string projectDirectory, string host, CancellationToken cancellationToken = default)
@@ -179,5 +287,7 @@ public static class AuthTokenManager
         public string AccessToken { get; set; } = string.Empty;
         public DateTime? ExpiresAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+        public string? RefreshToken { get; set; }
+        public DateTime? RefreshTokenExpiresAt { get; set; }
     }
 }
