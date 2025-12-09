@@ -28,6 +28,13 @@ public class Translation
     public string? Value { get; set; }
 
     /// <summary>
+    /// Per-language comment/note for this translation.
+    /// Each language can have its own comment (e.g., "Save button" in EN, "Κουμπί αποθήκευσης" in EL).
+    /// </summary>
+    [Column("comment")]
+    public string? Comment { get; set; }
+
+    /// <summary>
     /// Plural form identifier (empty for non-plural, "one", "other", "few", "many" for plurals).
     /// </summary>
     [MaxLength(20)]
