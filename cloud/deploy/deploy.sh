@@ -187,6 +187,11 @@ docker compose stop api web nginx
 print_step "Starting containers..."
 docker compose up -d
 
+# Step 5.5: Restart nginx to ensure it picks up config changes + refresh DNS
+print_step "Restarting nginx..."
+docker compose up -d nginx
+docker compose restart nginx
+
 # Step 6: Wait for health
 print_step "Waiting for API to be healthy..."
 MAX_WAIT=60

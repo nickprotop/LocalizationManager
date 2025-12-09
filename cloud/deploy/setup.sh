@@ -527,9 +527,10 @@ else
     docker compose up -d
 fi
 
-# Reload nginx to pick up any config changes
-print_step "Reloading nginx configuration..."
+# Ensure nginx is running and restart to pick up config changes + refresh DNS
+print_step "Restarting nginx..."
 docker compose up -d nginx
+docker compose restart nginx
 
 # Wait for PostgreSQL
 print_step "Waiting for PostgreSQL to be ready..."
