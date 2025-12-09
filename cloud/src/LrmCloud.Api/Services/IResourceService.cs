@@ -1,4 +1,5 @@
 using LrmCloud.Shared.DTOs.Resources;
+using LrmCloud.Shared.DTOs.Sync;
 
 namespace LrmCloud.Api.Services;
 
@@ -70,17 +71,29 @@ public interface IResourceService
     Task<ValidationResultDto> ValidateProjectAsync(int projectId, int userId);
 
     // ============================================================
-    // CLI Sync Operations
+    // REST API Operations (for web UI)
     // ============================================================
 
     /// <summary>
-    /// Gets all resources for a project (for CLI pull).
+    /// Gets all resources for a project as structured DTOs.
     /// </summary>
     Task<List<ResourceDto>> GetResourcesAsync(int projectId, string? languageCode, int userId);
 
+    // ============================================================
+    // CLI Sync Operations (File-Based)
+    // ============================================================
+
     /// <summary>
-    /// Pushes resources from CLI to cloud.
+    /// Pushes files to cloud with incremental changes.
+    /// Stores files to S3 and parses them to database using Core's backends.
     /// </summary>
-    Task<(bool Success, PushResourcesResponse? Response, string? ErrorMessage)> PushResourcesAsync(
-        int projectId, int userId, PushResourcesRequest request);
+    Task<(bool Success, PushResponse? Response, string? ErrorMessage)> PushResourcesAsync(
+        int projectId, int userId, PushRequest request);
+
+    /// <summary>
+    /// Pulls files from cloud - generates files from database.
+    /// Generates files from database using Core's backends.
+    /// </summary>
+    Task<(bool Success, PullResponse? Response, string? ErrorMessage)> PullResourcesAsync(
+        int projectId, int userId);
 }

@@ -1,6 +1,7 @@
 using LrmCloud.Api.Data;
 using LrmCloud.Shared.Constants;
 using LrmCloud.Shared.DTOs.Resources;
+using LrmCloud.Shared.DTOs.Sync;
 using LrmCloud.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,15 +11,18 @@ public class ResourceService : IResourceService
 {
     private readonly AppDbContext _db;
     private readonly IProjectService _projectService;
+    private readonly ResourceSyncService _syncService;
     private readonly ILogger<ResourceService> _logger;
 
     public ResourceService(
         AppDbContext db,
         IProjectService projectService,
+        ResourceSyncService syncService,
         ILogger<ResourceService> logger)
     {
         _db = db;
         _projectService = projectService;
+        _syncService = syncService;
         _logger = logger;
     }
 
@@ -626,8 +630,16 @@ public class ResourceService : IResourceService
         return resources;
     }
 
-    public async Task<(bool Success, PushResourcesResponse? Response, string? ErrorMessage)> PushResourcesAsync(
-        int projectId, int userId, PushResourcesRequest request)
+    // ============================================================
+    // NEW: File-based Cloud Sync (using Core backends)
+    // ============================================================
+
+    /// <summary>
+    /// Pushes resources using file-based sync with Core backends.
+    /// Supports incremental sync (modified + deleted files).
+    /// </summary>
+    public async Task<(bool Success, PushResponse? Response, string? ErrorMessage)> PushResourcesAsync(
+        int projectId, int userId, PushRequest request)
     {
         try
         {
@@ -639,75 +651,43 @@ public class ResourceService : IResourceService
             if (project == null)
                 return (false, null, "Project not found");
 
-            int filesUpdated = 0;
-
-            // Process each resource file
-            foreach (var resource in request.Resources)
+            // Update configuration if provided
+            if (request.Configuration != null)
             {
-                // Parse the JSON content
-                var translationsDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(resource.Content);
-                if (translationsDict == null)
-                    continue;
-
-                // Extract language code from filename (e.g., "strings.en.json" -> "en")
-                var languageCode = ExtractLanguageCode(resource.Path);
-                if (string.IsNullOrEmpty(languageCode))
-                    continue;
-
-                // Update or create resource keys and translations
-                foreach (var kvp in translationsDict)
-                {
-                    var keyName = kvp.Key;
-                    var value = kvp.Value;
-
-                    // Find or create resource key
-                    var resourceKey = await _db.ResourceKeys
-                        .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == keyName);
-
-                    if (resourceKey == null)
-                    {
-                        resourceKey = new ResourceKey
-                        {
-                            ProjectId = projectId,
-                            KeyName = keyName,
-                            Comment = null,
-                            Version = 1,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        };
-                        _db.ResourceKeys.Add(resourceKey);
-                        await _db.SaveChangesAsync(); // Save to get the ID
-                    }
-
-                    // Find or create translation
-                    var translation = await _db.Translations
-                        .FirstOrDefaultAsync(t => t.ResourceKeyId == resourceKey.Id && t.LanguageCode == languageCode);
-
-                    if (translation == null)
-                    {
-                        translation = new Translation
-                        {
-                            ResourceKeyId = resourceKey.Id,
-                            LanguageCode = languageCode,
-                            Value = value,
-                            Status = TranslationStatus.Approved,
-                            Version = 1,
-                            UpdatedAt = DateTime.UtcNow
-                        };
-                        _db.Translations.Add(translation);
-                    }
-                    else if (translation.Value != value)
-                    {
-                        translation.Value = value;
-                        translation.Status = TranslationStatus.Approved;
-                        translation.Version = translation.Version + 1;
-                        translation.UpdatedAt = DateTime.UtcNow;
-                    }
-                }
-
-                filesUpdated++;
+                project.ConfigJson = request.Configuration;
+                project.ConfigUpdatedAt = DateTime.UtcNow;
+                project.ConfigUpdatedBy = userId;
             }
 
+            // Handle deleted files - remove languages from database
+            if (request.DeletedFiles.Count > 0)
+            {
+                var config = project.ConfigJson != null
+                    ? System.Text.Json.JsonSerializer.Deserialize<LocalizationManager.Core.Configuration.ConfigurationModel>(project.ConfigJson)
+                    : new LocalizationManager.Core.Configuration.ConfigurationModel();
+
+                foreach (var deletedPath in request.DeletedFiles)
+                {
+                    // Extract language code from deleted file path
+                    var langCode = ExtractLanguageCodeFromPath(deletedPath, config!);
+                    await _syncService.DeleteLanguageTranslationsAsync(projectId, langCode);
+                }
+            }
+
+            // Store modified files to S3/Minio
+            if (request.ModifiedFiles.Count > 0)
+            {
+                await _syncService.StoreUploadedFilesAsync(projectId, request.ModifiedFiles);
+            }
+
+            // Parse modified files to database
+            if (request.ModifiedFiles.Count > 0)
+            {
+                await _syncService.ParseFilesToDatabaseAsync(projectId, request.ModifiedFiles, project.ConfigJson);
+            }
+
+            // Update project last sync time
+            project.LastSyncedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
 
             // Record sync history
@@ -719,17 +699,18 @@ public class ResourceService : IResourceService
                 Status = "completed",
                 CreatedAt = DateTime.UtcNow
             });
-
             await _db.SaveChangesAsync();
 
-            _logger.LogInformation("User {UserId} pushed {Count} resources to project {ProjectId}", userId, filesUpdated, projectId);
+            _logger.LogInformation(
+                "User {UserId} pushed {Modified} modified and {Deleted} deleted files to project {ProjectId}",
+                userId, request.ModifiedFiles.Count, request.DeletedFiles.Count, projectId);
 
-            return (true, new PushResourcesResponse
+            return (true, new PushResponse
             {
                 Success = true,
-                Message = $"Successfully pushed {filesUpdated} resource file(s)",
-                FilesUpdated = filesUpdated,
-                PushedAt = DateTime.UtcNow
+                ModifiedCount = request.ModifiedFiles.Count,
+                DeletedCount = request.DeletedFiles.Count,
+                Message = $"Successfully pushed {request.ModifiedFiles.Count} modified and {request.DeletedFiles.Count} deleted files"
             }, null);
         }
         catch (Exception ex)
@@ -739,13 +720,70 @@ public class ResourceService : IResourceService
         }
     }
 
-    private string? ExtractLanguageCode(string path)
+    /// <summary>
+    /// Pulls resources using file-based sync with Core backends.
+    /// </summary>
+    public async Task<(bool Success, PullResponse? Response, string? ErrorMessage)> PullResourcesAsync(
+        int projectId, int userId)
     {
-        // Extract language code from filename like "strings.en.json" -> "en"
-        var filename = System.IO.Path.GetFileNameWithoutExtension(path);
-        var parts = filename.Split('.');
-        if (parts.Length >= 2)
-            return parts[^1]; // Return last part before extension
-        return null;
+        try
+        {
+            // Check permission
+            if (!await _projectService.CanViewProjectAsync(projectId, userId))
+                return (false, null, "You don't have permission to view this project");
+
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null)
+                return (false, null, "Project not found");
+
+            // Generate files from database using Core's backends
+            var files = await _syncService.GenerateFilesFromDatabaseAsync(projectId, project.ConfigJson);
+
+            _logger.LogInformation("User {UserId} pulled {Count} files from project {ProjectId}",
+                userId, files.Count, projectId);
+
+            return (true, new PullResponse
+            {
+                Configuration = project.ConfigJson,
+                Files = files
+            }, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error pulling resources from project {ProjectId}", projectId);
+            return (false, null, $"An error occurred while pulling resources: {ex.Message}");
+        }
     }
+
+    private string ExtractLanguageCodeFromPath(string filePath, LocalizationManager.Core.Configuration.ConfigurationModel config)
+    {
+        var fileName = System.IO.Path.GetFileNameWithoutExtension(filePath);
+
+        // RESX format: Resources.el.resx → "el", Resources.resx → default language
+        if (config.ResourceFormat == "resx")
+        {
+            var parts = fileName.Split('.');
+            if (parts.Length > 1)
+            {
+                return parts[^1];
+            }
+            return config.DefaultLanguageCode ?? "en";
+        }
+
+        // JSON i18next format: el.json → "el"
+        if (config.Json?.I18nextCompatible == true)
+        {
+            return fileName;
+        }
+
+        // JSON standard format: strings.el.json → "el", strings.json → default language
+        var jsonParts = fileName.Split('.');
+        if (jsonParts.Length > 1)
+        {
+            return jsonParts[^1];
+        }
+
+        return config.DefaultLanguageCode ?? "en";
+    }
+
 }

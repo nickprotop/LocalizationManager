@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LrmCloud.Shared\LrmCloud.Shared.csproj" />
+    <ProjectReference Include="..\..\..\LocalizationManager.Core\LocalizationManager.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

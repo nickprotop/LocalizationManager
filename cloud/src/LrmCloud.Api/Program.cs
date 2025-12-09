@@ -107,6 +107,7 @@ public class Program
             builder.Services.AddScoped<IOrganizationService, OrganizationService>();
             builder.Services.AddScoped<IProjectService, ProjectService>();
             builder.Services.AddScoped<IResourceService, ResourceService>();
+            builder.Services.AddScoped<ResourceSyncService>(); // New: File-based sync with Core backends
             builder.Services.AddScoped<IStorageService, MinioStorageService>();
 
             // =============================================================================
