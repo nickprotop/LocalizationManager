@@ -1306,9 +1306,10 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 - [x] Manual end-to-end testing of login flow ✅
 - [x] Manual testing of push/pull with real API ✅
 - [x] Conflict resolution testing ✅
-- [ ] Unit tests for URL parser, config manager
-- [ ] Automated integration tests
-- [ ] Config sync and conflict resolution automated tests
+- [x] Unit tests for URL parser, config manager ✅
+- [x] Unit tests for SyncStateManager, AuthTokenManager ✅
+- [x] CloudSyncValidator format validation tests ✅
+- [x] ConflictDetector and PullBackupManager tests ✅
 
 ### Phase 4: GitHub App (Week 9-10)
 - [ ] Register GitHub App
