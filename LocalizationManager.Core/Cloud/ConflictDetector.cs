@@ -58,8 +58,8 @@ public class ConflictDetector
     /// Detect conflicts between local and remote resources.
     /// </summary>
     public List<Conflict> DetectResourceConflicts(
-        List<ResourceFile> localResources,
-        List<ResourceFile> remoteResources)
+        List<FileDto> localResources,
+        List<FileDto> remoteResources)
     {
         var conflicts = new List<Conflict>();
 
@@ -120,8 +120,8 @@ public class ConflictDetector
     /// Get a summary of differences between local and remote.
     /// </summary>
     public DiffSummary GetDiffSummary(
-        List<ResourceFile> localResources,
-        List<ResourceFile> remoteResources)
+        List<FileDto> localResources,
+        List<FileDto> remoteResources)
     {
         var summary = new DiffSummary();
 

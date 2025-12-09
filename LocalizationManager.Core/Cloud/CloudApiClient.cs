@@ -135,35 +135,28 @@ public class CloudApiClient : IDisposable
 
     #endregion
 
-    #region Resource Sync API
+    #region Resource Sync API (V2 - File-Based)
 
     /// <summary>
-    /// Gets resource files from the cloud.
+    /// Pushes files to the cloud (V2 - file-based sync with incremental changes).
     /// </summary>
-    public async Task<List<ResourceFile>> GetResourcesAsync(CancellationToken cancellationToken = default)
+    public async Task<PushResponse> PushResourcesAsync(
+        PushRequest request,
+        CancellationToken cancellationToken = default)
     {
-        var url = $"{_remoteUrl.ProjectApiUrl}/resources";
-        var response = await GetAsync<List<ResourceFile>>(url, cancellationToken);
-        return response ?? new List<ResourceFile>();
+        var url = $"{_remoteUrl.ProjectApiUrl}/sync/push";
+        var response = await PostAsync<PushResponse>(url, request, cancellationToken);
+        return response ?? throw new CloudApiException("Failed to push resources");
     }
 
     /// <summary>
-    /// Uploads resource files to the cloud.
+    /// Pulls files from the cloud (V2 - generates files from database).
     /// </summary>
-    public async Task<PushResult> PushResourcesAsync(
-        List<ResourceFile> resources,
-        string? message = null,
-        CancellationToken cancellationToken = default)
+    public async Task<PullResponse> PullResourcesAsync(CancellationToken cancellationToken = default)
     {
-        var url = $"{_remoteUrl.ProjectApiUrl}/resources/push";
-        var request = new PushRequest
-        {
-            Resources = resources,
-            Message = message
-        };
-
-        var response = await PostAsync<PushResult>(url, request, cancellationToken);
-        return response ?? throw new CloudApiException("Failed to push resources");
+        var url = $"{_remoteUrl.ProjectApiUrl}/sync/pull";
+        var response = await GetAsync<PullResponse>(url, cancellationToken);
+        return response ?? throw new CloudApiException("Failed to pull resources");
     }
 
     /// <summary>
@@ -319,9 +312,9 @@ public class ConfigurationHistoryEntry
 }
 
 /// <summary>
-/// Represents a resource file.
+/// Represents a resource file for V2 sync.
 /// </summary>
-public class ResourceFile
+public class FileDto
 {
     public string Path { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
@@ -329,23 +322,33 @@ public class ResourceFile
 }
 
 /// <summary>
-/// Request to push resources.
+/// Request to push resources (V2 - file-based with incremental changes).
 /// </summary>
 public class PushRequest
 {
-    public List<ResourceFile> Resources { get; set; } = new();
+    public string? Configuration { get; set; }
+    public List<FileDto> ModifiedFiles { get; set; } = new();
+    public List<string> DeletedFiles { get; set; } = new();
+}
+
+/// <summary>
+/// Response from push operation (V2).
+/// </summary>
+public class PushResponse
+{
+    public bool Success { get; set; }
+    public int ModifiedCount { get; set; }
+    public int DeletedCount { get; set; }
     public string? Message { get; set; }
 }
 
 /// <summary>
-/// Result of push operation.
+/// Response from pull operation (V2).
 /// </summary>
-public class PushResult
+public class PullResponse
 {
-    public bool Success { get; set; }
-    public string? Message { get; set; }
-    public int FilesUpdated { get; set; }
-    public DateTime PushedAt { get; set; }
+    public string? Configuration { get; set; }
+    public List<FileDto> Files { get; set; } = new();
 }
 
 /// <summary>
