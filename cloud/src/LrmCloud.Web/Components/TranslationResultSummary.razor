@@ -1,0 +1,106 @@
+@using LrmCloud.Shared.DTOs.Translation
+
+<MudStack Spacing="4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Justify="Justify.Center">
+        @if (Result.Success)
+        {
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
+            <MudText Typo="Typo.h6" Color="Color.Success">Translation Complete</MudText>
+        }
+        else
+        {
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Large" />
+            <MudText Typo="Typo.h6" Color="Color.Warning">Translation Completed with Issues</MudText>
+        }
+    </MudStack>
+
+    <MudDivider />
+
+    <MudGrid Spacing="2">
+        <MudItem xs="4">
+            <MudPaper Class="pa-4 text-center" Elevation="0" Style="background-color: var(--mud-palette-success-lighten);">
+                <MudText Typo="Typo.h4" Color="Color.Success">@Result.TranslatedCount</MudText>
+                <MudText Typo="Typo.body2">Translated</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="4">
+            <MudPaper Class="pa-4 text-center" Elevation="0" Style="background-color: var(--mud-palette-warning-lighten);">
+                <MudText Typo="Typo.h4" Color="Color.Warning">@Result.SkippedCount</MudText>
+                <MudText Typo="Typo.body2">Skipped</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="4">
+            <MudPaper Class="pa-4 text-center" Elevation="0" Style="background-color: var(--mud-palette-error-lighten);">
+                <MudText Typo="Typo.h4" Color="Color.Error">@Result.FailedCount</MudText>
+                <MudText Typo="Typo.body2">Failed</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-2">
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Small" />
+            <MudText Typo="Typo.body2">@FormatElapsedTime(Result.ElapsedMs)</MudText>
+        </MudStack>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.TextFields" Size="Size.Small" />
+            <MudText Typo="Typo.body2">@Result.CharactersTranslated.ToString("N0") characters</MudText>
+        </MudStack>
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@Result.Provider</MudChip>
+    </MudStack>
+
+    @if (Result.Errors.Any())
+    {
+        <MudAlert Severity="Severity.Error" Dense="true">
+            <MudText Typo="Typo.body2">@string.Join(", ", Result.Errors.Take(3))</MudText>
+            @if (Result.Errors.Count > 3)
+            {
+                <MudText Typo="Typo.caption">...and @(Result.Errors.Count - 3) more errors</MudText>
+            }
+        </MudAlert>
+    }
+
+    @if (Result.Results.Any(r => !r.Success))
+    {
+        <MudExpansionPanels>
+            <MudExpansionPanel Text="@($"Failed Translations ({Result.Results.Count(r => !r.Success)})")">
+                <MudSimpleTable Dense="true" Striped="true" Style="max-height: 200px; overflow-y: auto;">
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Language</th>
+                            <th>Error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var failed in Result.Results.Where(r => !r.Success).Take(10))
+                        {
+                            <tr>
+                                <td>@failed.Key</td>
+                                <td>@failed.TargetLanguage</td>
+                                <td><MudText Typo="Typo.caption" Color="Color.Error">@failed.Error</MudText></td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    }
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired]
+    public TranslateResponseDto Result { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private static string FormatElapsedTime(long ms)
+    {
+        if (ms < 1000)
+            return $"{ms}ms";
+        if (ms < 60000)
+            return $"{ms / 1000.0:F1}s";
+        return $"{ms / 60000}m {(ms % 60000) / 1000}s";
+    }
+}

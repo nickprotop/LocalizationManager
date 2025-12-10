@@ -1,0 +1,119 @@
+@using LrmCloud.Shared.DTOs.Translation
+
+<MudCard Elevation="1" Class="provider-card">
+    <MudCardContent>
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                <MudIcon Icon="@GetProviderIcon(Provider.Name)" Size="Size.Medium" />
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.subtitle1">@Provider.DisplayName</MudText>
+                    @if (!Provider.RequiresApiKey)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">
+                            Free
+                        </MudChip>
+                    }
+                    else if (Provider.IsAiProvider)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                            AI
+                        </MudChip>
+                    }
+                </MudStack>
+            </MudStack>
+
+            @if (Provider.IsConfigured)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+            }
+        </MudStack>
+
+        @if (!string.IsNullOrEmpty(Provider.Description))
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                @Provider.Description
+            </MudText>
+        }
+
+        @if (Provider.IsConfigured && Provider.ApiKeySource != null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                Key from: @Provider.ApiKeySource
+            </MudText>
+        }
+    </MudCardContent>
+
+    <MudCardActions>
+        @if (Provider.RequiresApiKey)
+        {
+            @if (Provider.IsConfigured)
+            {
+                <MudButton Size="Size.Small"
+                           Color="Color.Primary"
+                           Variant="Variant.Text"
+                           OnClick="@(() => OnConfigure.InvokeAsync(Provider))">
+                    Update Key
+                </MudButton>
+                <MudButton Size="Size.Small"
+                           Color="Color.Error"
+                           Variant="Variant.Text"
+                           OnClick="@(() => OnRemove.InvokeAsync(Provider))">
+                    Remove
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Size="Size.Small"
+                           Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           OnClick="@(() => OnConfigure.InvokeAsync(Provider))">
+                    Add API Key
+                </MudButton>
+            }
+        }
+        else
+        {
+            <MudButton Size="Size.Small"
+                       Color="Color.Primary"
+                       Variant="Variant.Text"
+                       Disabled="true">
+                Ready to Use
+            </MudButton>
+        }
+    </MudCardActions>
+</MudCard>
+
+<style>
+    .provider-card {
+        transition: box-shadow 0.2s ease;
+    }
+
+    .provider-card:hover {
+        box-shadow: var(--mud-elevation-4);
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired]
+    public TranslationProviderDto Provider { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback<TranslationProviderDto> OnConfigure { get; set; }
+
+    [Parameter]
+    public EventCallback<TranslationProviderDto> OnRemove { get; set; }
+
+    private static string GetProviderIcon(string provider) => provider switch
+    {
+        "google" => Icons.Custom.Brands.Google,
+        "deepl" => Icons.Material.Filled.Language,
+        "openai" => Icons.Material.Filled.Psychology,
+        "claude" => Icons.Material.Filled.AutoAwesome,
+        "azuretranslator" or "azureopenai" => Icons.Custom.Brands.Microsoft,
+        "lingva" => Icons.Material.Filled.Public,
+        "mymemory" => Icons.Material.Filled.Memory,
+        "ollama" => Icons.Material.Filled.Computer,
+        "libretranslate" => Icons.Material.Filled.Code,
+        _ => Icons.Material.Filled.Translate
+    };
+}

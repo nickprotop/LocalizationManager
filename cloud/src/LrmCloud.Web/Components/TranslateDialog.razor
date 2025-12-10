@@ -1,0 +1,291 @@
+@using LrmCloud.Shared.DTOs.Translation
+@using LrmCloud.Web.Services
+@inject TranslationService TranslationService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Translate" />
+            <MudText Typo="Typo.h6">Translate Keys</MudText>
+        </MudStack>
+    </TitleContent>
+
+    <DialogContent>
+        @if (_isLoadingProviders)
+        {
+            <MudStack AlignItems="AlignItems.Center" Class="py-8">
+                <MudProgressCircular Indeterminate="true" />
+                <MudText>Loading providers...</MudText>
+            </MudStack>
+        }
+        else if (_isTranslating)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="4" Class="py-8">
+                <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+                <MudText Typo="Typo.h6">Translating...</MudText>
+                <MudText Color="Color.Secondary">
+                    @_keysToTranslate.Count keys × @_selectedLanguages.Count languages
+                </MudText>
+                @if (_translationResult != null)
+                {
+                    <MudText Color="Color.Info">
+                        @_translationResult.TranslatedCount translated, @_translationResult.FailedCount failed
+                    </MudText>
+                }
+            </MudStack>
+        }
+        else if (_translationResult != null)
+        {
+            <TranslationResultSummary Result="_translationResult" OnClose="CloseResult" />
+        }
+        else
+        {
+            <MudStack Spacing="4">
+                @if (!_providers.Any())
+                {
+                    <MudAlert Severity="Severity.Warning">
+                        No translation providers configured. Please add an API key in Settings.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Translate @(_keysToTranslate.Count > 0 ? $"{_keysToTranslate.Count} selected keys" : "all keys")
+                        to the selected languages.
+                    </MudText>
+
+                    <MudSelect T="string"
+                               @bind-Value="_selectedProvider"
+                               Label="Translation Provider"
+                               Variant="Variant.Outlined"
+                               AnchorOrigin="Origin.BottomCenter">
+                        @foreach (var provider in _providers.Where(p => p.IsConfigured))
+                        {
+                            <MudSelectItem Value="@provider.Name">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@GetProviderIcon(provider.Name)" Size="Size.Small" />
+                                    <span>@provider.DisplayName</span>
+                                    @if (!provider.RequiresApiKey)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success">Free</MudChip>
+                                    }
+                                    @if (provider.ApiKeySource != null)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">(@provider.ApiKeySource)</MudText>
+                                    }
+                                </MudStack>
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudText Typo="Typo.subtitle2">Target Languages</MudText>
+                    <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
+                        @foreach (var lang in AvailableLanguages.Where(l => l != SourceLanguage))
+                        {
+                            var langCode = lang;
+                            var isSelected = _selectedLanguages.Contains(langCode);
+                            <MudChip T="string"
+                                     Color="@(isSelected ? Color.Primary : Color.Default)"
+                                     Variant="@(isSelected ? Variant.Filled : Variant.Outlined)"
+                                     OnClick="@(() => ToggleLanguage(langCode))">
+                                @langCode.ToUpperInvariant()
+                            </MudChip>
+                        }
+                    </MudStack>
+
+                    @if (!_selectedLanguages.Any())
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true">
+                            Select at least one target language
+                        </MudAlert>
+                    }
+
+                    <MudDivider />
+
+                    <MudSwitch T="bool" @bind-Value="_onlyMissing" Color="Color.Primary">
+                        Only translate missing translations
+                    </MudSwitch>
+
+                    <MudSwitch T="bool" @bind-Value="_overwrite" Color="Color.Warning" Disabled="@_onlyMissing">
+                        Overwrite existing translations
+                    </MudSwitch>
+
+                    <MudTextField T="string"
+                                  @bind-Value="_context"
+                                  Label="Context (optional)"
+                                  Placeholder="Provide context for better AI translations..."
+                                  Variant="Variant.Outlined"
+                                  Lines="2"
+                                  HelperText="Context helps AI providers produce more accurate translations" />
+                }
+            </MudStack>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        @if (_translationResult != null)
+        {
+            <MudButton OnClick="CloseResult">Translate More</MudButton>
+            <MudButton Color="Color.Primary" OnClick="@(() => MudDialog.Close(DialogResult.Ok(true)))">
+                Done
+            </MudButton>
+        }
+        else
+        {
+            <MudButton OnClick="Cancel">Cancel</MudButton>
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       Disabled="@(!CanTranslate)"
+                       OnClick="StartTranslation">
+                @if (_isTranslating)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Translate
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    [Parameter]
+    public string SourceLanguage { get; set; } = "en";
+
+    [Parameter]
+    public List<string> AvailableLanguages { get; set; } = new();
+
+    [Parameter]
+    public List<string> KeysToTranslate { get; set; } = new();
+
+    private List<TranslationProviderDto> _providers = new();
+    private string? _selectedProvider;
+    private HashSet<string> _selectedLanguages = new();
+    private List<string> _keysToTranslate = new();
+    private bool _onlyMissing = true;
+    private bool _overwrite = false;
+    private string? _context;
+    private bool _isLoadingProviders = true;
+    private bool _isTranslating = false;
+    private TranslateResponseDto? _translationResult;
+
+    private bool CanTranslate => !_isLoadingProviders &&
+                                  !_isTranslating &&
+                                  !string.IsNullOrEmpty(_selectedProvider) &&
+                                  _selectedLanguages.Any();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _keysToTranslate = KeysToTranslate;
+
+        // Pre-select all non-source languages
+        _selectedLanguages = AvailableLanguages
+            .Where(l => l != SourceLanguage)
+            .ToHashSet();
+
+        await LoadProvidersAsync();
+    }
+
+    private async Task LoadProvidersAsync()
+    {
+        _isLoadingProviders = true;
+        try
+        {
+            _providers = await TranslationService.GetProvidersAsync(ProjectId);
+
+            // Select first configured provider
+            _selectedProvider = _providers
+                .FirstOrDefault(p => p.IsConfigured)?.Name;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load providers: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingProviders = false;
+        }
+    }
+
+    private void ToggleLanguage(string lang)
+    {
+        if (_selectedLanguages.Contains(lang))
+            _selectedLanguages.Remove(lang);
+        else
+            _selectedLanguages.Add(lang);
+    }
+
+    private async Task StartTranslation()
+    {
+        _isTranslating = true;
+        _translationResult = null;
+
+        try
+        {
+            var request = new TranslateRequestDto
+            {
+                Keys = _keysToTranslate,
+                TargetLanguages = _selectedLanguages.ToList(),
+                SourceLanguage = SourceLanguage,
+                Provider = _selectedProvider,
+                OnlyMissing = _onlyMissing,
+                Overwrite = _overwrite,
+                Context = _context
+            };
+
+            _translationResult = await TranslationService.TranslateKeysAsync(ProjectId, request);
+
+            if (_translationResult.Success)
+            {
+                Snackbar.Add($"Translated {_translationResult.TranslatedCount} keys successfully", Severity.Success);
+            }
+            else if (_translationResult.Errors.Any())
+            {
+                Snackbar.Add(_translationResult.Errors.First(), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Translation failed: {ex.Message}", Severity.Error);
+            _translationResult = new TranslateResponseDto
+            {
+                Success = false,
+                Errors = [ex.Message]
+            };
+        }
+        finally
+        {
+            _isTranslating = false;
+        }
+    }
+
+    private void CloseResult()
+    {
+        _translationResult = null;
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private static string GetProviderIcon(string provider) => provider switch
+    {
+        "google" => Icons.Custom.Brands.Google,
+        "deepl" => Icons.Material.Filled.Language,
+        "openai" => Icons.Material.Filled.Psychology,
+        "claude" => Icons.Material.Filled.AutoAwesome,
+        "azuretranslator" or "azureopenai" => Icons.Custom.Brands.Microsoft,
+        "lingva" => Icons.Material.Filled.Public,
+        "mymemory" => Icons.Material.Filled.Memory,
+        "ollama" => Icons.Material.Filled.Computer,
+        "libretranslate" => Icons.Material.Filled.Code,
+        _ => Icons.Material.Filled.Translate
+    };
+}

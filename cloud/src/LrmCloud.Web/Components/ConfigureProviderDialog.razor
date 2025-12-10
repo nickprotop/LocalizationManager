@@ -1,0 +1,171 @@
+@using LrmCloud.Shared.DTOs.Translation
+@using LrmCloud.Web.Services
+@inject TranslationService TranslationService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Key" />
+            <MudText Typo="Typo.h6">Configure @Provider.DisplayName</MudText>
+        </MudStack>
+    </TitleContent>
+
+    <DialogContent>
+        <MudStack Spacing="4">
+            @if (!string.IsNullOrEmpty(Provider.Description))
+            {
+                <MudAlert Severity="Severity.Info" Dense="true">
+                    @Provider.Description
+                </MudAlert>
+            }
+
+            <MudTextField T="string"
+                          @bind-Value="_apiKey"
+                          Label="API Key"
+                          Placeholder="Enter your API key..."
+                          Variant="Variant.Outlined"
+                          InputType="@(_showKey ? InputType.Text : InputType.Password)"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@(_showKey ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                          OnAdornmentClick="@(() => _showKey = !_showKey)"
+                          Required="true" />
+
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @GetApiKeyHelpText(Provider.Name)
+            </MudText>
+
+            @if (_testResult != null)
+            {
+                <MudAlert Severity="@(_testResult.IsValid ? Severity.Success : Severity.Error)" Dense="true">
+                    @if (_testResult.IsValid)
+                    {
+                        <MudText>@(_testResult.ProviderMessage ?? "API key is valid!")</MudText>
+                    }
+                    else
+                    {
+                        <MudText>@(_testResult.Error ?? "Invalid API key")</MudText>
+                    }
+                </MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_isSaving">Cancel</MudButton>
+        <MudButton Color="Color.Secondary"
+                   Variant="Variant.Outlined"
+                   OnClick="TestApiKey"
+                   Disabled="@(string.IsNullOrEmpty(_apiKey) || _isTesting || _isSaving)">
+            @if (_isTesting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Test
+        </MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Save"
+                   Disabled="@(string.IsNullOrEmpty(_apiKey) || _isSaving)">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public TranslationProviderDto Provider { get; set; } = null!;
+
+    private string _apiKey = string.Empty;
+    private bool _showKey = false;
+    private bool _isTesting = false;
+    private bool _isSaving = false;
+    private TestApiKeyResponse? _testResult;
+
+    private async Task TestApiKey()
+    {
+        _isTesting = true;
+        _testResult = null;
+
+        try
+        {
+            var request = new TestApiKeyRequest
+            {
+                ProviderName = Provider.Name,
+                ApiKey = _apiKey
+            };
+
+            _testResult = await TranslationService.TestApiKeyAsync(request);
+        }
+        catch (Exception ex)
+        {
+            _testResult = new TestApiKeyResponse
+            {
+                IsValid = false,
+                Error = ex.Message
+            };
+        }
+        finally
+        {
+            _isTesting = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        _isSaving = true;
+
+        try
+        {
+            var request = new SetApiKeyRequest
+            {
+                ProviderName = Provider.Name,
+                ApiKey = _apiKey
+            };
+
+            var result = await TranslationService.SetUserApiKeyAsync(request);
+
+            if (result.IsSuccess)
+            {
+                Snackbar.Add($"API key for {Provider.DisplayName} saved successfully", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to save API key", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to save: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private static string GetApiKeyHelpText(string provider) => provider switch
+    {
+        "google" => "Get your API key from Google Cloud Console → APIs & Services → Credentials",
+        "deepl" => "Get your API key from DeepL Pro account → Account → Authentication Key",
+        "openai" => "Get your API key from OpenAI Platform → API Keys",
+        "claude" => "Get your API key from Anthropic Console → API Keys",
+        "azuretranslator" => "Get your key from Azure Portal → Cognitive Services → Translator",
+        "azureopenai" => "Get your key from Azure Portal → Azure OpenAI Service → Keys",
+        "libretranslate" => "API key is optional for public instances. Required for private instances.",
+        _ => "Enter your API key for this provider"
+    };
+}
