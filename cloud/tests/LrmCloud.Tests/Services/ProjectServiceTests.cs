@@ -10,6 +10,8 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
+using Translation = LrmCloud.Shared.Entities.Translation;
+
 namespace LrmCloud.Tests.Services;
 
 public class ProjectServiceTests : IDisposable
@@ -677,9 +679,9 @@ public class ProjectServiceTests : IDisposable
 
         // Add translations
         _db.Translations.AddRange(
-            new Translation { ResourceKeyId = key1.Id, LanguageCode = "en", Value = "Hello", Status = TranslationStatus.Translated, UpdatedAt = DateTime.UtcNow },
-            new Translation { ResourceKeyId = key1.Id, LanguageCode = "fr", Value = "Bonjour", Status = TranslationStatus.Translated, UpdatedAt = DateTime.UtcNow },
-            new Translation { ResourceKeyId = key2.Id, LanguageCode = "en", Value = "Goodbye", Status = TranslationStatus.Pending, UpdatedAt = DateTime.UtcNow }
+            new Shared.Entities.Translation { ResourceKeyId = key1.Id, LanguageCode = "en", Value = "Hello", Status = TranslationStatus.Translated, UpdatedAt = DateTime.UtcNow },
+            new Shared.Entities.Translation { ResourceKeyId = key1.Id, LanguageCode = "fr", Value = "Bonjour", Status = TranslationStatus.Translated, UpdatedAt = DateTime.UtcNow },
+            new Shared.Entities.Translation { ResourceKeyId = key2.Id, LanguageCode = "en", Value = "Goodbye", Status = TranslationStatus.Pending, UpdatedAt = DateTime.UtcNow }
         );
         await _db.SaveChangesAsync();
 
