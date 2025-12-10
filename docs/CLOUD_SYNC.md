@@ -45,13 +45,37 @@ The remote URL is stored in `lrm.json` and shared with your team via git.
 
 ### 2. Authentication
 
-Set your API token for authentication:
+There are three ways to authenticate with LRM Cloud:
+
+#### Option A: Browser Login (Interactive)
 
 ```bash
-lrm cloud set-token <your-token>
+lrm cloud login lrm.cloud
 ```
 
-The token is stored in `.lrm/config.json` (git-ignored) for security.
+This opens a browser for authentication and stores a JWT token.
+
+#### Option B: CLI API Key (Recommended for CI/CD)
+
+Generate an API key from the LRM Cloud web UI (Settings > CLI API Keys), then:
+
+```bash
+# Store the API key
+lrm cloud set-api-key --key lrm_your_api_key_here
+
+# Or use environment variable
+export LRM_CLOUD_API_KEY=lrm_your_api_key_here
+```
+
+#### Option C: Manual Token
+
+```bash
+lrm cloud set-token --token <your-token>
+```
+
+**Authentication Priority:** Environment variable (`LRM_CLOUD_API_KEY`) > Stored API key > JWT token
+
+Tokens are stored in `.lrm/auth.json` (git-ignored) for security.
 
 ### 3. Verify Configuration
 
@@ -412,10 +436,13 @@ lrm cloud pull --no-backup
 
 ### Cloud Commands
 
+- `lrm cloud login <host>` - Authenticate via browser
+- `lrm cloud logout` - Clear stored tokens
 - `lrm cloud push [options]` - Push local changes to cloud
 - `lrm cloud pull [options]` - Pull remote changes from cloud
 - `lrm cloud status` - Show sync status
-- `lrm cloud set-token <token>` - Set authentication token
+- `lrm cloud set-token` - Set authentication token manually
+- `lrm cloud set-api-key` - Store a CLI API key for authentication
 
 ### Options
 
@@ -426,6 +453,11 @@ lrm cloud pull --no-backup
 - `--strategy <strategy>` - Resolution strategy (pull only)
 - `--config-only` - Sync configuration only
 - `--resources-only` - Sync resources only
+
+**set-api-key Options:**
+- `--key <KEY>` - API key to store (will prompt if not provided)
+- `--host <HOST>` - Remote host (auto-detected from remote URL if configured)
+- `--remove` - Remove stored API key instead of setting one
 
 ## See Also
 

@@ -33,6 +33,7 @@ _lrm() {
         'config:Manage LRM configuration and API keys'
         'backup:Backup management commands for resource files'
         'web:Start web server with REST API and Blazor UI'
+        'cloud:Cloud synchronization commands'
     )
 
     local -a global_opts
@@ -530,6 +531,96 @@ _lrm() {
                                         '--dry-run[Preview without deleting]' \
                                         '(-y --yes)'{-y,--yes}'[Skip confirmation]' \
                                         $global_opts
+                                    ;;
+                            esac
+                            ;;
+                    esac
+                    ;;
+                cloud)
+                    local -a cloud_subcommands
+                    cloud_subcommands=(
+                        'login:Authenticate with LRM Cloud'
+                        'logout:Clear stored authentication tokens'
+                        'status:Show cloud sync status'
+                        'push:Push local changes to cloud'
+                        'pull:Pull remote changes from cloud'
+                        'set-token:Manually set an authentication token'
+                        'set-api-key:Store a CLI API key for cloud authentication'
+                        'remote:Remote URL configuration'
+                    )
+
+                    _arguments -C \
+                        '1: :->subcommand' \
+                        '*:: :->subargs' \
+                        && return 0
+
+                    case $state in
+                        subcommand)
+                            _describe -t cloud-subcommands 'cloud subcommands' cloud_subcommands
+                            ;;
+                        subargs)
+                            case $words[1] in
+                                login)
+                                    _arguments \
+                                        '1:host' \
+                                        $global_opts
+                                    ;;
+                                logout)
+                                    _arguments \
+                                        '--host[Remote host]:host' \
+                                        '--all[Clear all stored tokens]' \
+                                        $global_opts
+                                    ;;
+                                status)
+                                    _arguments \
+                                        '--format[Output format]:format:->formats' \
+                                        $global_opts
+                                    case $state in
+                                        formats)
+                                            _describe -t formats 'output formats' format_opts
+                                            ;;
+                                    esac
+                                    ;;
+                                push)
+                                    _arguments \
+                                        '(-m --message)'{-m,--message}'[Commit message]:message' \
+                                        '--dry-run[Preview changes without pushing]' \
+                                        '--force[Force push even if conflicts]' \
+                                        '--config-only[Push only configuration]' \
+                                        '--resources-only[Push only resources]' \
+                                        $global_opts
+                                    ;;
+                                pull)
+                                    _arguments \
+                                        '--dry-run[Preview changes without pulling]' \
+                                        '--force[Force pull and overwrite local]' \
+                                        '--no-backup[Skip backup creation]' \
+                                        '--strategy[Conflict resolution]:strategy:(local remote prompt abort)' \
+                                        '--config-only[Pull only configuration]' \
+                                        '--resources-only[Pull only resources]' \
+                                        $global_opts
+                                    ;;
+                                set-token)
+                                    _arguments \
+                                        '--host[Remote host]:host' \
+                                        '--token[Authentication token]:token' \
+                                        $global_opts
+                                    ;;
+                                set-api-key)
+                                    _arguments \
+                                        '--key[API key to store]:key' \
+                                        '--host[Remote host]:host' \
+                                        '--remove[Remove stored API key]' \
+                                        $global_opts
+                                    ;;
+                                remote)
+                                    local -a remote_subcommands
+                                    remote_subcommands=(
+                                        'set:Set the remote URL'
+                                        'get:Display current remote URL'
+                                        'unset:Remove remote configuration'
+                                    )
+                                    _describe -t remote-subcommands 'remote subcommands' remote_subcommands
                                     ;;
                             esac
                             ;;

@@ -13,7 +13,7 @@ _lrm_completions() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands
-    local commands="init convert validate stats view add update delete merge-duplicates export import edit translate config scan check chain list-languages add-language remove-language backup web"
+    local commands="init convert validate stats view add update delete merge-duplicates export import edit translate config scan check chain list-languages add-language remove-language backup web cloud"
 
     # Global options
     local global_opts="--path -p --backend --help -h --version -v"
@@ -57,6 +57,17 @@ _lrm_completions() {
 
     # Web command options
     local web_opts="--path -p --source-path --port --bind-address --no-open-browser --enable-https --cert-path --cert-password --help -h"
+
+    # Cloud subcommands and options
+    local cloud_opts="login logout status push pull set-token set-api-key remote --help -h"
+    local cloud_login_opts="--help -h"
+    local cloud_logout_opts="--host --all --help -h"
+    local cloud_status_opts="--path -p --format --help -h"
+    local cloud_push_opts="--path -p --message -m --dry-run --force --config-only --resources-only --help -h"
+    local cloud_pull_opts="--path -p --dry-run --force --no-backup --strategy --config-only --resources-only --help -h"
+    local cloud_set_token_opts="--host --token --help -h"
+    local cloud_set_api_key_opts="--path -p --key --host --remove --help -h"
+    local cloud_remote_opts="set get unset --help -h"
 
     # Format options
     local format_opts="table json simple csv tui"
@@ -371,6 +382,49 @@ _lrm_completions() {
                         ;;
                     prune)
                         COMPREPLY=( $(compgen -W "${backup_prune_opts}" -- "${cur}") )
+                        ;;
+                    *)
+                        COMPREPLY=()
+                        ;;
+                esac
+            fi
+            ;;
+        cloud)
+            # Handle cloud subcommands
+            if [[ -z "${subcommand}" ]]; then
+                # No subcommand yet, suggest subcommands
+                COMPREPLY=( $(compgen -W "${cloud_opts}" -- "${cur}") )
+            else
+                # Complete options for the specific subcommand
+                case "${subcommand}" in
+                    login)
+                        if [[ "${cur}" == -* ]]; then
+                            COMPREPLY=( $(compgen -W "${cloud_login_opts}" -- "${cur}") )
+                        else
+                            # Host argument
+                            COMPREPLY=()
+                        fi
+                        ;;
+                    logout)
+                        COMPREPLY=( $(compgen -W "${cloud_logout_opts}" -- "${cur}") )
+                        ;;
+                    status)
+                        COMPREPLY=( $(compgen -W "${cloud_status_opts}" -- "${cur}") )
+                        ;;
+                    push)
+                        COMPREPLY=( $(compgen -W "${cloud_push_opts}" -- "${cur}") )
+                        ;;
+                    pull)
+                        COMPREPLY=( $(compgen -W "${cloud_pull_opts}" -- "${cur}") )
+                        ;;
+                    set-token)
+                        COMPREPLY=( $(compgen -W "${cloud_set_token_opts}" -- "${cur}") )
+                        ;;
+                    set-api-key)
+                        COMPREPLY=( $(compgen -W "${cloud_set_api_key_opts}" -- "${cur}") )
+                        ;;
+                    remote)
+                        COMPREPLY=( $(compgen -W "${cloud_remote_opts}" -- "${cur}") )
                         ;;
                     *)
                         COMPREPLY=()

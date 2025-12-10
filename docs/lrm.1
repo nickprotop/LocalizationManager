@@ -403,11 +403,64 @@ Subcommands:
 .B list-providers
 - List available translation providers
 .IP \(bu 2
-.B set-key
+.B set-api-key
 - Set API key for a provider
 .IP \(bu 2
-.B show-config
-- Display current configuration
+.B get-api-key
+- Check where an API key is configured
+.IP \(bu 2
+.B delete-api-key
+- Remove an API key from the store
+.SS cloud
+Cloud synchronization commands for LRM Cloud.
+.PP
+.B lrm cloud
+\fISUBCOMMAND\fR
+.PP
+Subcommands:
+.IP \(bu 2
+.B login \fIHOST\fR
+- Authenticate with LRM Cloud via browser
+.IP \(bu 2
+.B logout
+- Clear stored authentication tokens
+.IP \(bu 2
+.B status
+- Show cloud sync status
+.IP \(bu 2
+.B push
+- Push local changes to cloud
+.IP \(bu 2
+.B pull
+- Pull remote changes from cloud
+.IP \(bu 2
+.B set-token
+- Manually set an authentication token
+.IP \(bu 2
+.B set-api-key
+- Store a CLI API key for cloud authentication
+.IP \(bu 2
+.B remote
+- Remote URL configuration (set, get, unset)
+.SS cloud set\-api\-key
+Store a CLI API key for cloud authentication.
+.PP
+.B lrm cloud set\-api\-key
+[\fB\-\-key\fR \fIKEY\fR]
+[\fB\-\-host\fR \fIHOST\fR]
+[\fB\-\-remove\fR]
+.TP
+.BR \-\-key " " \fIKEY\fR
+API key to store (will prompt if not provided)
+.TP
+.BR \-\-host " " \fIHOST\fR
+Remote host (auto-detected from remote URL if configured)
+.TP
+.BR \-\-remove
+Remove stored API key instead of setting one
+.PP
+API keys provide an alternative to JWT authentication for CI/CD pipelines and automation.
+Priority: environment variable (LRM_CLOUD_API_KEY) > stored key > JWT token
 .SS chain
 Execute multiple LRM commands sequentially in a single invocation.
 .PP
@@ -509,6 +562,9 @@ Azure Translator API key
 .TP
 .B LRM_AZURE_OPENAI_API_KEY
 Azure OpenAI API key
+.TP
+.B LRM_CLOUD_API_KEY
+CLI API key for LRM Cloud authentication (used in CI/CD)
 .TP
 .B DOTNET_CLI_TELEMETRY_OPTOUT
 Set to 1 to disable .NET telemetry
