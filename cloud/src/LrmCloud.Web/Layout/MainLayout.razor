@@ -1,38 +1,55 @@
 @inherits LayoutComponentBase
 @inject AuthService AuthService
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
+@using LrmCloud.Web.Components
+
+<MudThemeProvider @ref="_themeProvider" @bind-IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1">
+    <MudAppBar Elevation="1" Dense="@_isMobile">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
-        <MudText Typo="Typo.h6" Class="ml-3">LRM Cloud</MudText>
+        <MudText Typo="Typo.h6" Class="ml-3 d-none d-sm-flex">LRM Cloud</MudText>
+        <MudText Typo="Typo.h6" Class="ml-2 d-flex d-sm-none">LRM</MudText>
+        <MudDivider Vertical="true" FlexItem="true" Class="mx-2 d-none d-sm-flex" />
+        <OrgSelector />
         <MudSpacer />
         <MudTooltip Text="Toggle dark mode">
             <MudToggleIconButton @bind-Toggled="@_isDarkMode"
                                  Icon="@Icons.Material.Filled.DarkMode"
                                  ToggledIcon="@Icons.Material.Filled.LightMode"
-                                 Color="Color.Inherit" />
+                                 Color="Color.Inherit"
+                                 Size="@(_isMobile ? Size.Small : Size.Medium)" />
         </MudTooltip>
         <AuthorizeView>
             <Authorized>
-                <MudMenu Icon="@Icons.Material.Filled.Person" Color="Color.Inherit">
+                <MudMenu Icon="@Icons.Material.Filled.Person" Color="Color.Inherit" Size="@(_isMobile ? Size.Small : Size.Medium)">
                     <MudMenuItem Disabled="true">
                         <MudText Typo="Typo.body2" Color="Color.Secondary">@context.User.Identity?.Name</MudText>
                     </MudMenuItem>
                     <MudDivider />
-                    <MudMenuItem Href="/settings/profile" Icon="@Icons.Material.Filled.Person">Profile</MudMenuItem>
-                    <MudMenuItem Href="/settings/api-keys" Icon="@Icons.Material.Filled.Key">API Keys</MudMenuItem>
+                    <MudMenuItem Href="settings/profile" Icon="@Icons.Material.Filled.Person">Profile</MudMenuItem>
+                    <MudMenuItem Href="settings/api-keys" Icon="@Icons.Material.Filled.Key">API Keys</MudMenuItem>
+                    <MudMenuItem Href="settings/usage" Icon="@Icons.Material.Filled.Analytics">Usage</MudMenuItem>
                     <MudDivider />
                     <MudMenuItem OnClick="@Logout" Icon="@Icons.Material.Filled.Logout">Logout</MudMenuItem>
                 </MudMenu>
             </Authorized>
             <NotAuthorized>
-                <MudButton Variant="Variant.Text" Color="Color.Inherit" Href="/login">Login</MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Inherit" Href="login" Size="@(_isMobile ? Size.Small : Size.Medium)">Login</MudButton>
             </NotAuthorized>
         </AuthorizeView>
     </MudAppBar>
 
-    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+    <MudDrawer @bind-Open="_drawerOpen"
+               ClipMode="DrawerClipMode.Always"
+               Elevation="2"
+               Breakpoint="Breakpoint.Md"
+               Variant="@(_isMobile ? DrawerVariant.Temporary : DrawerVariant.Mini)"
+               OpenMiniOnHover="@(!_isMobile)">
         <MudDrawerHeader>
             <MudText Typo="Typo.h6">Navigation</MudText>
         </MudDrawerHeader>
@@ -40,15 +57,54 @@
     </MudDrawer>
 
     <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
-            @Body
+        <OfflineBanner />
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="@(_isMobile ? "pa-2" : "py-4")">
+            <GlobalErrorBoundary>
+                @Body
+            </GlobalErrorBoundary>
         </MudContainer>
     </MudMainContent>
 </MudLayout>
 
 @code {
+    private MudThemeProvider? _themeProvider;
     private bool _drawerOpen = true;
     private bool _isDarkMode;
+    private bool _isMobile;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Detect system theme preference
+            if (_themeProvider != null)
+            {
+                _isDarkMode = await _themeProvider.GetSystemDarkModeAsync();
+                await InvokeAsync(StateHasChanged);
+            }
+
+            // Check if mobile on first render
+            await CheckMobileBreakpoint();
+        }
+    }
+
+    private async Task CheckMobileBreakpoint()
+    {
+        try
+        {
+            var width = await JS.InvokeAsync<int>("eval", "window.innerWidth");
+            _isMobile = width < 960; // md breakpoint
+            if (_isMobile)
+            {
+                _drawerOpen = false;
+            }
+            StateHasChanged();
+        }
+        catch
+        {
+            // Ignore JS interop errors during prerendering
+        }
+    }
 
     private void ToggleDrawer()
     {
@@ -58,6 +114,6 @@
     private async Task Logout()
     {
         await AuthService.LogoutAsync();
-        Navigation.NavigateTo("/login", forceLoad: true);
+        Navigation.NavigateTo("login", forceLoad: true);
     }
 }

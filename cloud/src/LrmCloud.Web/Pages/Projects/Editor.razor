@@ -4,7 +4,11 @@
 @inject ResourceService ResourceService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject IDialogService DialogService
+@implements IAsyncDisposable
 @using LrmCloud.Web.Models
+@using LrmCloud.Web.Components
 
 <PageTitle>@(_project?.Name ?? "Editor") - LRM Cloud</PageTitle>
 
@@ -19,7 +23,7 @@ else if (_project == null)
 {
     <MudAlert Severity="Severity.Error">
         Project not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/">Go to Dashboard</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="">Go to Dashboard</MudButton>
     </MudAlert>
 }
 else
@@ -339,8 +343,32 @@ else
 
     private async Task OnTranslateSelected(IEnumerable<TranslationGridRow> rows)
     {
-        // TODO: Open translate dialog
-        Snackbar.Add($"Translate {rows.Count()} keys - coming soon!", Severity.Info);
+        if (_project == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { nameof(TranslateDialog.ProjectId), ProjectId },
+            { nameof(TranslateDialog.SourceLanguage), _project.DefaultLanguage },
+            { nameof(TranslateDialog.AvailableLanguages), _languages },
+            { nameof(TranslateDialog.KeysToTranslate), rows.Select(r => r.KeyName).ToList() }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            BackdropClick = false
+        };
+
+        var dialog = await DialogService.ShowAsync<TranslateDialog>("Translate", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            // Refresh data after translation
+            await RefreshData();
+        }
     }
 
     private void OnDeleteSelected(IEnumerable<TranslationGridRow> rows)
@@ -415,11 +443,9 @@ else
         }
     }
 
-    private Task TranslateKey(TranslationGridRow row)
+    private async Task TranslateKey(TranslationGridRow row)
     {
-        // TODO: Open translate dialog for single key
-        Snackbar.Add("Translation coming soon!", Severity.Info);
-        return Task.CompletedTask;
+        await OnTranslateSelected(new[] { row });
     }
 
     private async Task DeleteKey(TranslationGridRow row)
@@ -445,4 +471,63 @@ else
         >= 50 => Color.Warning,
         _ => Color.Error
     };
+
+    // ============================================================
+    // Keyboard Shortcuts
+    // ============================================================
+
+    private DotNetObjectReference<Editor>? _dotNetRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("lrmKeyboard.init", _dotNetRef);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_dotNetRef != null)
+        {
+            await JS.InvokeVoidAsync("lrmKeyboard.dispose");
+            _dotNetRef.Dispose();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnKeyboardSave()
+    {
+        if (_hasUnsavedChanges && !_isSaving)
+        {
+            await SaveChanges();
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnKeyboardSearch()
+    {
+        // Focus the search input in the grid
+        await JS.InvokeVoidAsync("lrmKeyboard.focusElement", ".translation-grid input[type='text']");
+    }
+
+    [JSInvokable]
+    public void OnKeyboardEscape()
+    {
+        if (_drawerOpen)
+        {
+            CloseDrawer();
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public void OnKeyboardDelete()
+    {
+        // This would require getting selected items from the grid
+        // For now, just show a message
+        Snackbar.Add("Select rows and click Delete to remove keys", Severity.Info);
+    }
 }

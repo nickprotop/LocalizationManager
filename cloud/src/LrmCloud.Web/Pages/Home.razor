@@ -1,7 +1,9 @@
 @page "/"
 @attribute [Authorize]
 @inject ProjectService ProjectService
+@inject OrganizationContextService OrgContext
 @inject NavigationManager Navigation
+@implements IDisposable
 
 <PageTitle>Dashboard - LRM Cloud</PageTitle>
 
@@ -70,9 +72,14 @@ else
 
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-6 mb-4">
     <MudText Typo="Typo.h5">Recent Projects</MudText>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreateDialog">
-        New Project
-    </MudButton>
+    <MudStack Row="true" Spacing="2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Upload" OnClick="@OpenImportDialog">
+            Import
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreateDialog">
+            New Project
+        </MudButton>
+    </MudStack>
 </MudStack>
 
 @if (_isLoading)
@@ -86,7 +93,7 @@ else
         }
     </MudGrid>
 }
-else if (_projects.Count == 0)
+else if (_filteredProjects.Count == 0)
 {
     <MudPaper Class="pa-4" Elevation="2">
         <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="py-8">
@@ -101,7 +108,7 @@ else if (_projects.Count == 0)
 else
 {
     <MudGrid>
-        @foreach (var project in _projects.Take(6))
+        @foreach (var project in _filteredProjects.Take(6))
         {
             <MudItem xs="12" sm="6" md="4">
                 <MudCard Elevation="2" Class="cursor-pointer" @onclick="@(() => NavigateToProject(project.Id))">
@@ -142,11 +149,11 @@ else
         }
     </MudGrid>
 
-    @if (_projects.Count > 6)
+    @if (_filteredProjects.Count > 6)
     {
         <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
-            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/projects">
-                View All Projects (@_projects.Count)
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="projects">
+                View All Projects (@_filteredProjects.Count)
             </MudButton>
         </MudStack>
     }
@@ -154,17 +161,28 @@ else
 
 <CreateProjectDialog @ref="_createDialog" OnProjectCreated="OnProjectCreated" />
 <EditProjectDialog @ref="_editDialog" OnProjectUpdated="OnProjectUpdated" OnProjectDeleted="OnProjectDeleted" />
+<ImportProjectDialog @ref="_importDialog" OnProjectImported="OnProjectCreated" OrganizationId="@OrgContext.SelectedOrganizationId" />
 
 @code {
     private List<ProjectDto> _projects = new();
+    private List<ProjectDto> _filteredProjects = new();
     private DashboardStats _stats = new();
     private bool _isLoading = true;
     private CreateProjectDialog? _createDialog;
     private EditProjectDialog? _editDialog;
+    private ImportProjectDialog? _importDialog;
 
     protected override async Task OnInitializedAsync()
     {
+        await OrgContext.InitializeAsync();
+        OrgContext.OnOrganizationChanged += OnOrgContextChanged;
         await LoadDataAsync();
+    }
+
+    private async void OnOrgContextChanged()
+    {
+        FilterProjects();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task LoadDataAsync()
@@ -173,6 +191,7 @@ else
         try
         {
             _projects = await ProjectService.GetProjectsAsync();
+            FilterProjects();
             _stats = await ProjectService.GetDashboardStatsAsync();
         }
         catch
@@ -185,6 +204,26 @@ else
         }
     }
 
+    private void FilterProjects()
+    {
+        var selectedOrgId = OrgContext.SelectedOrganizationId;
+        if (selectedOrgId.HasValue)
+        {
+            // Show only projects from the selected organization
+            _filteredProjects = _projects.Where(p => p.OrganizationId == selectedOrgId.Value).ToList();
+        }
+        else
+        {
+            // Personal context: show personal projects (no org) and all org projects
+            _filteredProjects = _projects.ToList();
+        }
+    }
+
+    public void Dispose()
+    {
+        OrgContext.OnOrganizationChanged -= OnOrgContextChanged;
+    }
+
     private void OpenCreateDialog()
     {
         _createDialog?.Open();
@@ -195,9 +234,15 @@ else
         _editDialog?.Open(project);
     }
 
+    private void OpenImportDialog()
+    {
+        _importDialog?.Open();
+    }
+
     private async Task OnProjectCreated(ProjectDto project)
     {
         _projects.Insert(0, project);
+        FilterProjects();
         _stats.ProjectCount++;
         _stats.TotalKeys += project.KeyCount;
         StateHasChanged();

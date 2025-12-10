@@ -39,7 +39,7 @@
                           Disabled="_isLoading" />
 
             <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                <MudLink Href="/forgot-password" Typo="Typo.body2">Forgot password?</MudLink>
+                <MudLink Href="forgot-password" Typo="Typo.body2">Forgot password?</MudLink>
             </MudStack>
 
             <MudButton ButtonType="ButtonType.Submit"
@@ -75,7 +75,7 @@
         </MudButton>
 
         <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-4">
-            Don't have an account? <MudLink Href="/register">Sign up</MudLink>
+            Don't have an account? <MudLink Href="register">Sign up</MudLink>
         </MudText>
     </MudStack>
 </MudPaper>
@@ -101,7 +101,9 @@
 
             if (result.IsSuccess)
             {
-                Navigation.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
+                // Use empty string to navigate to app root (relative to base href /app/)
+                // forceLoad ensures auth state is refreshed
+                Navigation.NavigateTo(ReturnUrl ?? "", forceLoad: true);
             }
             else
             {

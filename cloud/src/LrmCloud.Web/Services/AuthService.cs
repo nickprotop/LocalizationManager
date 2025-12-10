@@ -2,6 +2,8 @@ using System.Net.Http.Json;
 using LrmCloud.Shared.Api;
 using LrmCloud.Shared.DTOs.Auth;
 
+using UserProfileDto = LrmCloud.Shared.DTOs.Auth.UserProfileDto;
+
 namespace LrmCloud.Web.Services;
 
 /// <summary>
@@ -214,6 +216,99 @@ public class AuthService
         return null;
     }
 
+    public async Task<bool> IsAuthenticatedAsync()
+    {
+        var token = await _tokenStorage.GetAccessTokenAsync();
+        return !string.IsNullOrEmpty(token);
+    }
+
+    public async Task<ProfileResult> GetProfileAsync()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("auth/me");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<UserProfileDto>>();
+                if (result?.Data != null)
+                {
+                    return ProfileResult.Success(result.Data);
+                }
+            }
+            var error = await ReadErrorMessageAsync(response);
+            return ProfileResult.Failure(error);
+        }
+        catch (Exception ex)
+        {
+            return ProfileResult.Failure($"Failed to get profile: {ex.Message}");
+        }
+    }
+
+    public async Task<ProfileResult> UpdateProfileAsync(UpdateProfileRequest request)
+    {
+        try
+        {
+            var response = await _httpClient.PatchAsJsonAsync("auth/profile", request);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<UserProfileDto>>();
+                if (result?.Data != null)
+                {
+                    return ProfileResult.Success(result.Data, "Profile updated successfully");
+                }
+            }
+            var error = await ReadErrorMessageAsync(response);
+            return ProfileResult.Failure(error);
+        }
+        catch (Exception ex)
+        {
+            return ProfileResult.Failure($"Failed to update profile: {ex.Message}");
+        }
+    }
+
+    public async Task<AuthResult> ChangePasswordAsync(ChangePasswordRequest request)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("auth/change-password", request);
+            if (response.IsSuccessStatusCode)
+            {
+                return AuthResult.Success(null, "Password changed successfully");
+            }
+            var error = await ReadErrorMessageAsync(response);
+            return AuthResult.Failure(error);
+        }
+        catch (Exception ex)
+        {
+            return AuthResult.Failure($"Failed to change password: {ex.Message}");
+        }
+    }
+
+    public async Task<AuthResult> DeleteAccountAsync(DeleteAccountRequest request)
+    {
+        try
+        {
+            var httpRequest = new HttpRequestMessage(HttpMethod.Delete, "auth/account")
+            {
+                Content = JsonContent.Create(request)
+            };
+            var response = await _httpClient.SendAsync(httpRequest);
+
+            if (response.IsSuccessStatusCode)
+            {
+                await _tokenStorage.ClearTokensAsync();
+                _authStateProvider.NotifyUserLogout();
+                return AuthResult.Success(null, "Account deleted successfully");
+            }
+            var error = await ReadErrorMessageAsync(response);
+            return AuthResult.Failure(error);
+        }
+        catch (Exception ex)
+        {
+            return AuthResult.Failure($"Failed to delete account: {ex.Message}");
+        }
+    }
+
     private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response)
     {
         try
@@ -255,6 +350,30 @@ public class AuthResult
     };
 
     public static AuthResult Failure(string error) => new()
+    {
+        IsSuccess = false,
+        ErrorMessage = error
+    };
+}
+
+/// <summary>
+/// Result of a profile operation
+/// </summary>
+public class ProfileResult
+{
+    public bool IsSuccess { get; private set; }
+    public string? ErrorMessage { get; private set; }
+    public string? SuccessMessage { get; private set; }
+    public UserProfileDto? Profile { get; private set; }
+
+    public static ProfileResult Success(UserProfileDto profile, string? message = null) => new()
+    {
+        IsSuccess = true,
+        Profile = profile,
+        SuccessMessage = message
+    };
+
+    public static ProfileResult Failure(string error) => new()
     {
         IsSuccess = false,
         ErrorMessage = error

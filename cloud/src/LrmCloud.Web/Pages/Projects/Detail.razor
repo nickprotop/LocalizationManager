@@ -18,7 +18,7 @@ else if (_project == null)
 {
     <MudAlert Severity="Severity.Error">
         Project not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/">Go to Dashboard</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="">Go to Dashboard</MudButton>
     </MudAlert>
 }
 else
@@ -26,7 +26,7 @@ else
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
             <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                           OnClick="@(() => Navigation.NavigateTo("/"))"
+                           OnClick="@(() => Navigation.NavigateTo(""))"
                            Size="Size.Small" />
             <MudText Typo="Typo.h4">@_project.Name</MudText>
             <MudChip T="string" Size="Size.Small" Color="@GetFormatColor(_project.Format)">@_project.Format</MudChip>
@@ -248,7 +248,7 @@ else
 
     private void OnProjectDeleted(int projectId)
     {
-        Navigation.NavigateTo("/");
+        Navigation.NavigateTo("");
     }
 
     private void TranslateAll()

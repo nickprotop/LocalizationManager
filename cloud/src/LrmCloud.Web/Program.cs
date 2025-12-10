@@ -23,7 +23,9 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredServ
 builder.Services.AddAuthorizationCore();
 
 // Configure HttpClient with API base URL and auth handler
-var apiBaseUrl = new Uri(new Uri(builder.HostEnvironment.BaseAddress), "api/");
+// Use the origin (scheme + host + port) with /api/ path, not relative to Blazor's /app/ base
+var baseUri = new Uri(builder.HostEnvironment.BaseAddress);
+var apiBaseUrl = new Uri($"{baseUri.Scheme}://{baseUri.Authority}/api/");
 
 builder.Services.AddScoped<AuthenticatedHttpHandler>();
 builder.Services.AddScoped(sp =>
@@ -39,5 +41,10 @@ builder.Services.AddScoped<AuthService>();
 // Application services
 builder.Services.AddScoped<ProjectService>();
 builder.Services.AddScoped<ResourceService>();
+builder.Services.AddScoped<TranslationService>();
+builder.Services.AddScoped<CliApiKeyService>();
+builder.Services.AddScoped<UsageService>();
+builder.Services.AddScoped<OrganizationService>();
+builder.Services.AddScoped<OrganizationContextService>();
 
 await builder.Build().RunAsync();
