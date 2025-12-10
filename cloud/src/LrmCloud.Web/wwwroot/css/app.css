@@ -1,11 +1,23 @@
 /* LRM Cloud - App Styles */
 
+/* =============================================================================
+   Base Styles
+   ============================================================================= */
+
 /* Keep focus outline for accessibility but remove default browser styling */
 h1:focus {
     outline: none;
 }
 
-/* Error UI */
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* =============================================================================
+   Error UI
+   ============================================================================= */
+
 #blazor-error-ui {
     color-scheme: light only;
     background: lightyellow;
@@ -38,7 +50,10 @@ h1:focus {
     content: "An error has occurred."
 }
 
-/* Loading progress indicator */
+/* =============================================================================
+   Loading Progress Indicator
+   ============================================================================= */
+
 .loading-progress {
     position: relative;
     display: block;
@@ -69,4 +84,169 @@ h1:focus {
 
 .loading-progress-text:after {
     content: var(--blazor-load-percentage-text, "Loading");
+}
+
+/* =============================================================================
+   Offline Banner
+   ============================================================================= */
+
+.offline-banner {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-radius: 0 !important;
+}
+
+/* =============================================================================
+   Responsive Utilities
+   ============================================================================= */
+
+/* Touch-friendly tap targets on mobile */
+@media (max-width: 599px) {
+    .mud-button {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    .mud-icon-button {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* Larger form inputs on mobile */
+    .mud-input {
+        font-size: 16px !important; /* Prevent iOS zoom on focus */
+    }
+
+    /* Full-width dialogs on mobile */
+    .mud-dialog {
+        margin: 8px !important;
+        max-height: calc(100vh - 16px) !important;
+    }
+
+    /* Adjust card padding on mobile */
+    .mud-card-content {
+        padding: 12px !important;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 600px) and (max-width: 959px) {
+    .mud-dialog {
+        margin: 24px !important;
+    }
+}
+
+/* =============================================================================
+   Custom Scrollbar
+   ============================================================================= */
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Dark mode scrollbar */
+.mud-theme-dark ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.mud-theme-dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* =============================================================================
+   Translation Grid Styles
+   ============================================================================= */
+
+.translation-grid .mud-table-cell {
+    vertical-align: top;
+}
+
+.translation-grid .mud-input-root-outlined {
+    background: transparent;
+}
+
+/* Missing translation indicator */
+.translation-cell-missing {
+    background-color: rgba(244, 67, 54, 0.08);
+}
+
+.mud-theme-dark .translation-cell-missing {
+    background-color: rgba(244, 67, 54, 0.15);
+}
+
+/* =============================================================================
+   Cursor Utilities
+   ============================================================================= */
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.cursor-not-allowed {
+    cursor: not-allowed;
+}
+
+/* =============================================================================
+   Animation Utilities
+   ============================================================================= */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+/* =============================================================================
+   Print Styles
+   ============================================================================= */
+
+@media print {
+    .mud-appbar,
+    .mud-drawer,
+    .offline-banner,
+    .mud-snackbar-provider {
+        display: none !important;
+    }
+
+    .mud-main-content {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
 }
