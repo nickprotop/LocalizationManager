@@ -1,0 +1,197 @@
+@page "/settings/translation"
+@attribute [Authorize]
+@using LrmCloud.Shared.DTOs.Translation
+@using LrmCloud.Web.Services
+@inject TranslationService TranslationService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Translation Providers - LRM Cloud</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-4">
+    <MudStack Spacing="4">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h5">Translation Providers</MudText>
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="LoadProvidersAsync"
+                       Disabled="_isLoading">
+                Refresh
+            </MudButton>
+        </MudStack>
+
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Configure API keys for translation providers. Free providers work without any setup.
+            Your API keys are encrypted and stored securely.
+        </MudText>
+
+        @if (_isLoading)
+        {
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
+        }
+        else
+        {
+            <MudText Typo="Typo.h6" Class="mt-4">Free Providers</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                These providers work without an API key. Great for getting started!
+            </MudText>
+
+            <MudGrid Spacing="2">
+                @foreach (var provider in _providers.Where(p => !p.RequiresApiKey))
+                {
+                    <MudItem xs="12" sm="6">
+                        <ProviderCard Provider="provider" OnConfigure="OpenConfigureDialog" />
+                    </MudItem>
+                }
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+
+            <MudText Typo="Typo.h6">API Key Required</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                Add your own API keys for these premium providers. Bring Your Own Key (BYOK) - you only pay for what you use.
+            </MudText>
+
+            <MudGrid Spacing="2">
+                @foreach (var provider in _providers.Where(p => p.RequiresApiKey))
+                {
+                    <MudItem xs="12" sm="6">
+                        <ProviderCard Provider="provider" OnConfigure="OpenConfigureDialog" OnRemove="RemoveApiKey" />
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+
+        <MudDivider Class="my-4" />
+
+        <MudText Typo="Typo.h6">Usage</MudText>
+        @if (_usage != null)
+        {
+            <MudPaper Class="pa-4" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudStack>
+                        <MudText Typo="Typo.body1">
+                            <strong>@_usage.CharactersUsed.ToString("N0")</strong> characters translated
+                        </MudText>
+                        @if (_usage.CharacterLimit.HasValue)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                @_usage.CharacterLimit.Value.ToString("N0") limit (@_usage.Plan plan)
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                Unlimited (BYOK)
+                            </MudText>
+                        }
+                    </MudStack>
+                    @if (_usage.CharacterLimit.HasValue)
+                    {
+                        <MudProgressLinear Value="@_usage.UsagePercentage"
+                                           Color="@GetUsageColor(_usage.UsagePercentage)"
+                                           Style="width: 200px;" />
+                    }
+                </MudStack>
+            </MudPaper>
+        }
+        else
+        {
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" />
+        }
+    </MudStack>
+</MudContainer>
+
+@code {
+    private List<TranslationProviderDto> _providers = new();
+    private TranslationUsageDto? _usage;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProvidersAsync();
+        await LoadUsageAsync();
+    }
+
+    private async Task LoadProvidersAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _providers = await TranslationService.GetProvidersAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load providers: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadUsageAsync()
+    {
+        try
+        {
+            _usage = await TranslationService.GetUsageAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load usage: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OpenConfigureDialog(TranslationProviderDto provider)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(ConfigureProviderDialog.Provider), provider }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfigureProviderDialog>($"Configure {provider.DisplayName}", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadProvidersAsync();
+        }
+    }
+
+    private async Task RemoveApiKey(TranslationProviderDto provider)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Remove API Key",
+            $"Are you sure you want to remove the API key for {provider.DisplayName}?",
+            yesText: "Remove",
+            cancelText: "Cancel");
+
+        if (confirmed == true)
+        {
+            var result = await TranslationService.RemoveUserApiKeyAsync(provider.Name);
+            if (result.IsSuccess)
+            {
+                Snackbar.Add("API key removed", Severity.Success);
+                await LoadProvidersAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to remove API key", Severity.Error);
+            }
+        }
+    }
+
+    private static Color GetUsageColor(double percentage) => percentage switch
+    {
+        >= 90 => Color.Error,
+        >= 70 => Color.Warning,
+        _ => Color.Primary
+    };
+}

@@ -1,0 +1,271 @@
+@page "/settings/usage"
+@using LrmCloud.Shared.DTOs.Usage
+@using LrmCloud.Web.Services
+@inject UsageService UsageService
+@attribute [Authorize]
+
+<PageTitle>Usage Dashboard - LRM Cloud</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudText Typo="Typo.h4" Class="mb-2">Usage Dashboard</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+        Monitor your resource usage and account limits.
+    </MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_stats == null)
+    {
+        <MudAlert Severity="Severity.Error">Failed to load usage statistics.</MudAlert>
+    }
+    else
+    {
+        <MudGrid>
+            @* Translation Usage Card *@
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <div class="d-flex justify-space-between align-center mb-2">
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Translate" Class="mr-2" Style="vertical-align: middle;" />
+                            Translation Usage
+                        </MudText>
+                        <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(_stats.Plan)">@_stats.Plan.ToUpper()</MudChip>
+                    </div>
+
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Characters translated this period
+                    </MudText>
+
+                    <div class="mb-2">
+                        <MudProgressLinear Value="@_stats.TranslationUsagePercent" Color="@GetUsageColor(_stats.TranslationUsagePercent)"
+                                          Size="Size.Large" Rounded="true" />
+                    </div>
+
+                    <div class="d-flex justify-space-between">
+                        <MudText Typo="Typo.body2">
+                            <strong>@_stats.TranslationCharsUsed.ToString("N0")</strong> / @_stats.TranslationCharsLimit.ToString("N0") characters
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="@GetUsageTextColor(_stats.TranslationUsagePercent)">
+                            @_stats.TranslationUsagePercent%
+                        </MudText>
+                    </div>
+
+                    @if (_stats.TranslationCharsResetAt.HasValue)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                            Resets on @_stats.TranslationCharsResetAt.Value.ToString("MMM d, yyyy")
+                        </MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            @* Account Overview Card *@
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" Style="vertical-align: middle;" />
+                        Account Overview
+                    </MudText>
+
+                    <MudList T="string" Dense="true">
+                        <MudListItem>
+                            <div class="d-flex justify-space-between w-100">
+                                <MudText>Plan</MudText>
+                                <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(_stats.Plan)">@_stats.Plan.ToUpper()</MudChip>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between w-100">
+                                <MudText>Member since</MudText>
+                                <MudText Color="Color.Secondary">@_stats.MemberSince.ToString("MMM d, yyyy")</MudText>
+                            </div>
+                        </MudListItem>
+                    </MudList>
+
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true" Class="mt-3" Disabled="true">
+                        Upgrade Plan (Coming Soon)
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+
+            @* Projects Stats *@
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-4 text-center" Elevation="2">
+                    <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Large" Color="Color.Primary" />
+                    <MudText Typo="Typo.h4" Class="mt-2">@_stats.ProjectCount</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Projects</MudText>
+                </MudPaper>
+            </MudItem>
+
+            @* Resource Files Stats *@
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-4 text-center" Elevation="2">
+                    <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.h4" Class="mt-2">@_stats.ResourceFileCount</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Resource Files</MudText>
+                </MudPaper>
+            </MudItem>
+
+            @* Keys Stats *@
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-4 text-center" Elevation="2">
+                    <MudIcon Icon="@Icons.Material.Filled.VpnKey" Size="Size.Large" Color="Color.Info" />
+                    <MudText Typo="Typo.h4" Class="mt-2">@_stats.TotalKeyCount</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Localization Keys</MudText>
+                </MudPaper>
+            </MudItem>
+
+            @* API Keys Stats *@
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-4 text-center" Elevation="2">
+                    <MudIcon Icon="@Icons.Material.Filled.Key" Size="Size.Large" Color="Color.Success" />
+                    <MudText Typo="Typo.h4" Class="mt-2">@_stats.ActiveApiKeyCount / @_stats.ApiKeyCount</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Active API Keys</MudText>
+                </MudPaper>
+            </MudItem>
+
+            @* Plan Limits Info *@
+            <MudItem xs="12">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" Style="vertical-align: middle;" />
+                        Plan Limits
+                    </MudText>
+
+                    <MudTable Items="@_planLimits" Hover="true" Dense="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Feature</MudTh>
+                            <MudTh>Your Usage</MudTh>
+                            <MudTh>@_stats.Plan.ToUpper() Limit</MudTh>
+                            <MudTh>Status</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Feature">@context.Feature</MudTd>
+                            <MudTd DataLabel="Your Usage">@context.CurrentUsage</MudTd>
+                            <MudTd DataLabel="Limit">@context.Limit</MudTd>
+                            <MudTd DataLabel="Status">
+                                <MudChip T="string" Size="Size.Small" Color="@context.StatusColor">@context.Status</MudChip>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    private UsageStatsDto? _stats;
+    private bool _loading = true;
+    private List<PlanLimitInfo> _planLimits = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStats();
+    }
+
+    private async Task LoadStats()
+    {
+        _loading = true;
+        try
+        {
+            _stats = await UsageService.GetStatsAsync();
+            if (_stats != null)
+            {
+                BuildPlanLimits();
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void BuildPlanLimits()
+    {
+        if (_stats == null) return;
+
+        _planLimits = new List<PlanLimitInfo>
+        {
+            new()
+            {
+                Feature = "Translation Characters",
+                CurrentUsage = _stats.TranslationCharsUsed.ToString("N0"),
+                Limit = _stats.TranslationCharsLimit.ToString("N0") + " / month",
+                Status = GetLimitStatus(_stats.TranslationUsagePercent),
+                StatusColor = GetUsageColor(_stats.TranslationUsagePercent)
+            },
+            new()
+            {
+                Feature = "Projects",
+                CurrentUsage = _stats.ProjectCount.ToString(),
+                Limit = _stats.Plan == "free" ? "5" : "Unlimited",
+                Status = _stats.Plan == "free" && _stats.ProjectCount >= 5 ? "Limit Reached" : "OK",
+                StatusColor = _stats.Plan == "free" && _stats.ProjectCount >= 5 ? Color.Error : Color.Success
+            },
+            new()
+            {
+                Feature = "API Keys",
+                CurrentUsage = _stats.ApiKeyCount.ToString(),
+                Limit = _stats.Plan == "free" ? "3" : "10",
+                Status = (_stats.Plan == "free" && _stats.ApiKeyCount >= 3) ||
+                         (_stats.Plan != "free" && _stats.ApiKeyCount >= 10) ? "Limit Reached" : "OK",
+                StatusColor = (_stats.Plan == "free" && _stats.ApiKeyCount >= 3) ||
+                              (_stats.Plan != "free" && _stats.ApiKeyCount >= 10) ? Color.Error : Color.Success
+            }
+        };
+    }
+
+    private static string GetLimitStatus(double usagePercent)
+    {
+        return usagePercent switch
+        {
+            >= 100 => "Limit Reached",
+            >= 80 => "Approaching Limit",
+            _ => "OK"
+        };
+    }
+
+    private static Color GetUsageColor(double usagePercent)
+    {
+        return usagePercent switch
+        {
+            >= 100 => Color.Error,
+            >= 80 => Color.Warning,
+            >= 50 => Color.Info,
+            _ => Color.Success
+        };
+    }
+
+    private static Color GetUsageTextColor(double usagePercent)
+    {
+        return usagePercent switch
+        {
+            >= 100 => Color.Error,
+            >= 80 => Color.Warning,
+            _ => Color.Default
+        };
+    }
+
+    private static Color GetPlanColor(string plan)
+    {
+        return plan.ToLower() switch
+        {
+            "pro" => Color.Primary,
+            "team" => Color.Secondary,
+            "enterprise" => Color.Tertiary,
+            _ => Color.Default
+        };
+    }
+
+    private class PlanLimitInfo
+    {
+        public string Feature { get; set; } = "";
+        public string CurrentUsage { get; set; } = "";
+        public string Limit { get; set; } = "";
+        public string Status { get; set; } = "";
+        public Color StatusColor { get; set; } = Color.Default;
+    }
+}

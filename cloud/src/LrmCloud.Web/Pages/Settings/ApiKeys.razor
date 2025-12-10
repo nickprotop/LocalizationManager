@@ -1,0 +1,370 @@
+@page "/settings/api-keys"
+@using LrmCloud.Shared.DTOs.Auth
+@using LrmCloud.Web.Services
+@inject CliApiKeyService ApiKeyService
+@inject ISnackbar Snackbar
+@attribute [Authorize]
+
+<PageTitle>CLI API Keys - LRM Cloud</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudText Typo="Typo.h4" Class="mb-2">CLI API Keys</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+        API keys allow the LRM CLI to authenticate with your cloud account for syncing resources.
+    </MudText>
+
+    <MudPaper Class="pa-4 mb-4">
+        <div class="d-flex justify-space-between align-center mb-4">
+            <MudText Typo="Typo.h6">Your API Keys</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreateDialog">
+                Create New Key
+            </MudButton>
+        </div>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_keys.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-0">
+                You don't have any API keys yet. Create one to start syncing with the CLI.
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="@_keys" Hover="true" Breakpoint="Breakpoint.Sm" Dense="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Key Prefix</MudTh>
+                    <MudTh>Scopes</MudTh>
+                    <MudTh>Project</MudTh>
+                    <MudTh>Last Used</MudTh>
+                    <MudTh>Expires</MudTh>
+                    <MudTh Style="width: 100px">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Key Prefix">
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default">@context.KeyPrefix...</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Scopes">
+                        @foreach (var scope in context.Scopes.Split(','))
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="mr-1">@scope.Trim()</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Project">
+                        @if (!string.IsNullOrEmpty(context.ProjectName))
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Secondary">@context.ProjectName</MudChip>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">All projects</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Last Used">
+                        @if (context.LastUsedAt.HasValue)
+                        {
+                            @context.LastUsedAt.Value.ToString("g")
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">Never</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Expires">
+                        @if (context.ExpiresAt.HasValue)
+                        {
+                            @if (context.IsExpired)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error">Expired</MudChip>
+                            }
+                            else
+                            {
+                                @context.ExpiresAt.Value.ToString("d")
+                            }
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">Never</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                       OnClick="() => ConfirmDeleteKey(context)" Title="Delete key" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.h6" Class="mb-2">Using API Keys</MudText>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            Configure your API key in the LRM CLI to sync resources with the cloud:
+        </MudText>
+        <MudPaper Class="pa-3 mb-3" Style="background-color: var(--mud-palette-background-gray);">
+            <code>lrm cloud set-api-key --key YOUR_API_KEY</code>
+        </MudPaper>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            Or set the environment variable for CI/CD pipelines:
+        </MudText>
+        <MudPaper Class="pa-3 mb-3" Style="background-color: var(--mud-palette-background-gray);">
+            <code>export LRM_CLOUD_API_KEY=YOUR_API_KEY</code>
+        </MudPaper>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            API keys take priority over JWT tokens when both are configured.
+        </MudText>
+    </MudPaper>
+</MudContainer>
+
+@* Create Key Dialog *@
+<MudDialog @bind-Visible="_createDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Create New API Key</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_createForm">
+            <MudTextField @bind-Value="_newKeyName" Label="Key Name" Placeholder="e.g., My Laptop"
+                          Required="true" RequiredError="Name is required"
+                          HelperText="A friendly name to identify this key" Class="mb-3" />
+
+            <MudSelect @bind-Value="_newKeyScopes" Label="Scopes" HelperText="Permissions for this key" Class="mb-3">
+                <MudSelectItem Value="@("read,write")">Read & Write</MudSelectItem>
+                <MudSelectItem Value="@("read")">Read Only</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect @bind-Value="_newKeyProjectId" Label="Project (Optional)"
+                       HelperText="Limit key to a specific project" Class="mb-3" Clearable="true">
+                <MudSelectItem T="int?" Value="@((int?)null)">All Projects</MudSelectItem>
+                @* TODO: Load projects when available *@
+            </MudSelect>
+
+            <MudSelect @bind-Value="_newKeyExpiresInDays" Label="Expiration" Class="mb-3">
+                <MudSelectItem T="int?" Value="@((int?)null)">Never expires</MudSelectItem>
+                <MudSelectItem T="int?" Value="@((int?)30)">30 days</MudSelectItem>
+                <MudSelectItem T="int?" Value="@((int?)90)">90 days</MudSelectItem>
+                <MudSelectItem T="int?" Value="@((int?)365)">1 year</MudSelectItem>
+            </MudSelect>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseCreateDialog">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateKey" Disabled="_creating">
+            @if (_creating)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Create Key
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Show New Key Dialog *@
+<MudDialog @bind-Visible="_showKeyDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = false, BackdropClick = false })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Key" Class="mr-2" />
+            API Key Created
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Warning" Class="mb-4">
+            Make sure to copy your API key now. You won't be able to see it again!
+        </MudAlert>
+
+        <MudText Typo="Typo.body2" Class="mb-2">Your new API key:</MudText>
+        <MudPaper Class="pa-3 d-flex align-center" Style="background-color: var(--mud-palette-background-gray);">
+            <code style="word-break: break-all; flex: 1;">@_newlyCreatedKey</code>
+            <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" OnClick="CopyKeyToClipboard"
+                           Title="Copy to clipboard" Class="ml-2" />
+        </MudPaper>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseShowKeyDialog">
+            I've Copied My Key
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Delete Confirmation Dialog *@
+<MudDialog @bind-Visible="_deleteDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Delete API Key?</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText>
+            Are you sure you want to delete the key <strong>@_keyToDelete?.Name</strong>?
+        </MudText>
+        <MudText Color="Color.Secondary" Class="mt-2">
+            Any CLI instances using this key will no longer be able to authenticate.
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDeleteDialog">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="DeleteKey" Disabled="_deleting">
+            @if (_deleting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Delete
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<CliApiKeyDto> _keys = new();
+    private bool _loading = true;
+
+    // Create dialog
+    private bool _createDialogVisible;
+    private MudForm? _createForm;
+    private string _newKeyName = "";
+    private string _newKeyScopes = "read,write";
+    private int? _newKeyProjectId;
+    private int? _newKeyExpiresInDays;
+    private bool _creating;
+
+    // Show key dialog
+    private bool _showKeyDialogVisible;
+    private string _newlyCreatedKey = "";
+
+    // Delete dialog
+    private bool _deleteDialogVisible;
+    private CliApiKeyDto? _keyToDelete;
+    private bool _deleting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadKeys();
+    }
+
+    private async Task LoadKeys()
+    {
+        _loading = true;
+        try
+        {
+            _keys = await ApiKeyService.GetKeysAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenCreateDialog()
+    {
+        _newKeyName = "";
+        _newKeyScopes = "read,write";
+        _newKeyProjectId = null;
+        _newKeyExpiresInDays = null;
+        _createDialogVisible = true;
+    }
+
+    private void CloseCreateDialog()
+    {
+        _createDialogVisible = false;
+    }
+
+    private async Task CreateKey()
+    {
+        if (_createForm != null)
+        {
+            await _createForm.Validate();
+            if (!_createForm.IsValid) return;
+        }
+
+        _creating = true;
+        try
+        {
+            var request = new CreateCliApiKeyRequest
+            {
+                Name = _newKeyName,
+                Scopes = _newKeyScopes,
+                ProjectId = _newKeyProjectId,
+                ExpiresInDays = _newKeyExpiresInDays
+            };
+
+            var result = await ApiKeyService.CreateKeyAsync(request);
+
+            if (result.IsSuccess && result.ApiKey != null)
+            {
+                _newlyCreatedKey = result.ApiKey;
+                _createDialogVisible = false;
+                _showKeyDialogVisible = true;
+                await LoadKeys();
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to create API key", Severity.Error);
+            }
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+
+    private void CloseShowKeyDialog()
+    {
+        _showKeyDialogVisible = false;
+        _newlyCreatedKey = "";
+    }
+
+    private async Task CopyKeyToClipboard()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", _newlyCreatedKey);
+            Snackbar.Add("API key copied to clipboard", Severity.Success);
+        }
+        catch
+        {
+            Snackbar.Add("Failed to copy to clipboard", Severity.Error);
+        }
+    }
+
+    private void ConfirmDeleteKey(CliApiKeyDto key)
+    {
+        _keyToDelete = key;
+        _deleteDialogVisible = true;
+    }
+
+    private void CloseDeleteDialog()
+    {
+        _deleteDialogVisible = false;
+        _keyToDelete = null;
+    }
+
+    private async Task DeleteKey()
+    {
+        if (_keyToDelete == null) return;
+
+        _deleting = true;
+        try
+        {
+            var success = await ApiKeyService.DeleteKeyAsync(_keyToDelete.Id);
+
+            if (success)
+            {
+                Snackbar.Add("API key deleted", Severity.Success);
+                _deleteDialogVisible = false;
+                _keyToDelete = null;
+                await LoadKeys();
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete API key", Severity.Error);
+            }
+        }
+        finally
+        {
+            _deleting = false;
+        }
+    }
+
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+}

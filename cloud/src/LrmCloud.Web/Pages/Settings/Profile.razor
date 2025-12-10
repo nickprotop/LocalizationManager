@@ -1,0 +1,455 @@
+@page "/settings/profile"
+@attribute [Authorize]
+@using LrmCloud.Shared.DTOs.Auth
+@using LrmCloud.Web.Services
+@inject AuthService AuthService
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>Profile Settings - LRM Cloud</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-6">
+    <MudText Typo="Typo.h4" Class="mb-6">Profile Settings</MudText>
+
+    @if (_isLoading)
+    {
+        <MudStack Spacing="4">
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="150px" />
+        </MudStack>
+    }
+    else if (_profile == null)
+    {
+        <MudAlert Severity="Severity.Error">Failed to load profile</MudAlert>
+    }
+    else
+    {
+        <!-- Profile Information Card -->
+        <MudCard Class="mb-6">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Person" />
+                        <MudText Typo="Typo.h6">Profile Information</MudText>
+                    </MudStack>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudForm @ref="_profileForm" @bind-IsValid="_profileFormValid">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField T="string"
+                                          @bind-Value="_username"
+                                          Label="Username"
+                                          Variant="Variant.Outlined"
+                                          Required="true"
+                                          RequiredError="Username is required"
+                                          Validation="@(new Func<string, IEnumerable<string>>(ValidateUsername))"
+                                          HelperText="3-50 characters, letters, numbers, underscores, and hyphens" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField T="string"
+                                          @bind-Value="_displayName"
+                                          Label="Display Name"
+                                          Variant="Variant.Outlined"
+                                          HelperText="Optional - how you appear to others" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField T="string"
+                                          Value="@_profile.Email"
+                                          Label="Email"
+                                          Variant="Variant.Outlined"
+                                          ReadOnly="true"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@(_profile.EmailVerified ? Icons.Material.Filled.Verified : Icons.Material.Filled.Warning)"
+                                          AdornmentColor="@(_profile.EmailVerified ? Color.Success : Color.Warning)" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField T="string"
+                                          @bind-Value="_avatarUrl"
+                                          Label="Avatar URL"
+                                          Variant="Variant.Outlined"
+                                          Validation="@(new Func<string, IEnumerable<string>>(ValidateUrl))"
+                                          HelperText="URL to your avatar image" />
+                        </MudItem>
+                        @if (!string.IsNullOrEmpty(_avatarUrl))
+                        {
+                            <MudItem xs="12">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">Preview:</MudText>
+                                <MudAvatar Size="Size.Large">
+                                    <MudImage Src="@_avatarUrl" Alt="Avatar preview" />
+                                </MudAvatar>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudForm>
+            </MudCardContent>
+            <MudCardActions Class="pa-4">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="SaveProfileAsync"
+                           Disabled="@(!_profileFormValid || _isSaving)">
+                    @if (_isSaving)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    }
+                    Save Changes
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+
+        <!-- Account Information Card -->
+        <MudCard Class="mb-6">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" />
+                        <MudText Typo="Typo.h6">Account Information</MudText>
+                    </MudStack>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudSimpleTable Dense="true" Hover="true" Bordered="false" Striped="false" Class="rounded-lg">
+                    <tbody>
+                        <tr>
+                            <td><MudText Typo="Typo.body2" Color="Color.Secondary">Auth Method</MudText></td>
+                            <td>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                    @if (_profile.AuthType == "github")
+                                    {
+                                        <MudIcon Icon="@Icons.Custom.Brands.GitHub" Size="Size.Small" />
+                                        <MudText>GitHub</MudText>
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" />
+                                        <MudText>Email</MudText>
+                                    }
+                                </MudStack>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><MudText Typo="Typo.body2" Color="Color.Secondary">Plan</MudText></td>
+                            <td>
+                                <MudChip T="string" Color="@GetPlanColor(_profile.Plan)" Size="Size.Small">
+                                    @_profile.Plan.ToUpperInvariant()
+                                </MudChip>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><MudText Typo="Typo.body2" Color="Color.Secondary">Account Created</MudText></td>
+                            <td>@_profile.CreatedAt.ToString("MMMM d, yyyy")</td>
+                        </tr>
+                        @if (_profile.LastLoginAt.HasValue)
+                        {
+                            <tr>
+                                <td><MudText Typo="Typo.body2" Color="Color.Secondary">Last Login</MudText></td>
+                                <td>@_profile.LastLoginAt.Value.ToString("g")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudCardContent>
+        </MudCard>
+
+        <!-- Change Password Card (only for email auth) -->
+        @if (_profile.AuthType == "email")
+        {
+            <MudCard Class="mb-6">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Lock" />
+                            <MudText Typo="Typo.h6">Change Password</MudText>
+                        </MudStack>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudForm @ref="_passwordForm" @bind-IsValid="_passwordFormValid">
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12">
+                                <MudTextField T="string"
+                                              @bind-Value="_currentPassword"
+                                              Label="Current Password"
+                                              Variant="Variant.Outlined"
+                                              InputType="InputType.Password"
+                                              Required="true"
+                                              RequiredError="Current password is required" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField T="string"
+                                              @bind-Value="_newPassword"
+                                              Label="New Password"
+                                              Variant="Variant.Outlined"
+                                              InputType="InputType.Password"
+                                              Required="true"
+                                              RequiredError="New password is required"
+                                              Validation="@(new Func<string, IEnumerable<string>>(ValidatePassword))" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField T="string"
+                                              @bind-Value="_confirmPassword"
+                                              Label="Confirm New Password"
+                                              Variant="Variant.Outlined"
+                                              InputType="InputType.Password"
+                                              Required="true"
+                                              RequiredError="Please confirm your password"
+                                              Validation="@(new Func<string, IEnumerable<string>>(ValidateConfirmPassword))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudForm>
+                </MudCardContent>
+                <MudCardActions Class="pa-4">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="ChangePasswordAsync"
+                               Disabled="@(!_passwordFormValid || _isChangingPassword)">
+                        @if (_isChangingPassword)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        }
+                        Change Password
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        }
+
+        <!-- Danger Zone Card -->
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
+                        <MudText Typo="Typo.h6" Color="Color.Error">Danger Zone</MudText>
+                    </MudStack>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudAlert Severity="Severity.Warning" Class="mb-4">
+                    Deleting your account is permanent and cannot be undone. All your projects, translations, and settings will be permanently deleted.
+                </MudAlert>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Error"
+                           OnClick="OpenDeleteDialog">
+                    Delete Account
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+    }
+</MudContainer>
+
+<!-- Delete Account Dialog -->
+<MudDialog @bind-Visible="_showDeleteDialog" Options="@(new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
+            <MudText Typo="Typo.h6">Delete Account</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudText Class="mb-4">
+            This action is <strong>permanent</strong> and cannot be undone. Enter your password to confirm.
+        </MudText>
+        <MudTextField T="string"
+                      @bind-Value="_deletePassword"
+                      Label="Password"
+                      Variant="Variant.Outlined"
+                      InputType="InputType.Password"
+                      Required="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showDeleteDialog = false">Cancel</MudButton>
+        <MudButton Color="Color.Error"
+                   Variant="Variant.Filled"
+                   OnClick="DeleteAccountAsync"
+                   Disabled="@(string.IsNullOrEmpty(_deletePassword) || _isDeleting)">
+            @if (_isDeleting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Delete My Account
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private UserProfileDto? _profile;
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private bool _isChangingPassword;
+    private bool _isDeleting;
+    private bool _showDeleteDialog;
+
+    // Profile form
+    private MudForm? _profileForm;
+    private bool _profileFormValid;
+    private string _username = string.Empty;
+    private string _displayName = string.Empty;
+    private string _avatarUrl = string.Empty;
+
+    // Password form
+    private MudForm? _passwordForm;
+    private bool _passwordFormValid;
+    private string _currentPassword = string.Empty;
+    private string _newPassword = string.Empty;
+    private string _confirmPassword = string.Empty;
+
+    // Delete account
+    private string _deletePassword = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        _isLoading = true;
+        var result = await AuthService.GetProfileAsync();
+
+        if (result.IsSuccess && result.Profile != null)
+        {
+            _profile = result.Profile;
+            _username = _profile.Username;
+            _displayName = _profile.DisplayName ?? string.Empty;
+            _avatarUrl = _profile.AvatarUrl ?? string.Empty;
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Failed to load profile", Severity.Error);
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (_profileForm != null)
+            await _profileForm.Validate();
+
+        if (!_profileFormValid) return;
+
+        _isSaving = true;
+
+        var request = new UpdateProfileRequest
+        {
+            Username = _username,
+            DisplayName = string.IsNullOrWhiteSpace(_displayName) ? null : _displayName,
+            AvatarUrl = string.IsNullOrWhiteSpace(_avatarUrl) ? null : _avatarUrl
+        };
+
+        var result = await AuthService.UpdateProfileAsync(request);
+
+        if (result.IsSuccess)
+        {
+            _profile = result.Profile;
+            Snackbar.Add(result.SuccessMessage ?? "Profile updated", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Failed to update profile", Severity.Error);
+        }
+
+        _isSaving = false;
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        if (_passwordForm != null)
+            await _passwordForm.Validate();
+
+        if (!_passwordFormValid) return;
+
+        _isChangingPassword = true;
+
+        var request = new ChangePasswordRequest
+        {
+            CurrentPassword = _currentPassword,
+            NewPassword = _newPassword
+        };
+
+        var result = await AuthService.ChangePasswordAsync(request);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add(result.SuccessMessage ?? "Password changed", Severity.Success);
+            _currentPassword = string.Empty;
+            _newPassword = string.Empty;
+            _confirmPassword = string.Empty;
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Failed to change password", Severity.Error);
+        }
+
+        _isChangingPassword = false;
+    }
+
+    private void OpenDeleteDialog()
+    {
+        _deletePassword = string.Empty;
+        _showDeleteDialog = true;
+    }
+
+    private async Task DeleteAccountAsync()
+    {
+        if (string.IsNullOrEmpty(_deletePassword)) return;
+
+        _isDeleting = true;
+
+        var request = new DeleteAccountRequest { Password = _deletePassword };
+        var result = await AuthService.DeleteAccountAsync(request);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Account deleted successfully", Severity.Success);
+            NavigationManager.NavigateTo("");
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Failed to delete account", Severity.Error);
+        }
+
+        _isDeleting = false;
+        _showDeleteDialog = false;
+    }
+
+    private IEnumerable<string> ValidateUsername(string username)
+    {
+        if (string.IsNullOrWhiteSpace(username))
+            yield return "Username is required";
+        else if (username.Length < 3)
+            yield return "Username must be at least 3 characters";
+        else if (username.Length > 50)
+            yield return "Username cannot exceed 50 characters";
+        else if (!System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-zA-Z0-9_-]+$"))
+            yield return "Username can only contain letters, numbers, underscores, and hyphens";
+    }
+
+    private IEnumerable<string> ValidatePassword(string password)
+    {
+        if (string.IsNullOrWhiteSpace(password))
+            yield return "Password is required";
+        else if (password.Length < 12)
+            yield return "Password must be at least 12 characters";
+    }
+
+    private IEnumerable<string> ValidateConfirmPassword(string confirm)
+    {
+        if (confirm != _newPassword)
+            yield return "Passwords do not match";
+    }
+
+    private IEnumerable<string> ValidateUrl(string url)
+    {
+        if (!string.IsNullOrWhiteSpace(url) && !Uri.TryCreate(url, UriKind.Absolute, out _))
+            yield return "Please enter a valid URL";
+    }
+
+    private static Color GetPlanColor(string plan) => plan.ToLowerInvariant() switch
+    {
+        "pro" => Color.Primary,
+        "team" => Color.Secondary,
+        _ => Color.Default
+    };
+}
