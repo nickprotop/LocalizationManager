@@ -1311,64 +1311,80 @@ At $9/mo for 100K chars, margin is healthy even with paid providers.
 - [x] CloudSyncValidator format validation tests ✅
 - [x] ConflictDetector and PullBackupManager tests ✅
 
-### Phase 4: Blazor WebAssembly UI + Translation Service (Week 9-12)
+### Phase 4: Blazor WebAssembly UI + Translation Service (Week 9-12) ✅ COMPLETED
 
-**Phase 4A - Foundation (Week 9)**:
-- [ ] Add MudBlazor NuGet package + theming (light/dark toggle)
-- [ ] Layout: Top navbar + sidebar + main content area
-- [ ] Auth pages: Login, Register, Forgot Password, Reset Password
-- [ ] JWT AuthenticationStateProvider + HttpClient auth interceptor
-- [ ] Protected route handling (redirect to login if not authenticated)
+**Phase 4A - Foundation (Week 9) ✅**:
+- [x] Add MudBlazor v8 NuGet package + theming (light/dark toggle)
+- [x] Layout: Top navbar + sidebar + main content area
+- [x] Auth pages: Login, Register, Forgot Password, Reset Password
+- [x] JWT AuthenticationStateProvider + HttpClient auth interceptor
+- [x] Protected route handling (redirect to login if not authenticated)
 
-**Phase 4B - Dashboard (Week 9)**:
-- [ ] Project cards grid with stats (key count, completion %)
-- [ ] Create/Edit project modal
-- [ ] Organization dropdown/selector
-- [ ] Recent sync activity feed
+**Phase 4B - Dashboard (Week 9) ✅**:
+- [x] Project cards grid with stats (key count, completion %)
+- [x] Create/Edit project modal
+- [x] Organization dropdown/selector
+- [x] Recent sync activity feed
 
-**Phase 4C - Translation Editor Core (Week 10)**:
-- [ ] MudDataGrid with virtualization (10K+ keys)
-- [ ] Key column (frozen/sticky)
-- [ ] Dynamic language columns (based on project languages)
-- [ ] Row status indicator (complete/missing/partial)
-- [ ] Basic inline cell editing (click to edit)
+**Phase 4C - Translation Editor Core (Week 10) ✅**:
+- [x] MudDataGrid with virtualization (10K+ keys)
+- [x] Key column (frozen/sticky)
+- [x] Dynamic language columns (based on project languages)
+- [x] Row status indicator (complete/missing/partial)
+- [x] Basic inline cell editing (click to edit)
 
-**Phase 4D - Editor Features (Week 10-11)**:
-- [ ] Search/filter bar (by key, value, status)
-- [ ] Detail drawer component (double-click row to open):
-  - [ ] All translations with full textareas
-  - [ ] Comment field
-  - [ ] Character count per translation
-  - [ ] Per-language translate button
-- [ ] Bulk actions: Select rows → Translate selected
-- [ ] Add/Delete key functionality
-- [ ] Keyboard shortcuts (Ctrl+S save, arrows navigate)
+**Phase 4D - Editor Features (Week 10-11) ✅**:
+- [x] Search/filter bar (by key, value, status)
+- [x] Detail drawer component (click row to open):
+  - [x] All translations with full textareas
+  - [x] Comment field
+  - [x] Character count per translation
+  - [x] Per-language translate button
+- [x] Bulk actions: Select rows → Translate selected
+- [x] Add/Delete key functionality
+- [x] Keyboard shortcuts (Ctrl+S save)
 
-**Phase 4E - Translation Service Integration (Week 11)**:
-- [ ] API key hierarchy (project → user → org → platform fallback)
-- [ ] Translation with fallback providers (if primary fails, try next)
-- [ ] Usage tracking and limits (per user/org, shown in UI)
-- [ ] Batch translation endpoint (POST /api/projects/:id/translate)
-- [ ] Translation provider settings UI (add/remove API keys)
-- [ ] Translation progress indicator (for bulk operations)
-- [ ] Free provider support (MyMemory, Lingva as fallbacks)
+**Phase 4E - Translation Service Integration (Week 11) ✅**:
+- [x] API key hierarchy (project → user → org → platform fallback)
+- [x] Translation with fallback providers (if primary fails, try next)
+- [x] Usage tracking and limits (per user/org, shown in UI)
+- [x] Batch translation endpoint (POST /api/projects/:id/translate)
+- [x] Translation provider settings UI (add/remove API keys)
+- [x] Translation progress indicator (for bulk operations)
+- [x] Free provider support (MyMemory, Lingva as fallbacks)
+- [x] Comprehensive unit tests for Translation API endpoints
 
-**Phase 4F - Settings & Teams (Week 11-12)**:
-- [ ] Project settings page:
-  - [ ] Display current lrm.json configuration
-  - [ ] Editable: Default language, validation rules, translation settings
-  - [ ] Read-only: Resource format, file paths (tooltip: "Edit in lrm.json via CLI")
-  - [ ] Show sync status and last sync info
-  - [ ] Configuration history viewer
-- [ ] Team management (invite members, roles)
-- [ ] User profile settings
-- [ ] Translation provider API key management
+**Phase 4F - Settings & Teams (Week 11-12) ✅**:
+- [x] Project settings page:
+  - [x] Editable: Name, description, default language, format
+  - [x] GitHub integration settings
+  - [x] Danger zone with project deletion
+  - [x] Language management tab (add/remove languages with stats)
+- [x] User profile settings page:
+  - [x] Profile information (username, display name, avatar)
+  - [x] Account information display
+  - [x] Change password (email auth users)
+  - [x] Account deletion
+- [x] CLI API keys management page:
+  - [x] List keys with prefix, scopes, project, last used, expiration
+  - [x] Create new key with name, scopes, project restriction, expiration
+  - [x] Copy-to-clipboard for new keys (shown once)
+  - [x] Delete keys with confirmation
+- [x] Usage dashboard page:
+  - [x] Translation character usage with progress bar
+  - [x] Account overview (plan, member since)
+  - [x] Stats cards (projects, resource files, keys, API keys)
+  - [x] Plan limits table with status indicators
 
-**Phase 4G - Polish (Week 12)**:
-- [ ] Loading skeletons and spinners
-- [ ] Error boundaries and toast notifications
-- [ ] Responsive design (mobile-friendly)
-- [ ] PWA manifest + service worker (cache static assets + read-only project data)
+**Phase 4G - Polish (Week 12) ✅**:
+- [x] Loading skeletons and spinners (LoadingSkeleton.razor component)
+- [x] Error boundaries and toast notifications (GlobalErrorBoundary.razor)
+- [x] Responsive design (mobile-friendly layout, collapsible sidebar)
+- [x] PWA manifest + service worker (offline caching, offline page)
+- [x] Offline detection banner (OfflineBanner.razor)
+- [x] Empty state component (EmptyState.razor)
+- [x] Keyboard shortcuts (Ctrl+S, Ctrl+F, Escape, Delete)
+- [x] Unsaved changes warning
 
 ### Phase 5: GitHub App Integration (Week 13-14)
 - [ ] GitHub App registration and configuration
