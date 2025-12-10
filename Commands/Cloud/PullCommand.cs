@@ -106,21 +106,43 @@ public class PullCommand : Command<PullCommandSettings>
                 return 1;
             }
 
-            // Check authentication
-            var token = AuthTokenManager.GetTokenAsync(projectDirectory, remoteUrl.Host, cancellationToken).GetAwaiter().GetResult();
+            // Check authentication - API key takes priority over JWT
+            // 1. Check environment variable
+            var apiKey = AuthTokenManager.GetApiKeyFromEnvironment();
 
-            if (string.IsNullOrWhiteSpace(token))
+            // 2. Check stored API key
+            if (string.IsNullOrWhiteSpace(apiKey))
             {
-                AnsiConsole.MarkupLine("[red]✗ Not authenticated![/]");
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine($"[dim]Use 'lrm cloud set-token --host {remoteUrl.Host.EscapeMarkup()}' to authenticate[/]");
-                return 1;
+                apiKey = AuthTokenManager.GetApiKeyAsync(projectDirectory, remoteUrl.Host, cancellationToken).GetAwaiter().GetResult();
             }
 
             // Create API client
             using var apiClient = new CloudApiClient(remoteUrl);
-            apiClient.SetAccessToken(token);
-            apiClient.EnableAutoRefresh(projectDirectory);
+
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                // Use API key authentication
+                apiClient.SetApiKey(apiKey);
+                AnsiConsole.MarkupLine("[dim]Using API key authentication[/]");
+            }
+            else
+            {
+                // Fall back to JWT token
+                var token = AuthTokenManager.GetTokenAsync(projectDirectory, remoteUrl.Host, cancellationToken).GetAwaiter().GetResult();
+
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    AnsiConsole.MarkupLine("[red]✗ Not authenticated![/]");
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine($"[dim]Use 'lrm cloud login {remoteUrl.Host}' to authenticate[/]");
+                    AnsiConsole.MarkupLine($"[dim]Or set an API key: lrm cloud set-api-key --host {remoteUrl.Host.EscapeMarkup()}[/]");
+                    AnsiConsole.MarkupLine($"[dim]Or use environment variable: LRM_CLOUD_API_KEY[/]");
+                    return 1;
+                }
+
+                apiClient.SetAccessToken(token);
+                apiClient.EnableAutoRefresh(projectDirectory);
+            }
 
             // Fetch remote project info and validate format compatibility
             CloudProject? remoteProject = null;

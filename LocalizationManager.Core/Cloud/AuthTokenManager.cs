@@ -289,5 +289,190 @@ public static class AuthTokenManager
         public DateTime UpdatedAt { get; set; }
         public string? RefreshToken { get; set; }
         public DateTime? RefreshTokenExpiresAt { get; set; }
+        public string? ApiKey { get; set; }
+    }
+
+    // =========================================================================
+    // API Key Methods
+    // =========================================================================
+
+    /// <summary>
+    /// Gets the API key from the LRM_CLOUD_API_KEY environment variable.
+    /// </summary>
+    public static string? GetApiKeyFromEnvironment()
+    {
+        return Environment.GetEnvironmentVariable("LRM_CLOUD_API_KEY");
+    }
+
+    /// <summary>
+    /// Gets the stored API key for the specified remote host.
+    /// </summary>
+    public static async Task<string?> GetApiKeyAsync(string projectDirectory, string host, CancellationToken cancellationToken = default)
+    {
+        var tokenPath = GetTokenPath(projectDirectory);
+        if (!File.Exists(tokenPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(tokenPath, cancellationToken);
+            var tokens = JsonSerializer.Deserialize<Dictionary<string, TokenInfo>>(json);
+
+            if (tokens != null && tokens.TryGetValue(host, out var tokenInfo))
+            {
+                return tokenInfo.ApiKey;
+            }
+        }
+        catch (JsonException)
+        {
+            // Invalid token file, return null
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Sets the API key for the specified remote host.
+    /// </summary>
+    public static async Task SetApiKeyAsync(
+        string projectDirectory,
+        string host,
+        string apiKey,
+        CancellationToken cancellationToken = default)
+    {
+        var tokenPath = GetTokenPath(projectDirectory);
+        var directory = Path.GetDirectoryName(tokenPath);
+
+        if (directory != null && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        Dictionary<string, TokenInfo> tokens;
+
+        // Load existing tokens if file exists
+        if (File.Exists(tokenPath))
+        {
+            try
+            {
+                var json = await File.ReadAllTextAsync(tokenPath, cancellationToken);
+                tokens = JsonSerializer.Deserialize<Dictionary<string, TokenInfo>>(json) ?? new Dictionary<string, TokenInfo>();
+            }
+            catch (JsonException)
+            {
+                tokens = new Dictionary<string, TokenInfo>();
+            }
+        }
+        else
+        {
+            tokens = new Dictionary<string, TokenInfo>();
+        }
+
+        // Update or create entry with API key
+        if (tokens.TryGetValue(host, out var existingToken))
+        {
+            existingToken.ApiKey = apiKey;
+            existingToken.UpdatedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            tokens[host] = new TokenInfo
+            {
+                ApiKey = apiKey,
+                UpdatedAt = DateTime.UtcNow
+            };
+        }
+
+        // Save tokens
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true
+        };
+
+        var updatedJson = JsonSerializer.Serialize(tokens, options);
+        await File.WriteAllTextAsync(tokenPath, updatedJson, cancellationToken);
+
+        // Set file permissions to user-only (Unix-like systems)
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+        {
+            try
+            {
+                File.SetUnixFileMode(tokenPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+            catch
+            {
+                // Ignore errors setting permissions
+            }
+        }
+    }
+
+    /// <summary>
+    /// Removes the API key for the specified remote host.
+    /// </summary>
+    public static async Task RemoveApiKeyAsync(string projectDirectory, string host, CancellationToken cancellationToken = default)
+    {
+        var tokenPath = GetTokenPath(projectDirectory);
+        if (!File.Exists(tokenPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(tokenPath, cancellationToken);
+            var tokens = JsonSerializer.Deserialize<Dictionary<string, TokenInfo>>(json);
+
+            if (tokens != null && tokens.TryGetValue(host, out var tokenInfo))
+            {
+                tokenInfo.ApiKey = null;
+                tokenInfo.UpdatedAt = DateTime.UtcNow;
+
+                // If no tokens left for this host, remove the entry
+                if (string.IsNullOrEmpty(tokenInfo.AccessToken) && string.IsNullOrEmpty(tokenInfo.ApiKey))
+                {
+                    tokens.Remove(host);
+                }
+
+                if (tokens.Count == 0)
+                {
+                    // Delete file if no tokens left
+                    File.Delete(tokenPath);
+                }
+                else
+                {
+                    // Save updated tokens
+                    var options = new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    };
+
+                    var updatedJson = JsonSerializer.Serialize(tokens, options);
+                    await File.WriteAllTextAsync(tokenPath, updatedJson, cancellationToken);
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Invalid token file, ignore
+        }
+    }
+
+    /// <summary>
+    /// Checks if an API key exists for the specified remote host (environment or stored).
+    /// </summary>
+    public static async Task<bool> HasApiKeyAsync(string projectDirectory, string host, CancellationToken cancellationToken = default)
+    {
+        // Check environment variable first
+        var envKey = GetApiKeyFromEnvironment();
+        if (!string.IsNullOrWhiteSpace(envKey))
+        {
+            return true;
+        }
+
+        // Check stored key
+        var storedKey = await GetApiKeyAsync(projectDirectory, host, cancellationToken);
+        return !string.IsNullOrWhiteSpace(storedKey);
     }
 }

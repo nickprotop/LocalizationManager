@@ -17,6 +17,7 @@ public class CloudApiClient : IDisposable
     private readonly RemoteUrl _remoteUrl;
     private readonly JsonSerializerOptions _jsonOptions;
     private string? _accessToken;
+    private string? _apiKey;
     private string? _projectDirectory;
     private Func<Task<bool>>? _onTokenRefreshed;
 
@@ -56,6 +57,39 @@ public class CloudApiClient : IDisposable
     /// Gets the current access token.
     /// </summary>
     public string? GetAccessToken() => _accessToken;
+
+    /// <summary>
+    /// Sets the API key for authentication (takes priority over JWT).
+    /// Uses X-API-Key header.
+    /// </summary>
+    public void SetApiKey(string? apiKey)
+    {
+        _apiKey = apiKey;
+
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            // Remove Bearer authorization if set
+            _httpClient.DefaultRequestHeaders.Authorization = null;
+            // Remove existing X-API-Key header if any
+            _httpClient.DefaultRequestHeaders.Remove("X-API-Key");
+            // Add new X-API-Key header
+            _httpClient.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+        }
+        else
+        {
+            _httpClient.DefaultRequestHeaders.Remove("X-API-Key");
+        }
+    }
+
+    /// <summary>
+    /// Gets the current API key.
+    /// </summary>
+    public string? GetApiKey() => _apiKey;
+
+    /// <summary>
+    /// Returns true if using API key authentication instead of JWT.
+    /// </summary>
+    public bool IsUsingApiKey => !string.IsNullOrWhiteSpace(_apiKey);
 
     #region Project API
 
@@ -316,8 +350,9 @@ public class CloudApiClient : IDisposable
     {
         if (!response.IsSuccessStatusCode)
         {
-            // If 401 and auto-refresh is enabled, try to refresh token
+            // If 401 and using JWT (not API key) with auto-refresh enabled, try to refresh token
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                && !IsUsingApiKey  // Don't refresh for API key auth
                 && !string.IsNullOrEmpty(_projectDirectory))
             {
                 var refreshed = await TryRefreshTokenAsync(cancellationToken);

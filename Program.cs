@@ -188,7 +188,7 @@ app.Configure(config =>
     {
         cfg.SetDescription("Configuration commands for API keys and settings");
 
-        cfg.AddCommand<SetApiKeyCommand>("set-api-key")
+        cfg.AddCommand<LocalizationManager.Commands.Config.SetApiKeyCommand>("set-api-key")
             .WithDescription("Store an API key in the secure credential store")
             .WithExample(new[] { "config", "set-api-key", "--provider", "google", "--key", "your-api-key" })
             .WithExample(new[] { "config", "set-api-key", "-p", "deepl", "-k", "your-api-key" });
@@ -298,6 +298,13 @@ app.Configure(config =>
             .WithDescription("Manually set an authentication token for cloud access")
             .WithExample(new[] { "cloud", "set-token", "--host", "lrm.cloud", "--token", "your-token" })
             .WithExample(new[] { "cloud", "set-token" });
+
+        cfg.AddCommand<LocalizationManager.Commands.Cloud.SetApiKeyCommand>("set-api-key")
+            .WithDescription("Store a CLI API key for cloud authentication")
+            .WithExample(new[] { "cloud", "set-api-key" })
+            .WithExample(new[] { "cloud", "set-api-key", "--key", "lrm_abc123..." })
+            .WithExample(new[] { "cloud", "set-api-key", "--host", "staging.lrm.cloud" })
+            .WithExample(new[] { "cloud", "set-api-key", "--remove" });
 
         cfg.AddBranch("remote", remoteCfg =>
         {

@@ -60,10 +60,41 @@ public class StatusCommand : Command<StatusCommandSettings>
                 return 1;
             }
 
-            // Check authentication
-            var hasToken = AuthTokenManager.HasTokenAsync(projectDirectory, remoteUrl!.Host, cancellationToken).GetAwaiter().GetResult();
+            // Check authentication - API key takes priority over JWT
+            // 1. Check environment variable
+            var apiKey = AuthTokenManager.GetApiKeyFromEnvironment();
 
-            if (!hasToken)
+            // 2. Check stored API key
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                apiKey = AuthTokenManager.GetApiKeyAsync(projectDirectory, remoteUrl!.Host, cancellationToken).GetAwaiter().GetResult();
+            }
+
+            // Create API client
+            using var apiClient = new CloudApiClient(remoteUrl!);
+            bool isAuthenticated = false;
+
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                // Use API key authentication
+                apiClient.SetApiKey(apiKey);
+                isAuthenticated = true;
+            }
+            else
+            {
+                // Fall back to JWT token
+                var hasToken = AuthTokenManager.HasTokenAsync(projectDirectory, remoteUrl.Host, cancellationToken).GetAwaiter().GetResult();
+
+                if (hasToken)
+                {
+                    var token = AuthTokenManager.GetTokenAsync(projectDirectory, remoteUrl.Host, cancellationToken).GetAwaiter().GetResult();
+                    apiClient.SetAccessToken(token);
+                    apiClient.EnableAutoRefresh(projectDirectory);
+                    isAuthenticated = true;
+                }
+            }
+
+            if (!isAuthenticated)
             {
                 if (format == Core.Enums.OutputFormat.Json)
                 {
@@ -79,17 +110,12 @@ public class StatusCommand : Command<StatusCommandSettings>
                 {
                     AnsiConsole.MarkupLine("[red]✗ Not authenticated![/]");
                     AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine($"[dim]Use 'lrm cloud set-token --host {remoteUrl.Host.EscapeMarkup()}' to authenticate[/]");
+                    AnsiConsole.MarkupLine($"[dim]Use 'lrm cloud login {remoteUrl.Host}' to authenticate[/]");
+                    AnsiConsole.MarkupLine($"[dim]Or set an API key: lrm cloud set-api-key --host {remoteUrl.Host.EscapeMarkup()}[/]");
+                    AnsiConsole.MarkupLine($"[dim]Or use environment variable: LRM_CLOUD_API_KEY[/]");
                 }
                 return 1;
             }
-
-            // Get token and create API client
-            var token = AuthTokenManager.GetTokenAsync(projectDirectory, remoteUrl.Host, cancellationToken).GetAwaiter().GetResult();
-
-            using var apiClient = new CloudApiClient(remoteUrl);
-            apiClient.SetAccessToken(token);
-            apiClient.EnableAutoRefresh(projectDirectory);
 
             // Fetch sync status
             SyncStatus? syncStatus = null;
