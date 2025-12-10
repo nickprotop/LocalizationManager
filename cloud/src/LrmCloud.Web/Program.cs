@@ -36,4 +36,8 @@ builder.Services.AddScoped(sp =>
 // Auth service (depends on HttpClient, so register after)
 builder.Services.AddScoped<AuthService>();
 
+// Application services
+builder.Services.AddScoped<ProjectService>();
+builder.Services.AddScoped<ResourceService>();
+
 await builder.Build().RunAsync();

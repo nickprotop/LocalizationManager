@@ -1,0 +1,273 @@
+@inject ProjectService ProjectService
+@inject ISnackbar Snackbar
+
+<MudDialog @bind-Visible="_visible" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" />
+            Project Settings
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_project != null)
+        {
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-3">
+                <MudTabPanel Text="General">
+                    <EditForm Model="_model" OnValidSubmit="HandleSubmit">
+                        <DataAnnotationsValidator />
+                        <MudStack Spacing="3">
+                            <MudTextField @bind-Value="_model.Name"
+                                          Label="Project Name"
+                                          Variant="Variant.Outlined"
+                                          For="@(() => _model.Name)"
+                                          Disabled="_isSubmitting"
+                                          Required="true" />
+
+                            <MudTextField @bind-Value="_model.Description"
+                                          Label="Description"
+                                          Variant="Variant.Outlined"
+                                          Lines="2"
+                                          For="@(() => _model.Description)"
+                                          Disabled="_isSubmitting" />
+
+                            <MudSelect @bind-Value="_model.Format"
+                                       Label="Format"
+                                       Variant="Variant.Outlined"
+                                       For="@(() => _model.Format)"
+                                       Disabled="_isSubmitting"
+                                       Required="true">
+                                <MudSelectItem Value="@("resx")">.resx (C#/.NET)</MudSelectItem>
+                                <MudSelectItem Value="@("json")">JSON Localization</MudSelectItem>
+                                <MudSelectItem Value="@("i18next")">i18next (JS/React)</MudSelectItem>
+                            </MudSelect>
+
+                            <MudTextField @bind-Value="_model.DefaultLanguage"
+                                          Label="Default Language"
+                                          Variant="Variant.Outlined"
+                                          For="@(() => _model.DefaultLanguage)"
+                                          Disabled="_isSubmitting"
+                                          HelperText="e.g., en, en-US" />
+
+                            <MudTextField @bind-Value="_model.LocalizationPath"
+                                          Label="Localization Path"
+                                          Variant="Variant.Outlined"
+                                          For="@(() => _model.LocalizationPath)"
+                                          Disabled="_isSubmitting"
+                                          HelperText="Relative path to localization files" />
+
+                            @if (!string.IsNullOrEmpty(_errorMessage))
+                            {
+                                <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
+                            }
+                        </MudStack>
+                    </EditForm>
+                </MudTabPanel>
+
+                <MudTabPanel Text="GitHub">
+                    <MudStack Spacing="3">
+                        <MudTextField @bind-Value="_model.GitHubRepo"
+                                      Label="GitHub Repository"
+                                      Variant="Variant.Outlined"
+                                      For="@(() => _model.GitHubRepo)"
+                                      Disabled="_isSubmitting"
+                                      HelperText="e.g., owner/repo" />
+
+                        <MudTextField @bind-Value="_model.GitHubDefaultBranch"
+                                      Label="Default Branch"
+                                      Variant="Variant.Outlined"
+                                      For="@(() => _model.GitHubDefaultBranch)"
+                                      Disabled="_isSubmitting"
+                                      HelperText="e.g., main" />
+
+                        <MudAlert Severity="Severity.Info" Dense="true">
+                            Link a GitHub repository to enable automatic sync with your source code.
+                        </MudAlert>
+                    </MudStack>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Danger Zone">
+                    <MudStack Spacing="3">
+                        <MudAlert Severity="Severity.Warning">
+                            <MudText Typo="Typo.body2">
+                                Deleting this project will permanently remove all localization keys and translations.
+                                This action cannot be undone.
+                            </MudText>
+                        </MudAlert>
+
+                        @if (!_showDeleteConfirm)
+                        {
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Error"
+                                       StartIcon="@Icons.Material.Filled.Delete"
+                                       OnClick="@(() => _showDeleteConfirm = true)"
+                                       Disabled="_isSubmitting">
+                                Delete Project
+                            </MudButton>
+                        }
+                        else
+                        {
+                            <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-error-lighten);">
+                                <MudStack Spacing="2">
+                                    <MudText Typo="Typo.body2">
+                                        Type <strong>@_project.Name</strong> to confirm deletion:
+                                    </MudText>
+                                    <MudTextField @bind-Value="_deleteConfirmText"
+                                                  Variant="Variant.Outlined"
+                                                  Placeholder="@_project.Name"
+                                                  Disabled="_isDeleting" />
+                                    <MudStack Row="true" Spacing="2">
+                                        <MudButton Variant="Variant.Text"
+                                                   OnClick="@(() => { _showDeleteConfirm = false; _deleteConfirmText = string.Empty; })"
+                                                   Disabled="_isDeleting">
+                                            Cancel
+                                        </MudButton>
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Error"
+                                                   OnClick="HandleDelete"
+                                                   Disabled="@(_deleteConfirmText != _project.Name || _isDeleting)">
+                                            @if (_isDeleting)
+                                            {
+                                                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                                                <MudText Class="ms-2">Deleting...</MudText>
+                                            }
+                                            else
+                                            {
+                                                <MudText>Delete Forever</MudText>
+                                            }
+                                        </MudButton>
+                                    </MudStack>
+                                </MudStack>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </MudTabPanel>
+            </MudTabs>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" Disabled="_isSubmitting">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="HandleSubmit" Disabled="_isSubmitting">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Saving...</MudText>
+            }
+            else
+            {
+                <MudText>Save Changes</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public EventCallback<ProjectDto> OnProjectUpdated { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnProjectDeleted { get; set; }
+
+    private bool _visible;
+    private bool _isSubmitting;
+    private bool _isDeleting;
+    private bool _showDeleteConfirm;
+    private string _deleteConfirmText = string.Empty;
+    private string? _errorMessage;
+    private ProjectDto? _project;
+    private UpdateProjectRequest _model = new();
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        CloseOnEscapeKey = true
+    };
+
+    public void Open(ProjectDto project)
+    {
+        _project = project;
+        _model = new UpdateProjectRequest
+        {
+            Name = project.Name,
+            Description = project.Description,
+            Format = project.Format,
+            DefaultLanguage = project.DefaultLanguage,
+            LocalizationPath = project.LocalizationPath,
+            GitHubRepo = project.GitHubRepo,
+            GitHubDefaultBranch = project.GitHubDefaultBranch
+        };
+        _errorMessage = null;
+        _showDeleteConfirm = false;
+        _deleteConfirmText = string.Empty;
+        _visible = true;
+        StateHasChanged();
+    }
+
+    private void Close()
+    {
+        _visible = false;
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (_project == null) return;
+
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await ProjectService.UpdateProjectAsync(_project.Id, _model);
+
+            if (result.IsSuccess && result.Data != null)
+            {
+                Snackbar.Add($"Project '{result.Data.Name}' updated successfully!", Severity.Success);
+                await OnProjectUpdated.InvokeAsync(result.Data);
+                Close();
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private async Task HandleDelete()
+    {
+        if (_project == null || _deleteConfirmText != _project.Name) return;
+
+        _isDeleting = true;
+
+        try
+        {
+            var result = await ProjectService.DeleteProjectAsync(_project.Id);
+
+            if (result.IsSuccess)
+            {
+                Snackbar.Add($"Project '{_project.Name}' deleted.", Severity.Success);
+                await OnProjectDeleted.InvokeAsync(_project.Id);
+                Close();
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isDeleting = false;
+        }
+    }
+}

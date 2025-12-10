@@ -1,0 +1,180 @@
+@using LrmCloud.Web.Models
+
+<MudStack Spacing="3">
+    <MudTextField Value="@Row.KeyName"
+                  Label="Key Name"
+                  Variant="Variant.Outlined"
+                  ReadOnly="true"
+                  Adornment="Adornment.End"
+                  AdornmentIcon="@Icons.Material.Filled.ContentCopy"
+                  OnAdornmentClick="@CopyKeyName" />
+
+    @if (!string.IsNullOrEmpty(Row.Comment))
+    {
+        <MudTextField Value="@Row.Comment"
+                      Label="Comment"
+                      Variant="Variant.Outlined"
+                      Lines="2"
+                      ReadOnly="true" />
+    }
+
+    <MudStack Row="true" Spacing="2">
+        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(Row.Status)">
+            @Row.Status
+        </MudChip>
+        @if (Row.IsPlural)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Info">Plural</MudChip>
+        }
+    </MudStack>
+
+    <MudDivider />
+
+    <MudText Typo="Typo.subtitle1">Translations</MudText>
+
+    @foreach (var lang in Languages)
+    {
+        var cell = Row.Translations.GetValueOrDefault(lang);
+        var value = cell?.Value ?? "";
+        var isDefault = lang == DefaultLanguage;
+        var isDirty = cell?.IsDirty ?? false;
+
+        <MudStack Spacing="1">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    @lang.ToUpperInvariant()
+                    @if (isDefault)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Primary" Class="ml-1">(default)</MudText>
+                    }
+                </MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Translate"
+                               Size="Size.Small"
+                               Color="Color.Primary"
+                               OnClick="@(() => TranslateLanguage(lang))"
+                               Disabled="@(isDefault)" />
+            </MudStack>
+            <MudTextField T="string"
+                          Value="@cell!.Value"
+                          ValueChanged="@(v => { cell.Value = v; OnValueChanged(cell); })"
+                          Variant="Variant.Outlined"
+                          Lines="2"
+                          FullWidth="true"
+                          Immediate="true"
+                          Placeholder="@(isDefault ? "Enter source text" : "Enter translation")"
+                          Class="@(isDirty ? "dirty-field" : "")" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @((cell?.Value?.Length ?? 0)) characters
+            </MudText>
+        </MudStack>
+    }
+
+    <MudDivider Class="my-2" />
+
+    <MudStack Row="true" Justify="Justify.SpaceBetween">
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Error"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Delete"
+                   OnClick="@HandleDelete">
+            Delete
+        </MudButton>
+        <MudStack Row="true" Spacing="2">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Translate"
+                       OnClick="@HandleTranslateAll">
+                Translate All
+            </MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="@HandleSave"
+                       Disabled="@(!HasChanges || IsSaving)">
+                @if (IsSaving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Save
+            </MudButton>
+        </MudStack>
+    </MudStack>
+</MudStack>
+
+<style>
+    .dirty-field textarea {
+        background-color: rgba(255, 193, 7, 0.1) !important;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public required TranslationGridRow Row { get; set; }
+
+    [Parameter]
+    public List<string> Languages { get; set; } = new();
+
+    [Parameter]
+    public string DefaultLanguage { get; set; } = "en";
+
+    [Parameter]
+    public EventCallback<TranslationGridRow> OnSave { get; set; }
+
+    [Parameter]
+    public EventCallback<TranslationGridRow> OnTranslate { get; set; }
+
+    [Parameter]
+    public EventCallback<TranslationGridRow> OnDelete { get; set; }
+
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    private bool HasChanges => Row.Translations.Values.Any(t => t.IsDirty);
+
+    private void OnValueChanged(TranslationCell cell)
+    {
+        cell.IsDirty = cell.Value != cell.OriginalValue;
+    }
+
+    private async Task CopyKeyName()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", Row.KeyName);
+        Snackbar.Add("Key name copied!", Severity.Success);
+    }
+
+    private void TranslateLanguage(string langCode)
+    {
+        Snackbar.Add($"Translate to {langCode} - coming soon!", Severity.Info);
+    }
+
+    private async Task HandleSave()
+    {
+        await OnSave.InvokeAsync(Row);
+    }
+
+    private async Task HandleTranslateAll()
+    {
+        await OnTranslate.InvokeAsync(Row);
+    }
+
+    private async Task HandleDelete()
+    {
+        await OnDelete.InvokeAsync(Row);
+    }
+
+    private static Color GetStatusColor(TranslationStatus status) => status switch
+    {
+        TranslationStatus.Complete => Color.Success,
+        TranslationStatus.Partial => Color.Warning,
+        TranslationStatus.Missing => Color.Error,
+        _ => Color.Default
+    };
+}

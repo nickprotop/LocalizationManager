@@ -1,0 +1,155 @@
+@inject ProjectService ProjectService
+@inject ISnackbar Snackbar
+
+<MudDialog @bind-Visible="_visible" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Add" Class="mr-2" />
+            Create New Project
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="_model" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_model.Name"
+                              Label="Project Name"
+                              Variant="Variant.Outlined"
+                              For="@(() => _model.Name)"
+                              Disabled="_isSubmitting"
+                              Required="true" />
+
+                <MudTextField @bind-Value="_model.Description"
+                              Label="Description"
+                              Variant="Variant.Outlined"
+                              Lines="2"
+                              For="@(() => _model.Description)"
+                              Disabled="_isSubmitting" />
+
+                <MudSelect @bind-Value="_model.Format"
+                           Label="Format"
+                           Variant="Variant.Outlined"
+                           For="@(() => _model.Format)"
+                           Disabled="_isSubmitting"
+                           Required="true">
+                    <MudSelectItem Value="@("resx")">.resx (C#/.NET)</MudSelectItem>
+                    <MudSelectItem Value="@("json")">JSON Localization</MudSelectItem>
+                    <MudSelectItem Value="@("i18next")">i18next (JS/React)</MudSelectItem>
+                </MudSelect>
+
+                <MudTextField @bind-Value="_model.DefaultLanguage"
+                              Label="Default Language"
+                              Variant="Variant.Outlined"
+                              For="@(() => _model.DefaultLanguage)"
+                              Disabled="_isSubmitting"
+                              HelperText="e.g., en, en-US" />
+
+                <MudTextField @bind-Value="_model.LocalizationPath"
+                              Label="Localization Path"
+                              Variant="Variant.Outlined"
+                              For="@(() => _model.LocalizationPath)"
+                              Disabled="_isSubmitting"
+                              HelperText="Relative path to localization files" />
+
+                <MudExpansionPanels Class="mt-2">
+                    <MudExpansionPanel Text="GitHub Integration (Optional)">
+                        <MudStack Spacing="3">
+                            <MudTextField @bind-Value="_model.GitHubRepo"
+                                          Label="GitHub Repository"
+                                          Variant="Variant.Outlined"
+                                          For="@(() => _model.GitHubRepo)"
+                                          Disabled="_isSubmitting"
+                                          HelperText="e.g., owner/repo" />
+
+                            <MudTextField @bind-Value="_model.GitHubDefaultBranch"
+                                          Label="Default Branch"
+                                          Variant="Variant.Outlined"
+                                          For="@(() => _model.GitHubDefaultBranch)"
+                                          Disabled="_isSubmitting"
+                                          HelperText="e.g., main" />
+                        </MudStack>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
+                }
+            </MudStack>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" Disabled="_isSubmitting">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="HandleSubmit" Disabled="_isSubmitting">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Creating...</MudText>
+            }
+            else
+            {
+                <MudText>Create Project</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public EventCallback<ProjectDto> OnProjectCreated { get; set; }
+
+    private bool _visible;
+    private bool _isSubmitting;
+    private string? _errorMessage;
+    private CreateProjectRequest _model = new() { Name = "", Format = "resx" };
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        CloseOnEscapeKey = true
+    };
+
+    public void Open()
+    {
+        _model = new CreateProjectRequest { Name = "", Format = "resx", DefaultLanguage = "en", LocalizationPath = "." };
+        _errorMessage = null;
+        _visible = true;
+        StateHasChanged();
+    }
+
+    private void Close()
+    {
+        _visible = false;
+    }
+
+    private async Task HandleSubmit()
+    {
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await ProjectService.CreateProjectAsync(_model);
+
+            if (result.IsSuccess && result.Data != null)
+            {
+                Snackbar.Add($"Project '{result.Data.Name}' created successfully!", Severity.Success);
+                await OnProjectCreated.InvokeAsync(result.Data);
+                Close();
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

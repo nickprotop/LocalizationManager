@@ -1,84 +1,41 @@
-@page "/"
+@page "/projects"
 @attribute [Authorize]
 @inject ProjectService ProjectService
 @inject NavigationManager Navigation
 
-<PageTitle>Dashboard - LRM Cloud</PageTitle>
+<PageTitle>Projects - LRM Cloud</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Dashboard</MudText>
-
-@if (_isLoading)
-{
-    <MudGrid>
-        @for (int i = 0; i < 4; i++)
-        {
-            <MudItem xs="12" sm="6" md="3">
-                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="100px" />
-            </MudItem>
-        }
-    </MudGrid>
-}
-else
-{
-    <MudGrid>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <div>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Projects</MudText>
-                        <MudText Typo="Typo.h4">@_stats.ProjectCount</MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Size="Size.Large" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <div>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Total Keys</MudText>
-                        <MudText Typo="Typo.h4">@_stats.TotalKeys</MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Key" Color="Color.Info" Size="Size.Large" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <div>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Avg. Completion</MudText>
-                        <MudText Typo="Typo.h4">@(_stats.AverageCompletion.ToString("F0"))%</MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Translate" Color="Color.Success" Size="Size.Large" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <div>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Usage</MudText>
-                        <MudText Typo="Typo.h4">@FormatUsage()</MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Analytics" Color="Color.Warning" Size="Size.Large" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-}
-
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-6 mb-4">
-    <MudText Typo="Typo.h5">Recent Projects</MudText>
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Projects</MudText>
     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreateDialog">
         New Project
     </MudButton>
 </MudStack>
 
+<MudStack Row="true" Class="mb-4" Spacing="2">
+    <MudTextField @bind-Value="_searchText"
+                  Placeholder="Search projects..."
+                  Variant="Variant.Outlined"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Search"
+                  Immediate="true"
+                  DebounceInterval="300"
+                  Class="flex-grow-1" />
+    <MudSelect @bind-Value="_formatFilter"
+               Label="Format"
+               Variant="Variant.Outlined"
+               Style="min-width: 150px;">
+        <MudSelectItem Value="@("")">All Formats</MudSelectItem>
+        <MudSelectItem Value="@("resx")">.resx</MudSelectItem>
+        <MudSelectItem Value="@("json")">JSON</MudSelectItem>
+        <MudSelectItem Value="@("i18next")">i18next</MudSelectItem>
+    </MudSelect>
+</MudStack>
+
 @if (_isLoading)
 {
     <MudGrid>
-        @for (int i = 0; i < 3; i++)
+        @for (int i = 0; i < 6; i++)
         {
             <MudItem xs="12" sm="6" md="4">
                 <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="180px" />
@@ -86,22 +43,33 @@ else
         }
     </MudGrid>
 }
-else if (_projects.Count == 0)
+else if (!FilteredProjects.Any())
 {
     <MudPaper Class="pa-4" Elevation="2">
         <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="py-8">
-            <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Size="Size.Large" Color="Color.Secondary" />
-            <MudText Typo="Typo.subtitle1" Color="Color.Secondary">No projects yet</MudText>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreateDialog" Class="mt-2">
-                Create Your First Project
-            </MudButton>
+            @if (_projects.Count == 0)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.subtitle1" Color="Color.Secondary">No projects yet</MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreateDialog" Class="mt-2">
+                    Create Your First Project
+                </MudButton>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.subtitle1" Color="Color.Secondary">No projects match your search</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ClearFilters" Class="mt-2">
+                    Clear Filters
+                </MudButton>
+            }
         </MudStack>
     </MudPaper>
 }
 else
 {
     <MudGrid>
-        @foreach (var project in _projects.Take(6))
+        @foreach (var project in FilteredProjects)
         {
             <MudItem xs="12" sm="6" md="4">
                 <MudCard Elevation="2" Class="cursor-pointer" @onclick="@(() => NavigateToProject(project.Id))">
@@ -141,15 +109,6 @@ else
             </MudItem>
         }
     </MudGrid>
-
-    @if (_projects.Count > 6)
-    {
-        <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
-            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/projects">
-                View All Projects (@_projects.Count)
-            </MudButton>
-        </MudStack>
-    }
 }
 
 <CreateProjectDialog @ref="_createDialog" OnProjectCreated="OnProjectCreated" />
@@ -157,32 +116,45 @@ else
 
 @code {
     private List<ProjectDto> _projects = new();
-    private DashboardStats _stats = new();
     private bool _isLoading = true;
+    private string _searchText = string.Empty;
+    private string _formatFilter = string.Empty;
     private CreateProjectDialog? _createDialog;
     private EditProjectDialog? _editDialog;
 
+    private IEnumerable<ProjectDto> FilteredProjects => _projects
+        .Where(p => string.IsNullOrEmpty(_searchText) ||
+                    p.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                    (p.Description?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false))
+        .Where(p => string.IsNullOrEmpty(_formatFilter) || p.Format == _formatFilter)
+        .OrderByDescending(p => p.UpdatedAt);
+
     protected override async Task OnInitializedAsync()
     {
-        await LoadDataAsync();
+        await LoadProjectsAsync();
     }
 
-    private async Task LoadDataAsync()
+    private async Task LoadProjectsAsync()
     {
         _isLoading = true;
         try
         {
             _projects = await ProjectService.GetProjectsAsync();
-            _stats = await ProjectService.GetDashboardStatsAsync();
         }
         catch
         {
-            // Handle error - show snackbar
+            // Handle error - could show snackbar
         }
         finally
         {
             _isLoading = false;
         }
+    }
+
+    private void ClearFilters()
+    {
+        _searchText = string.Empty;
+        _formatFilter = string.Empty;
     }
 
     private void OpenCreateDialog()
@@ -198,8 +170,6 @@ else
     private async Task OnProjectCreated(ProjectDto project)
     {
         _projects.Insert(0, project);
-        _stats.ProjectCount++;
-        _stats.TotalKeys += project.KeyCount;
         StateHasChanged();
     }
 
@@ -216,7 +186,7 @@ else
     private async Task OnProjectDeleted(int projectId)
     {
         _projects.RemoveAll(p => p.Id == projectId);
-        await LoadDataAsync(); // Refresh stats
+        StateHasChanged();
     }
 
     private void NavigateToProject(int projectId)
@@ -227,13 +197,6 @@ else
     private void NavigateToEditor(int projectId)
     {
         Navigation.NavigateTo($"/projects/{projectId}/editor");
-    }
-
-    private string FormatUsage()
-    {
-        if (_stats.CharsUsed >= 1000)
-            return $"{_stats.CharsUsed / 1000}K / {_stats.CharsLimit / 1000}K";
-        return $"{_stats.CharsUsed} / {_stats.CharsLimit / 1000}K";
     }
 
     private static Color GetFormatColor(string format) => format.ToLower() switch

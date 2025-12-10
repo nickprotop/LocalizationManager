@@ -1,0 +1,285 @@
+@page "/projects/{ProjectId:int}"
+@attribute [Authorize]
+@inject ProjectService ProjectService
+@inject ResourceService ResourceService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_project?.Name ?? "Project") - LRM Cloud</PageTitle>
+
+@if (_isLoading)
+{
+    <MudStack Spacing="4">
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="120px" />
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
+    </MudStack>
+}
+else if (_project == null)
+{
+    <MudAlert Severity="Severity.Error">
+        Project not found or you don't have access to it.
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/">Go to Dashboard</MudButton>
+    </MudAlert>
+}
+else
+{
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                           OnClick="@(() => Navigation.NavigateTo("/"))"
+                           Size="Size.Small" />
+            <MudText Typo="Typo.h4">@_project.Name</MudText>
+            <MudChip T="string" Size="Size.Small" Color="@GetFormatColor(_project.Format)">@_project.Format</MudChip>
+        </MudStack>
+
+        <MudStack Row="true" Spacing="2">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.Settings"
+                       OnClick="@OpenEditDialog">
+                Settings
+            </MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       OnClick="@(() => Navigation.NavigateTo($"/projects/{ProjectId}/editor"))">
+                Open Editor
+            </MudButton>
+        </MudStack>
+    </MudStack>
+
+    @if (!string.IsNullOrEmpty(_project.Description))
+    {
+        <MudText Typo="Typo.body1" Class="mb-4" Color="Color.Secondary">@_project.Description</MudText>
+    }
+
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Keys</MudText>
+                        <MudText Typo="Typo.h4">@(_stats?.TotalKeys ?? _project.KeyCount)</MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.Key" Color="Color.Primary" Size="Size.Large" />
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Languages</MudText>
+                        <MudText Typo="Typo.h4">@(_stats?.Languages.Count ?? 0)</MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.Language" Color="Color.Info" Size="Size.Large" />
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Completion</MudText>
+                        <MudText Typo="Typo.h4">@(_stats?.OverallCompletion.ToString("F0") ?? _project.CompletionPercentage.ToString("F0"))%</MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="@GetCompletionColor(_stats?.OverallCompletion ?? _project.CompletionPercentage)" Size="Size.Large" />
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Last Updated</MudText>
+                        <MudText Typo="Typo.h6">@_project.UpdatedAt.ToString("MMM dd")</MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Color="Color.Secondary" Size="Size.Large" />
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @if (_stats != null && _stats.Languages.Any())
+    {
+        <MudText Typo="Typo.h6" Class="mt-6 mb-3">Language Progress</MudText>
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Spacing="3">
+                @foreach (var lang in _stats.Languages.OrderByDescending(l => l.Value.CompletionPercentage))
+                {
+                    <div>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudText Typo="Typo.body1">@lang.Key.ToUpperInvariant()</MudText>
+                                @if (lang.Key == _project.DefaultLanguage)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">Default</MudChip>
+                                }
+                            </MudStack>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                @lang.Value.TranslatedCount / @_stats.TotalKeys translated
+                            </MudText>
+                        </MudStack>
+                        <MudProgressLinear Value="@lang.Value.CompletionPercentage"
+                                           Color="@GetCompletionColor(lang.Value.CompletionPercentage)"
+                                           Class="mt-1" />
+                    </div>
+                }
+            </MudStack>
+        </MudPaper>
+    }
+
+    <MudText Typo="Typo.h6" Class="mt-6 mb-3">Project Details</MudText>
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Format</MudText>
+                <MudText Typo="Typo.body1">@_project.Format</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Default Language</MudText>
+                <MudText Typo="Typo.body1">@_project.DefaultLanguage</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Localization Path</MudText>
+                <MudText Typo="Typo.body1">@_project.LocalizationPath</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Organization</MudText>
+                <MudText Typo="Typo.body1">@(_project.OrganizationName ?? "Personal")</MudText>
+            </MudItem>
+            @if (!string.IsNullOrEmpty(_project.GitHubRepo))
+            {
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">GitHub Repository</MudText>
+                    <MudLink Href="@($"https://github.com/{_project.GitHubRepo}")" Target="_blank">
+                        @_project.GitHubRepo
+                    </MudLink>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Default Branch</MudText>
+                    <MudText Typo="Typo.body1">@(_project.GitHubDefaultBranch ?? "main")</MudText>
+                </MudItem>
+            }
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Created</MudText>
+                <MudText Typo="Typo.body1">@_project.CreatedAt.ToString("MMMM dd, yyyy")</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Last Synced</MudText>
+                <MudText Typo="Typo.body1">@(_project.LastSyncedAt?.ToString("MMMM dd, yyyy HH:mm") ?? "Never")</MudText>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudText Typo="Typo.h6" Class="mt-6 mb-3">Quick Actions</MudText>
+    <MudStack Row="true" Spacing="2" Class="flex-wrap">
+        <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.Edit"
+                   OnClick="@(() => Navigation.NavigateTo($"/projects/{ProjectId}/editor"))">
+            Open Editor
+        </MudButton>
+        <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.Translate"
+                   OnClick="@TranslateAll">
+            Translate All Missing
+        </MudButton>
+        <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.FileDownload"
+                   OnClick="@ExportProject">
+            Export
+        </MudButton>
+        <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.ContentCopy"
+                   OnClick="@CopySyncCommand">
+            CLI Sync Command
+        </MudButton>
+    </MudStack>
+}
+
+<EditProjectDialog @ref="_editDialog" OnProjectUpdated="OnProjectUpdated" OnProjectDeleted="OnProjectDeleted" />
+
+@code {
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    private ProjectDto? _project;
+    private ProjectStatsDto? _stats;
+    private bool _isLoading = true;
+    private EditProjectDialog? _editDialog;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _project = await ProjectService.GetProjectAsync(ProjectId);
+            if (_project != null)
+            {
+                _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading project: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OpenEditDialog()
+    {
+        if (_project != null)
+            _editDialog?.Open(_project);
+    }
+
+    private async Task OnProjectUpdated(ProjectDto project)
+    {
+        _project = project;
+        StateHasChanged();
+    }
+
+    private void OnProjectDeleted(int projectId)
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    private void TranslateAll()
+    {
+        Snackbar.Add("Translate all missing - coming soon!", Severity.Info);
+    }
+
+    private void ExportProject()
+    {
+        Snackbar.Add("Export - coming soon!", Severity.Info);
+    }
+
+    private async Task CopySyncCommand()
+    {
+        var command = $"lrm cloud sync --project {ProjectId}";
+        // This requires JS interop
+        Snackbar.Add($"CLI command: {command}", Severity.Info);
+    }
+
+    private static Color GetFormatColor(string format) => format.ToLower() switch
+    {
+        "resx" => Color.Primary,
+        "json" => Color.Info,
+        "i18next" => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private static Color GetCompletionColor(double percentage) => percentage switch
+    {
+        >= 90 => Color.Success,
+        >= 50 => Color.Warning,
+        _ => Color.Error
+    };
+}

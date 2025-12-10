@@ -1,0 +1,302 @@
+@using LrmCloud.Web.Models
+@inject ISnackbar Snackbar
+
+<MudDataGrid T="TranslationGridRow"
+             Items="@Items"
+             Dense="true"
+             Hover="true"
+             Bordered="true"
+             Striped="true"
+             Virtualize="true"
+             FixedHeader="true"
+             Height="calc(100vh - 300px)"
+             RowClick="@OnRowClick"
+             SelectedItemsChanged="@OnSelectedItemsChanged"
+             MultiSelection="true"
+             SelectOnRowClick="false"
+             ReadOnly="false"
+             EditMode="DataGridEditMode.Cell"
+             EditTrigger="DataGridEditTrigger.OnRowClick"
+             CommittedItemChanges="@OnCellCommitted"
+             Class="translation-grid">
+
+    <ToolBarContent>
+        <MudTextField @bind-Value="_searchText"
+                      Placeholder="Search keys..."
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Small"
+                      Immediate="true"
+                      DebounceInterval="300"
+                      Class="mt-0"
+                      Style="max-width: 300px;" />
+
+        <MudSelect T="TranslationStatus?" @bind-Value="_statusFilter"
+                   Label="Status"
+                   Variant="Variant.Outlined"
+                   Dense="true"
+                   Margin="Margin.Dense"
+                   Class="ml-4"
+                   Style="max-width: 150px;">
+            <MudSelectItem T="TranslationStatus?" Value="@((TranslationStatus?)null)">All</MudSelectItem>
+            <MudSelectItem T="TranslationStatus?" Value="@TranslationStatus.Complete">Complete</MudSelectItem>
+            <MudSelectItem T="TranslationStatus?" Value="@TranslationStatus.Partial">Partial</MudSelectItem>
+            <MudSelectItem T="TranslationStatus?" Value="@TranslationStatus.Missing">Missing</MudSelectItem>
+        </MudSelect>
+
+        <MudSpacer />
+
+        @if (SelectedItems.Any())
+        {
+            <MudChip T="string" Color="Color.Primary" Size="Size.Small" Class="mr-2">
+                @SelectedItems.Count() selected
+            </MudChip>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Translate"
+                       OnClick="@OnTranslateSelected"
+                       Class="mr-2">
+                Translate
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Error"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Delete"
+                       OnClick="@OnDeleteSelected">
+                Delete
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@OnAddKey">
+                Add Key
+            </MudButton>
+        }
+    </ToolBarContent>
+
+    <Columns>
+        <SelectColumn T="TranslationGridRow" ShowInFooter="false" />
+
+        <PropertyColumn Property="x => x.Status" Title="" Sortable="false" Filterable="false" CellStyle="width: 40px;">
+            <CellTemplate>
+                @switch (context.Item.Status)
+                {
+                    case TranslationStatus.Complete:
+                        <MudTooltip Text="All translations complete">
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                        </MudTooltip>
+                        break;
+                    case TranslationStatus.Partial:
+                        <MudTooltip Text="Some translations missing">
+                            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small" />
+                        </MudTooltip>
+                        break;
+                    case TranslationStatus.Missing:
+                        <MudTooltip Text="No translations">
+                            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small" />
+                        </MudTooltip>
+                        break;
+                }
+            </CellTemplate>
+        </PropertyColumn>
+
+        <PropertyColumn Property="x => x.KeyName" Title="Key" StickyLeft="true">
+            <CellTemplate>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudText Typo="Typo.body2">@context.Item.KeyName</MudText>
+                    @if (context.Item.IsPlural)
+                    {
+                        <MudTooltip Text="Plural key">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info">P</MudChip>
+                        </MudTooltip>
+                    }
+                    @if (!string.IsNullOrEmpty(context.Item.Comment))
+                    {
+                        <MudTooltip Text="@context.Item.Comment">
+                            <MudIcon Icon="@Icons.Material.Filled.Comment" Size="Size.Small" Color="Color.Secondary" />
+                        </MudTooltip>
+                    }
+                </MudStack>
+            </CellTemplate>
+        </PropertyColumn>
+
+        @foreach (var lang in Languages)
+        {
+            var langCode = lang;
+            <TemplateColumn T="TranslationGridRow" Title="@GetLanguageTitle(lang)" CellStyle="min-width: 200px;">
+                <CellTemplate>
+                    @{
+                        var cell = context.Item.Translations.GetValueOrDefault(langCode);
+                        var value = cell?.Value ?? "";
+                        var isDirty = cell?.IsDirty ?? false;
+                    }
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Class="@(isDirty ? "dirty-cell" : "")">
+                        @if (string.IsNullOrEmpty(value))
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="font-italic">
+                                (empty)
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Style="@(value.Length > 50 ? "overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;" : "")">
+                                @value
+                            </MudText>
+                        }
+                    </MudStack>
+                </CellTemplate>
+                <EditTemplate>
+                    @{
+                        var cell = context.Item.Translations.GetValueOrDefault(langCode);
+                        var currentValue = cell?.Value ?? "";
+                    }
+                    <MudTextField T="string"
+                                  Value="@currentValue"
+                                  ValueChanged="@(v => OnCellValueChanged(context.Item, langCode, v))"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth="true"
+                                  AutoFocus="true" />
+                </EditTemplate>
+            </TemplateColumn>
+        }
+    </Columns>
+
+    <NoRecordsContent>
+        <MudStack AlignItems="AlignItems.Center" Class="py-8">
+            <MudIcon Icon="@Icons.Material.Filled.Translate" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.subtitle1" Color="Color.Secondary">No translation keys found</MudText>
+            @if (!string.IsNullOrEmpty(_searchText) || _statusFilter.HasValue)
+            {
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ClearFilters">
+                    Clear Filters
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@OnAddKey">
+                    Add Your First Key
+                </MudButton>
+            }
+        </MudStack>
+    </NoRecordsContent>
+
+    <LoadingContent>
+        <MudStack AlignItems="AlignItems.Center" Class="py-8">
+            <MudProgressCircular Indeterminate="true" />
+            <MudText Typo="Typo.subtitle1" Color="Color.Secondary">Loading translations...</MudText>
+        </MudStack>
+    </LoadingContent>
+
+    <PagerContent>
+        <MudDataGridPager T="TranslationGridRow" />
+    </PagerContent>
+</MudDataGrid>
+
+<style>
+    .translation-grid .mud-table-cell {
+        padding: 4px 8px !important;
+    }
+
+    .dirty-cell {
+        background-color: rgba(255, 193, 7, 0.1);
+    }
+
+    .translation-grid .mud-table-row:hover {
+        cursor: pointer;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public List<TranslationGridRow> Items { get; set; } = new();
+
+    [Parameter]
+    public List<string> Languages { get; set; } = new();
+
+    [Parameter]
+    public string DefaultLanguage { get; set; } = "en";
+
+    [Parameter]
+    public EventCallback<TranslationGridRow> OnRowSelected { get; set; }
+
+    [Parameter]
+    public EventCallback OnAddKeyClicked { get; set; }
+
+    [Parameter]
+    public EventCallback<IEnumerable<TranslationGridRow>> OnTranslateClicked { get; set; }
+
+    [Parameter]
+    public EventCallback<IEnumerable<TranslationGridRow>> OnDeleteClicked { get; set; }
+
+    [Parameter]
+    public EventCallback<(TranslationGridRow Row, string LanguageCode, string Value)> OnCellChanged { get; set; }
+
+    private string _searchText = string.Empty;
+    private TranslationStatus? _statusFilter;
+    private HashSet<TranslationGridRow> _selectedItems = new();
+
+    private IEnumerable<TranslationGridRow> FilteredItems => Items
+        .Where(i => string.IsNullOrEmpty(_searchText) ||
+                    i.KeyName.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                    i.Translations.Values.Any(t => t.Value?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (i.Comment?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false))
+        .Where(i => !_statusFilter.HasValue || i.Status == _statusFilter.Value);
+
+    private IEnumerable<TranslationGridRow> SelectedItems => _selectedItems;
+
+    private string GetLanguageTitle(string langCode)
+    {
+        var title = langCode.ToUpperInvariant();
+        if (langCode == DefaultLanguage)
+            title += " (default)";
+        return title;
+    }
+
+    private void ClearFilters()
+    {
+        _searchText = string.Empty;
+        _statusFilter = null;
+    }
+
+    private void OnRowClick(DataGridRowClickEventArgs<TranslationGridRow> args)
+    {
+        OnRowSelected.InvokeAsync(args.Item);
+    }
+
+    private void OnSelectedItemsChanged(HashSet<TranslationGridRow> items)
+    {
+        _selectedItems = items;
+    }
+
+    private void OnCellValueChanged(TranslationGridRow row, string languageCode, string value)
+    {
+        row.SetTranslation(languageCode, value);
+        OnCellChanged.InvokeAsync((row, languageCode, value));
+    }
+
+    private void OnCellCommitted(TranslationGridRow row)
+    {
+        // Cell editing committed
+    }
+
+    private void OnAddKey()
+    {
+        OnAddKeyClicked.InvokeAsync();
+    }
+
+    private void OnTranslateSelected()
+    {
+        OnTranslateClicked.InvokeAsync(_selectedItems);
+    }
+
+    private void OnDeleteSelected()
+    {
+        OnDeleteClicked.InvokeAsync(_selectedItems);
+    }
+}

@@ -362,30 +362,38 @@ cloud/src/LrmCloud.Web/
 
 ### Tasks
 
-- [ ] **4B.1** Create ProjectService
-  - [ ] `GetProjectsAsync()` - list user's projects
-  - [ ] `GetProjectAsync(id)` - single project with stats
-  - [ ] `CreateProjectAsync(request)`
-  - [ ] `UpdateProjectAsync(id, request)`
-  - [ ] `DeleteProjectAsync(id)`
+- [x] **4B.1** Create ProjectService ✅ (2025-12-10)
+  - [x] `GetProjectsAsync()` - list user's projects
+  - [x] `GetProjectAsync(id)` - single project with stats
+  - [x] `CreateProjectAsync(request)`
+  - [x] `UpdateProjectAsync(id, request)`
+  - [x] `DeleteProjectAsync(id)`
+  - [x] `GetDashboardStatsAsync()` - stats from projects
 
-- [ ] **4B.2** Dashboard page
-  - [ ] Project cards grid (MudGrid + MudCard)
-  - [ ] Stats per project (key count, completion %)
-  - [ ] "New Project" button
-  - [ ] Recent activity section (if time)
+- [x] **4B.2** Dashboard page ✅ (2025-12-10)
+  - [x] Stats cards (Projects, Total Keys, Avg Completion, Usage)
+  - [x] Project cards grid (MudGrid + MudCard)
+  - [x] Stats per project (key count, completion %)
+  - [x] "New Project" button
+  - [x] Skeleton loading states
+  - [x] Empty state with CTA
 
-- [ ] **4B.3** Project dialogs
-  - [ ] Create project modal (MudDialog)
-  - [ ] Edit project modal
-  - [ ] Delete confirmation
+- [x] **4B.3** Project dialogs ✅ (2025-12-10)
+  - [x] Create project modal (MudDialog) - CreateProjectDialog.razor
+  - [x] Edit project modal - EditProjectDialog.razor with tabs
+  - [x] Delete confirmation with type-to-confirm
 
-- [ ] **4B.4** Organization selector
+- [x] **4B.4** Projects list page ✅ (2025-12-10)
+  - [x] `/projects` route with search and filter
+  - [x] Format filter (resx/json/i18next)
+  - [x] Same card layout as dashboard
+
+- [ ] **4B.5** Organization selector
   - [ ] Dropdown in AppBar or sidebar
   - [ ] Switch between personal/org projects
   - [ ] Remember last selection
 
-- [ ] **4B.5** Project import (file upload)
+- [ ] **4B.6** Project import (file upload)
   - [ ] File dropzone component (MudFileUpload)
   - [ ] Accept .resx, .json files (drag & drop or browse)
   - [ ] Auto-detect format (resx vs json-localization vs i18next)
@@ -417,30 +425,50 @@ Services/
 
 ### Tasks
 
-- [ ] **4C.1** Create ResourceService
-  - [ ] `GetKeysAsync(projectId, filter)` - paginated/filtered
-  - [ ] `GetKeyDetailAsync(projectId, key)` - with all translations
-  - [ ] `UpdateTranslationAsync(projectId, key, lang, value)`
-  - [ ] `CreateKeyAsync(projectId, request)`
-  - [ ] `DeleteKeyAsync(projectId, key)`
+- [x] **4C.1** Create ResourceService ✅ (2025-12-10)
+  - [x] `GetResourceKeysAsync(projectId)` - list keys
+  - [x] `GetResourceKeyAsync(projectId, keyName)` - with all translations
+  - [x] `UpdateTranslationAsync(projectId, keyName, lang, request)`
+  - [x] `CreateResourceKeyAsync(projectId, request)`
+  - [x] `DeleteResourceKeyAsync(projectId, keyName)`
+  - [x] `GetProjectStatsAsync(projectId)` - stats with language list
+  - [x] `BulkUpdateTranslationsAsync(projectId, lang, updates)`
 
-- [ ] **4C.2** Translation grid component
-  - [ ] MudDataGrid with virtualization
-  - [ ] Dynamic columns based on project languages
-  - [ ] Key column (frozen/sticky)
-  - [ ] Status column (icons: missing, complete, partial)
-  - [ ] Row selection (checkbox column)
+- [x] **4C.2** Translation grid component ✅ (2025-12-10)
+  - [x] MudDataGrid with virtualization - TranslationGrid.razor
+  - [x] Dynamic columns based on project languages
+  - [x] Key column with sticky behavior
+  - [x] Status column (icons: missing, complete, partial)
+  - [x] Row selection (checkbox column)
+  - [x] Toolbar with search, filter, bulk actions
 
-- [ ] **4C.3** Inline cell editing
-  - [ ] Click cell to enter edit mode
-  - [ ] Tab to next cell
-  - [ ] Enter to save, Escape to cancel
-  - [ ] Dirty indicator for unsaved changes
+- [x] **4C.3** Inline cell editing ✅ (2025-12-10)
+  - [x] Click cell to enter edit mode
+  - [x] MudDataGrid EditMode.Cell support
+  - [x] Dirty indicator for unsaved changes
 
-- [ ] **4C.4** Grid styling
-  - [ ] Missing translations highlighted
-  - [ ] Plural keys indicator
-  - [ ] Comment tooltip on hover
+- [x] **4C.4** Grid styling ✅ (2025-12-10)
+  - [x] Missing translations highlighted (empty state)
+  - [x] Plural keys indicator (P chip)
+  - [x] Comment tooltip on hover
+
+- [x] **4C.5** Project detail page ✅ (2025-12-10)
+  - [x] /projects/{id} route - Detail.razor
+  - [x] Stats overview cards
+  - [x] Language progress bars
+  - [x] Project details section
+  - [x] Quick actions (edit, translate, export, CLI command)
+
+- [x] **4C.6** Key detail drawer ✅ (2025-12-10)
+  - [x] KeyDetailDrawer.razor component
+  - [x] All translations in full textareas
+  - [x] Character count per field
+  - [x] Per-language translate button (placeholder)
+  - [x] Save/Delete buttons
+
+- [x] **4C.7** Add/Delete dialogs ✅ (2025-12-10)
+  - [x] AddKeyDialog.razor with plural support
+  - [x] ConfirmDeleteDialog.razor with item list
 
 ### Files to Create
 

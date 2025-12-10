@@ -1,0 +1,448 @@
+@page "/projects/{ProjectId:int}/editor"
+@attribute [Authorize]
+@inject ProjectService ProjectService
+@inject ResourceService ResourceService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@using LrmCloud.Web.Models
+
+<PageTitle>@(_project?.Name ?? "Editor") - LRM Cloud</PageTitle>
+
+@if (_isLoading)
+{
+    <MudStack>
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" />
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="calc(100vh - 250px)" />
+    </MudStack>
+}
+else if (_project == null)
+{
+    <MudAlert Severity="Severity.Error">
+        Project not found or you don't have access to it.
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/">Go to Dashboard</MudButton>
+    </MudAlert>
+}
+else
+{
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                           OnClick="@(() => Navigation.NavigateTo($"/projects/{ProjectId}"))"
+                           Size="Size.Small" />
+            <MudText Typo="Typo.h5">@_project.Name</MudText>
+            <MudChip T="string" Size="Size.Small" Color="@GetFormatColor(_project.Format)">@_project.Format</MudChip>
+        </MudStack>
+
+        <MudStack Row="true" Spacing="2">
+            @if (_hasUnsavedChanges)
+            {
+                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Unsaved changes</MudChip>
+            }
+            <MudButton Variant="Variant.Outlined"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="@RefreshData"
+                       Disabled="_isRefreshing">
+                @if (_isRefreshing)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Refresh
+            </MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="@SaveChanges"
+                       Disabled="@(!_hasUnsavedChanges || _isSaving)">
+                @if (_isSaving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Save
+            </MudButton>
+        </MudStack>
+    </MudStack>
+
+    @if (_stats != null)
+    {
+        <MudStack Row="true" Class="mb-4" Spacing="2">
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                @_stats.TotalKeys keys
+            </MudChip>
+            @foreach (var lang in _stats.Languages)
+            {
+                <MudTooltip Text="@($"{lang.Value.TranslatedCount}/{_stats.TotalKeys} translated")">
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@GetCompletionColor(lang.Value.CompletionPercentage)"
+                             Variant="Variant.Outlined">
+                        @lang.Key: @lang.Value.CompletionPercentage.ToString("F0")%
+                    </MudChip>
+                </MudTooltip>
+            }
+        </MudStack>
+    }
+
+    <TranslationGrid Items="@_gridRows"
+                     Languages="@_languages"
+                     DefaultLanguage="@_project.DefaultLanguage"
+                     OnRowSelected="@OnRowSelected"
+                     OnAddKeyClicked="@OpenAddKeyDialog"
+                     OnTranslateClicked="@OnTranslateSelected"
+                     OnDeleteClicked="@OnDeleteSelected"
+                     OnCellChanged="@OnCellChanged" />
+
+    <MudDrawer @bind-Open="_drawerOpen"
+               Anchor="Anchor.Right"
+               Elevation="1"
+               Variant="DrawerVariant.Temporary"
+               Width="400px">
+        <MudDrawerHeader>
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
+                <MudText Typo="Typo.h6">Edit Key</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@CloseDrawer" Size="Size.Small" />
+            </MudStack>
+        </MudDrawerHeader>
+        <MudDrawerContainer Class="pa-4">
+            @if (_selectedRow != null)
+            {
+                <KeyDetailDrawer Row="@_selectedRow"
+                                 Languages="@_languages"
+                                 DefaultLanguage="@_project.DefaultLanguage"
+                                 OnSave="@SaveKeyDetails"
+                                 OnTranslate="@TranslateKey"
+                                 OnDelete="@DeleteKey"
+                                 IsSaving="_isSavingKey" />
+            }
+        </MudDrawerContainer>
+    </MudDrawer>
+}
+
+<AddKeyDialog @ref="_addKeyDialog" OnKeyAdded="@OnKeyAdded" ProjectId="@ProjectId" />
+<ConfirmDeleteDialog @ref="_deleteDialog" OnConfirmed="@OnDeleteConfirmed" />
+
+@code {
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    private ProjectDto? _project;
+    private ProjectStatsDto? _stats;
+    private List<TranslationGridRow> _gridRows = new();
+    private List<string> _languages = new();
+    private bool _isLoading = true;
+    private bool _isRefreshing;
+    private bool _isSaving;
+    private bool _isSavingKey;
+    private bool _hasUnsavedChanges;
+    private bool _drawerOpen;
+    private TranslationGridRow? _selectedRow;
+    private AddKeyDialog? _addKeyDialog;
+    private ConfirmDeleteDialog? _deleteDialog;
+    private IEnumerable<TranslationGridRow>? _pendingDeleteRows;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _project = await ProjectService.GetProjectAsync(ProjectId);
+            if (_project != null)
+            {
+                _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
+                _languages = _stats?.Languages.Keys.ToList() ?? new List<string> { _project.DefaultLanguage };
+
+                // Ensure default language is first
+                if (_languages.Contains(_project.DefaultLanguage))
+                {
+                    _languages.Remove(_project.DefaultLanguage);
+                    _languages.Insert(0, _project.DefaultLanguage);
+                }
+
+                await LoadResourceKeysAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading project: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadResourceKeysAsync()
+    {
+        var keys = await ResourceService.GetResourceKeysAsync(ProjectId);
+        _gridRows = new List<TranslationGridRow>();
+
+        foreach (var key in keys)
+        {
+            var detail = await ResourceService.GetResourceKeyAsync(ProjectId, key.KeyName);
+            if (detail != null)
+            {
+                var row = new TranslationGridRow
+                {
+                    KeyId = detail.Id,
+                    KeyName = detail.KeyName,
+                    KeyPath = detail.KeyPath,
+                    IsPlural = detail.IsPlural,
+                    Comment = detail.Comment,
+                    Version = detail.Version,
+                    UpdatedAt = detail.UpdatedAt
+                };
+
+                foreach (var translation in detail.Translations)
+                {
+                    row.Translations[translation.LanguageCode] = new TranslationCell
+                    {
+                        TranslationId = translation.Id,
+                        LanguageCode = translation.LanguageCode,
+                        Value = translation.Value,
+                        OriginalValue = translation.Value,
+                        PluralForm = translation.PluralForm,
+                        Status = translation.Status,
+                        Version = translation.Version
+                    };
+                }
+
+                // Ensure all languages have an entry
+                foreach (var lang in _languages)
+                {
+                    if (!row.Translations.ContainsKey(lang))
+                    {
+                        row.Translations[lang] = new TranslationCell
+                        {
+                            LanguageCode = lang,
+                            Value = null,
+                            OriginalValue = null
+                        };
+                    }
+                }
+
+                _gridRows.Add(row);
+            }
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        if (_hasUnsavedChanges)
+        {
+            Snackbar.Add("Please save or discard your changes before refreshing", Severity.Warning);
+            return;
+        }
+
+        _isRefreshing = true;
+        try
+        {
+            _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
+            await LoadResourceKeysAsync();
+            Snackbar.Add("Data refreshed", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error refreshing: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isRefreshing = false;
+        }
+    }
+
+    private async Task SaveChanges()
+    {
+        _isSaving = true;
+        var savedCount = 0;
+        var errorCount = 0;
+
+        try
+        {
+            foreach (var row in _gridRows)
+            {
+                foreach (var (langCode, cell) in row.Translations.Where(t => t.Value.IsDirty))
+                {
+                    var request = new UpdateTranslationRequest
+                    {
+                        Value = cell.Value ?? "",
+                        PluralForm = cell.PluralForm,
+                        Status = "translated"
+                    };
+
+                    var result = await ResourceService.UpdateTranslationAsync(
+                        ProjectId, row.KeyName, langCode, request);
+
+                    if (result.IsSuccess)
+                    {
+                        cell.IsDirty = false;
+                        cell.OriginalValue = cell.Value;
+                        savedCount++;
+                    }
+                    else
+                    {
+                        errorCount++;
+                    }
+                }
+            }
+
+            _hasUnsavedChanges = _gridRows.Any(r => r.Translations.Values.Any(t => t.IsDirty));
+
+            if (errorCount > 0)
+                Snackbar.Add($"Saved {savedCount} translations, {errorCount} failed", Severity.Warning);
+            else if (savedCount > 0)
+                Snackbar.Add($"Saved {savedCount} translations", Severity.Success);
+
+            // Refresh stats
+            _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void OnRowSelected(TranslationGridRow row)
+    {
+        _selectedRow = row;
+        _drawerOpen = true;
+    }
+
+    private void CloseDrawer()
+    {
+        _drawerOpen = false;
+        _selectedRow = null;
+    }
+
+    private void OnCellChanged((TranslationGridRow Row, string LanguageCode, string Value) args)
+    {
+        _hasUnsavedChanges = true;
+    }
+
+    private void OpenAddKeyDialog()
+    {
+        _addKeyDialog?.Open();
+    }
+
+    private async Task OnKeyAdded(ResourceKeyDto key)
+    {
+        await RefreshData();
+    }
+
+    private async Task OnTranslateSelected(IEnumerable<TranslationGridRow> rows)
+    {
+        // TODO: Open translate dialog
+        Snackbar.Add($"Translate {rows.Count()} keys - coming soon!", Severity.Info);
+    }
+
+    private void OnDeleteSelected(IEnumerable<TranslationGridRow> rows)
+    {
+        _pendingDeleteRows = rows;
+        _deleteDialog?.Open(
+            "Delete Keys",
+            $"Are you sure you want to delete {rows.Count()} key(s)? This action cannot be undone.",
+            rows.Select(r => r.KeyName).ToList());
+    }
+
+    private async Task OnDeleteConfirmed()
+    {
+        if (_pendingDeleteRows == null) return;
+
+        var deleted = 0;
+        var failed = 0;
+
+        foreach (var row in _pendingDeleteRows)
+        {
+            var result = await ResourceService.DeleteResourceKeyAsync(ProjectId, row.KeyName);
+            if (result.IsSuccess)
+                deleted++;
+            else
+                failed++;
+        }
+
+        if (failed > 0)
+            Snackbar.Add($"Deleted {deleted} keys, {failed} failed", Severity.Warning);
+        else
+            Snackbar.Add($"Deleted {deleted} keys", Severity.Success);
+
+        _pendingDeleteRows = null;
+        await RefreshData();
+    }
+
+    private async Task SaveKeyDetails(TranslationGridRow row)
+    {
+        _isSavingKey = true;
+        try
+        {
+            foreach (var (langCode, cell) in row.Translations.Where(t => t.Value.IsDirty))
+            {
+                var request = new UpdateTranslationRequest
+                {
+                    Value = cell.Value ?? "",
+                    PluralForm = cell.PluralForm,
+                    Status = "translated"
+                };
+
+                var result = await ResourceService.UpdateTranslationAsync(
+                    ProjectId, row.KeyName, langCode, request);
+
+                if (result.IsSuccess)
+                {
+                    cell.IsDirty = false;
+                    cell.OriginalValue = cell.Value;
+                }
+            }
+
+            Snackbar.Add("Translations saved", Severity.Success);
+            _hasUnsavedChanges = _gridRows.Any(r => r.Translations.Values.Any(t => t.IsDirty));
+            _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSavingKey = false;
+        }
+    }
+
+    private Task TranslateKey(TranslationGridRow row)
+    {
+        // TODO: Open translate dialog for single key
+        Snackbar.Add("Translation coming soon!", Severity.Info);
+        return Task.CompletedTask;
+    }
+
+    private async Task DeleteKey(TranslationGridRow row)
+    {
+        _pendingDeleteRows = new[] { row };
+        _deleteDialog?.Open(
+            "Delete Key",
+            $"Are you sure you want to delete '{row.KeyName}'? This action cannot be undone.",
+            new List<string> { row.KeyName });
+    }
+
+    private static Color GetFormatColor(string format) => format.ToLower() switch
+    {
+        "resx" => Color.Primary,
+        "json" => Color.Info,
+        "i18next" => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private static Color GetCompletionColor(double percentage) => percentage switch
+    {
+        >= 90 => Color.Success,
+        >= 50 => Color.Warning,
+        _ => Color.Error
+    };
+}
