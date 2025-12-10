@@ -1,4 +1,9 @@
+@using LrmCloud.Shared.DTOs.Projects
+@using LrmCloud.Shared.DTOs.Resources
+@using LrmCloud.Shared.DTOs.Translation
 @inject ProjectService ProjectService
+@inject ResourceService ResourceService
+@inject TranslationService TranslationService
 @inject ISnackbar Snackbar
 
 <MudDialog @bind-Visible="_visible" Options="_dialogOptions">
@@ -63,6 +68,79 @@
                     </EditForm>
                 </MudTabPanel>
 
+                <MudTabPanel Text="Languages" OnClick="LoadLanguages">
+                    @if (_loadingLanguages)
+                    {
+                        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                    }
+                    else
+                    {
+                        <MudStack Spacing="3">
+                            <div class="d-flex justify-space-between align-center">
+                                <MudText Typo="Typo.subtitle1">Project Languages</MudText>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddLanguageDialog">
+                                    Add Language
+                                </MudButton>
+                            </div>
+
+                            @if (_languages.Count == 0)
+                            {
+                                <MudAlert Severity="Severity.Info">
+                                    No languages in this project yet. Add resource keys first, then add languages.
+                                </MudAlert>
+                            }
+                            else
+                            {
+                                <MudTable Items="@_languages" Dense="true" Hover="true">
+                                    <HeaderContent>
+                                        <MudTh>Language</MudTh>
+                                        <MudTh>Completion</MudTh>
+                                        <MudTh>Last Updated</MudTh>
+                                        <MudTh Style="width: 80px">Actions</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd DataLabel="Language">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                                <MudText>@context.LanguageCode</MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">(@context.DisplayName)</MudText>
+                                                @if (context.IsDefault)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">Default</MudChip>
+                                                }
+                                            </MudStack>
+                                        </MudTd>
+                                        <MudTd DataLabel="Completion">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                <MudProgressLinear Value="@context.CompletionPercentage" Color="@GetCompletionColor(context.CompletionPercentage)"
+                                                                   Style="width: 100px;" Size="Size.Small" Rounded="true" />
+                                                <MudText Typo="Typo.caption">@context.CompletionPercentage%</MudText>
+                                            </MudStack>
+                                        </MudTd>
+                                        <MudTd DataLabel="Last Updated">
+                                            @if (context.LastUpdated.HasValue)
+                                            {
+                                                @context.LastUpdated.Value.ToString("g")
+                                            }
+                                            else
+                                            {
+                                                <MudText Color="Color.Secondary">Never</MudText>
+                                            }
+                                        </MudTd>
+                                        <MudTd DataLabel="Actions">
+                                            @if (!context.IsDefault)
+                                            {
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                                               OnClick="@(() => ConfirmRemoveLanguage(context))" />
+                                            }
+                                        </MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            }
+                        </MudStack>
+                    }
+                </MudTabPanel>
+
                 <MudTabPanel Text="GitHub">
                     <MudStack Spacing="3">
                         <MudTextField @bind-Value="_model.GitHubRepo"
@@ -83,6 +161,76 @@
                             Link a GitHub repository to enable automatic sync with your source code.
                         </MudAlert>
                     </MudStack>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Translation" OnClick="LoadTranslationProviders">
+                    @if (_loadingProviders)
+                    {
+                        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                    }
+                    else
+                    {
+                        <MudStack Spacing="3">
+                            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                                <strong>Key Hierarchy:</strong> Project keys override Organization and User-level keys.
+                                @if (_project?.OrganizationId != null)
+                                {
+                                    <span>Keys configured here will only be used for this project.</span>
+                                }
+                            </MudAlert>
+
+                            @if (!_translationProviders.Any())
+                            {
+                                <MudAlert Severity="Severity.Warning">
+                                    No translation providers available. Configure your API keys in Settings.
+                                </MudAlert>
+                            }
+                            else
+                            {
+                                @foreach (var provider in _translationProviders)
+                                {
+                                    <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                <MudIcon Icon="@GetProviderIcon(provider.Name)" />
+                                                <MudStack Spacing="0">
+                                                    <MudText Typo="Typo.subtitle2">@provider.DisplayName</MudText>
+                                                    @if (provider.IsConfigured)
+                                                    {
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            Using: @GetKeySourceLabel(provider.ApiKeySource)
+                                                        </MudText>
+                                                    }
+                                                </MudStack>
+                                            </MudStack>
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                                @if (provider.IsConfigured)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Configured</MudChip>
+                                                }
+                                                @if (provider.ApiKeySource == "project")
+                                                {
+                                                    <MudButton Size="Size.Small" Color="Color.Primary"
+                                                               OnClick="@(() => OpenSetProviderKeyDialog(provider))">
+                                                        Update
+                                                    </MudButton>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                                                   OnClick="@(() => ConfirmRemoveProviderKey(provider))" />
+                                                }
+                                                else
+                                                {
+                                                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined"
+                                                               OnClick="@(() => OpenSetProviderKeyDialog(provider))">
+                                                        Override
+                                                    </MudButton>
+                                                }
+                                            </MudStack>
+                                        </MudStack>
+                                    </MudPaper>
+                                }
+                            }
+                        </MudStack>
+                    }
                 </MudTabPanel>
 
                 <MudTabPanel Text="Danger Zone">
@@ -160,6 +308,129 @@
     </DialogActions>
 </MudDialog>
 
+@* Add Language Dialog *@
+<MudDialog @bind-Visible="_addLanguageDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Add Language</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_newLanguageCode" Label="Language Code" Placeholder="e.g., fr, de, es"
+                      HelperText="Use ISO 639-1 codes (en, fr, de) or with region (en-US, pt-BR)"
+                      Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _addLanguageDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddLanguage" Disabled="_addingLanguage || string.IsNullOrWhiteSpace(_newLanguageCode)">
+            @if (_addingLanguage)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Add
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Remove Language Confirmation *@
+<MudDialog @bind-Visible="_removeLanguageDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Remove Language?</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText>
+            Are you sure you want to remove <strong>@_languageToRemove?.DisplayName</strong> (@_languageToRemove?.LanguageCode)?
+        </MudText>
+        <MudText Color="Color.Error" Class="mt-2">
+            This will permanently delete all translations for this language.
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _removeLanguageDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="RemoveLanguage" Disabled="_removingLanguage">
+            @if (_removingLanguage)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Remove
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Set Provider API Key Dialog *@
+<MudDialog @bind-Visible="_setProviderKeyDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Configure @_selectedProvider?.DisplayName</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_providerKeyForm">
+            <MudTextField @bind-Value="_newProviderApiKey"
+                          Label="API Key"
+                          InputType="InputType.Password"
+                          Required="true"
+                          RequiredError="API key is required"
+                          HelperText="Your API key will be encrypted and stored securely"
+                          Class="mb-3" />
+
+            @if (_selectedProvider?.Name == "azureopenai")
+            {
+                <MudTextField @bind-Value="_azureEndpoint"
+                              Label="Azure Endpoint (Optional)"
+                              Placeholder="https://your-resource.openai.azure.com/"
+                              HelperText="Required for Azure OpenAI deployments"
+                              Class="mb-3" />
+            }
+        </MudForm>
+
+        @if (!string.IsNullOrEmpty(_providerTestResult))
+        {
+            <MudAlert Severity="@(_providerTestSuccess ? Severity.Success : Severity.Error)" Dense="true" Class="mt-2">
+                @_providerTestResult
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _setProviderKeyDialogVisible = false)">Cancel</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="TestProviderKey" Disabled="_testingProviderKey">
+            @if (_testingProviderKey)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Test
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveProviderKey" Disabled="_savingProviderKey">
+            @if (_savingProviderKey)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Remove Provider Key Confirmation *@
+<MudDialog @bind-Visible="_removeProviderKeyDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Remove API Key?</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText>
+            Remove the <strong>@_selectedProvider?.DisplayName</strong> API key override for this project?
+        </MudText>
+        <MudText Color="Color.Secondary" Class="mt-2">
+            The project will fall back to organization, user, or platform-level keys.
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _removeProviderKeyDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="RemoveProviderKey" Disabled="_removingProviderKey">
+            @if (_removingProviderKey)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Remove
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     [Parameter]
     public EventCallback<ProjectDto> OnProjectUpdated { get; set; }
@@ -175,6 +446,41 @@
     private string? _errorMessage;
     private ProjectDto? _project;
     private UpdateProjectRequest _model = new();
+
+    // Languages
+    private List<ProjectLanguageDto> _languages = new();
+    private bool _loadingLanguages;
+    private bool _languagesLoaded;
+
+    // Add language
+    private bool _addLanguageDialogVisible;
+    private string _newLanguageCode = "";
+    private bool _addingLanguage;
+
+    // Remove language
+    private bool _removeLanguageDialogVisible;
+    private ProjectLanguageDto? _languageToRemove;
+    private bool _removingLanguage;
+
+    // Translation providers
+    private List<TranslationProviderDto> _translationProviders = new();
+    private bool _loadingProviders;
+    private bool _providersLoaded;
+
+    // Set provider key
+    private bool _setProviderKeyDialogVisible;
+    private MudForm? _providerKeyForm;
+    private TranslationProviderDto? _selectedProvider;
+    private string _newProviderApiKey = "";
+    private string _azureEndpoint = "";
+    private bool _savingProviderKey;
+    private bool _testingProviderKey;
+    private string? _providerTestResult;
+    private bool _providerTestSuccess;
+
+    // Remove provider key
+    private bool _removeProviderKeyDialogVisible;
+    private bool _removingProviderKey;
 
     private readonly DialogOptions _dialogOptions = new()
     {
@@ -199,6 +505,10 @@
         _errorMessage = null;
         _showDeleteConfirm = false;
         _deleteConfirmText = string.Empty;
+        _languagesLoaded = false;
+        _languages = new();
+        _providersLoaded = false;
+        _translationProviders = new();
         _visible = true;
         StateHasChanged();
     }
@@ -270,4 +580,256 @@
             _isDeleting = false;
         }
     }
+
+    private async Task LoadLanguages()
+    {
+        if (_project == null || _languagesLoaded) return;
+
+        _loadingLanguages = true;
+        try
+        {
+            _languages = await ResourceService.GetProjectLanguagesAsync(_project.Id);
+            _languagesLoaded = true;
+        }
+        finally
+        {
+            _loadingLanguages = false;
+        }
+    }
+
+    private void OpenAddLanguageDialog()
+    {
+        _newLanguageCode = "";
+        _addLanguageDialogVisible = true;
+    }
+
+    private async Task AddLanguage()
+    {
+        if (_project == null || string.IsNullOrWhiteSpace(_newLanguageCode)) return;
+
+        _addingLanguage = true;
+        try
+        {
+            var request = new AddLanguageRequest { LanguageCode = _newLanguageCode.Trim().ToLowerInvariant() };
+            var result = await ResourceService.AddLanguageAsync(_project.Id, request);
+
+            if (result.IsSuccess && result.Data != null)
+            {
+                _languages.Add(result.Data);
+                _languages = _languages.OrderBy(l => !l.IsDefault).ThenBy(l => l.LanguageCode).ToList();
+                Snackbar.Add($"Language '{result.Data.DisplayName}' added", Severity.Success);
+                _addLanguageDialogVisible = false;
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to add language", Severity.Error);
+            }
+        }
+        finally
+        {
+            _addingLanguage = false;
+        }
+    }
+
+    private void ConfirmRemoveLanguage(ProjectLanguageDto language)
+    {
+        _languageToRemove = language;
+        _removeLanguageDialogVisible = true;
+    }
+
+    private async Task RemoveLanguage()
+    {
+        if (_project == null || _languageToRemove == null) return;
+
+        _removingLanguage = true;
+        try
+        {
+            var result = await ResourceService.RemoveLanguageAsync(_project.Id, _languageToRemove.LanguageCode);
+
+            if (result.IsSuccess)
+            {
+                _languages.RemoveAll(l => l.LanguageCode == _languageToRemove.LanguageCode);
+                Snackbar.Add($"Language '{_languageToRemove.DisplayName}' removed", Severity.Success);
+                _removeLanguageDialogVisible = false;
+                _languageToRemove = null;
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to remove language", Severity.Error);
+            }
+        }
+        finally
+        {
+            _removingLanguage = false;
+        }
+    }
+
+    private static Color GetCompletionColor(double percentage) => percentage switch
+    {
+        >= 90 => Color.Success,
+        >= 50 => Color.Warning,
+        _ => Color.Error
+    };
+
+    // Translation provider methods
+    private async Task LoadTranslationProviders()
+    {
+        if (_project == null || _providersLoaded) return;
+
+        _loadingProviders = true;
+        try
+        {
+            _translationProviders = await TranslationService.GetProvidersAsync(projectId: _project.Id);
+            _providersLoaded = true;
+        }
+        finally
+        {
+            _loadingProviders = false;
+        }
+    }
+
+    private void OpenSetProviderKeyDialog(TranslationProviderDto provider)
+    {
+        _selectedProvider = provider;
+        _newProviderApiKey = "";
+        _azureEndpoint = "";
+        _providerTestResult = null;
+        _setProviderKeyDialogVisible = true;
+    }
+
+    private async Task TestProviderKey()
+    {
+        if (string.IsNullOrWhiteSpace(_newProviderApiKey) || _selectedProvider == null) return;
+
+        _testingProviderKey = true;
+        _providerTestResult = null;
+        try
+        {
+            var request = new TestApiKeyRequest
+            {
+                ProviderName = _selectedProvider.Name,
+                ApiKey = _newProviderApiKey
+            };
+
+            if (!string.IsNullOrEmpty(_azureEndpoint))
+            {
+                request.AdditionalConfig = new Dictionary<string, string> { ["endpoint"] = _azureEndpoint };
+            }
+
+            var result = await TranslationService.TestApiKeyAsync(request);
+            _providerTestSuccess = result.IsValid;
+            _providerTestResult = result.IsValid
+                ? result.ProviderMessage ?? "Key is valid!"
+                : result.Error ?? "Key validation failed";
+        }
+        catch (Exception ex)
+        {
+            _providerTestSuccess = false;
+            _providerTestResult = $"Test failed: {ex.Message}";
+        }
+        finally
+        {
+            _testingProviderKey = false;
+        }
+    }
+
+    private async Task SaveProviderKey()
+    {
+        if (_providerKeyForm != null)
+        {
+            await _providerKeyForm.Validate();
+            if (!_providerKeyForm.IsValid) return;
+        }
+
+        if (_project == null || _selectedProvider == null) return;
+
+        _savingProviderKey = true;
+        try
+        {
+            var request = new SetApiKeyRequest
+            {
+                ProviderName = _selectedProvider.Name,
+                ApiKey = _newProviderApiKey
+            };
+
+            if (!string.IsNullOrEmpty(_azureEndpoint))
+            {
+                request.AdditionalConfig = new Dictionary<string, string> { ["endpoint"] = _azureEndpoint };
+            }
+
+            var result = await TranslationService.SetProjectApiKeyAsync(_project.Id, request);
+
+            if (result.IsSuccess)
+            {
+                Snackbar.Add($"{_selectedProvider.DisplayName} API key saved for project", Severity.Success);
+                _setProviderKeyDialogVisible = false;
+                _providersLoaded = false;
+                await LoadTranslationProviders();
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to save API key", Severity.Error);
+            }
+        }
+        finally
+        {
+            _savingProviderKey = false;
+        }
+    }
+
+    private void ConfirmRemoveProviderKey(TranslationProviderDto provider)
+    {
+        _selectedProvider = provider;
+        _removeProviderKeyDialogVisible = true;
+    }
+
+    private async Task RemoveProviderKey()
+    {
+        if (_project == null || _selectedProvider == null) return;
+
+        _removingProviderKey = true;
+        try
+        {
+            var result = await TranslationService.RemoveProjectApiKeyAsync(_project.Id, _selectedProvider.Name);
+
+            if (result.IsSuccess)
+            {
+                Snackbar.Add($"{_selectedProvider.DisplayName} API key removed", Severity.Success);
+                _removeProviderKeyDialogVisible = false;
+                _providersLoaded = false;
+                await LoadTranslationProviders();
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to remove API key", Severity.Error);
+            }
+        }
+        finally
+        {
+            _removingProviderKey = false;
+        }
+    }
+
+    private static string GetProviderIcon(string provider) => provider.ToLowerInvariant() switch
+    {
+        "google" => Icons.Material.Filled.Translate,
+        "deepl" => Icons.Material.Filled.Translate,
+        "openai" => Icons.Material.Filled.Psychology,
+        "claude" => Icons.Material.Filled.Psychology,
+        "azuretranslator" => Icons.Material.Filled.Cloud,
+        "azureopenai" => Icons.Material.Filled.Cloud,
+        "ollama" => Icons.Material.Filled.Computer,
+        "libretranslate" => Icons.Material.Filled.Public,
+        "mymemory" => Icons.Material.Filled.Memory,
+        _ => Icons.Material.Filled.Api
+    };
+
+    private static string GetKeySourceLabel(string? source) => source switch
+    {
+        "project" => "Project key",
+        "organization" => "Organization key",
+        "user" => "User key",
+        "platform" => "Platform key",
+        _ => "Unknown"
+    };
 }

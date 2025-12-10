@@ -1,0 +1,64 @@
+@* Reusable empty state component for consistent empty/zero-data states *@
+
+<MudPaper Class="@($"pa-8 {Class}")" Elevation="@Elevation">
+    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="3">
+        <MudIcon Icon="@Icon" Size="Size.Large" Color="@IconColor" Style="font-size: 4rem; opacity: 0.5;" />
+        <MudText Typo="Typo.h6" Color="Color.Secondary">@Title</MudText>
+        @if (!string.IsNullOrEmpty(Description))
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center" Style="max-width: 400px;">
+                @Description
+            </MudText>
+        }
+        @if (ShowAction)
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@ActionIcon"
+                       OnClick="@OnActionClick"
+                       Href="@ActionHref"
+                       Class="mt-2">
+                @ActionText
+            </MudButton>
+        }
+        @ChildContent
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter]
+    public string Icon { get; set; } = Icons.Material.Filled.Inbox;
+
+    [Parameter]
+    public Color IconColor { get; set; } = Color.Secondary;
+
+    [Parameter]
+    public string Title { get; set; } = "No items found";
+
+    [Parameter]
+    public string? Description { get; set; }
+
+    [Parameter]
+    public bool ShowAction { get; set; } = false;
+
+    [Parameter]
+    public string ActionText { get; set; } = "Create";
+
+    [Parameter]
+    public string ActionIcon { get; set; } = Icons.Material.Filled.Add;
+
+    [Parameter]
+    public EventCallback OnActionClick { get; set; }
+
+    [Parameter]
+    public string? ActionHref { get; set; }
+
+    [Parameter]
+    public int Elevation { get; set; } = 2;
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

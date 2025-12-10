@@ -1,0 +1,126 @@
+@* Reusable skeleton loading component for consistent loading states *@
+@using LrmCloud.Web.Models
+
+@if (Type == LoadingSkeletonType.Card)
+{
+    <MudCard Elevation="2">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudSkeleton Width="60%" Height="24px" />
+                <MudSkeleton Width="40%" Height="16px" Class="mt-1" />
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudSkeleton SkeletonType="SkeletonType.Circle" Width="32px" Height="32px" />
+            </CardHeaderActions>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudSkeleton Width="100%" Height="16px" />
+            <MudSkeleton Width="80%" Height="16px" Class="mt-2" />
+            <MudSkeleton Width="100%" Height="8px" Class="mt-4" />
+        </MudCardContent>
+        <MudCardActions>
+            <MudSkeleton Width="60px" Height="32px" />
+            <MudSkeleton Width="80px" Height="32px" Class="ml-2" />
+        </MudCardActions>
+    </MudCard>
+}
+else if (Type == LoadingSkeletonType.Table)
+{
+    <MudPaper Elevation="2" Class="pa-4">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-4">
+            <MudSkeleton Width="200px" Height="40px" />
+            <MudSkeleton Width="120px" Height="40px" />
+        </MudStack>
+        @for (int i = 0; i < Rows; i++)
+        {
+            <MudStack Row="true" Class="mb-2">
+                <MudSkeleton Width="40px" Height="24px" />
+                <MudSkeleton Width="30%" Height="24px" Class="ml-2" />
+                <MudSkeleton Width="20%" Height="24px" Class="ml-2" />
+                <MudSkeleton Width="25%" Height="24px" Class="ml-2" />
+                <MudSkeleton Width="15%" Height="24px" Class="ml-2" />
+            </MudStack>
+        }
+    </MudPaper>
+}
+else if (Type == LoadingSkeletonType.Form)
+{
+    <MudStack Spacing="4">
+        @for (int i = 0; i < Rows; i++)
+        {
+            <div>
+                <MudSkeleton Width="120px" Height="16px" Class="mb-1" />
+                <MudSkeleton Width="100%" Height="40px" />
+            </div>
+        }
+        <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-4">
+            <MudSkeleton Width="80px" Height="36px" />
+            <MudSkeleton Width="100px" Height="36px" Class="ml-2" />
+        </MudStack>
+    </MudStack>
+}
+else if (Type == LoadingSkeletonType.Stats)
+{
+    <MudGrid>
+        @for (int i = 0; i < Count; i++)
+        {
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                        <div>
+                            <MudSkeleton Width="80px" Height="16px" />
+                            <MudSkeleton Width="60px" Height="32px" Class="mt-2" />
+                        </div>
+                        <MudSkeleton SkeletonType="SkeletonType.Circle" Width="48px" Height="48px" />
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+}
+else if (Type == LoadingSkeletonType.List)
+{
+    <MudStack Spacing="2">
+        @for (int i = 0; i < Rows; i++)
+        {
+            <MudPaper Elevation="1" Class="pa-3">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    @if (ShowAvatar)
+                    {
+                        <MudSkeleton SkeletonType="SkeletonType.Circle" Width="40px" Height="40px" />
+                    }
+                    <MudStack Spacing="1" Class="flex-grow-1">
+                        <MudSkeleton Width="60%" Height="20px" />
+                        <MudSkeleton Width="40%" Height="16px" />
+                    </MudStack>
+                    <MudSkeleton Width="80px" Height="32px" />
+                </MudStack>
+            </MudPaper>
+        }
+    </MudStack>
+}
+else
+{
+    @* Default: Rectangle *@
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="@Height" Width="@Width" />
+}
+
+@code {
+    [Parameter]
+    public LoadingSkeletonType Type { get; set; } = LoadingSkeletonType.Rectangle;
+
+    [Parameter]
+    public int Rows { get; set; } = 5;
+
+    [Parameter]
+    public int Count { get; set; } = 4;
+
+    [Parameter]
+    public string Height { get; set; } = "100px";
+
+    [Parameter]
+    public string Width { get; set; } = "100%";
+
+    [Parameter]
+    public bool ShowAvatar { get; set; } = false;
+}

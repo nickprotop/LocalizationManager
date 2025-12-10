@@ -1,0 +1,82 @@
+@* Global error boundary component - catches and displays unhandled errors gracefully *@
+@inherits ErrorBoundary
+@inject ISnackbar Snackbar
+@inject ILogger<GlobalErrorBoundary> Logger
+
+@if (CurrentException != null)
+{
+    <MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+        <MudPaper Elevation="3" Class="pa-6">
+            <MudStack AlignItems="AlignItems.Center" Spacing="4">
+                <MudIcon Icon="@Icons.Material.Filled.Error"
+                         Color="Color.Error"
+                         Style="font-size: 5rem;" />
+
+                <MudText Typo="Typo.h5" Align="Align.Center">
+                    Something went wrong
+                </MudText>
+
+                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+                    We're sorry, but an unexpected error occurred. Please try again.
+                </MudText>
+
+                @if (ShowDetails)
+                {
+                    <MudExpansionPanels Class="mud-width-full">
+                        <MudExpansionPanel Text="Error Details">
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="font-family: monospace; white-space: pre-wrap; word-break: break-word;">
+                                @CurrentException.Message
+                            </MudText>
+                            @if (CurrentException.InnerException != null)
+                            {
+                                <MudDivider Class="my-2" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Inner Exception:</MudText>
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="font-family: monospace; white-space: pre-wrap; word-break: break-word;">
+                                    @CurrentException.InnerException.Message
+                                </MudText>
+                            }
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                }
+
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Refresh"
+                               OnClick="@Recover">
+                        Try Again
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Home"
+                               Href="">
+                        Go to Dashboard
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudContainer>
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter]
+    public bool ShowDetails { get; set; }
+
+#if DEBUG
+    protected override void OnInitialized()
+    {
+        ShowDetails = true;
+    }
+#endif
+
+    protected override Task OnErrorAsync(Exception exception)
+    {
+        Logger.LogError(exception, "Unhandled error caught by GlobalErrorBoundary");
+        Snackbar.Add("An unexpected error occurred", Severity.Error);
+        return Task.CompletedTask;
+    }
+}

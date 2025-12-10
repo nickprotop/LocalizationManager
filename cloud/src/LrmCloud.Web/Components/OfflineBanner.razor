@@ -1,0 +1,65 @@
+@* Offline detection banner - shows when the user loses internet connectivity *@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@if (_isOffline)
+{
+    <MudAlert Severity="Severity.Warning"
+              Variant="Variant.Filled"
+              Class="offline-banner"
+              Dense="true"
+              Icon="@Icons.Material.Filled.WifiOff">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="width: 100%;">
+            <span>You're offline. Some features may not be available.</span>
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Inherit"
+                       Size="Size.Small"
+                       OnClick="@CheckConnection">
+                Retry
+            </MudButton>
+        </MudStack>
+    </MudAlert>
+}
+
+@code {
+    private bool _isOffline;
+    private DotNetObjectReference<OfflineBanner>? _dotNetRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("lrmOffline.init", _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public void OnOnlineStatusChanged(bool isOnline)
+    {
+        _isOffline = !isOnline;
+        StateHasChanged();
+    }
+
+    private async Task CheckConnection()
+    {
+        var isOnline = await JS.InvokeAsync<bool>("lrmOffline.checkConnection");
+        _isOffline = !isOnline;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_dotNetRef != null)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("lrmOffline.dispose");
+            }
+            catch
+            {
+                // Ignore errors during disposal
+            }
+            _dotNetRef.Dispose();
+        }
+    }
+}

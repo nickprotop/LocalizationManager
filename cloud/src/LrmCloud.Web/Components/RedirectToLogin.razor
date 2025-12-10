@@ -5,9 +5,9 @@
     {
         var returnUrl = Uri.EscapeDataString(Navigation.ToBaseRelativePath(Navigation.Uri));
         var loginUrl = string.IsNullOrEmpty(returnUrl) || returnUrl == "/"
-            ? "/login"
-            : $"/login?returnUrl={returnUrl}";
+            ? "login"
+            : $"login?returnUrl={returnUrl}";
 
-        Navigation.NavigateTo(loginUrl);
+        Navigation.NavigateTo(loginUrl, forceLoad: false);
     }
 }

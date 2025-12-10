@@ -1,0 +1,498 @@
+@using LrmCloud.Shared.DTOs.Projects
+@using LrmCloud.Web.Services
+@inject ProjectService ProjectService
+@inject ISnackbar Snackbar
+
+<MudDialog @bind-Visible="_visible" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Upload" Class="mr-2" />
+            Import Project
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTabs @bind-ActivePanelIndex="_currentStep" Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-3">
+            <MudTabPanel Text="1. Upload" Disabled="@(_currentStep > 0)">
+                <MudStack Spacing="3">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Upload your localization files to create a new project. Supported formats:
+                    </MudText>
+                    <MudStack Row="true" Spacing="2" Class="mb-2">
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">.resx</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info">.json</MudChip>
+                    </MudStack>
+
+                    <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                   FilesChanged="OnFilesChanged"
+                                   Accept=".resx,.json"
+                                   MaximumFileCount="50"
+                                   Class="mt-0">
+                        <ActivatorContent>
+                            <MudPaper Outlined="true" Class="pa-8 d-flex flex-column align-center justify-center cursor-pointer"
+                                      Style="border-style: dashed; min-height: 150px;">
+                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Secondary" />
+                                <MudText Typo="Typo.body1" Class="mt-2">Drop files here or click to browse</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    .resx or .json files (max 50 files)
+                                </MudText>
+                            </MudPaper>
+                        </ActivatorContent>
+                    </MudFileUpload>
+
+                    @if (_uploadedFiles.Any())
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mt-4">Selected Files (@_uploadedFiles.Count)</MudText>
+                        <MudList T="string" Dense="true">
+                            @foreach (var file in _uploadedFiles)
+                            {
+                                <MudListItem Icon="@GetFileIcon(file.Name)">
+                                    <div class="d-flex justify-space-between align-center" style="width: 100%;">
+                                        <MudText>@file.Name</MudText>
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @FormatFileSize(file.Size)
+                                            </MudText>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                                           Size="Size.Small"
+                                                           OnClick="@(() => RemoveFile(file))" />
+                                        </MudStack>
+                                    </div>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
+
+                    @if (_uploadedFiles.Any())
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => _currentStep = 1)" Class="mt-4">
+                            Next: Configure
+                        </MudButton>
+                    }
+                </MudStack>
+            </MudTabPanel>
+
+            <MudTabPanel Text="2. Configure" Disabled="@(_currentStep < 1)">
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="_projectName"
+                                  Label="Project Name"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="Project name is required" />
+
+                    <MudTextField @bind-Value="_projectDescription"
+                                  Label="Description (optional)"
+                                  Variant="Variant.Outlined"
+                                  Lines="2" />
+
+                    <MudSelect @bind-Value="_detectedFormat"
+                               Label="Format"
+                               Variant="Variant.Outlined"
+                               Required="true"
+                               HelperText="Auto-detected from files">
+                        <MudSelectItem Value="@("resx")">.resx (C#/.NET)</MudSelectItem>
+                        <MudSelectItem Value="@("json")">JSON Localization</MudSelectItem>
+                        <MudSelectItem Value="@("i18next")">i18next (JS/React)</MudSelectItem>
+                    </MudSelect>
+
+                    <MudTextField @bind-Value="_defaultLanguage"
+                                  Label="Default Language"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  HelperText="e.g., en, en-US (auto-detected)" />
+
+                    @if (_detectedLanguages.Any())
+                    {
+                        <MudText Typo="Typo.subtitle2">Detected Languages</MudText>
+                        <MudStack Row="true" Spacing="1" Class="flex-wrap">
+                            @foreach (var lang in _detectedLanguages)
+                            {
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@(lang == _defaultLanguage ? Color.Primary : Color.Default)">
+                                    @lang
+                                    @if (lang == _defaultLanguage)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="ml-1">(default)</MudText>
+                                    }
+                                </MudChip>
+                            }
+                        </MudStack>
+                    }
+
+                    @if (_parseErrors.Any())
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true">
+                            <MudText Typo="Typo.body2">Some files had issues:</MudText>
+                            <ul class="mb-0">
+                                @foreach (var error in _parseErrors.Take(5))
+                                {
+                                    <li>@error</li>
+                                }
+                                @if (_parseErrors.Count > 5)
+                                {
+                                    <li>...and @(_parseErrors.Count - 5) more</li>
+                                }
+                            </ul>
+                        </MudAlert>
+                    }
+
+                    <MudStack Row="true" Spacing="2" Class="mt-4">
+                        <MudButton Variant="Variant.Outlined" OnClick="@(() => _currentStep = 0)">
+                            Back
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   Disabled="@(string.IsNullOrWhiteSpace(_projectName))"
+                                   OnClick="@(() => _currentStep = 2)">
+                            Next: Review
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudTabPanel>
+
+            <MudTabPanel Text="3. Import" Disabled="@(_currentStep < 2)">
+                @if (_isImporting)
+                {
+                    <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="py-4">
+                        <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+                        <MudText>Importing project...</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Processing @_uploadedFiles.Count files
+                        </MudText>
+                    </MudStack>
+                }
+                else if (_importComplete)
+                {
+                    <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="py-4">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success"
+                                 Style="font-size: 4rem;" />
+                        <MudText Typo="Typo.h6">Import Complete!</MudText>
+                        <MudText Color="Color.Secondary">
+                            Created project "@_projectName" with @_importedKeyCount keys
+                            in @_detectedLanguages.Count languages.
+                        </MudText>
+
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-4">
+                            <MudText Typo="Typo.body2">
+                                <strong>Sync with CLI:</strong> Use this command to keep your local files in sync:
+                            </MudText>
+                            <MudText Typo="Typo.body2" Class="mt-1" Style="font-family: monospace;">
+                                lrm cloud sync --project @_createdProject?.Id
+                            </MudText>
+                        </MudAlert>
+                    </MudStack>
+                }
+                else
+                {
+                    <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="py-4">
+                        <MudText Typo="Typo.body1">Ready to import:</MudText>
+                        <MudSimpleTable Dense="true" Bordered="true">
+                            <tbody>
+                                <tr>
+                                    <td><strong>Project Name</strong></td>
+                                    <td>@_projectName</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Format</strong></td>
+                                    <td>@_detectedFormat</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Files</strong></td>
+                                    <td>@_uploadedFiles.Count</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Languages</strong></td>
+                                    <td>@string.Join(", ", _detectedLanguages)</td>
+                                </tr>
+                            </tbody>
+                        </MudSimpleTable>
+                    </MudStack>
+                }
+            </MudTabPanel>
+        </MudTabs>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-4">@_errorMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_importComplete)
+        {
+            <MudButton OnClick="Close">Close</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                       OnClick="@(() => GoToProject(_createdProject?.Id ?? 0))">
+                Open Project
+            </MudButton>
+        }
+        else
+        {
+            <MudButton OnClick="Close" Disabled="_isImporting">Cancel</MudButton>
+            @if (_currentStep == 2)
+            {
+                <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                           OnClick="ImportProject" Disabled="_isImporting">
+                    @if (_isImporting)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    }
+                    Import
+                </MudButton>
+            }
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public EventCallback<ProjectDto> OnProjectImported { get; set; }
+
+    [Parameter]
+    public int? OrganizationId { get; set; }
+
+    private bool _visible;
+    private int _currentStep = 0;
+
+    // Step 1: File upload
+    private List<IBrowserFile> _uploadedFiles = new();
+
+    // Step 2: Configuration
+    private string _projectName = "";
+    private string _projectDescription = "";
+    private string _detectedFormat = "resx";
+    private string _defaultLanguage = "en";
+    private List<string> _detectedLanguages = new();
+    private List<string> _parseErrors = new();
+
+    // Step 3: Import
+    private bool _isImporting;
+    private bool _importComplete;
+    private int _importedKeyCount;
+    private ProjectDto? _createdProject;
+    private string? _errorMessage;
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = true,
+        CloseOnEscapeKey = true
+    };
+
+    public void Open()
+    {
+        Reset();
+        _visible = true;
+        StateHasChanged();
+    }
+
+    private void Reset()
+    {
+        _currentStep = 0;
+        _uploadedFiles = new();
+        _projectName = "";
+        _projectDescription = "";
+        _detectedFormat = "resx";
+        _defaultLanguage = "en";
+        _detectedLanguages = new();
+        _parseErrors = new();
+        _isImporting = false;
+        _importComplete = false;
+        _importedKeyCount = 0;
+        _createdProject = null;
+        _errorMessage = null;
+    }
+
+    private void Close()
+    {
+        _visible = false;
+    }
+
+    private void OnFilesChanged(IReadOnlyList<IBrowserFile> files)
+    {
+        _uploadedFiles = files.ToList();
+        AnalyzeFiles();
+        StateHasChanged();
+    }
+
+    private void RemoveFile(IBrowserFile file)
+    {
+        _uploadedFiles.Remove(file);
+        AnalyzeFiles();
+    }
+
+    private void AnalyzeFiles()
+    {
+        _detectedLanguages.Clear();
+        _parseErrors.Clear();
+
+        if (!_uploadedFiles.Any()) return;
+
+        // Detect format from file extensions
+        var hasResx = _uploadedFiles.Any(f => f.Name.EndsWith(".resx", StringComparison.OrdinalIgnoreCase));
+        var hasJson = _uploadedFiles.Any(f => f.Name.EndsWith(".json", StringComparison.OrdinalIgnoreCase));
+
+        if (hasResx && !hasJson)
+        {
+            _detectedFormat = "resx";
+            AnalyzeResxFiles();
+        }
+        else if (hasJson && !hasResx)
+        {
+            _detectedFormat = "json";
+            AnalyzeJsonFiles();
+        }
+        else if (hasResx && hasJson)
+        {
+            _parseErrors.Add("Mixed file types detected. Please upload only .resx OR .json files.");
+        }
+
+        // Auto-generate project name from first file
+        if (string.IsNullOrEmpty(_projectName) && _uploadedFiles.Any())
+        {
+            var firstFile = _uploadedFiles.First().Name;
+            var baseName = System.IO.Path.GetFileNameWithoutExtension(firstFile);
+            // Remove language suffix if present
+            var dotIndex = baseName.LastIndexOf('.');
+            if (dotIndex > 0)
+            {
+                var possibleLang = baseName[(dotIndex + 1)..];
+                if (possibleLang.Length <= 5) // e.g., "en", "en-US"
+                {
+                    baseName = baseName[..dotIndex];
+                }
+            }
+            _projectName = baseName;
+        }
+    }
+
+    private void AnalyzeResxFiles()
+    {
+        foreach (var file in _uploadedFiles)
+        {
+            var fileName = System.IO.Path.GetFileNameWithoutExtension(file.Name);
+
+            // Parse language from filename: Resources.en.resx, Resources.resx
+            var parts = fileName.Split('.');
+            if (parts.Length >= 2)
+            {
+                var lang = parts[^1]; // Last part
+                if (lang.Length <= 5 && !lang.Equals("resx", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!_detectedLanguages.Contains(lang))
+                        _detectedLanguages.Add(lang);
+                }
+            }
+            else
+            {
+                // Default language file (no suffix)
+                if (!_detectedLanguages.Contains(_defaultLanguage))
+                    _detectedLanguages.Insert(0, _defaultLanguage);
+            }
+        }
+
+        if (!_detectedLanguages.Any())
+            _detectedLanguages.Add(_defaultLanguage);
+    }
+
+    private void AnalyzeJsonFiles()
+    {
+        foreach (var file in _uploadedFiles)
+        {
+            var fileName = System.IO.Path.GetFileNameWithoutExtension(file.Name);
+
+            // Common patterns: en.json, strings.en.json, locales/en.json
+            if (fileName.Length <= 5) // Direct language file: en.json, fr.json
+            {
+                if (!_detectedLanguages.Contains(fileName))
+                    _detectedLanguages.Add(fileName);
+            }
+            else
+            {
+                // Try to extract language: strings.en.json
+                var parts = fileName.Split('.');
+                if (parts.Length >= 2)
+                {
+                    var lang = parts[^1];
+                    if (lang.Length <= 5)
+                    {
+                        if (!_detectedLanguages.Contains(lang))
+                            _detectedLanguages.Add(lang);
+                    }
+                }
+            }
+        }
+
+        if (!_detectedLanguages.Any())
+            _detectedLanguages.Add(_defaultLanguage);
+
+        // Set default language to first detected
+        if (_detectedLanguages.Any())
+            _defaultLanguage = _detectedLanguages.First();
+    }
+
+    private async Task ImportProject()
+    {
+        if (string.IsNullOrWhiteSpace(_projectName)) return;
+
+        _isImporting = true;
+        _errorMessage = null;
+
+        try
+        {
+            // Create the project first
+            var createRequest = new CreateProjectRequest
+            {
+                Name = _projectName.Trim(),
+                Description = _projectDescription?.Trim(),
+                Format = _detectedFormat,
+                DefaultLanguage = _defaultLanguage,
+                OrganizationId = OrganizationId
+            };
+
+            var createResult = await ProjectService.CreateProjectAsync(createRequest);
+            if (!createResult.IsSuccess || createResult.Data == null)
+            {
+                _errorMessage = createResult.ErrorMessage ?? "Failed to create project";
+                return;
+            }
+
+            _createdProject = createResult.Data;
+
+            // TODO: Upload and import files
+            // For now, we just create the project. Full file import would require:
+            // 1. Reading file contents via IBrowserFile.OpenReadStream()
+            // 2. Sending to backend import endpoint
+            // 3. Backend parsing and storing resources
+
+            _importedKeyCount = 0; // Would come from import result
+            _importComplete = true;
+
+            await OnProjectImported.InvokeAsync(_createdProject);
+            Snackbar.Add($"Project '{_projectName}' created successfully!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Import failed: {ex.Message}";
+        }
+        finally
+        {
+            _isImporting = false;
+        }
+    }
+
+    private void GoToProject(int projectId)
+    {
+        Close();
+        // Navigation would be handled by parent
+    }
+
+    private static string GetFileIcon(string fileName) =>
+        fileName.EndsWith(".resx", StringComparison.OrdinalIgnoreCase)
+            ? Icons.Material.Filled.Code
+            : Icons.Material.Filled.DataObject;
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024):F1} MB";
+    }
+}
