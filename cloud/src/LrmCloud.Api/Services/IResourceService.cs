@@ -71,6 +71,27 @@ public interface IResourceService
     Task<ValidationResultDto> ValidateProjectAsync(int projectId, int userId);
 
     // ============================================================
+    // Language Management
+    // ============================================================
+
+    /// <summary>
+    /// Gets all languages in a project.
+    /// </summary>
+    Task<List<ProjectLanguageDto>> GetProjectLanguagesAsync(int projectId, int userId);
+
+    /// <summary>
+    /// Adds a new language to a project.
+    /// </summary>
+    Task<(bool Success, ProjectLanguageDto? Language, string? ErrorMessage)> AddLanguageAsync(
+        int projectId, int userId, AddLanguageRequest request);
+
+    /// <summary>
+    /// Removes a language from a project (deletes all translations for that language).
+    /// </summary>
+    Task<(bool Success, string? ErrorMessage)> RemoveLanguageAsync(
+        int projectId, int userId, RemoveLanguageRequest request);
+
+    // ============================================================
     // REST API Operations (for web UI)
     // ============================================================
 

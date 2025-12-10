@@ -225,7 +225,7 @@ public class ResourceSyncService
 
         if (translation == null)
         {
-            translation = new Translation
+            translation = new Shared.Entities.Translation
             {
                 ResourceKeyId = resourceKeyId,
                 LanguageCode = languageCode,

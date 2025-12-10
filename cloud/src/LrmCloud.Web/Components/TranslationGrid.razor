@@ -44,6 +44,29 @@
             <MudSelectItem T="TranslationStatus?" Value="@TranslationStatus.Missing">Missing</MudSelectItem>
         </MudSelect>
 
+        <MudMenu Icon="@Icons.Material.Filled.ViewColumn"
+                 Label="Columns"
+                 Variant="Variant.Outlined"
+                 Dense="true"
+                 Class="ml-4"
+                 AnchorOrigin="Origin.BottomLeft">
+            @foreach (var lang in Languages)
+            {
+                var langCode = lang;
+                var isVisible = !_hiddenLanguages.Contains(langCode);
+                <MudMenuItem OnClick="@(() => ToggleLanguageVisibility(langCode))">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudCheckBox T="bool" Value="@isVisible" Size="Size.Small" ReadOnly="true" />
+                        <MudText>@langCode.ToUpperInvariant()</MudText>
+                        @if (langCode == DefaultLanguage)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">(default)</MudText>
+                        }
+                    </MudStack>
+                </MudMenuItem>
+            }
+        </MudMenu>
+
         <MudSpacer />
 
         @if (SelectedItems.Any())
@@ -125,7 +148,7 @@
             </CellTemplate>
         </PropertyColumn>
 
-        @foreach (var lang in Languages)
+        @foreach (var lang in VisibleLanguages)
         {
             var langCode = lang;
             <TemplateColumn T="TranslationGridRow" Title="@GetLanguageTitle(lang)" CellStyle="min-width: 200px;">
@@ -240,6 +263,9 @@
     private string _searchText = string.Empty;
     private TranslationStatus? _statusFilter;
     private HashSet<TranslationGridRow> _selectedItems = new();
+    private HashSet<string> _hiddenLanguages = new();
+
+    private IEnumerable<string> VisibleLanguages => Languages.Where(l => !_hiddenLanguages.Contains(l));
 
     private IEnumerable<TranslationGridRow> FilteredItems => Items
         .Where(i => string.IsNullOrEmpty(_searchText) ||
@@ -262,6 +288,15 @@
     {
         _searchText = string.Empty;
         _statusFilter = null;
+        _hiddenLanguages.Clear();
+    }
+
+    private void ToggleLanguageVisibility(string langCode)
+    {
+        if (_hiddenLanguages.Contains(langCode))
+            _hiddenLanguages.Remove(langCode);
+        else
+            _hiddenLanguages.Add(langCode);
     }
 
     private void OnRowClick(DataGridRowClickEventArgs<TranslationGridRow> args)

@@ -99,7 +99,7 @@ public class ResourceService : IResourceService
                 var project = await _db.Projects.FindAsync(projectId);
                 if (project != null)
                 {
-                    var translation = new Translation
+                    var translation = new Shared.Entities.Translation
                     {
                         ResourceKeyId = resourceKey.Id,
                         LanguageCode = project.DefaultLanguage,
@@ -238,7 +238,7 @@ public class ResourceService : IResourceService
             if (translation == null)
             {
                 // Create new translation
-                translation = new Translation
+                translation = new Shared.Entities.Translation
                 {
                     ResourceKeyId = resourceKey.Id,
                     LanguageCode = languageCode,
@@ -321,7 +321,7 @@ public class ResourceService : IResourceService
 
                 if (translation == null)
                 {
-                    translation = new Translation
+                    translation = new Shared.Entities.Translation
                     {
                         ResourceKeyId = resourceKey.Id,
                         LanguageCode = languageCode,
@@ -549,7 +549,7 @@ public class ResourceService : IResourceService
         };
     }
 
-    private TranslationDto MapToTranslationDto(Translation translation)
+    private TranslationDto MapToTranslationDto(Shared.Entities.Translation translation)
     {
         return new TranslationDto
         {
@@ -786,4 +786,181 @@ public class ResourceService : IResourceService
         return config.DefaultLanguageCode ?? "en";
     }
 
+    // ============================================================
+    // Language Management
+    // ============================================================
+
+    public async Task<List<ProjectLanguageDto>> GetProjectLanguagesAsync(int projectId, int userId)
+    {
+        // Check permission
+        if (!await _projectService.CanViewProjectAsync(projectId, userId))
+            return new List<ProjectLanguageDto>();
+
+        var project = await _db.Projects.FindAsync(projectId);
+        if (project == null)
+            return new List<ProjectLanguageDto>();
+
+        var totalKeys = await _db.ResourceKeys.CountAsync(k => k.ProjectId == projectId);
+
+        // Get all translations grouped by language
+        var languageData = await _db.Translations
+            .Where(t => t.ResourceKey.ProjectId == projectId)
+            .GroupBy(t => t.LanguageCode)
+            .Select(g => new
+            {
+                LanguageCode = g.Key,
+                TranslatedCount = g.Count(t => !string.IsNullOrWhiteSpace(t.Value)),
+                LastUpdated = g.Max(t => (DateTime?)t.UpdatedAt)
+            })
+            .ToListAsync();
+
+        return languageData.Select(l => new ProjectLanguageDto
+        {
+            LanguageCode = l.LanguageCode,
+            DisplayName = GetLanguageDisplayName(l.LanguageCode),
+            IsDefault = l.LanguageCode == project.DefaultLanguage,
+            TranslatedCount = l.TranslatedCount,
+            TotalKeys = totalKeys,
+            CompletionPercentage = totalKeys > 0 ? Math.Round((double)l.TranslatedCount / totalKeys * 100, 1) : 0,
+            LastUpdated = l.LastUpdated
+        }).OrderBy(l => !l.IsDefault).ThenBy(l => l.LanguageCode).ToList();
+    }
+
+    public async Task<(bool Success, ProjectLanguageDto? Language, string? ErrorMessage)> AddLanguageAsync(
+        int projectId, int userId, AddLanguageRequest request)
+    {
+        try
+        {
+            // Check permission
+            if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+                return (false, null, "You don't have permission to manage languages in this project");
+
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null)
+                return (false, null, "Project not found");
+
+            // Check if language already exists
+            var exists = await _db.Translations
+                .AnyAsync(t => t.ResourceKey.ProjectId == projectId && t.LanguageCode == request.LanguageCode);
+
+            if (exists)
+                return (false, null, $"Language '{request.LanguageCode}' already exists in this project");
+
+            // Get all resource keys
+            var resourceKeys = await _db.ResourceKeys
+                .Where(k => k.ProjectId == projectId)
+                .ToListAsync();
+
+            if (resourceKeys.Count == 0)
+            {
+                // No keys yet, just return success with empty language
+                return (true, new ProjectLanguageDto
+                {
+                    LanguageCode = request.LanguageCode,
+                    DisplayName = GetLanguageDisplayName(request.LanguageCode),
+                    IsDefault = false,
+                    TranslatedCount = 0,
+                    TotalKeys = 0,
+                    CompletionPercentage = 0,
+                    LastUpdated = null
+                }, null);
+            }
+
+            // Create empty translations for the new language
+            var now = DateTime.UtcNow;
+            foreach (var key in resourceKeys)
+            {
+                _db.Translations.Add(new Shared.Entities.Translation
+                {
+                    ResourceKeyId = key.Id,
+                    LanguageCode = request.LanguageCode,
+                    Value = "",
+                    Status = TranslationStatus.Pending,
+                    Version = 1,
+                    UpdatedAt = now
+                });
+            }
+
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} added language {LanguageCode} to project {ProjectId}",
+                userId, request.LanguageCode, projectId);
+
+            return (true, new ProjectLanguageDto
+            {
+                LanguageCode = request.LanguageCode,
+                DisplayName = GetLanguageDisplayName(request.LanguageCode),
+                IsDefault = false,
+                TranslatedCount = 0,
+                TotalKeys = resourceKeys.Count,
+                CompletionPercentage = 0,
+                LastUpdated = now
+            }, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding language {LanguageCode} to project {ProjectId}",
+                request.LanguageCode, projectId);
+            return (false, null, "An error occurred while adding the language");
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> RemoveLanguageAsync(
+        int projectId, int userId, RemoveLanguageRequest request)
+    {
+        try
+        {
+            // Check permission
+            if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+                return (false, "You don't have permission to manage languages in this project");
+
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null)
+                return (false, "Project not found");
+
+            // Don't allow removing the default language
+            if (request.LanguageCode == project.DefaultLanguage)
+                return (false, "Cannot remove the default language. Change the default language first.");
+
+            // Require confirmation
+            if (!request.ConfirmDelete)
+                return (false, "Please confirm deletion. This will permanently remove all translations for this language.");
+
+            // Get all translations for this language
+            var translations = await _db.Translations
+                .Where(t => t.ResourceKey.ProjectId == projectId && t.LanguageCode == request.LanguageCode)
+                .ToListAsync();
+
+            if (translations.Count == 0)
+                return (false, $"Language '{request.LanguageCode}' not found in this project");
+
+            // Delete all translations
+            _db.Translations.RemoveRange(translations);
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} removed language {LanguageCode} from project {ProjectId} ({Count} translations deleted)",
+                userId, request.LanguageCode, projectId, translations.Count);
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing language {LanguageCode} from project {ProjectId}",
+                request.LanguageCode, projectId);
+            return (false, "An error occurred while removing the language");
+        }
+    }
+
+    private static string GetLanguageDisplayName(string languageCode)
+    {
+        try
+        {
+            var culture = System.Globalization.CultureInfo.GetCultureInfo(languageCode);
+            return culture.EnglishName;
+        }
+        catch
+        {
+            return languageCode;
+        }
+    }
 }

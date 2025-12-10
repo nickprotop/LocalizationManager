@@ -210,6 +210,72 @@ public class ResourceService
         }
     }
 
+    /// <summary>
+    /// Gets all languages in a project
+    /// </summary>
+    public async Task<List<ProjectLanguageDto>> GetProjectLanguagesAsync(int projectId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"projects/{projectId}/languages");
+            if (!response.IsSuccessStatusCode)
+                return new List<ProjectLanguageDto>();
+
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<List<ProjectLanguageDto>>>();
+            return result?.Data ?? new List<ProjectLanguageDto>();
+        }
+        catch
+        {
+            return new List<ProjectLanguageDto>();
+        }
+    }
+
+    /// <summary>
+    /// Adds a new language to a project
+    /// </summary>
+    public async Task<ServiceResult<ProjectLanguageDto>> AddLanguageAsync(int projectId, AddLanguageRequest request)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync($"projects/{projectId}/languages", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<ProjectLanguageDto>>();
+                if (result?.Data != null)
+                    return ServiceResult<ProjectLanguageDto>.Success(result.Data);
+            }
+
+            var error = await ReadErrorMessageAsync(response);
+            return ServiceResult<ProjectLanguageDto>.Failure(error);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<ProjectLanguageDto>.Failure($"Failed to add language: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Removes a language from a project
+    /// </summary>
+    public async Task<ServiceResult> RemoveLanguageAsync(int projectId, string languageCode)
+    {
+        try
+        {
+            var response = await _httpClient.DeleteAsync($"projects/{projectId}/languages/{languageCode}?confirm=true");
+
+            if (response.IsSuccessStatusCode)
+                return ServiceResult.Success("Language removed successfully");
+
+            var error = await ReadErrorMessageAsync(response);
+            return ServiceResult.Failure(error);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult.Failure($"Failed to remove language: {ex.Message}");
+        }
+    }
+
     private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response)
     {
         try

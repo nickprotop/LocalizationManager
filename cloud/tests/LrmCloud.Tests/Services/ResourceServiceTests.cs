@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
+using Translation = LrmCloud.Shared.Entities.Translation;
+
 namespace LrmCloud.Tests.Services;
 
 public class ResourceServiceTests : IDisposable
@@ -30,7 +32,9 @@ public class ResourceServiceTests : IDisposable
         _mockProjectService = new Mock<IProjectService>();
         _mockLogger = new Mock<ILogger<ResourceService>>();
 
-        _resourceService = new ResourceService(_db, _mockProjectService.Object, _mockLogger.Object);
+        // Create ResourceSyncService mock (can't easily mock concrete class but we need the parameter)
+        // For now, pass null since our tests don't use sync functionality
+        _resourceService = new ResourceService(_db, _mockProjectService.Object, null!, _mockLogger.Object);
     }
 
     public void Dispose()
@@ -239,8 +243,8 @@ public class ResourceServiceTests : IDisposable
 
         // Add translations
         _db.Translations.AddRange(
-            new Translation { ResourceKeyId = key.Id, LanguageCode = "en", Value = "Hello", UpdatedAt = DateTime.UtcNow },
-            new Translation { ResourceKeyId = key.Id, LanguageCode = "fr", Value = "Bonjour", UpdatedAt = DateTime.UtcNow }
+            new Shared.Entities.Translation { ResourceKeyId = key.Id, LanguageCode = "en", Value = "Hello", UpdatedAt = DateTime.UtcNow },
+            new Shared.Entities.Translation { ResourceKeyId = key.Id, LanguageCode = "fr", Value = "Bonjour", UpdatedAt = DateTime.UtcNow }
         );
         await _db.SaveChangesAsync();
 
@@ -296,7 +300,7 @@ public class ResourceServiceTests : IDisposable
         var key = await CreateTestResourceKeyAsync(project.Id, "test.key");
 
         // Add translations
-        var translation = new Translation
+        var translation = new Shared.Entities.Translation
         {
             ResourceKeyId = key.Id,
             LanguageCode = "en",
@@ -367,7 +371,7 @@ public class ResourceServiceTests : IDisposable
         var project = await CreateTestProjectAsync(user.Id);
         var key = await CreateTestResourceKeyAsync(project.Id, "test.key");
 
-        var existingTranslation = new Translation
+        var existingTranslation = new Shared.Entities.Translation
         {
             ResourceKeyId = key.Id,
             LanguageCode = "en",
@@ -409,7 +413,7 @@ public class ResourceServiceTests : IDisposable
         var project = await CreateTestProjectAsync(user.Id);
         var key = await CreateTestResourceKeyAsync(project.Id, "test.key");
 
-        var existingTranslation = new Translation
+        var existingTranslation = new Shared.Entities.Translation
         {
             ResourceKeyId = key.Id,
             LanguageCode = "en",
@@ -544,12 +548,12 @@ public class ResourceServiceTests : IDisposable
         // Add translations in different states
         _db.Translations.AddRange(
             // English translations
-            new Translation { ResourceKeyId = key1.Id, LanguageCode = "en", Value = "Hello", Status = TranslationStatus.Translated, UpdatedAt = DateTime.UtcNow },
-            new Translation { ResourceKeyId = key2.Id, LanguageCode = "en", Value = "Goodbye", Status = TranslationStatus.Approved, UpdatedAt = DateTime.UtcNow },
+            new Shared.Entities.Translation { ResourceKeyId = key1.Id, LanguageCode = "en", Value = "Hello", Status = TranslationStatus.Translated, UpdatedAt = DateTime.UtcNow },
+            new Shared.Entities.Translation { ResourceKeyId = key2.Id, LanguageCode = "en", Value = "Goodbye", Status = TranslationStatus.Approved, UpdatedAt = DateTime.UtcNow },
 
             // French translations
-            new Translation { ResourceKeyId = key1.Id, LanguageCode = "fr", Value = "Bonjour", Status = TranslationStatus.Reviewed, UpdatedAt = DateTime.UtcNow },
-            new Translation { ResourceKeyId = key2.Id, LanguageCode = "fr", Value = "", Status = TranslationStatus.Pending, UpdatedAt = DateTime.UtcNow }
+            new Shared.Entities.Translation { ResourceKeyId = key1.Id, LanguageCode = "fr", Value = "Bonjour", Status = TranslationStatus.Reviewed, UpdatedAt = DateTime.UtcNow },
+            new Shared.Entities.Translation { ResourceKeyId = key2.Id, LanguageCode = "fr", Value = "", Status = TranslationStatus.Pending, UpdatedAt = DateTime.UtcNow }
         );
         await _db.SaveChangesAsync();
 
@@ -614,7 +618,7 @@ public class ResourceServiceTests : IDisposable
         var key = await CreateTestResourceKeyAsync(project.Id, "test.key");
 
         // Add only English translation
-        _db.Translations.Add(new Translation
+        _db.Translations.Add(new Shared.Entities.Translation
         {
             ResourceKeyId = key.Id,
             LanguageCode = "en",
@@ -623,7 +627,7 @@ public class ResourceServiceTests : IDisposable
         });
 
         // Add empty French translation
-        _db.Translations.Add(new Translation
+        _db.Translations.Add(new Shared.Entities.Translation
         {
             ResourceKeyId = key.Id,
             LanguageCode = "fr",
@@ -651,7 +655,7 @@ public class ResourceServiceTests : IDisposable
         var project = await CreateTestProjectAsync(user.Id);
         var key = await CreateTestResourceKeyAsync(project.Id, "test.key");
 
-        _db.Translations.Add(new Translation
+        _db.Translations.Add(new Shared.Entities.Translation
         {
             ResourceKeyId = key.Id,
             LanguageCode = "en",

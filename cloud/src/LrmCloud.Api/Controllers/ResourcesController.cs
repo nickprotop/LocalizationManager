@@ -245,4 +245,66 @@ public class ResourcesController : ApiControllerBase
         var result = await _resourceService.ValidateProjectAsync(projectId, userId);
         return Success(result);
     }
+
+    // ============================================================
+    // Languages
+    // ============================================================
+
+    /// <summary>
+    /// Gets all languages in a project.
+    /// </summary>
+    /// <param name="projectId">Project ID</param>
+    /// <returns>List of languages with statistics</returns>
+    [HttpGet("languages")]
+    [ProducesResponseType(typeof(ApiResponse<List<ProjectLanguageDto>>), 200)]
+    public async Task<ActionResult<ApiResponse<List<ProjectLanguageDto>>>> GetLanguages(int projectId)
+    {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var languages = await _resourceService.GetProjectLanguagesAsync(projectId, userId);
+        return Success(languages);
+    }
+
+    /// <summary>
+    /// Adds a new language to a project.
+    /// </summary>
+    /// <param name="projectId">Project ID</param>
+    /// <param name="request">Add language request</param>
+    /// <returns>Created language</returns>
+    [HttpPost("languages")]
+    [ProducesResponseType(typeof(ApiResponse<ProjectLanguageDto>), 201)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    public async Task<ActionResult<ApiResponse<ProjectLanguageDto>>> AddLanguage(
+        int projectId, [FromBody] AddLanguageRequest request)
+    {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var (success, language, errorMessage) = await _resourceService.AddLanguageAsync(projectId, userId, request);
+
+        if (!success)
+            return BadRequest("LANG_ADD_FAILED", errorMessage!);
+
+        return Success(language!);
+    }
+
+    /// <summary>
+    /// Removes a language from a project.
+    /// </summary>
+    /// <param name="projectId">Project ID</param>
+    /// <param name="languageCode">Language code to remove</param>
+    /// <param name="confirm">Must be true to confirm deletion</param>
+    /// <returns>Success response</returns>
+    [HttpDelete("languages/{languageCode}")]
+    [ProducesResponseType(typeof(ApiResponse), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    public async Task<ActionResult<ApiResponse>> RemoveLanguage(
+        int projectId, string languageCode, [FromQuery] bool confirm = false)
+    {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var request = new RemoveLanguageRequest { LanguageCode = languageCode, ConfirmDelete = confirm };
+        var (success, errorMessage) = await _resourceService.RemoveLanguageAsync(projectId, userId, request);
+
+        if (!success)
+            return BadRequest("LANG_REMOVE_FAILED", errorMessage!);
+
+        return Success($"Language '{languageCode}' removed successfully");
+    }
 }
