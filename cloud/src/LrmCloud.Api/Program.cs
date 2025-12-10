@@ -1,8 +1,11 @@
 namespace LrmCloud.Api;
 
+using LrmCloud.Api.Authentication;
+using LrmCloud.Api.Authorization;
 using LrmCloud.Api.Data;
 using LrmCloud.Api.Middleware;
 using LrmCloud.Api.Services;
+using LrmCloud.Api.Services.Translation;
 using LrmCloud.Shared.Configuration;
 using Microsoft.EntityFrameworkCore;
 using HealthChecks.NpgSql;
@@ -110,6 +113,20 @@ public class Program
             builder.Services.AddScoped<ResourceSyncService>(); // New: File-based sync with Core backends
             builder.Services.AddScoped<IStorageService, MinioStorageService>();
 
+            // Translation Services
+            builder.Services.AddSingleton<IApiKeyEncryptionService, ApiKeyEncryptionService>();
+            builder.Services.AddScoped<IApiKeyHierarchyService, ApiKeyHierarchyService>();
+            builder.Services.AddScoped<ICloudTranslationService, CloudTranslationService>();
+
+            // CLI API Key Service
+            builder.Services.AddScoped<ICliApiKeyService, CliApiKeyService>();
+
+            // Usage Statistics Service
+            builder.Services.AddScoped<IUsageService, UsageService>();
+
+            // Authorization Service
+            builder.Services.AddScoped<ILrmAuthorizationService, LrmAuthorizationService>();
+
             // =============================================================================
             // Database (PostgreSQL + EF Core)
             // =============================================================================
@@ -148,14 +165,19 @@ public class Program
             // API & Security
             // =============================================================================
 
-            // JWT Authentication
+            // Authentication: JWT Bearer + API Key with policy-based scheme selection
             var jwtKey = Encoding.UTF8.GetBytes(config.Auth.JwtSecret);
             builder.Services.AddAuthentication(options =>
             {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                // Use policy scheme that selects between API Key and JWT based on request headers
+                options.DefaultAuthenticateScheme = "ApiKeyOrJwt";
+                options.DefaultChallengeScheme = "ApiKeyOrJwt";
             })
-            .AddJwtBearer(options =>
+            // API Key authentication scheme
+            .AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
+                ApiKeyAuthenticationOptions.DefaultScheme, _ => { })
+            // JWT Bearer authentication scheme
+            .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
             {
                 options.RequireHttpsMetadata = false; // Set to true in production with HTTPS
                 options.SaveToken = true;
@@ -180,6 +202,20 @@ public class Program
                         }
                         return Task.CompletedTask;
                     }
+                };
+            })
+            // Policy scheme to select between API Key and JWT based on presence of X-API-Key header
+            .AddPolicyScheme("ApiKeyOrJwt", "API Key or JWT", options =>
+            {
+                options.ForwardDefaultSelector = context =>
+                {
+                    // If X-API-Key header is present, use API key authentication
+                    if (context.Request.Headers.ContainsKey(ApiKeyAuthenticationOptions.HeaderName))
+                    {
+                        return ApiKeyAuthenticationOptions.DefaultScheme;
+                    }
+                    // Otherwise fall back to JWT Bearer
+                    return JwtBearerDefaults.AuthenticationScheme;
                 };
             });
 
