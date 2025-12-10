@@ -17,6 +17,7 @@ services:
     depends_on:
       - api
       - web
+      - www
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
       interval: 30s
@@ -44,7 +45,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=${ENVIRONMENT:-Production}
 
   # ==========================================================================
-  # Web (Blazor WASM)
+  # Web (Blazor WASM) - served at /app/*
   # ==========================================================================
   web:
     build:
@@ -55,6 +56,25 @@ services:
     # No ports exposed - proxied by nginx
     volumes:
       - ./data/logs/web:/var/log/nginx
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ==========================================================================
+  # WWW (Static landing/marketing site) - served at /
+  # ==========================================================================
+  www:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.www
+    container_name: lrmcloud-www
+    restart: unless-stopped
+    # No ports exposed - proxied by nginx
+    volumes:
+      - ./data/logs/www:/var/log/nginx
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:80/health"]
       interval: 30s

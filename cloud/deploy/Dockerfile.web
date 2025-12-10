@@ -41,6 +41,10 @@ RUN apk add --no-cache curl
 # Copy Blazor WASM published output to nginx html directory
 COPY --from=build /app/publish/wwwroot /usr/share/nginx/html
 
+# Fix permissions for all files (nginx needs read access)
+RUN chmod -R 644 /usr/share/nginx/html/* 2>/dev/null || true && \
+    find /usr/share/nginx/html -type d -exec chmod 755 {} \;
+
 # Copy nginx configuration for SPA routing (from deploy/nginx/)
 COPY deploy/nginx/blazor.conf /etc/nginx/conf.d/default.conf
 

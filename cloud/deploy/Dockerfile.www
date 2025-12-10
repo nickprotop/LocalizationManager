@@ -1,0 +1,28 @@
+# LRM Cloud WWW - Static landing/marketing site
+# Location: cloud/deploy/Dockerfile.www
+# Build context: cloud/ (set in docker-compose.yml)
+# Build: cd cloud/deploy && docker compose build www
+# Run: cd cloud/deploy && docker compose up -d www
+
+# Simple nginx container for static files
+FROM nginx:alpine AS runtime
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Copy static site files and ensure readable permissions
+COPY src/www /usr/share/nginx/html
+RUN chmod -R 644 /usr/share/nginx/html/* && \
+    find /usr/share/nginx/html -type d -exec chmod 755 {} \;
+
+# Copy nginx configuration
+COPY deploy/nginx/www.conf /etc/nginx/conf.d/default.conf
+
+# Expose port (internal, proxied by main nginx)
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -sf http://localhost:80/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
