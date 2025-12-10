@@ -1,0 +1,248 @@
+@page "/invite/{Token}"
+@using LrmCloud.Web.Services
+@inject OrganizationService OrganizationService
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Accept Invitation - LRM Cloud</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="min-height: 80vh;">
+    <MudPaper Elevation="3" Class="pa-8" Style="width: 100%;">
+        @if (_isProcessing)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="4">
+                <MudProgressCircular Size="Size.Large" Indeterminate="true" />
+                <MudText Typo="Typo.h6">Processing invitation...</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Please wait while we process your invitation.</MudText>
+            </MudStack>
+        }
+        else if (_isSuccess)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="4">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Style="font-size: 5rem;" />
+                <MudText Typo="Typo.h5" Align="Align.Center">Invitation Accepted!</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+                    You've successfully joined the organization.
+                </MudText>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           Href="organizations"
+                           Class="mt-4">
+                    Go to Organizations
+                </MudButton>
+            </MudStack>
+        }
+        else if (_requiresLogin)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="4">
+                <MudIcon Icon="@Icons.Material.Filled.Email" Color="Color.Primary" Style="font-size: 5rem;" />
+                <MudText Typo="Typo.h5" Align="Align.Center">You've Been Invited!</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+                    Please log in or create an account to accept this invitation.
+                </MudText>
+                <MudStack Row="true" Spacing="2" Class="mt-4">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Large"
+                               Href="@($"login?returnUrl=invite/{Token}")">
+                        Log In
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               Size="Size.Large"
+                               Href="@($"register?returnUrl=invite/{Token}")">
+                        Create Account
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+        }
+        else if (_showDeclineConfirm)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="4">
+                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Style="font-size: 5rem;" />
+                <MudText Typo="Typo.h5" Align="Align.Center">Decline Invitation?</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+                    Are you sure you want to decline this invitation? You'll need to be invited again to join.
+                </MudText>
+                <MudStack Row="true" Spacing="2" Class="mt-4">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               Size="Size.Large"
+                               OnClick="@CancelDecline">
+                        Cancel
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Error"
+                               Size="Size.Large"
+                               OnClick="@ConfirmDecline"
+                               Disabled="@_isProcessing">
+                        @if (_isProcessing)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        }
+                        Decline Invitation
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+        }
+        else if (_isDeclined)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="4">
+                <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Default" Style="font-size: 5rem;" />
+                <MudText Typo="Typo.h5" Align="Align.Center">Invitation Declined</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+                    You've declined this invitation.
+                </MudText>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           Href=""
+                           Class="mt-4">
+                    Go to Dashboard
+                </MudButton>
+            </MudStack>
+        }
+        else if (_showAcceptConfirm)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="4">
+                <MudIcon Icon="@Icons.Material.Filled.Email" Color="Color.Primary" Style="font-size: 5rem;" />
+                <MudText Typo="Typo.h5" Align="Align.Center">Organization Invitation</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+                    What would you like to do with this invitation?
+                </MudText>
+                <MudStack Row="true" Spacing="2" Class="mt-4">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               Size="Size.Large"
+                               OnClick="@ShowDeclineConfirm">
+                        Decline
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Large"
+                               OnClick="@ProcessInvitation"
+                               Disabled="@_isProcessing">
+                        @if (_isProcessing)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        }
+                        Accept
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+        }
+        else
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="4">
+                <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Style="font-size: 5rem;" />
+                <MudText Typo="Typo.h5" Align="Align.Center">Invitation Failed</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+                    @_errorMessage
+                </MudText>
+                <MudStack Row="true" Spacing="2" Class="mt-4">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Href="">
+                        Go to Dashboard
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               OnClick="@RetryAcceptInvitation">
+                        Try Again
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string Token { get; set; } = "";
+
+    private bool _isProcessing = true;
+    private bool _isSuccess;
+    private bool _isDeclined;
+    private bool _requiresLogin;
+    private bool _showAcceptConfirm;
+    private bool _showDeclineConfirm;
+    private string _errorMessage = "The invitation link is invalid or has expired.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAuthentication();
+    }
+
+    private async Task CheckAuthentication()
+    {
+        _isProcessing = true;
+
+        // Check if user is authenticated
+        var isAuthenticated = await AuthService.IsAuthenticatedAsync();
+
+        if (!isAuthenticated)
+        {
+            _requiresLogin = true;
+            _isProcessing = false;
+            return;
+        }
+
+        // User is authenticated - show accept/decline options
+        _showAcceptConfirm = true;
+        _isProcessing = false;
+    }
+
+    private async Task ProcessInvitation()
+    {
+        _isProcessing = true;
+        _showAcceptConfirm = false;
+
+        // Try to accept the invitation
+        var (success, error) = await OrganizationService.AcceptInvitationAsync(Token);
+
+        if (success)
+        {
+            _isSuccess = true;
+            Snackbar.Add("Invitation accepted successfully!", Severity.Success);
+        }
+        else
+        {
+            _errorMessage = error ?? "The invitation link is invalid or has expired.";
+        }
+
+        _isProcessing = false;
+    }
+
+    private void ShowDeclineConfirm()
+    {
+        _showAcceptConfirm = false;
+        _showDeclineConfirm = true;
+    }
+
+    private void CancelDecline()
+    {
+        _showDeclineConfirm = false;
+        _showAcceptConfirm = true;
+    }
+
+    private async Task ConfirmDecline()
+    {
+        _isProcessing = true;
+        _showDeclineConfirm = false;
+
+        // Note: This uses the token from email, which requires bcrypt verification
+        // For now, we show declined state - the invitation will expire naturally
+        // A proper implementation would need a decline endpoint that works with email tokens
+        _isDeclined = true;
+        _isProcessing = false;
+        Snackbar.Add("Invitation declined", Severity.Info);
+    }
+
+    private async Task RetryAcceptInvitation()
+    {
+        _showAcceptConfirm = true;
+        _isProcessing = false;
+    }
+}

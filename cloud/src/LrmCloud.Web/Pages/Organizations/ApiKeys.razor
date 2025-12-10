@@ -1,0 +1,487 @@
+@page "/organizations/{OrganizationId:int}/api-keys"
+@using LrmCloud.Shared.DTOs.Organizations
+@using LrmCloud.Shared.DTOs.Translation
+@using LrmCloud.Web.Services
+@inject OrganizationService OrganizationService
+@inject TranslationService TranslationService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@attribute [Authorize]
+
+<PageTitle>Translation API Keys - LRM Cloud</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_organization == null)
+    {
+        <MudAlert Severity="Severity.Error">Organization not found.</MudAlert>
+    }
+    else
+    {
+        <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4 px-0" />
+
+        <div class="d-flex justify-space-between align-center mb-4">
+            <div>
+                <MudText Typo="Typo.h4">Translation API Keys</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Configure translation provider API keys for @_organization.Name
+                </MudText>
+            </div>
+        </div>
+
+        @if (!_canManageKeys)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">
+                You need Admin or Owner permissions to manage API keys.
+            </MudAlert>
+        }
+
+        <MudPaper Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-2">Key Hierarchy</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                API keys are resolved in order: Project → User → Organization → Platform.
+                Organization keys are shared across all projects in this organization.
+            </MudText>
+
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-0">
+                Keys configured here will be used by all projects in this organization unless overridden at the project or user level.
+            </MudAlert>
+        </MudPaper>
+
+        <MudPaper Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-4">Available Providers</MudText>
+
+            @if (_loadingProviders)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else
+            {
+                <MudGrid>
+                    @foreach (var provider in _providers)
+                    {
+                        <MudItem xs="12" md="6" lg="4">
+                            <MudCard Outlined="true" Class="h-100">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <div class="d-flex align-center">
+                                            <MudIcon Icon="@GetProviderIcon(provider.Name)" Class="mr-2" />
+                                            <MudText Typo="Typo.subtitle1">@provider.DisplayName</MudText>
+                                        </div>
+                                    </CardHeaderContent>
+                                    <CardHeaderActions>
+                                        @if (provider.IsConfigured && provider.ApiKeySource == "organization")
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Success">Configured</MudChip>
+                                        }
+                                        else if (provider.IsConfigured)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                                                @(provider.ApiKeySource ?? "Inherited")
+                                            </MudChip>
+                                        }
+                                    </CardHeaderActions>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                                        @(provider.Description ?? GetProviderDescription(provider.Name))
+                                    </MudText>
+                                    @if (provider.IsAiProvider)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Class="mt-2">AI Provider</MudChip>
+                                    }
+                                </MudCardContent>
+                                <MudCardActions>
+                                    @if (_canManageKeys)
+                                    {
+                                        @if (provider.IsConfigured && provider.ApiKeySource == "organization")
+                                        {
+                                            <MudButton Size="Size.Small" Color="Color.Primary"
+                                                       OnClick="@(() => OpenSetKeyDialog(provider))">
+                                                Update
+                                            </MudButton>
+                                            <MudButton Size="Size.Small" Color="Color.Error"
+                                                       OnClick="@(() => ConfirmRemoveKey(provider))">
+                                                Remove
+                                            </MudButton>
+                                        }
+                                        else
+                                        {
+                                            <MudButton Size="Size.Small" Color="Color.Primary"
+                                                       OnClick="@(() => OpenSetKeyDialog(provider))">
+                                                Configure
+                                            </MudButton>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">View only</MudText>
+                                    }
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </MudPaper>
+
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-2">Getting API Keys</MudText>
+            <MudText Typo="Typo.body2" Class="mb-4">
+                Each translation provider requires an API key from their service. Here are the links to get started:
+            </MudText>
+            <MudList T="string" Dense="true">
+                <MudListItem Icon="@Icons.Material.Filled.Link">
+                    <MudLink Href="https://cloud.google.com/translate" Target="_blank">
+                        Google Cloud Translation
+                    </MudLink>
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Link">
+                    <MudLink Href="https://www.deepl.com/pro-api" Target="_blank">
+                        DeepL API
+                    </MudLink>
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Link">
+                    <MudLink Href="https://platform.openai.com/api-keys" Target="_blank">
+                        OpenAI
+                    </MudLink>
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Link">
+                    <MudLink Href="https://console.anthropic.com/" Target="_blank">
+                        Anthropic (Claude)
+                    </MudLink>
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Link">
+                    <MudLink Href="https://azure.microsoft.com/products/ai-services/translator" Target="_blank">
+                        Azure Translator
+                    </MudLink>
+                </MudListItem>
+            </MudList>
+        </MudPaper>
+    }
+</MudContainer>
+
+@* Set API Key Dialog *@
+<MudDialog @bind-Visible="_setKeyDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @(_selectedProvider?.IsConfigured == true && _selectedProvider?.ApiKeySource == "organization" ? "Update" : "Configure")
+            @_selectedProvider?.DisplayName API Key
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_setKeyForm">
+            <MudTextField @bind-Value="_newApiKey"
+                          Label="API Key"
+                          InputType="InputType.Password"
+                          Required="true"
+                          RequiredError="API key is required"
+                          HelperText="Your API key will be encrypted and stored securely"
+                          Class="mb-3" />
+
+            @if (_selectedProvider?.Name == "azureopenai")
+            {
+                <MudTextField @bind-Value="_azureEndpoint"
+                              Label="Azure Endpoint (Optional)"
+                              Placeholder="https://your-resource.openai.azure.com/"
+                              HelperText="Required for Azure OpenAI deployments"
+                              Class="mb-3" />
+            }
+        </MudForm>
+
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-4">
+            You can test the key before saving to verify it's valid.
+        </MudAlert>
+
+        @if (!string.IsNullOrEmpty(_testResult))
+        {
+            <MudAlert Severity="@(_testSuccess ? Severity.Success : Severity.Error)" Dense="true" Class="mt-2">
+                @_testResult
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseSetKeyDialog">Cancel</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="TestKey" Disabled="_testing">
+            @if (_testing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Test Key
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveKey" Disabled="_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Save Key
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Remove Key Confirmation Dialog *@
+<MudDialog @bind-Visible="_removeDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Remove API Key?</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText>
+            Are you sure you want to remove the <strong>@_selectedProvider?.DisplayName</strong> API key?
+        </MudText>
+        <MudText Color="Color.Secondary" Class="mt-2">
+            Projects in this organization will fall back to user or platform-level keys.
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseRemoveDialog">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="RemoveKey" Disabled="_removing">
+            @if (_removing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Remove
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public int OrganizationId { get; set; }
+
+    private OrganizationDto? _organization;
+    private List<TranslationProviderDto> _providers = new();
+    private bool _loading = true;
+    private bool _loadingProviders;
+    private bool _canManageKeys;
+
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
+    // Set key dialog
+    private bool _setKeyDialogVisible;
+    private MudForm? _setKeyForm;
+    private TranslationProviderDto? _selectedProvider;
+    private string _newApiKey = "";
+    private string _azureEndpoint = "";
+    private bool _saving;
+    private bool _testing;
+    private string? _testResult;
+    private bool _testSuccess;
+
+    // Remove dialog
+    private bool _removeDialogVisible;
+    private bool _removing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrganization();
+        await LoadProviders();
+    }
+
+    private async Task LoadOrganization()
+    {
+        _loading = true;
+        try
+        {
+            _organization = await OrganizationService.GetOrganizationAsync(OrganizationId);
+
+            if (_organization != null)
+            {
+                _canManageKeys = _organization.UserRole is "Owner" or "Admin";
+
+                _breadcrumbs = new List<BreadcrumbItem>
+                {
+                    new("Organizations", "/organizations", icon: Icons.Material.Filled.Business),
+                    new(_organization.Name, $"/organizations/{OrganizationId}"),
+                    new("API Keys", null, disabled: true)
+                };
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadProviders()
+    {
+        _loadingProviders = true;
+        try
+        {
+            _providers = await TranslationService.GetProvidersAsync(organizationId: OrganizationId);
+        }
+        finally
+        {
+            _loadingProviders = false;
+        }
+    }
+
+    private void OpenSetKeyDialog(TranslationProviderDto provider)
+    {
+        _selectedProvider = provider;
+        _newApiKey = "";
+        _azureEndpoint = "";
+        _testResult = null;
+        _setKeyDialogVisible = true;
+    }
+
+    private void CloseSetKeyDialog()
+    {
+        _setKeyDialogVisible = false;
+        _selectedProvider = null;
+    }
+
+    private async Task TestKey()
+    {
+        if (string.IsNullOrWhiteSpace(_newApiKey) || _selectedProvider == null)
+            return;
+
+        _testing = true;
+        _testResult = null;
+        try
+        {
+            var request = new TestApiKeyRequest
+            {
+                ProviderName = _selectedProvider.Name,
+                ApiKey = _newApiKey
+            };
+
+            if (!string.IsNullOrEmpty(_azureEndpoint))
+            {
+                request.AdditionalConfig = new Dictionary<string, string>
+                {
+                    ["endpoint"] = _azureEndpoint
+                };
+            }
+
+            var result = await TranslationService.TestApiKeyAsync(request);
+            _testSuccess = result.IsValid;
+            _testResult = result.IsValid
+                ? result.ProviderMessage ?? "Key is valid!"
+                : result.Error ?? "Key validation failed";
+        }
+        catch (Exception ex)
+        {
+            _testSuccess = false;
+            _testResult = $"Test failed: {ex.Message}";
+        }
+        finally
+        {
+            _testing = false;
+        }
+    }
+
+    private async Task SaveKey()
+    {
+        if (_setKeyForm != null)
+        {
+            await _setKeyForm.Validate();
+            if (!_setKeyForm.IsValid) return;
+        }
+
+        if (_selectedProvider == null) return;
+
+        _saving = true;
+        try
+        {
+            var request = new SetApiKeyRequest
+            {
+                ProviderName = _selectedProvider.Name,
+                ApiKey = _newApiKey
+            };
+
+            if (!string.IsNullOrEmpty(_azureEndpoint))
+            {
+                request.AdditionalConfig = new Dictionary<string, string>
+                {
+                    ["endpoint"] = _azureEndpoint
+                };
+            }
+
+            var result = await TranslationService.SetOrganizationApiKeyAsync(OrganizationId, request);
+
+            if (result.IsSuccess)
+            {
+                Snackbar.Add($"{_selectedProvider.DisplayName} API key saved", Severity.Success);
+                _setKeyDialogVisible = false;
+                await LoadProviders();
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to save API key", Severity.Error);
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void ConfirmRemoveKey(TranslationProviderDto provider)
+    {
+        _selectedProvider = provider;
+        _removeDialogVisible = true;
+    }
+
+    private void CloseRemoveDialog()
+    {
+        _removeDialogVisible = false;
+        _selectedProvider = null;
+    }
+
+    private async Task RemoveKey()
+    {
+        if (_selectedProvider == null) return;
+
+        _removing = true;
+        try
+        {
+            var result = await TranslationService.RemoveOrganizationApiKeyAsync(OrganizationId, _selectedProvider.Name);
+
+            if (result.IsSuccess)
+            {
+                Snackbar.Add($"{_selectedProvider.DisplayName} API key removed", Severity.Success);
+                _removeDialogVisible = false;
+                await LoadProviders();
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to remove API key", Severity.Error);
+            }
+        }
+        finally
+        {
+            _removing = false;
+        }
+    }
+
+    private static string GetProviderIcon(string provider) => provider.ToLowerInvariant() switch
+    {
+        "google" => Icons.Material.Filled.Translate,
+        "deepl" => Icons.Material.Filled.Translate,
+        "openai" => Icons.Material.Filled.Psychology,
+        "claude" => Icons.Material.Filled.Psychology,
+        "azuretranslator" => Icons.Material.Filled.Cloud,
+        "azureopenai" => Icons.Material.Filled.Cloud,
+        "ollama" => Icons.Material.Filled.Computer,
+        "libretranslate" => Icons.Material.Filled.Public,
+        "mymemory" => Icons.Material.Filled.Memory,
+        _ => Icons.Material.Filled.Api
+    };
+
+    private static string GetProviderDescription(string provider) => provider.ToLowerInvariant() switch
+    {
+        "google" => "Google Cloud Translation API with neural machine translation.",
+        "deepl" => "High-quality neural translation, especially for European languages.",
+        "openai" => "GPT-4 based translation with context awareness.",
+        "claude" => "Anthropic's Claude for nuanced, context-aware translation.",
+        "azuretranslator" => "Microsoft Azure Cognitive Services Translator.",
+        "azureopenai" => "Azure-hosted OpenAI models for enterprise use.",
+        "ollama" => "Self-hosted open-source LLMs for private translation.",
+        "libretranslate" => "Self-hosted open-source translation API.",
+        "mymemory" => "Free translation memory with community contributions.",
+        _ => "Translation provider."
+    };
+}

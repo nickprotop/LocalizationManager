@@ -56,6 +56,31 @@ public interface IOrganizationService
     Task<(bool Success, string? ErrorMessage)> AcceptInvitationAsync(int userId, string token);
 
     /// <summary>
+    /// Declines an invitation to join an organization (by token from email).
+    /// </summary>
+    Task<(bool Success, string? ErrorMessage)> DeclineInvitationAsync(int userId, string token);
+
+    /// <summary>
+    /// Accepts an invitation by ID (for authenticated users viewing their pending list).
+    /// </summary>
+    Task<(bool Success, string? ErrorMessage)> AcceptInvitationByIdAsync(int userId, int invitationId);
+
+    /// <summary>
+    /// Declines an invitation by ID (for authenticated users viewing their pending list).
+    /// </summary>
+    Task<(bool Success, string? ErrorMessage)> DeclineInvitationByIdAsync(int userId, int invitationId);
+
+    /// <summary>
+    /// Gets all pending invitations for a user (by email).
+    /// </summary>
+    Task<List<PendingInvitationDto>> GetPendingInvitationsAsync(int userId);
+
+    /// <summary>
+    /// Allows a member to leave an organization (owner cannot leave).
+    /// </summary>
+    Task<(bool Success, string? ErrorMessage)> LeaveOrganizationAsync(int organizationId, int userId);
+
+    /// <summary>
     /// Removes a member from an organization (admin+ required, cannot remove owner).
     /// </summary>
     Task<(bool Success, string? ErrorMessage)> RemoveMemberAsync(int organizationId, int userId, int memberUserId);
@@ -64,6 +89,11 @@ public interface IOrganizationService
     /// Updates a member's role in an organization (owner only).
     /// </summary>
     Task<(bool Success, string? ErrorMessage)> UpdateMemberRoleAsync(int organizationId, int userId, int memberUserId, string newRole);
+
+    /// <summary>
+    /// Transfers ownership of an organization to another member.
+    /// </summary>
+    Task<(bool Success, string? ErrorMessage)> TransferOwnershipAsync(int organizationId, int currentOwnerId, int newOwnerId);
 
     // ============================================================
     // Authorization Helpers

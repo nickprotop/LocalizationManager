@@ -439,6 +439,248 @@ public class OrganizationService : IOrganizationService
         }
     }
 
+    public async Task<(bool Success, string? ErrorMessage)> DeclineInvitationAsync(int userId, string token)
+    {
+        try
+        {
+            // Find invitations for the user's email
+            var user = await _db.Users.FindAsync(userId);
+            if (user == null || string.IsNullOrEmpty(user.Email))
+                return (false, "User not found.");
+
+            var invitations = await _db.OrganizationInvitations
+                .Where(i =>
+                    i.Email == user.Email.ToLowerInvariant() &&
+                    i.AcceptedAt == null &&
+                    i.ExpiresAt > DateTime.UtcNow)
+                .ToListAsync();
+
+            if (invitations.Count == 0)
+                return (false, "No valid invitation found.");
+
+            // Find the invitation that matches the token
+            OrganizationInvitation? matchingInvitation = null;
+            foreach (var inv in invitations)
+            {
+                if (BCrypt.Net.BCrypt.Verify(token, inv.TokenHash))
+                {
+                    matchingInvitation = inv;
+                    break;
+                }
+            }
+
+            if (matchingInvitation == null)
+                return (false, "Invalid or expired invitation token.");
+
+            // Delete the invitation (declined)
+            _db.OrganizationInvitations.Remove(matchingInvitation);
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} declined invitation to organization {OrgId}",
+                userId, matchingInvitation.OrganizationId);
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error declining invitation for user {UserId}", userId);
+            return (false, "An error occurred while declining the invitation.");
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> AcceptInvitationByIdAsync(int userId, int invitationId)
+    {
+        try
+        {
+            var user = await _db.Users.FindAsync(userId);
+            if (user == null || string.IsNullOrEmpty(user.Email))
+                return (false, "User not found.");
+
+            // Find invitation by ID and verify it belongs to this user's email
+            var invitation = await _db.OrganizationInvitations
+                .Include(i => i.Organization)
+                .FirstOrDefaultAsync(i =>
+                    i.Id == invitationId &&
+                    i.Email == user.Email.ToLowerInvariant() &&
+                    i.AcceptedAt == null &&
+                    i.ExpiresAt > DateTime.UtcNow);
+
+            if (invitation == null)
+                return (false, "Invitation not found or has expired.");
+
+            // Check if already a member
+            var existingMember = await _db.OrganizationMembers
+                .FirstOrDefaultAsync(m =>
+                    m.OrganizationId == invitation.OrganizationId &&
+                    m.UserId == userId);
+
+            if (existingMember != null)
+            {
+                invitation.AcceptedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+                return (false, "You are already a member of this organization.");
+            }
+
+            // Add user as member
+            var member = new OrganizationMember
+            {
+                OrganizationId = invitation.OrganizationId,
+                UserId = userId,
+                Role = invitation.Role,
+                InvitedById = invitation.InvitedBy,
+                InvitedAt = invitation.CreatedAt,
+                JoinedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.OrganizationMembers.Add(member);
+            invitation.AcceptedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} accepted invitation {InvId} to organization {OrgId}",
+                userId, invitationId, invitation.OrganizationId);
+
+            // Send welcome email
+            await SendWelcomeEmailAsync(user, invitation.Organization!, invitation.Role);
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error accepting invitation {InvId} for user {UserId}", invitationId, userId);
+            return (false, "An error occurred while accepting the invitation.");
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> DeclineInvitationByIdAsync(int userId, int invitationId)
+    {
+        try
+        {
+            var user = await _db.Users.FindAsync(userId);
+            if (user == null || string.IsNullOrEmpty(user.Email))
+                return (false, "User not found.");
+
+            // Find invitation by ID and verify it belongs to this user's email
+            var invitation = await _db.OrganizationInvitations
+                .FirstOrDefaultAsync(i =>
+                    i.Id == invitationId &&
+                    i.Email == user.Email.ToLowerInvariant() &&
+                    i.AcceptedAt == null &&
+                    i.ExpiresAt > DateTime.UtcNow);
+
+            if (invitation == null)
+                return (false, "Invitation not found or has expired.");
+
+            // Delete the invitation
+            _db.OrganizationInvitations.Remove(invitation);
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} declined invitation {InvId} to organization {OrgId}",
+                userId, invitationId, invitation.OrganizationId);
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error declining invitation {InvId} for user {UserId}", invitationId, userId);
+            return (false, "An error occurred while declining the invitation.");
+        }
+    }
+
+    public async Task<List<PendingInvitationDto>> GetPendingInvitationsAsync(int userId)
+    {
+        try
+        {
+            var user = await _db.Users.FindAsync(userId);
+            if (user == null || string.IsNullOrEmpty(user.Email))
+                return new List<PendingInvitationDto>();
+
+            var invitations = await _db.OrganizationInvitations
+                .Include(i => i.Organization)
+                .Include(i => i.Inviter)
+                .Where(i =>
+                    i.Email == user.Email.ToLowerInvariant() &&
+                    i.AcceptedAt == null &&
+                    i.ExpiresAt > DateTime.UtcNow)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToListAsync();
+
+            // We need to return tokens in a way the frontend can use them
+            // Since we store hashed tokens, we need to generate new ones for display
+            // Actually, we should NOT return the actual token in the list -
+            // instead we use the invitation ID and generate a new lookup token
+
+            // For security, we'll return a hash-based identifier that can be used
+            // to look up the invitation, but the actual acceptance needs the original token
+            // which was sent via email.
+
+            // Actually, looking at the design - the user gets the token via email link.
+            // For the "pending invitations" list, we show them the invitations but
+            // they need to use the email link to actually accept/decline.
+            // Or we can generate a temporary token based on the invitation ID.
+
+            // Simpler approach: Return invitation ID as the "token" since the user
+            // is already authenticated with their email - we can verify the match.
+
+            return invitations.Select(i => new PendingInvitationDto
+            {
+                Token = i.Id.ToString(), // Use invitation ID as lookup token for authenticated users
+                OrganizationId = i.OrganizationId,
+                OrganizationName = i.Organization?.Name ?? "Unknown",
+                OrganizationSlug = i.Organization?.Slug ?? "",
+                Role = i.Role,
+                InvitedByEmail = i.Inviter?.Email,
+                InvitedByName = i.Inviter?.DisplayName ?? i.Inviter?.Username,
+                ExpiresAt = i.ExpiresAt,
+                CreatedAt = i.CreatedAt
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting pending invitations for user {UserId}", userId);
+            return new List<PendingInvitationDto>();
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> LeaveOrganizationAsync(int organizationId, int userId)
+    {
+        try
+        {
+            // Check if user is a member
+            var member = await _db.OrganizationMembers
+                .FirstOrDefaultAsync(m =>
+                    m.OrganizationId == organizationId &&
+                    m.UserId == userId);
+
+            if (member == null)
+                return (false, "You are not a member of this organization.");
+
+            // Check if user is the owner
+            var org = await _db.Organizations
+                .FirstOrDefaultAsync(o => o.Id == organizationId);
+
+            if (org == null)
+                return (false, "Organization not found.");
+
+            if (org.OwnerId == userId)
+                return (false, "The owner cannot leave the organization. Transfer ownership first or delete the organization.");
+
+            // Remove membership
+            _db.OrganizationMembers.Remove(member);
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} left organization {OrgId}", userId, organizationId);
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error leaving organization {OrgId} for user {UserId}", organizationId, userId);
+            return (false, "An error occurred while leaving the organization.");
+        }
+    }
+
     public async Task<(bool Success, string? ErrorMessage)> RemoveMemberAsync(
         int organizationId, int userId, int memberUserId)
     {
@@ -532,6 +774,61 @@ public class OrganizationService : IOrganizationService
             _logger.LogError(ex, "Error updating role for member {MemberUserId} in organization {OrgId}",
                 memberUserId, organizationId);
             return (false, "An error occurred while updating the member's role.");
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> TransferOwnershipAsync(
+        int organizationId, int currentOwnerId, int newOwnerId)
+    {
+        try
+        {
+            // Verify current user is the owner
+            var org = await _db.Organizations
+                .FirstOrDefaultAsync(o => o.Id == organizationId);
+
+            if (org == null)
+                return (false, "Organization not found.");
+
+            if (org.OwnerId != currentOwnerId)
+                return (false, "Only the current owner can transfer ownership.");
+
+            // Verify new owner is a member
+            var newOwnerMember = await _db.OrganizationMembers
+                .Include(m => m.User)
+                .FirstOrDefaultAsync(m =>
+                    m.OrganizationId == organizationId &&
+                    m.UserId == newOwnerId);
+
+            if (newOwnerMember == null)
+                return (false, "The new owner must be a member of the organization.");
+
+            // Get current owner's membership
+            var currentOwnerMember = await _db.OrganizationMembers
+                .FirstOrDefaultAsync(m =>
+                    m.OrganizationId == organizationId &&
+                    m.UserId == currentOwnerId);
+
+            // Update organization owner
+            org.OwnerId = newOwnerId;
+            org.UpdatedAt = DateTime.UtcNow;
+
+            // Update roles
+            if (currentOwnerMember != null)
+                currentOwnerMember.Role = OrganizationRole.Admin; // Demote to admin
+
+            newOwnerMember.Role = OrganizationRole.Owner;
+
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("Organization {OrgId} ownership transferred from user {OldOwner} to {NewOwner}",
+                organizationId, currentOwnerId, newOwnerId);
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error transferring ownership of organization {OrgId}", organizationId);
+            return (false, "An error occurred while transferring ownership.");
         }
     }
 

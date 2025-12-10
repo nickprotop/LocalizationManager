@@ -1,0 +1,116 @@
+@using LrmCloud.Shared.DTOs.Organizations
+@using LrmCloud.Web.Services
+@inject OrganizationService OrganizationService
+@inject OrganizationContextService OrgContext
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<AuthorizeView>
+    <Authorized>
+        @if (_organizations.Any() || _selectedOrgId == null)
+        {
+            <MudMenu Label="@_selectedOrgName" EndIcon="@Icons.Material.Filled.KeyboardArrowDown"
+                     Color="Color.Inherit" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft"
+                     Dense="true">
+                <MudMenuItem OnClick="@SelectPersonal" Icon="@Icons.Material.Filled.Person">
+                    <div class="d-flex align-center">
+                        <MudText>Personal</MudText>
+                        @if (_selectedOrgId == null)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Class="ml-2" Color="Color.Success" />
+                        }
+                    </div>
+                </MudMenuItem>
+
+                @if (_organizations.Any())
+                {
+                    <MudDivider />
+                    <MudText Typo="Typo.caption" Class="px-4 py-2" Color="Color.Secondary">Organizations</MudText>
+                }
+
+                @foreach (var org in _organizations)
+                {
+                    <MudMenuItem OnClick="@(() => SelectOrganization(org))" Icon="@Icons.Material.Filled.Business">
+                        <div class="d-flex align-center">
+                            <MudText>@org.Name</MudText>
+                            @if (_selectedOrgId == org.Id)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Class="ml-2" Color="Color.Success" />
+                            }
+                        </div>
+                    </MudMenuItem>
+                }
+
+                <MudDivider />
+                <MudMenuItem Href="organizations" Icon="@Icons.Material.Filled.Settings">
+                    Manage Organizations
+                </MudMenuItem>
+            </MudMenu>
+        }
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    private List<OrganizationDto> _organizations = new();
+    private int? _selectedOrgId;
+    private string _selectedOrgName = "Personal";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await OrgContext.InitializeAsync();
+        _selectedOrgId = OrgContext.SelectedOrganizationId;
+
+        await LoadOrganizations();
+        UpdateSelectedOrgName();
+    }
+
+    private async Task LoadOrganizations()
+    {
+        try
+        {
+            _organizations = await OrganizationService.GetOrganizationsAsync();
+        }
+        catch
+        {
+            _organizations = new List<OrganizationDto>();
+        }
+    }
+
+    private void UpdateSelectedOrgName()
+    {
+        if (_selectedOrgId.HasValue)
+        {
+            var org = _organizations.FirstOrDefault(o => o.Id == _selectedOrgId.Value);
+            _selectedOrgName = org?.Name ?? "Personal";
+            if (org == null)
+            {
+                // Organization no longer exists or user lost access
+                _selectedOrgId = null;
+                _selectedOrgName = "Personal";
+            }
+        }
+        else
+        {
+            _selectedOrgName = "Personal";
+        }
+    }
+
+    private async Task SelectPersonal()
+    {
+        _selectedOrgId = null;
+        _selectedOrgName = "Personal";
+        await OrgContext.SetOrganizationAsync(null);
+    }
+
+    private async Task SelectOrganization(OrganizationDto org)
+    {
+        _selectedOrgId = org.Id;
+        _selectedOrgName = org.Name;
+        await OrgContext.SetOrganizationAsync(org.Id);
+    }
+
+    public void Dispose()
+    {
+        // No event subscriptions to clean up in this component
+    }
+}

@@ -125,6 +125,36 @@ public class OrganizationsController : ApiControllerBase
     }
 
     /// <summary>
+    /// Transfer organization ownership to another member (owner only)
+    /// </summary>
+    [HttpPost("{id}/transfer")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ApiResponse>> TransferOwnership(
+        int id,
+        [FromBody] TransferOwnershipRequest request)
+    {
+        var userId = GetAuthenticatedUserId();
+        if (!userId.HasValue)
+            return Unauthorized(ErrorCodes.AUTH_UNAUTHORIZED, "User not authenticated");
+
+        var (success, errorMessage) =
+            await _organizationService.TransferOwnershipAsync(id, userId.Value, request.NewOwnerId);
+
+        if (!success)
+        {
+            if (errorMessage?.Contains("owner") == true)
+                return Forbidden(ErrorCodes.AUTH_FORBIDDEN, errorMessage);
+
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, errorMessage ?? "Failed to transfer ownership");
+        }
+
+        return Success("Ownership transferred successfully");
+    }
+
+    /// <summary>
     /// Delete an organization (owner only, soft delete)
     /// </summary>
     [HttpDelete("{id}")]
@@ -283,11 +313,27 @@ public class OrganizationsController : ApiControllerBase
     }
 
     // ============================================================
-    // Invitation Acceptance
+    // Invitation Management
     // ============================================================
 
     /// <summary>
-    /// Accept an invitation to join an organization
+    /// Get pending invitations for the current user
+    /// </summary>
+    [HttpGet("/api/invitations")]
+    [ProducesResponseType(typeof(ApiResponse<List<PendingInvitationDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ApiResponse<List<PendingInvitationDto>>>> GetPendingInvitations()
+    {
+        var userId = GetAuthenticatedUserId();
+        if (!userId.HasValue)
+            return Unauthorized(ErrorCodes.AUTH_UNAUTHORIZED, "User not authenticated");
+
+        var invitations = await _organizationService.GetPendingInvitationsAsync(userId.Value);
+        return Success(invitations);
+    }
+
+    /// <summary>
+    /// Accept an invitation to join an organization (by token from email)
     /// </summary>
     [HttpPost("accept-invitation")]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
@@ -307,6 +353,72 @@ public class OrganizationsController : ApiControllerBase
             return BadRequest(ErrorCodes.VAL_INVALID_INPUT, errorMessage ?? "Failed to accept invitation");
 
         return Success("Invitation accepted successfully");
+    }
+
+    /// <summary>
+    /// Accept an invitation by ID (for authenticated users viewing their pending list)
+    /// </summary>
+    [HttpPost("/api/invitations/{invitationId}/accept")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ApiResponse>> AcceptInvitationById(int invitationId)
+    {
+        var userId = GetAuthenticatedUserId();
+        if (!userId.HasValue)
+            return Unauthorized(ErrorCodes.AUTH_UNAUTHORIZED, "User not authenticated");
+
+        var (success, errorMessage) =
+            await _organizationService.AcceptInvitationByIdAsync(userId.Value, invitationId);
+
+        if (!success)
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, errorMessage ?? "Failed to accept invitation");
+
+        return Success("Invitation accepted successfully");
+    }
+
+    /// <summary>
+    /// Decline an invitation by ID (for authenticated users viewing their pending list)
+    /// </summary>
+    [HttpPost("/api/invitations/{invitationId}/decline")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ApiResponse>> DeclineInvitationById(int invitationId)
+    {
+        var userId = GetAuthenticatedUserId();
+        if (!userId.HasValue)
+            return Unauthorized(ErrorCodes.AUTH_UNAUTHORIZED, "User not authenticated");
+
+        var (success, errorMessage) =
+            await _organizationService.DeclineInvitationByIdAsync(userId.Value, invitationId);
+
+        if (!success)
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, errorMessage ?? "Failed to decline invitation");
+
+        return Success("Invitation declined successfully");
+    }
+
+    /// <summary>
+    /// Leave an organization (non-owners only)
+    /// </summary>
+    [HttpPost("{id}/leave")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ApiResponse>> LeaveOrganization(int id)
+    {
+        var userId = GetAuthenticatedUserId();
+        if (!userId.HasValue)
+            return Unauthorized(ErrorCodes.AUTH_UNAUTHORIZED, "User not authenticated");
+
+        var (success, errorMessage) =
+            await _organizationService.LeaveOrganizationAsync(id, userId.Value);
+
+        if (!success)
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, errorMessage ?? "Failed to leave organization");
+
+        return Success("You have left the organization");
     }
 
     // ============================================================

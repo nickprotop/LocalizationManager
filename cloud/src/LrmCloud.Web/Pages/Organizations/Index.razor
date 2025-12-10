@@ -1,0 +1,418 @@
+@page "/organizations"
+@attribute [Authorize]
+@using LrmCloud.Shared.Constants
+@using LrmCloud.Shared.DTOs.Organizations
+@using LrmCloud.Web.Services
+@using LrmCloud.Web.Components
+@using LrmCloud.Web.Models
+@inject OrganizationService OrganizationService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Organizations - LRM Cloud</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Organizations</MudText>
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="@OpenCreateDialog">
+        New Organization
+    </MudButton>
+</MudStack>
+
+@* Pending Invitations Section *@
+@if (_pendingInvitations.Any())
+{
+    <MudText Typo="Typo.h6" Class="mb-3">Pending Invitations</MudText>
+    <MudStack Spacing="2" Class="mb-6">
+        @foreach (var invitation in _pendingInvitations)
+        {
+            <MudPaper Elevation="1" Class="pa-4">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                        <MudAvatar Color="Color.Primary" Size="Size.Medium">
+                            @GetOrgInitials(invitation.OrganizationName)
+                        </MudAvatar>
+                        <div>
+                            <MudText Typo="Typo.subtitle1">
+                                <strong>@invitation.OrganizationName</strong> invited you as
+                                <MudChip T="string" Size="Size.Small" Color="@GetRoleColor(invitation.Role)" Class="mx-1">@invitation.Role</MudChip>
+                            </MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                @if (!string.IsNullOrEmpty(invitation.InvitedByName))
+                                {
+                                    <span>Invited by @invitation.InvitedByName</span>
+                                }
+                                <span class="mx-2">·</span>
+                                <span>Expires @GetExpiryText(invitation.ExpiresAt)</span>
+                            </MudText>
+                        </div>
+                    </MudStack>
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Default"
+                                   Size="Size.Small"
+                                   OnClick="@(() => DeclineInvitation(invitation))"
+                                   Disabled="@_isProcessingInvitation">
+                            Decline
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="@(() => AcceptInvitation(invitation))"
+                                   Disabled="@_isProcessingInvitation">
+                            @if (_processingInvitationId == int.Parse(invitation.Token))
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                            }
+                            Accept
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        }
+    </MudStack>
+
+    <MudText Typo="Typo.h6" Class="mb-3">Your Organizations</MudText>
+}
+
+@if (_isLoading)
+{
+    <MudGrid>
+        @for (int i = 0; i < 3; i++)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <LoadingSkeleton Type="LoadingSkeletonType.Card" />
+            </MudItem>
+        }
+    </MudGrid>
+}
+else if (!_organizations.Any())
+{
+    <EmptyState Icon="@Icons.Material.Filled.Business"
+                Title="No organizations yet"
+                Description="Organizations let you collaborate with your team on translation projects. Create one to get started."
+                ShowAction="true"
+                ActionText="Create Organization"
+                ActionIcon="@Icons.Material.Filled.Add"
+                OnActionClick="@OpenCreateDialog" />
+}
+else
+{
+    <MudGrid>
+        @foreach (var org in _organizations)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="2" Class="cursor-pointer" @onclick="@(() => NavigateToOrg(org.Id))">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@GetOrgColor(org.Name)" Size="Size.Large">
+                                @GetOrgInitials(org.Name)
+                            </MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">@org.Name</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@org.Slug</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudChip T="string" Size="Size.Small" Color="@GetRoleColor(org.UserRole)">
+                                @org.UserRole
+                            </MudChip>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (!string.IsNullOrEmpty(org.Description))
+                        {
+                            <MudText Typo="Typo.body2" Class="mb-3" Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                @org.Description
+                            </MudText>
+                        }
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Color="Color.Secondary" />
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">@org.MemberCount members</MudText>
+                            </MudStack>
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@GetPlanColor(org.Plan)">
+                                @org.Plan
+                            </MudChip>
+                        </MudStack>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => NavigateToMembers(org.Id))"
+                                   ClickPropagation="false">
+                            Members
+                        </MudButton>
+                        @if (OrganizationRole.IsAdminOrOwner(org.UserRole))
+                        {
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Secondary"
+                                       OnClick="@(() => NavigateToSettings(org.Id))"
+                                       ClickPropagation="false">
+                                Settings
+                            </MudButton>
+                        }
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+<!-- Create Organization Dialog -->
+<MudDialog @bind-Visible="_createDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Business" />
+            <MudText Typo="Typo.h6">Create Organization</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_createForm" @bind-IsValid="_createFormValid">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_createRequest.Name"
+                              Label="Organization Name"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              RequiredError="Organization name is required"
+                              MaxLength="255"
+                              Counter="255"
+                              Immediate="true"
+                              HelperText="The display name for your organization" />
+
+                <MudTextField @bind-Value="_createRequest.Slug"
+                              Label="URL Slug (optional)"
+                              Variant="Variant.Outlined"
+                              MaxLength="255"
+                              Validation="@(new Func<string?, IEnumerable<string>>(ValidateSlug))"
+                              HelperText="Auto-generated from name if left empty. Use lowercase letters, numbers, and hyphens." />
+
+                <MudTextField @bind-Value="_createRequest.Description"
+                              Label="Description (optional)"
+                              Variant="Variant.Outlined"
+                              MaxLength="1000"
+                              Lines="3"
+                              Counter="1000" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@CloseCreateDialog">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="@CreateOrganization"
+                   Disabled="@(!_createFormValid || _isCreating)">
+            @if (_isCreating)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Create
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<OrganizationDto> _organizations = new();
+    private List<PendingInvitationDto> _pendingInvitations = new();
+    private bool _isLoading = true;
+    private bool _createDialogVisible;
+    private bool _createFormValid;
+    private bool _isCreating;
+    private bool _isProcessingInvitation;
+    private int? _processingInvitationId;
+    private MudForm? _createForm;
+    private CreateOrganizationRequest _createRequest = new() { Name = "" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var orgsTask = OrganizationService.GetOrganizationsAsync();
+            var invitationsTask = OrganizationService.GetPendingInvitationsAsync();
+
+            await Task.WhenAll(orgsTask, invitationsTask);
+
+            _organizations = orgsTask.Result;
+            _pendingInvitations = invitationsTask.Result;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load data: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task AcceptInvitation(PendingInvitationDto invitation)
+    {
+        if (!int.TryParse(invitation.Token, out var invitationId)) return;
+
+        _isProcessingInvitation = true;
+        _processingInvitationId = invitationId;
+
+        try
+        {
+            var (success, error) = await OrganizationService.AcceptInvitationByIdAsync(invitationId);
+
+            if (success)
+            {
+                Snackbar.Add($"You've joined {invitation.OrganizationName}!", Severity.Success);
+                _pendingInvitations.Remove(invitation);
+                // Reload organizations to include the new one
+                _organizations = await OrganizationService.GetOrganizationsAsync();
+            }
+            else
+            {
+                Snackbar.Add(error ?? "Failed to accept invitation", Severity.Error);
+            }
+        }
+        finally
+        {
+            _isProcessingInvitation = false;
+            _processingInvitationId = null;
+        }
+    }
+
+    private async Task DeclineInvitation(PendingInvitationDto invitation)
+    {
+        if (!int.TryParse(invitation.Token, out var invitationId)) return;
+
+        _isProcessingInvitation = true;
+        _processingInvitationId = invitationId;
+
+        try
+        {
+            var (success, error) = await OrganizationService.DeclineInvitationByIdAsync(invitationId);
+
+            if (success)
+            {
+                Snackbar.Add("Invitation declined", Severity.Info);
+                _pendingInvitations.Remove(invitation);
+            }
+            else
+            {
+                Snackbar.Add(error ?? "Failed to decline invitation", Severity.Error);
+            }
+        }
+        finally
+        {
+            _isProcessingInvitation = false;
+            _processingInvitationId = null;
+        }
+    }
+
+    private static string GetExpiryText(DateTime expiresAt)
+    {
+        var remaining = expiresAt - DateTime.UtcNow;
+        if (remaining.TotalDays >= 1)
+            return $"in {(int)remaining.TotalDays} day{((int)remaining.TotalDays != 1 ? "s" : "")}";
+        if (remaining.TotalHours >= 1)
+            return $"in {(int)remaining.TotalHours} hour{((int)remaining.TotalHours != 1 ? "s" : "")}";
+        return "soon";
+    }
+
+    private void OpenCreateDialog()
+    {
+        _createRequest = new CreateOrganizationRequest { Name = "" };
+        _createDialogVisible = true;
+    }
+
+    private void CloseCreateDialog()
+    {
+        _createDialogVisible = false;
+    }
+
+    private async Task CreateOrganization()
+    {
+        if (_createForm != null)
+            await _createForm.Validate();
+
+        if (!_createFormValid) return;
+
+        _isCreating = true;
+        try
+        {
+            var (success, org, error) = await OrganizationService.CreateOrganizationAsync(_createRequest);
+
+            if (success && org != null)
+            {
+                _organizations.Insert(0, org);
+                Snackbar.Add("Organization created successfully", Severity.Success);
+                CloseCreateDialog();
+            }
+            else
+            {
+                Snackbar.Add(error ?? "Failed to create organization", Severity.Error);
+            }
+        }
+        finally
+        {
+            _isCreating = false;
+        }
+    }
+
+    private void NavigateToOrg(int id)
+    {
+        Navigation.NavigateTo($"/organizations/{id}");
+    }
+
+    private void NavigateToMembers(int id)
+    {
+        Navigation.NavigateTo($"/organizations/{id}/members");
+    }
+
+    private void NavigateToSettings(int id)
+    {
+        Navigation.NavigateTo($"/organizations/{id}/settings");
+    }
+
+    private IEnumerable<string> ValidateSlug(string? slug)
+    {
+        if (!string.IsNullOrEmpty(slug))
+        {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(slug, @"^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$"))
+                yield return "Slug must contain only lowercase letters, numbers, and hyphens";
+        }
+    }
+
+    private static string GetOrgInitials(string name)
+    {
+        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length >= 2)
+            return $"{words[0][0]}{words[1][0]}".ToUpper();
+        return name.Length >= 2 ? name[..2].ToUpper() : name.ToUpper();
+    }
+
+    private static Color GetOrgColor(string name)
+    {
+        var hash = name.GetHashCode();
+        var colors = new[] { Color.Primary, Color.Secondary, Color.Info, Color.Success, Color.Warning };
+        return colors[Math.Abs(hash) % colors.Length];
+    }
+
+    private static Color GetRoleColor(string role) => role switch
+    {
+        OrganizationRole.Owner => Color.Error,
+        OrganizationRole.Admin => Color.Warning,
+        OrganizationRole.Member => Color.Primary,
+        OrganizationRole.Viewer => Color.Default,
+        _ => Color.Default
+    };
+
+    private static Color GetPlanColor(string plan) => plan.ToLowerInvariant() switch
+    {
+        "team" => Color.Secondary,
+        "enterprise" => Color.Primary,
+        _ => Color.Default
+    };
+}
