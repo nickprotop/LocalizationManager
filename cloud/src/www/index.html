@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="LRM Cloud - Manage translations for your .NET and web applications with 10 AI translation providers. CLI, TUI, and Web interfaces.">
+    <meta name="keywords" content="localization, translation, i18n, .NET, resx, json, AI translation, DeepL, Google Translate, OpenAI">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="author" content="LRM Cloud">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="LRM Cloud - Localization Made Simple">
+    <meta property="og:description" content="Manage translations for your .NET and web apps with 10 AI translation providers">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://lrmcloud.io">
+
+    <title>LRM Cloud - Localization Made Simple</title>
+
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <style>
+        /* CSS Reset & Base */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #8b5cf6;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --bg-card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --text-light: #94a3b8;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f172a;
+                --bg-alt: #1e293b;
+                --bg-card: #1e293b;
+                --text: #f1f5f9;
+                --text-muted: #94a3b8;
+                --text-light: #64748b;
+                --border: #334155;
+                --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+            }
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        a:hover {
+            color: var(--primary-dark);
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            header {
+                background: rgba(15, 23, 42, 0.9);
+            }
+        }
+
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--text);
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        nav a {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.9375rem;
+            transition: color 0.2s;
+        }
+
+        nav a:hover {
+            color: var(--text);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.9375rem;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px 0 rgba(99, 102, 241, 0.5);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--bg-alt);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        .btn-lg {
+            padding: 14px 32px;
+            font-size: 1rem;
+        }
+
+        /* Hero */
+        .hero {
+            padding: 140px 0 80px;
+            text-align: center;
+            background: linear-gradient(180deg, var(--bg-alt) 0%, var(--bg) 100%);
+        }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 5vw, 3.5rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, var(--text) 0%, var(--text-muted) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            max-width: 640px;
+            margin: 0 auto 40px;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 48px;
+            margin-top: 64px;
+            flex-wrap: wrap;
+        }
+
+        .hero-stat {
+            text-align: center;
+        }
+
+        .hero-stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .hero-stat-label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Features */
+        .features {
+            padding: 80px 0;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 56px;
+        }
+
+        .section-title h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .section-title p {
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary-light);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 0.9375rem;
+        }
+
+        /* Providers */
+        .providers {
+            padding: 80px 0;
+            background: var(--bg-alt);
+        }
+
+        .provider-logos {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 48px;
+            flex-wrap: wrap;
+            margin-top: 40px;
+        }
+
+        .provider-logo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            transition: color 0.2s;
+        }
+
+        .provider-logo:hover {
+            color: var(--text);
+        }
+
+        .provider-logo span {
+            font-size: 2rem;
+        }
+
+        /* Pricing */
+        .pricing {
+            padding: 80px 0;
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .price-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .price-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .price-card.popular {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 1px var(--primary);
+        }
+
+        .price-card.popular::before {
+            content: 'Most Popular';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .price-card h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .price-card .price {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .price-card .price span {
+            font-size: 1rem;
+            font-weight: 400;
+            color: var(--text-muted);
+        }
+
+        .price-card .description {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 24px;
+        }
+
+        .price-card ul {
+            list-style: none;
+            margin-bottom: 32px;
+        }
+
+        .price-card li {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            font-size: 0.9375rem;
+            color: var(--text-muted);
+        }
+
+        .price-card li::before {
+            content: '✓';
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .price-card .btn {
+            width: 100%;
+        }
+
+        /* CTA */
+        .cta {
+            padding: 80px 0;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            text-align: center;
+            color: white;
+        }
+
+        .cta h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .cta p {
+            opacity: 0.9;
+            margin-bottom: 32px;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .cta .btn {
+            background: white;
+            color: var(--primary);
+        }
+
+        .cta .btn:hover {
+            background: var(--bg-alt);
+            color: var(--primary);
+        }
+
+        /* Footer */
+        footer {
+            padding: 48px 0;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .footer-links a:hover {
+            color: var(--text);
+        }
+
+        .footer-copy {
+            color: var(--text-light);
+            font-size: 0.875rem;
+        }
+
+        /* Mobile Menu */
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .hero p {
+                font-size: 1rem;
+            }
+
+            .hero-stats {
+                gap: 32px;
+            }
+
+            .footer-inner {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .footer-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .hero h1, .hero p, .hero-buttons, .hero-stats {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+
+        .hero p { animation-delay: 0.1s; }
+        .hero-buttons { animation-delay: 0.2s; }
+        .hero-stats { animation-delay: 0.3s; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="header-inner">
+                <a href="/" class="logo">
+                    <div class="logo-icon">LR</div>
+                    LRM Cloud
+                </a>
+
+                <nav>
+                    <div class="nav-links">
+                        <a href="#features">Features</a>
+                        <a href="#pricing">Pricing</a>
+                        <a href="https://github.com/nickprotop/LocalizationManager" target="_blank">GitHub</a>
+                        <a href="/docs">Docs</a>
+                    </div>
+
+                    <div class="nav-buttons">
+                        <a href="/app/login" class="btn btn-secondary">Log In</a>
+                        <a href="/app/register" class="btn btn-primary">Get Started</a>
+                    </div>
+
+                    <button class="mobile-menu-btn" aria-label="Menu">☰</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="container">
+            <h1>Localization <span>Made Simple</span></h1>
+            <p>Manage translations for your .NET and web applications with 10 AI translation providers, team collaboration, and CLI/TUI/Web interfaces.</p>
+
+            <div class="hero-buttons">
+                <a href="/app/register" class="btn btn-primary btn-lg">Get Started Free</a>
+                <a href="https://github.com/nickprotop/LocalizationManager" class="btn btn-secondary btn-lg" target="_blank">View on GitHub</a>
+            </div>
+
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <div class="hero-stat-value">10+</div>
+                    <div class="hero-stat-label">AI Providers</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-value">3</div>
+                    <div class="hero-stat-label">Interfaces (CLI/TUI/Web)</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-value">Free</div>
+                    <div class="hero-stat-label">Open Source CLI</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-title">
+                <h2>Everything You Need for Localization</h2>
+                <p>From single developer to enterprise teams, LRM scales with your needs</p>
+            </div>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>10 AI Translation Providers</h3>
+                    <p>Google, DeepL, OpenAI, Claude, Azure, Ollama, and more. Use free providers or bring your own API keys.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">⌨️</div>
+                    <h3>CLI + TUI + Web</h3>
+                    <p>Work your way. Command line for CI/CD, terminal UI for focused editing, or web browser for team collaboration.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">👥</div>
+                    <h3>Team Collaboration</h3>
+                    <p>Organizations with role-based access. Invite team members, manage permissions, and work together.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔑</div>
+                    <h3>Bring Your Own Keys</h3>
+                    <p>Use platform translations or configure your own API keys. Your keys, your data, your control.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📁</div>
+                    <h3>Multiple Formats</h3>
+                    <p>Support for .resx, JSON, and i18next formats. Perfect for .NET, React, Vue, Angular, and more.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h3>Code Scanner</h3>
+                    <p>Find unused and missing localization keys in your codebase. Keep your translations clean and complete.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Providers -->
+    <section class="providers">
+        <div class="container">
+            <div class="section-title">
+                <h2>Supported Translation Providers</h2>
+                <p>Choose from free, paid, or self-hosted options</p>
+            </div>
+
+            <div class="provider-logos">
+                <div class="provider-logo">
+                    <span>🟢</span>
+                    Google
+                </div>
+                <div class="provider-logo">
+                    <span>🔵</span>
+                    DeepL
+                </div>
+                <div class="provider-logo">
+                    <span>⚫</span>
+                    OpenAI
+                </div>
+                <div class="provider-logo">
+                    <span>🟤</span>
+                    Claude
+                </div>
+                <div class="provider-logo">
+                    <span>🔷</span>
+                    Azure
+                </div>
+                <div class="provider-logo">
+                    <span>🦙</span>
+                    Ollama
+                </div>
+                <div class="provider-logo">
+                    <span>🆓</span>
+                    Lingva
+                </div>
+                <div class="provider-logo">
+                    <span>🆓</span>
+                    MyMemory
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section class="pricing" id="pricing">
+        <div class="container">
+            <div class="section-title">
+                <h2>Simple, Transparent Pricing</h2>
+                <p>Start free, upgrade when you need more</p>
+            </div>
+
+            <div class="pricing-grid">
+                <div class="price-card">
+                    <h3>Free</h3>
+                    <div class="price">$0 <span>/month</span></div>
+                    <p class="description">Perfect for getting started</p>
+                    <ul>
+                        <li>10,000 characters/month</li>
+                        <li>Free providers (Lingva, MyMemory)</li>
+                        <li>2 projects</li>
+                        <li>Bring your own API keys</li>
+                        <li>CLI + TUI access</li>
+                    </ul>
+                    <a href="/app/register" class="btn btn-secondary">Get Started</a>
+                </div>
+
+                <div class="price-card popular">
+                    <h3>Pro</h3>
+                    <div class="price">$9 <span>/month</span></div>
+                    <p class="description">For professional developers</p>
+                    <ul>
+                        <li>100,000 characters/month</li>
+                        <li>Google + DeepL included</li>
+                        <li>Unlimited projects</li>
+                        <li>Priority support</li>
+                        <li>Translation cache</li>
+                    </ul>
+                    <a href="/app/register?plan=pro" class="btn btn-primary">Start Pro Trial</a>
+                </div>
+
+                <div class="price-card">
+                    <h3>Team</h3>
+                    <div class="price">$29 <span>/month</span></div>
+                    <p class="description">For teams and organizations</p>
+                    <ul>
+                        <li>500,000 characters/month</li>
+                        <li>All premium providers</li>
+                        <li>Unlimited team members</li>
+                        <li>Organization management</li>
+                        <li>API access</li>
+                    </ul>
+                    <a href="/app/register?plan=team" class="btn btn-secondary">Contact Sales</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta">
+        <div class="container">
+            <h2>Ready to Simplify Your Localization?</h2>
+            <p>Join developers who trust LRM Cloud for their translation workflows.</p>
+            <a href="/app/register" class="btn btn-lg">Get Started Free</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-links">
+                    <a href="/docs">Documentation</a>
+                    <a href="https://github.com/nickprotop/LocalizationManager" target="_blank">GitHub</a>
+                    <a href="/privacy">Privacy</a>
+                    <a href="/terms">Terms</a>
+                </div>
+                <div class="footer-copy">
+                    &copy; 2025 LRM Cloud. All rights reserved.
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Header scroll effect
+        let lastScroll = 0;
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('header');
+            const currentScroll = window.pageYOffset;
+
+            if (currentScroll > 100) {
+                header.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+            } else {
+                header.style.boxShadow = 'none';
+            }
+
+            lastScroll = currentScroll;
+        });
+    </script>
+</body>
+</html>
