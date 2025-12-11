@@ -61,9 +61,13 @@ public class UsageService : IUsageService
 
         return new UsageStatsDto
         {
+            // LRM Translation usage (counts against plan)
             TranslationCharsUsed = user.TranslationCharsUsed,
             TranslationCharsLimit = user.TranslationCharsLimit,
             TranslationCharsResetAt = user.TranslationCharsResetAt,
+            // BYOK usage (tracked but unlimited)
+            ByokCharsUsed = user.ByokCharsUsed,
+            // Other stats
             ProjectCount = projectCount,
             ResourceFileCount = resourceFileCount, // Using this for unique language/project combos
             TotalKeyCount = totalKeyCount,

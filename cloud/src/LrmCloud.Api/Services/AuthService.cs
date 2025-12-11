@@ -586,6 +586,7 @@ public class AuthService : IAuthService
             TranslationCharsUsed = user.TranslationCharsUsed,
             TranslationCharsLimit = user.TranslationCharsLimit,
             TranslationCharsResetAt = user.TranslationCharsResetAt,
+            ByokCharsUsed = user.ByokCharsUsed,
             LastLoginAt = user.LastLoginAt,
             CreatedAt = user.CreatedAt
         };
@@ -643,6 +644,7 @@ public class AuthService : IAuthService
             TranslationCharsUsed = user.TranslationCharsUsed,
             TranslationCharsLimit = user.TranslationCharsLimit,
             TranslationCharsResetAt = user.TranslationCharsResetAt,
+            ByokCharsUsed = user.ByokCharsUsed,
             LastLoginAt = user.LastLoginAt,
             CreatedAt = user.CreatedAt
         };
