@@ -41,7 +41,7 @@ lrm remote set https://lrm.cloud/@john/my-project
 lrm remote set https://staging.lrm.cloud/myorg/project
 ```
 
-The remote URL is stored in `lrm.json` and shared with your team via git.
+The remote URL is stored in `.lrm/cloud.json` (per-developer, git-ignored).
 
 ### 2. Authentication
 
@@ -61,7 +61,7 @@ Generate an API key from the LRM Cloud web UI (Settings > CLI API Keys), then:
 
 ```bash
 # Store the API key
-lrm cloud set-api-key --key lrm_your_api_key_here
+lrm cloud set-api-key lrm_your_api_key_here
 
 # Or use environment variable
 export LRM_CLOUD_API_KEY=lrm_your_api_key_here
@@ -70,12 +70,12 @@ export LRM_CLOUD_API_KEY=lrm_your_api_key_here
 #### Option C: Manual Token
 
 ```bash
-lrm cloud set-token --token <your-token>
+lrm cloud set-token <your-token>
 ```
 
 **Authentication Priority:** Environment variable (`LRM_CLOUD_API_KEY`) > Stored API key > JWT token
 
-Tokens are stored in `.lrm/auth.json` (git-ignored) for security.
+All credentials are stored in `.lrm/cloud.json` (git-ignored) for security.
 
 ### 3. Verify Configuration
 
@@ -436,13 +436,14 @@ lrm cloud pull --no-backup
 
 ### Cloud Commands
 
-- `lrm cloud login <host>` - Authenticate via browser
+- `lrm cloud init [url]` - Connect to cloud project (interactive or direct URL)
+- `lrm cloud login [host]` - Authenticate via email/password
 - `lrm cloud logout` - Clear stored tokens
 - `lrm cloud push [options]` - Push local changes to cloud
 - `lrm cloud pull [options]` - Pull remote changes from cloud
-- `lrm cloud status` - Show sync status
-- `lrm cloud set-token` - Set authentication token manually
-- `lrm cloud set-api-key` - Store a CLI API key for authentication
+- `lrm cloud status` - Show sync status or account info
+- `lrm cloud set-token [token]` - Set authentication token manually
+- `lrm cloud set-api-key [key]` - Store a CLI API key for authentication
 
 ### Options
 
@@ -455,9 +456,12 @@ lrm cloud pull --no-backup
 - `--resources-only` - Sync resources only
 
 **set-api-key Options:**
-- `--key <KEY>` - API key to store (will prompt if not provided)
-- `--host <HOST>` - Remote host (auto-detected from remote URL if configured)
+- `[key]` - API key to store (will prompt if not provided)
 - `--remove` - Remove stored API key instead of setting one
+
+**set-token Options:**
+- `[token]` - Token to store (will prompt if not provided)
+- `--expires <datetime>` - Token expiration date (ISO 8601 format)
 
 ## See Also
 

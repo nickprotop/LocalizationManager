@@ -419,14 +419,17 @@ Cloud synchronization commands for LRM Cloud.
 .PP
 Subcommands:
 .IP \(bu 2
-.B login \fIHOST\fR
-- Authenticate with LRM Cloud via browser
+.B init \fI[URL]\fR
+- Connect local project to cloud (interactive or direct URL)
+.IP \(bu 2
+.B login \fI[HOST]\fR
+- Authenticate with LRM Cloud via email/password
 .IP \(bu 2
 .B logout
 - Clear stored authentication tokens
 .IP \(bu 2
 .B status
-- Show cloud sync status
+- Show cloud sync status or account info
 .IP \(bu 2
 .B push
 - Push local changes to cloud
@@ -434,32 +437,73 @@ Subcommands:
 .B pull
 - Pull remote changes from cloud
 .IP \(bu 2
-.B set-token
+.B set-token \fI[TOKEN]\fR
 - Manually set an authentication token
 .IP \(bu 2
-.B set-api-key
+.B set-api-key \fI[KEY]\fR
 - Store a CLI API key for cloud authentication
 .IP \(bu 2
 .B remote
 - Remote URL configuration (set, get, unset)
+.SS cloud init
+Connect local project to a cloud project.
+.PP
+.B lrm cloud init
+[\fIURL\fR]
+[\fB\-n\fR|\fB\-\-name\fR \fINAME\fR]
+[\fB\-\-organization\fR \fIORG\fR]
+[\fB\-y\fR|\fB\-\-yes\fR]
+.TP
+.I URL
+Remote URL (e.g., https://lrm.cloud/org/project). Interactive if not provided.
+.TP
+.BR \-n ", " \-\-name " " \fINAME\fR
+Project name (skip selection if matches existing project)
+.TP
+.BR \-\-organization " " \fIORG\fR
+Organization slug for new project
+.SS cloud login
+Authenticate with LRM Cloud.
+.PP
+.B lrm cloud login
+[\fIHOST\fR]
+[\fB\-\-email\fR \fIEMAIL\fR]
+[\fB\-\-password\fR \fIPASSWORD\fR]
+.TP
+.I HOST
+Cloud host (e.g., lrm.cloud, localhost:3000). Uses configured remote if not provided.
+.TP
+.BR \-\-email " " \fIEMAIL\fR
+Email address for authentication
+.TP
+.BR \-\-password " " \fIPASSWORD\fR
+Password (not recommended - will prompt if not provided)
 .SS cloud set\-api\-key
 Store a CLI API key for cloud authentication.
 .PP
 .B lrm cloud set\-api\-key
-[\fB\-\-key\fR \fIKEY\fR]
-[\fB\-\-host\fR \fIHOST\fR]
+[\fIKEY\fR]
 [\fB\-\-remove\fR]
 .TP
-.BR \-\-key " " \fIKEY\fR
+.I KEY
 API key to store (will prompt if not provided)
-.TP
-.BR \-\-host " " \fIHOST\fR
-Remote host (auto-detected from remote URL if configured)
 .TP
 .BR \-\-remove
 Remove stored API key instead of setting one
+.SS cloud set\-token
+Manually set an authentication token.
 .PP
-API keys provide an alternative to JWT authentication for CI/CD pipelines and automation.
+.B lrm cloud set\-token
+[\fITOKEN\fR]
+[\fB\-\-expires\fR \fIDATETIME\fR]
+.TP
+.I TOKEN
+Access token (will prompt if not provided)
+.TP
+.BR \-\-expires " " \fIDATETIME\fR
+Token expiration date/time (ISO 8601 format)
+.PP
+All credentials are stored in .lrm/cloud.json (git-ignored).
 Priority: environment variable (LRM_CLOUD_API_KEY) > stored key > JWT token
 .SS chain
 Execute multiple LRM commands sequentially in a single invocation.

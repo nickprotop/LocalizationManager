@@ -539,9 +539,10 @@ _lrm() {
                 cloud)
                     local -a cloud_subcommands
                     cloud_subcommands=(
+                        'init:Connect local project to cloud'
                         'login:Authenticate with LRM Cloud'
                         'logout:Clear stored authentication tokens'
-                        'status:Show cloud sync status'
+                        'status:Show cloud sync status or account info'
                         'push:Push local changes to cloud'
                         'pull:Pull remote changes from cloud'
                         'set-token:Manually set an authentication token'
@@ -560,20 +561,29 @@ _lrm() {
                             ;;
                         subargs)
                             case $words[1] in
+                                init)
+                                    _arguments \
+                                        '1:remote URL' \
+                                        '(-n --name)'{-n,--name}'[Project name]:name' \
+                                        '--organization[Organization slug]:org' \
+                                        '(-y --yes)'{-y,--yes}'[Skip confirmation prompts]' \
+                                        $global_opts
+                                    ;;
                                 login)
                                     _arguments \
                                         '1:host' \
+                                        '--email[Email address]:email' \
+                                        '--password[Password]:password' \
                                         $global_opts
                                     ;;
                                 logout)
                                     _arguments \
-                                        '--host[Remote host]:host' \
-                                        '--all[Clear all stored tokens]' \
                                         $global_opts
                                     ;;
                                 status)
                                     _arguments \
                                         '--format[Output format]:format:->formats' \
+                                        '--account[Show account info instead of sync status]' \
                                         $global_opts
                                     case $state in
                                         formats)
@@ -602,14 +612,13 @@ _lrm() {
                                     ;;
                                 set-token)
                                     _arguments \
-                                        '--host[Remote host]:host' \
-                                        '--token[Authentication token]:token' \
+                                        '1:token' \
+                                        '--expires[Token expiration date (ISO 8601)]:datetime' \
                                         $global_opts
                                     ;;
                                 set-api-key)
                                     _arguments \
-                                        '--key[API key to store]:key' \
-                                        '--host[Remote host]:host' \
+                                        '1:API key' \
                                         '--remove[Remove stored API key]' \
                                         $global_opts
                                     ;;

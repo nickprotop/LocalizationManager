@@ -59,14 +59,15 @@ _lrm_completions() {
     local web_opts="--path -p --source-path --port --bind-address --no-open-browser --enable-https --cert-path --cert-password --help -h"
 
     # Cloud subcommands and options
-    local cloud_opts="login logout status push pull set-token set-api-key remote --help -h"
-    local cloud_login_opts="--help -h"
-    local cloud_logout_opts="--host --all --help -h"
-    local cloud_status_opts="--path -p --format --help -h"
+    local cloud_opts="init login logout status push pull set-token set-api-key remote --help -h"
+    local cloud_init_opts="--path -p --name -n --organization --yes -y --help -h"
+    local cloud_login_opts="--path -p --email --password --help -h"
+    local cloud_logout_opts="--path -p --help -h"
+    local cloud_status_opts="--path -p --format --account --help -h"
     local cloud_push_opts="--path -p --message -m --dry-run --force --config-only --resources-only --help -h"
     local cloud_pull_opts="--path -p --dry-run --force --no-backup --strategy --config-only --resources-only --help -h"
-    local cloud_set_token_opts="--host --token --help -h"
-    local cloud_set_api_key_opts="--path -p --key --host --remove --help -h"
+    local cloud_set_token_opts="--path -p --expires --help -h"
+    local cloud_set_api_key_opts="--path -p --remove --help -h"
     local cloud_remote_opts="set get unset --help -h"
 
     # Format options
@@ -397,6 +398,14 @@ _lrm_completions() {
             else
                 # Complete options for the specific subcommand
                 case "${subcommand}" in
+                    init)
+                        if [[ "${cur}" == -* ]]; then
+                            COMPREPLY=( $(compgen -W "${cloud_init_opts}" -- "${cur}") )
+                        else
+                            # URL argument
+                            COMPREPLY=()
+                        fi
+                        ;;
                     login)
                         if [[ "${cur}" == -* ]]; then
                             COMPREPLY=( $(compgen -W "${cloud_login_opts}" -- "${cur}") )
@@ -418,10 +427,20 @@ _lrm_completions() {
                         COMPREPLY=( $(compgen -W "${cloud_pull_opts}" -- "${cur}") )
                         ;;
                     set-token)
-                        COMPREPLY=( $(compgen -W "${cloud_set_token_opts}" -- "${cur}") )
+                        if [[ "${cur}" == -* ]]; then
+                            COMPREPLY=( $(compgen -W "${cloud_set_token_opts}" -- "${cur}") )
+                        else
+                            # Token argument
+                            COMPREPLY=()
+                        fi
                         ;;
                     set-api-key)
-                        COMPREPLY=( $(compgen -W "${cloud_set_api_key_opts}" -- "${cur}") )
+                        if [[ "${cur}" == -* ]]; then
+                            COMPREPLY=( $(compgen -W "${cloud_set_api_key_opts}" -- "${cur}") )
+                        else
+                            # API key argument
+                            COMPREPLY=()
+                        fi
                         ;;
                     remote)
                         COMPREPLY=( $(compgen -W "${cloud_remote_opts}" -- "${cur}") )
