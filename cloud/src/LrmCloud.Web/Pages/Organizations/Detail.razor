@@ -179,7 +179,7 @@ else
             @foreach (var project in _orgProjects.Take(6))
             {
                 <MudItem xs="12" sm="6" md="4">
-                    <MudCard Elevation="2" Class="cursor-pointer" @onclick="@(() => Navigation.NavigateTo($"/projects/{project.Id}"))">
+                    <MudCard Elevation="2" Class="cursor-pointer" @onclick="@(() => Navigation.NavigateTo($"projects/{project.Id}"))">
                         <MudCardHeader>
                             <CardHeaderContent>
                                 <MudText Typo="Typo.subtitle1">@project.Name</MudText>
