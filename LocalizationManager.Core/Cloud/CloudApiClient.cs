@@ -577,9 +577,12 @@ public class UserProfile
     public string AuthType { get; set; } = "email";
     public long? GitHubId { get; set; }
     public string Plan { get; set; } = "free";
+    // LRM Translation usage (counts against plan)
     public int TranslationCharsUsed { get; set; }
     public int TranslationCharsLimit { get; set; }
     public DateTime? TranslationCharsResetAt { get; set; }
+    // BYOK usage (tracked but unlimited)
+    public long ByokCharsUsed { get; set; }
     public DateTime? LastLoginAt { get; set; }
     public DateTime CreatedAt { get; set; }
 }

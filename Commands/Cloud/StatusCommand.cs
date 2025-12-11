@@ -347,14 +347,27 @@ public class StatusCommand : Command<StatusCommandSettings>
         var planColor = user.Plan == "free" ? "yellow" : "green";
         userTable.AddRow("Plan", $"[{planColor}]{user.Plan.EscapeMarkup()}[/]");
 
+        // LRM Translation usage (counts against plan)
         var usagePercent = user.TranslationCharsLimit > 0
             ? (user.TranslationCharsUsed * 100) / user.TranslationCharsLimit
             : 0;
         var usageColor = usagePercent > 90 ? "red" : usagePercent > 70 ? "yellow" : "green";
         var usageText = user.TranslationCharsLimit > 0
-            ? $"{user.TranslationCharsUsed:N0} / {user.TranslationCharsLimit:N0} chars"
+            ? $"{user.TranslationCharsUsed:N0} / {user.TranslationCharsLimit:N0} chars ({usagePercent}%)"
             : $"{user.TranslationCharsUsed:N0} chars";
-        userTable.AddRow("Translation Usage", $"[{usageColor}]{usageText}[/]");
+        userTable.AddRow("LRM Usage", $"[{usageColor}]{usageText}[/]");
+
+        // BYOK usage (tracked but unlimited)
+        if (user.ByokCharsUsed > 0)
+        {
+            userTable.AddRow("BYOK Usage", $"[dim]{user.ByokCharsUsed:N0} chars (unlimited)[/]");
+        }
+
+        // Reset date
+        if (user.TranslationCharsResetAt.HasValue)
+        {
+            userTable.AddRow("Resets", user.TranslationCharsResetAt.Value.ToString("yyyy-MM-dd"));
+        }
 
         AnsiConsole.Write(userTable);
         AnsiConsole.WriteLine();
@@ -430,7 +443,11 @@ public class StatusCommand : Command<StatusCommandSettings>
         Console.WriteLine($"Email: {user.Email}");
         Console.WriteLine($"Username: {user.Username}");
         Console.WriteLine($"Plan: {user.Plan}");
-        Console.WriteLine($"Translation Usage: {user.TranslationCharsUsed:N0} / {user.TranslationCharsLimit:N0}");
+        Console.WriteLine($"LRM Usage: {user.TranslationCharsUsed:N0} / {user.TranslationCharsLimit:N0} chars");
+        if (user.ByokCharsUsed > 0)
+            Console.WriteLine($"BYOK Usage: {user.ByokCharsUsed:N0} chars (unlimited)");
+        if (user.TranslationCharsResetAt.HasValue)
+            Console.WriteLine($"Resets: {user.TranslationCharsResetAt.Value:yyyy-MM-dd}");
 
         if (projects != null && projects.Count > 0)
         {
@@ -463,8 +480,11 @@ public class StatusCommand : Command<StatusCommandSettings>
                 plan = user.Plan,
                 translationUsage = new
                 {
-                    used = user.TranslationCharsUsed,
-                    limit = user.TranslationCharsLimit,
+                    // LRM usage (counts against plan)
+                    lrmUsed = user.TranslationCharsUsed,
+                    lrmLimit = user.TranslationCharsLimit,
+                    // BYOK usage (tracked but unlimited)
+                    byokUsed = user.ByokCharsUsed,
                     resetAt = user.TranslationCharsResetAt
                 },
                 createdAt = user.CreatedAt
