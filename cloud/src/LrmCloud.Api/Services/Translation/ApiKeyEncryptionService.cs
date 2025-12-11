@@ -1,11 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
+using LrmCloud.Shared.Configuration;
 
 namespace LrmCloud.Api.Services.Translation;
 
 /// <summary>
 /// AES-256 encryption service for API keys.
-/// The encryption key is derived from the API_KEY_MASTER_SECRET environment variable.
+/// The encryption key is derived from the apiKeyMasterSecret configuration or API_KEY_MASTER_SECRET environment variable.
 /// </summary>
 public class ApiKeyEncryptionService : IApiKeyEncryptionService
 {
@@ -13,13 +14,13 @@ public class ApiKeyEncryptionService : IApiKeyEncryptionService
     private const int KeySize = 256;
     private const int IvSize = 16; // 128 bits for AES
 
-    public ApiKeyEncryptionService(IConfiguration configuration)
+    public ApiKeyEncryptionService(CloudConfiguration config)
     {
-        // Get master secret from configuration (set via environment variable)
-        var masterSecret = configuration["ApiKeyMasterSecret"]
+        // Get master secret from strongly-typed configuration or environment variable
+        var masterSecret = config.ApiKeyMasterSecret
             ?? Environment.GetEnvironmentVariable("API_KEY_MASTER_SECRET")
             ?? throw new InvalidOperationException(
-                "API_KEY_MASTER_SECRET environment variable or ApiKeyMasterSecret configuration is required");
+                "apiKeyMasterSecret configuration or API_KEY_MASTER_SECRET environment variable is required");
 
         // Derive a 256-bit key from the master secret using PBKDF2
         _encryptionKey = DeriveKey(masterSecret);

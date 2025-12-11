@@ -176,6 +176,137 @@ public class TranslationService
         };
     }
 
+    // =========================================================================
+    // Provider Configuration Management
+    // =========================================================================
+
+    /// <summary>
+    /// Get provider configuration at user level.
+    /// </summary>
+    public async Task<ProviderConfigDto?> GetUserProviderConfigAsync(string provider)
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<ProviderConfigDto>($"translation/config/user/{provider}");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Set provider configuration at user level (API key and/or config).
+    /// </summary>
+    public async Task<ServiceResult> SetUserProviderConfigAsync(string provider, SetProviderConfigRequest request)
+    {
+        var response = await _httpClient.PutAsJsonAsync($"translation/config/user/{provider}", request);
+        return await ParseServiceResultAsync(response);
+    }
+
+    /// <summary>
+    /// Remove provider configuration at user level.
+    /// </summary>
+    public async Task<ServiceResult> RemoveUserProviderConfigAsync(string provider)
+    {
+        var response = await _httpClient.DeleteAsync($"translation/config/user/{provider}");
+        return await ParseServiceResultAsync(response);
+    }
+
+    /// <summary>
+    /// Get provider configuration at organization level.
+    /// </summary>
+    public async Task<ProviderConfigDto?> GetOrganizationProviderConfigAsync(int organizationId, string provider)
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<ProviderConfigDto>(
+                $"translation/config/organizations/{organizationId}/{provider}");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Set provider configuration at organization level.
+    /// </summary>
+    public async Task<ServiceResult> SetOrganizationProviderConfigAsync(
+        int organizationId, string provider, SetProviderConfigRequest request)
+    {
+        var response = await _httpClient.PutAsJsonAsync(
+            $"translation/config/organizations/{organizationId}/{provider}", request);
+        return await ParseServiceResultAsync(response);
+    }
+
+    /// <summary>
+    /// Remove provider configuration at organization level.
+    /// </summary>
+    public async Task<ServiceResult> RemoveOrganizationProviderConfigAsync(int organizationId, string provider)
+    {
+        var response = await _httpClient.DeleteAsync(
+            $"translation/config/organizations/{organizationId}/{provider}");
+        return await ParseServiceResultAsync(response);
+    }
+
+    /// <summary>
+    /// Get provider configuration at project level.
+    /// </summary>
+    public async Task<ProviderConfigDto?> GetProjectProviderConfigAsync(int projectId, string provider)
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<ProviderConfigDto>(
+                $"translation/config/projects/{projectId}/{provider}");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Set provider configuration at project level.
+    /// </summary>
+    public async Task<ServiceResult> SetProjectProviderConfigAsync(
+        int projectId, string provider, SetProviderConfigRequest request)
+    {
+        var response = await _httpClient.PutAsJsonAsync(
+            $"translation/config/projects/{projectId}/{provider}", request);
+        return await ParseServiceResultAsync(response);
+    }
+
+    /// <summary>
+    /// Remove provider configuration at project level.
+    /// </summary>
+    public async Task<ServiceResult> RemoveProjectProviderConfigAsync(int projectId, string provider)
+    {
+        var response = await _httpClient.DeleteAsync(
+            $"translation/config/projects/{projectId}/{provider}");
+        return await ParseServiceResultAsync(response);
+    }
+
+    /// <summary>
+    /// Get resolved (merged) configuration for a provider.
+    /// </summary>
+    public async Task<ResolvedProviderConfigDto?> GetResolvedProviderConfigAsync(
+        string provider, int? projectId = null, int? organizationId = null)
+    {
+        var url = $"translation/config/resolved/{provider}";
+        var queryParams = new List<string>();
+
+        if (projectId.HasValue)
+            queryParams.Add($"projectId={projectId}");
+        if (organizationId.HasValue)
+            queryParams.Add($"organizationId={organizationId}");
+
+        if (queryParams.Any())
+            url += "?" + string.Join("&", queryParams);
+
+        return await _httpClient.GetFromJsonAsync<ResolvedProviderConfigDto>(url);
+    }
+
     private static async Task<ServiceResult> ParseServiceResultAsync(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode)

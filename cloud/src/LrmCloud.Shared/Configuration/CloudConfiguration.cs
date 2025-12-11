@@ -38,6 +38,12 @@ public sealed class CloudConfiguration
 
     [Required]
     public required LimitsConfiguration Limits { get; init; }
+
+    /// <summary>
+    /// Master secret for encrypting translation provider API keys.
+    /// Should be a long random string (32+ characters).
+    /// </summary>
+    public string? ApiKeyMasterSecret { get; init; }
 }
 
 /// <summary>

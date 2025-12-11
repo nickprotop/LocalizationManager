@@ -342,11 +342,15 @@ public class CloudTranslationService : ICloudTranslationService
     {
         try
         {
-            // Resolve API key from hierarchy
+            // Resolve API key and config from hierarchy
+            var resolved = await _keyHierarchy.ResolveProviderConfigAsync(
+                providerName, projectId, userId, organizationId);
+
+            // Get the actual API key (not masked) for the provider
             var (apiKey, _) = await _keyHierarchy.ResolveApiKeyAsync(
                 providerName, projectId, userId, organizationId);
 
-            // Create a minimal config model with just the API key
+            // Create config model with merged provider settings
             var config = new ConfigurationModel
             {
                 Translation = new TranslationConfiguration
@@ -355,8 +359,8 @@ public class CloudTranslationService : ICloudTranslationService
                 }
             };
 
-            // Set the appropriate API key in the config
-            SetApiKeyInConfig(config, providerName, apiKey);
+            // Set the API key and apply provider-specific configuration
+            ApplyProviderConfig(config, providerName, apiKey, resolved.Config);
 
             return TranslationProviderFactory.Create(providerName, config);
         }
@@ -367,7 +371,14 @@ public class CloudTranslationService : ICloudTranslationService
         }
     }
 
-    private static void SetApiKeyInConfig(ConfigurationModel config, string provider, string? apiKey)
+    /// <summary>
+    /// Applies the resolved API key and provider-specific configuration to the config model.
+    /// </summary>
+    private static void ApplyProviderConfig(
+        ConfigurationModel config,
+        string provider,
+        string? apiKey,
+        Dictionary<string, object?>? providerConfig)
     {
         config.Translation ??= new TranslationConfiguration();
         config.Translation.ApiKeys ??= new TranslationApiKeys();
@@ -377,30 +388,127 @@ public class CloudTranslationService : ICloudTranslationService
         {
             case "google":
                 config.Translation.ApiKeys.Google = apiKey;
+                // Google doesn't have additional config currently
                 break;
+
             case "deepl":
                 config.Translation.ApiKeys.DeepL = apiKey;
+                // DeepL doesn't have additional config currently
                 break;
+
             case "openai":
-                config.Translation.AIProviders.OpenAI ??= new OpenAISettings();
                 config.Translation.ApiKeys.OpenAI = apiKey;
+                config.Translation.AIProviders.OpenAI = new OpenAISettings
+                {
+                    Model = GetConfigString(providerConfig, "model"),
+                    CustomSystemPrompt = GetConfigString(providerConfig, "customSystemPrompt"),
+                    RateLimitPerMinute = GetConfigInt(providerConfig, "rateLimitPerMinute")
+                };
                 break;
+
             case "claude":
-                config.Translation.AIProviders.Claude ??= new ClaudeSettings();
                 config.Translation.ApiKeys.Claude = apiKey;
+                config.Translation.AIProviders.Claude = new ClaudeSettings
+                {
+                    Model = GetConfigString(providerConfig, "model"),
+                    CustomSystemPrompt = GetConfigString(providerConfig, "customSystemPrompt"),
+                    RateLimitPerMinute = GetConfigInt(providerConfig, "rateLimitPerMinute")
+                };
                 break;
+
             case "azureopenai":
-                config.Translation.AIProviders.AzureOpenAI ??= new AzureOpenAISettings();
                 config.Translation.ApiKeys.AzureOpenAI = apiKey;
+                config.Translation.AIProviders.AzureOpenAI = new AzureOpenAISettings
+                {
+                    Endpoint = GetConfigString(providerConfig, "endpoint"),
+                    DeploymentName = GetConfigString(providerConfig, "deploymentName"),
+                    CustomSystemPrompt = GetConfigString(providerConfig, "customSystemPrompt"),
+                    RateLimitPerMinute = GetConfigInt(providerConfig, "rateLimitPerMinute")
+                };
                 break;
+
             case "azuretranslator":
-                config.Translation.AIProviders.AzureTranslator ??= new AzureTranslatorSettings();
                 config.Translation.ApiKeys.AzureTranslator = apiKey;
+                config.Translation.AIProviders.AzureTranslator = new AzureTranslatorSettings
+                {
+                    Region = GetConfigString(providerConfig, "region"),
+                    Endpoint = GetConfigString(providerConfig, "endpoint"),
+                    RateLimitPerMinute = GetConfigInt(providerConfig, "rateLimitPerMinute")
+                };
                 break;
+
+            case "ollama":
+                // Ollama doesn't require API key but has config
+                config.Translation.AIProviders.Ollama = new OllamaSettings
+                {
+                    ApiUrl = GetConfigString(providerConfig, "apiUrl"),
+                    Model = GetConfigString(providerConfig, "model"),
+                    CustomSystemPrompt = GetConfigString(providerConfig, "customSystemPrompt"),
+                    RateLimitPerMinute = GetConfigInt(providerConfig, "rateLimitPerMinute")
+                };
+                break;
+
+            case "lingva":
+                // Lingva doesn't require API key but has config
+                config.Translation.AIProviders.Lingva = new LingvaSettings
+                {
+                    InstanceUrl = GetConfigString(providerConfig, "instanceUrl"),
+                    RateLimitPerMinute = GetConfigInt(providerConfig, "rateLimitPerMinute")
+                };
+                break;
+
             case "libretranslate":
                 config.Translation.ApiKeys.LibreTranslate = apiKey;
+                // LibreTranslate config would be apiUrl but that's not in current settings
+                // TODO: Add LibreTranslateSettings to Core if needed
+                break;
+
+            case "mymemory":
+                // MyMemory is free and has optional email config
+                config.Translation.AIProviders.MyMemory = new MyMemorySettings
+                {
+                    RateLimitPerMinute = GetConfigInt(providerConfig, "rateLimitPerMinute")
+                };
                 break;
         }
+    }
+
+    /// <summary>
+    /// Gets a string value from the provider config dictionary.
+    /// </summary>
+    private static string? GetConfigString(Dictionary<string, object?>? config, string key)
+    {
+        if (config == null) return null;
+
+        // Try exact key first
+        if (config.TryGetValue(key, out var value) && value != null)
+        {
+            return value.ToString();
+        }
+
+        // Try case-insensitive
+        var matchingKey = config.Keys.FirstOrDefault(k =>
+            string.Equals(k, key, StringComparison.OrdinalIgnoreCase));
+
+        if (matchingKey != null && config[matchingKey] != null)
+        {
+            return config[matchingKey]?.ToString();
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Gets an integer value from the provider config dictionary.
+    /// </summary>
+    private static int? GetConfigInt(Dictionary<string, object?>? config, string key)
+    {
+        var strValue = GetConfigString(config, key);
+        if (strValue != null && int.TryParse(strValue, out var intValue))
+        {
+            return intValue;
+        }
+        return null;
     }
 
     private static bool IsLocalProvider(string provider) =>

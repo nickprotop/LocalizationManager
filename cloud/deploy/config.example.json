@@ -22,6 +22,7 @@
   "encryption": {
     "tokenKey": "CHANGE_ME_BASE64_KEY"
   },
+  "apiKeyMasterSecret": "CHANGE_ME_LONG_RANDOM_STRING_FOR_API_KEY_ENCRYPTION",
   "auth": {
     "jwtSecret": "CHANGE_ME_LONG_RANDOM_STRING",
     "jwtExpiryHours": 1,

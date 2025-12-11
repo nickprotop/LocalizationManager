@@ -230,6 +230,200 @@ public class TranslationController : ControllerBase
         return Ok(new { message = "API key removed" });
     }
 
+// =========================================================================
+    // Provider Configuration Management (API Keys + Config)
+    // =========================================================================
+
+    /// <summary>
+    /// Get provider configuration at user level.
+    /// </summary>
+    [HttpGet("config/user/{provider}")]
+    public async Task<ActionResult<ProviderConfigDto>> GetUserProviderConfig(string provider)
+    {
+        var userId = GetUserId();
+        var config = await _keyHierarchy.GetProviderConfigAsync(provider, "user", userId);
+
+        if (config == null)
+            return NotFound(new { error = "Provider configuration not found" });
+
+        return Ok(config);
+    }
+
+    /// <summary>
+    /// Set provider configuration at user level (API key and/or config).
+    /// </summary>
+    [HttpPut("config/user/{provider}")]
+    public async Task<IActionResult> SetUserProviderConfig(string provider, [FromBody] SetProviderConfigRequest request)
+    {
+        var userId = GetUserId();
+
+        try
+        {
+            await _keyHierarchy.SetProviderConfigAsync(provider, "user", userId, request.ApiKey, request.Config);
+            return Ok(new { message = "Provider configuration saved successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to set user provider config for {Provider}", provider);
+            return BadRequest(new { error = "Failed to save provider configuration" });
+        }
+    }
+
+    /// <summary>
+    /// Remove provider configuration at user level.
+    /// </summary>
+    [HttpDelete("config/user/{provider}")]
+    public async Task<IActionResult> RemoveUserProviderConfig(string provider)
+    {
+        var userId = GetUserId();
+        var removed = await _keyHierarchy.RemoveProviderConfigAsync(provider, "user", userId);
+
+        if (!removed)
+            return NotFound(new { error = "Provider configuration not found" });
+
+        return Ok(new { message = "Provider configuration removed" });
+    }
+
+    /// <summary>
+    /// Get provider configuration at organization level.
+    /// </summary>
+    [HttpGet("config/organizations/{organizationId}/{provider}")]
+    public async Task<ActionResult<ProviderConfigDto>> GetOrganizationProviderConfig(int organizationId, string provider)
+    {
+        // TODO: Verify user has access to organization
+        var config = await _keyHierarchy.GetProviderConfigAsync(provider, "organization", organizationId);
+
+        if (config == null)
+            return NotFound(new { error = "Provider configuration not found" });
+
+        return Ok(config);
+    }
+
+    /// <summary>
+    /// Set provider configuration at organization level.
+    /// </summary>
+    [HttpPut("config/organizations/{organizationId}/{provider}")]
+    public async Task<IActionResult> SetOrganizationProviderConfig(int organizationId, string provider, [FromBody] SetProviderConfigRequest request)
+    {
+        // TODO: Verify user is organization admin
+
+        try
+        {
+            await _keyHierarchy.SetProviderConfigAsync(provider, "organization", organizationId, request.ApiKey, request.Config);
+            return Ok(new { message = "Provider configuration saved successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to set organization provider config for {Provider}", provider);
+            return BadRequest(new { error = "Failed to save provider configuration" });
+        }
+    }
+
+    /// <summary>
+    /// Remove provider configuration at organization level.
+    /// </summary>
+    [HttpDelete("config/organizations/{organizationId}/{provider}")]
+    public async Task<IActionResult> RemoveOrganizationProviderConfig(int organizationId, string provider)
+    {
+        // TODO: Verify user is organization admin
+        var removed = await _keyHierarchy.RemoveProviderConfigAsync(provider, "organization", organizationId);
+
+        if (!removed)
+            return NotFound(new { error = "Provider configuration not found" });
+
+        return Ok(new { message = "Provider configuration removed" });
+    }
+
+    /// <summary>
+    /// Get provider configuration at project level.
+    /// </summary>
+    [HttpGet("config/projects/{projectId}/{provider}")]
+    public async Task<ActionResult<ProviderConfigDto>> GetProjectProviderConfig(int projectId, string provider)
+    {
+        // TODO: Verify user has access to project
+        var config = await _keyHierarchy.GetProviderConfigAsync(provider, "project", projectId);
+
+        if (config == null)
+            return NotFound(new { error = "Provider configuration not found" });
+
+        return Ok(config);
+    }
+
+    /// <summary>
+    /// Set provider configuration at project level.
+    /// </summary>
+    [HttpPut("config/projects/{projectId}/{provider}")]
+    public async Task<IActionResult> SetProjectProviderConfig(int projectId, string provider, [FromBody] SetProviderConfigRequest request)
+    {
+        // TODO: Verify user has access to project
+
+        try
+        {
+            await _keyHierarchy.SetProviderConfigAsync(provider, "project", projectId, request.ApiKey, request.Config);
+            return Ok(new { message = "Provider configuration saved successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to set project provider config for {Provider}", provider);
+            return BadRequest(new { error = "Failed to save provider configuration" });
+        }
+    }
+
+    /// <summary>
+    /// Remove provider configuration at project level.
+    /// </summary>
+    [HttpDelete("config/projects/{projectId}/{provider}")]
+    public async Task<IActionResult> RemoveProjectProviderConfig(int projectId, string provider)
+    {
+        // TODO: Verify user has access to project
+        var removed = await _keyHierarchy.RemoveProviderConfigAsync(provider, "project", projectId);
+
+        if (!removed)
+            return NotFound(new { error = "Provider configuration not found" });
+
+        return Ok(new { message = "Provider configuration removed" });
+    }
+
+    /// <summary>
+    /// Get resolved (merged) configuration for a provider in a given context.
+    /// </summary>
+    [HttpGet("config/resolved/{provider}")]
+    public async Task<ActionResult<ResolvedProviderConfigDto>> GetResolvedProviderConfig(
+        string provider,
+        [FromQuery] int? projectId = null,
+        [FromQuery] int? organizationId = null)
+    {
+        var userId = GetUserId();
+        var resolved = await _keyHierarchy.ResolveProviderConfigAsync(provider, projectId, userId, organizationId);
+        return Ok(resolved);
+    }
+
+    /// <summary>
+    /// Get summary of all providers at a specific level.
+    /// </summary>
+    [HttpGet("config/summary/{level}/{entityId}")]
+    public async Task<ActionResult<List<ProviderConfigSummaryDto>>> GetProviderSummaries(
+        string level,
+        int entityId,
+        [FromQuery] int? projectId = null,
+        [FromQuery] int? organizationId = null)
+    {
+        var userId = GetUserId();
+
+        // For user level, entityId should match the authenticated user
+        if (level.Equals("user", StringComparison.OrdinalIgnoreCase) && entityId != userId)
+        {
+            return Forbid();
+        }
+
+        var summaries = await _keyHierarchy.GetProviderSummariesAsync(level, entityId, projectId, userId, organizationId);
+        return Ok(summaries);
+    }
+
+    // =========================================================================
+    // API Key Testing
+    // =========================================================================
+
     /// <summary>
     /// Test an API key without saving it.
     /// </summary>

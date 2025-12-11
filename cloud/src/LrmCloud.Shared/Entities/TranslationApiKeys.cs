@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace LrmCloud.Shared.Entities;
 
 /// <summary>
-/// User-level translation provider API key.
+/// User-level translation provider API key and configuration.
 /// Keys are encrypted at rest.
 /// </summary>
 [Table("user_api_keys")]
@@ -21,7 +21,7 @@ public class UserApiKey
     public User? User { get; set; }
 
     /// <summary>
-    /// Translation provider name: "google", "deepl", "openai", "azure", etc.
+    /// Translation provider name: "google", "deepl", "openai", "azure", "ollama", etc.
     /// </summary>
     [Required]
     [MaxLength(50)]
@@ -29,19 +29,28 @@ public class UserApiKey
     public required string Provider { get; set; }
 
     /// <summary>
-    /// AES-256 encrypted API key.
+    /// AES-256 encrypted API key. Nullable for providers that don't require keys (e.g., Ollama, MyMemory).
     /// </summary>
-    [Required]
     [Column("encrypted_key")]
-    public required string EncryptedKey { get; set; }
+    public string? EncryptedKey { get; set; }
+
+    /// <summary>
+    /// Provider-specific configuration as JSON.
+    /// Contains settings like model, apiUrl, customSystemPrompt, etc.
+    /// </summary>
+    [Column("config_json", TypeName = "jsonb")]
+    public string? ConfigJson { get; set; }
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [Column("updated_at")]
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 /// <summary>
-/// Organization-level translation provider API key.
-/// Shared across all organization projects.
+/// Organization-level translation provider API key and configuration.
+/// Shared across all organization members and projects.
 /// </summary>
 [Table("organization_api_keys")]
 public class OrganizationApiKey
@@ -56,22 +65,36 @@ public class OrganizationApiKey
     [ForeignKey(nameof(OrganizationId))]
     public Organization? Organization { get; set; }
 
+    /// <summary>
+    /// Translation provider name: "google", "deepl", "openai", "azure", "ollama", etc.
+    /// </summary>
     [Required]
     [MaxLength(50)]
     [Column("provider")]
     public required string Provider { get; set; }
 
-    [Required]
+    /// <summary>
+    /// AES-256 encrypted API key. Nullable for providers that don't require keys.
+    /// </summary>
     [Column("encrypted_key")]
-    public required string EncryptedKey { get; set; }
+    public string? EncryptedKey { get; set; }
+
+    /// <summary>
+    /// Provider-specific configuration as JSON.
+    /// </summary>
+    [Column("config_json", TypeName = "jsonb")]
+    public string? ConfigJson { get; set; }
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [Column("updated_at")]
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 /// <summary>
-/// Project-level translation provider API key.
-/// Highest priority in the hierarchy.
+/// Project-level translation provider API key and configuration.
+/// Highest priority in the hierarchy - overrides user and organization settings.
 /// </summary>
 [Table("project_api_keys")]
 public class ProjectApiKey
@@ -86,15 +109,29 @@ public class ProjectApiKey
     [ForeignKey(nameof(ProjectId))]
     public Project? Project { get; set; }
 
+    /// <summary>
+    /// Translation provider name: "google", "deepl", "openai", "azure", "ollama", etc.
+    /// </summary>
     [Required]
     [MaxLength(50)]
     [Column("provider")]
     public required string Provider { get; set; }
 
-    [Required]
+    /// <summary>
+    /// AES-256 encrypted API key. Nullable for providers that don't require keys.
+    /// </summary>
     [Column("encrypted_key")]
-    public required string EncryptedKey { get; set; }
+    public string? EncryptedKey { get; set; }
+
+    /// <summary>
+    /// Provider-specific configuration as JSON.
+    /// </summary>
+    [Column("config_json", TypeName = "jsonb")]
+    public string? ConfigJson { get; set; }
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [Column("updated_at")]
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

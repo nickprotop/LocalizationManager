@@ -5,6 +5,7 @@
 @inject TranslationService TranslationService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject NavigationManager Navigation
 
 <PageTitle>Translation Providers - LRM Cloud</PageTitle>
 
@@ -20,10 +21,78 @@
             </MudButton>
         </MudStack>
 
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            Configure API keys for translation providers. Free providers work without any setup.
-            Your API keys are encrypted and stored securely.
-        </MudText>
+        <!-- User Level Indicator -->
+        <MudPaper Class="pa-4" Elevation="0" Style="background-color: var(--mud-palette-background-grey); border-left: 4px solid var(--mud-palette-primary);">
+            <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" />
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.subtitle1">
+                        <strong>Your Personal Settings</strong> (User Level)
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Configure your personal API keys and provider options. These settings apply to all your projects
+                        unless overridden at the project level.
+                    </MudText>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+
+        <!-- Hierarchy Explanation -->
+        <MudExpansionPanels>
+            <MudExpansionPanel Text="How does configuration hierarchy work?">
+                <MudStack Spacing="3">
+                    <MudText Typo="Typo.body2">
+                        LRM Cloud supports configuration at multiple levels. Higher levels override lower levels:
+                    </MudText>
+
+                    <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Justify="Justify.Center">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Default">Platform</MudChip>
+                            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Secondary">Organization</MudChip>
+                            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary">User (You)</MudChip>
+                            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Success">Project</MudChip>
+                        </MudStack>
+                    </MudPaper>
+
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <thead>
+                            <tr>
+                                <th>Level</th>
+                                <th>Where to Configure</th>
+                                <th>Who Can Configure</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><MudChip T="string" Size="Size.Small" Color="Color.Default">Platform</MudChip></td>
+                                <td>Server configuration</td>
+                                <td>System administrator</td>
+                            </tr>
+                            <tr>
+                                <td><MudChip T="string" Size="Size.Small" Color="Color.Secondary">Organization</MudChip></td>
+                                <td>
+                                    <MudLink Href="organizations">Organizations</MudLink> &rarr; Settings
+                                </td>
+                                <td>Organization admin/owner</td>
+                            </tr>
+                            <tr style="background-color: var(--mud-palette-primary-lighten);">
+                                <td><MudChip T="string" Size="Size.Small" Color="Color.Primary">User</MudChip></td>
+                                <td><strong>This page</strong></td>
+                                <td>You</td>
+                            </tr>
+                            <tr>
+                                <td><MudChip T="string" Size="Size.Small" Color="Color.Success">Project</MudChip></td>
+                                <td>Projects &rarr; [Project] &rarr; Translation</td>
+                                <td>Project owner</td>
+                            </tr>
+                        </tbody>
+                    </MudSimpleTable>
+                </MudStack>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
 
         @if (_isLoading)
         {
@@ -33,7 +102,7 @@
         {
             <MudText Typo="Typo.h6" Class="mt-4">Free Providers</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-                These providers work without an API key. Great for getting started!
+                These providers work without an API key. Some have optional configuration options.
             </MudText>
 
             <MudGrid Spacing="2">
@@ -99,6 +168,20 @@
         {
             <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" />
         }
+
+        <!-- Quick Links -->
+        <MudPaper Class="pa-4 mt-4" Elevation="0" Style="border: 1px dashed var(--mud-palette-lines-default);">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Lightbulb" Color="Color.Warning" />
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.body2">
+                        <strong>Tip:</strong> Configure shared API keys for your organization in
+                        <MudLink Href="organizations">Organization Settings</MudLink>.
+                        Override specific projects in Project Settings.
+                    </MudText>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
     </MudStack>
 </MudContainer>
 

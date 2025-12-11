@@ -117,6 +117,7 @@ OLD_MINIO_PASSWORD="$CURRENT_MINIO_PASSWORD"
 
 CURRENT_JWT=$(config_get '.auth.jwtSecret' '')
 CURRENT_ENCRYPTION=$(config_get '.encryption.tokenKey' '')
+CURRENT_API_KEY_SECRET=$(config_get '.apiKeyMasterSecret' '')
 
 CURRENT_MAIL_HOST=$(config_get '.mail.host' 'localhost')
 CURRENT_MAIL_PORT=$(config_get '.mail.port' '25')
@@ -230,6 +231,7 @@ DEFAULT_DB_PASSWORD=${CURRENT_DB_PASSWORD:-$(generate_password)}
 DEFAULT_REDIS_PASSWORD=${CURRENT_REDIS_PASSWORD:-$(generate_password)}
 DEFAULT_JWT_SECRET=${CURRENT_JWT:-$(generate_password)$(generate_password)}
 DEFAULT_ENCRYPTION_KEY=${CURRENT_ENCRYPTION:-$(generate_key)}
+DEFAULT_API_KEY_SECRET=${CURRENT_API_KEY_SECRET:-$(generate_password)$(generate_password)}
 DEFAULT_MINIO_PASSWORD=${CURRENT_MINIO_PASSWORD:-$(generate_password)}
 
 # Prompt for PostgreSQL password
@@ -277,6 +279,15 @@ else
 fi
 ENCRYPTION_KEY=${INPUT_ENCRYPTION_KEY:-$DEFAULT_ENCRYPTION_KEY}
 
+# Prompt for API key master secret (for translation provider API key encryption)
+if [ -n "$CURRENT_API_KEY_SECRET" ]; then
+    print_info "API Key Master Secret exists (hidden)"
+    read -p "API Key Master Secret [keep existing]: " INPUT_API_KEY_SECRET
+else
+    read -p "API Key Master Secret [$DEFAULT_API_KEY_SECRET]: " INPUT_API_KEY_SECRET
+fi
+API_KEY_SECRET=${INPUT_API_KEY_SECRET:-$DEFAULT_API_KEY_SECRET}
+
 # Preserve other existing config values
 CURRENT_JWT_EXPIRY=$(config_get '.auth.jwtExpiryHours' '24')
 CURRENT_REG=$(config_get '.features.registration' 'true')
@@ -313,6 +324,7 @@ cat > "$CONFIG_FILE" <<EOF
   "encryption": {
     "tokenKey": "${ENCRYPTION_KEY}"
   },
+  "apiKeyMasterSecret": "${API_KEY_SECRET}",
   "auth": {
     "jwtSecret": "${JWT_SECRET}",
     "jwtExpiryHours": ${CURRENT_JWT_EXPIRY}

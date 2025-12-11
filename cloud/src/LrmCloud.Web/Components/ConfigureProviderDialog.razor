@@ -6,8 +6,11 @@
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Key" />
+            <MudIcon Icon="@Icons.Material.Filled.Settings" />
             <MudText Typo="Typo.h6">Configure @Provider.DisplayName</MudText>
+            <MudChip T="string" Size="Size.Small" Color="@GetLevelColor()" Variant="Variant.Outlined">
+                @GetLevelDisplayName()
+            </MudChip>
         </MudStack>
     </TitleContent>
 
@@ -20,53 +23,258 @@
                 </MudAlert>
             }
 
-            <MudTextField T="string"
-                          @bind-Value="_apiKey"
-                          Label="API Key"
-                          Placeholder="Enter your API key..."
-                          Variant="Variant.Outlined"
-                          InputType="@(_showKey ? InputType.Text : InputType.Password)"
-                          Adornment="Adornment.End"
-                          AdornmentIcon="@(_showKey ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
-                          OnAdornmentClick="@(() => _showKey = !_showKey)"
-                          Required="true" />
-
-            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                @GetApiKeyHelpText(Provider.Name)
-            </MudText>
-
-            @if (_testResult != null)
+            @if (_isLoading)
             {
-                <MudAlert Severity="@(_testResult.IsValid ? Severity.Success : Severity.Error)" Dense="true">
-                    @if (_testResult.IsValid)
-                    {
-                        <MudText>@(_testResult.ProviderMessage ?? "API key is valid!")</MudText>
-                    }
-                    else
-                    {
-                        <MudText>@(_testResult.Error ?? "Invalid API key")</MudText>
-                    }
-                </MudAlert>
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
+            }
+            else
+            {
+                <!-- API Key Section (for providers that require it) -->
+                @if (Provider.RequiresApiKey || ShowApiKeyField)
+                {
+                    <MudStack Spacing="2">
+                        @if (_inheritedKeySource != null)
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Key" Size="Size.Small" />
+                                    <MudText Typo="Typo.body2">
+                                        Using API key from <strong>@_inheritedKeySource</strong>
+                                    </MudText>
+                                </MudStack>
+                            </MudAlert>
+                        }
+
+                        <MudTextField T="string"
+                                      @bind-Value="_apiKey"
+                                      Label="@(Level == "user" && _inheritedKeySource != null ? "Override API Key (optional)" : "API Key")"
+                                      Placeholder="@GetApiKeyPlaceholder()"
+                                      Variant="Variant.Outlined"
+                                      InputType="@(_showKey ? InputType.Text : InputType.Password)"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@(_showKey ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                      OnAdornmentClick="@(() => _showKey = !_showKey)"
+                                      Required="@(Provider.RequiresApiKey && _inheritedKeySource == null && _existingConfig?.HasApiKey != true)"
+                                      HelperText="@GetApiKeyHelpText(Provider.Name)" />
+
+                        @if (_existingConfig?.HasApiKey == true)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Current (this level): @_existingConfig.MaskedApiKey
+                            </MudText>
+                        }
+                    </MudStack>
+                }
+
+                <!-- Provider-Specific Configuration -->
+                @switch (Provider.Name.ToLowerInvariant())
+                {
+                    case "ollama":
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">Ollama Configuration</MudText>
+
+                        <MudTextField T="string"
+                                      @bind-Value="_ollamaApiUrl"
+                                      Label="API URL"
+                                      Placeholder="http://localhost:11434"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Ollama server URL. Default: http://localhost:11434" />
+
+                        <MudTextField T="string"
+                                      @bind-Value="_ollamaModel"
+                                      Label="Model"
+                                      Placeholder="llama3.2"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Model to use (e.g., llama3.2, mistral, qwen2.5)" />
+
+                        <MudTextField T="string"
+                                      @bind-Value="_customSystemPrompt"
+                                      Label="Custom System Prompt"
+                                      Placeholder="Optional: Custom translation instructions..."
+                                      Variant="Variant.Outlined"
+                                      Lines="3"
+                                      HelperText="Override the default translation prompt (optional)" />
+                        break;
+
+                    case "openai":
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">OpenAI Configuration</MudText>
+
+                        <MudSelect T="string" @bind-Value="_openaiModel" Label="Model" Variant="Variant.Outlined"
+                                   HelperText="Select the GPT model to use">
+                            <MudSelectItem Value="@("gpt-4o-mini")">GPT-4o Mini (Recommended)</MudSelectItem>
+                            <MudSelectItem Value="@("gpt-4o")">GPT-4o</MudSelectItem>
+                            <MudSelectItem Value="@("gpt-4-turbo")">GPT-4 Turbo</MudSelectItem>
+                            <MudSelectItem Value="@("gpt-3.5-turbo")">GPT-3.5 Turbo</MudSelectItem>
+                        </MudSelect>
+
+                        <MudTextField T="string"
+                                      @bind-Value="_customSystemPrompt"
+                                      Label="Custom System Prompt"
+                                      Placeholder="Optional: Custom translation instructions..."
+                                      Variant="Variant.Outlined"
+                                      Lines="3"
+                                      HelperText="Override the default translation prompt (optional)" />
+                        break;
+
+                    case "claude":
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">Claude Configuration</MudText>
+
+                        <MudSelect T="string" @bind-Value="_claudeModel" Label="Model" Variant="Variant.Outlined"
+                                   HelperText="Select the Claude model to use">
+                            <MudSelectItem Value="@("claude-3-5-sonnet-20241022")">Claude 3.5 Sonnet (Recommended)</MudSelectItem>
+                            <MudSelectItem Value="@("claude-3-5-haiku-20241022")">Claude 3.5 Haiku (Fast)</MudSelectItem>
+                            <MudSelectItem Value="@("claude-3-opus-20240229")">Claude 3 Opus</MudSelectItem>
+                        </MudSelect>
+
+                        <MudTextField T="string"
+                                      @bind-Value="_customSystemPrompt"
+                                      Label="Custom System Prompt"
+                                      Placeholder="Optional: Custom translation instructions..."
+                                      Variant="Variant.Outlined"
+                                      Lines="3"
+                                      HelperText="Override the default translation prompt (optional)" />
+                        break;
+
+                    case "azureopenai":
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">Azure OpenAI Configuration</MudText>
+
+                        <MudTextField T="string"
+                                      @bind-Value="_azureEndpoint"
+                                      Label="Endpoint URL"
+                                      Placeholder="https://your-resource.openai.azure.com"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      HelperText="Your Azure OpenAI resource endpoint" />
+
+                        <MudTextField T="string"
+                                      @bind-Value="_azureDeploymentName"
+                                      Label="Deployment Name"
+                                      Placeholder="gpt-4"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      HelperText="The deployment name in Azure OpenAI Studio" />
+
+                        <MudTextField T="string"
+                                      @bind-Value="_customSystemPrompt"
+                                      Label="Custom System Prompt"
+                                      Placeholder="Optional: Custom translation instructions..."
+                                      Variant="Variant.Outlined"
+                                      Lines="3"
+                                      HelperText="Override the default translation prompt (optional)" />
+                        break;
+
+                    case "azuretranslator":
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">Azure Translator Configuration</MudText>
+
+                        <MudTextField T="string"
+                                      @bind-Value="_azureRegion"
+                                      Label="Region"
+                                      Placeholder="eastus"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Azure region (e.g., eastus, westeurope). Required for regional resources." />
+
+                        <MudTextField T="string"
+                                      @bind-Value="_azureEndpoint"
+                                      Label="Custom Endpoint"
+                                      Placeholder="https://api.cognitive.microsofttranslator.com"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Optional: Custom endpoint URL (uses default if not set)" />
+                        break;
+
+                    case "lingva":
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">Lingva Configuration</MudText>
+
+                        <MudTextField T="string"
+                                      @bind-Value="_lingvaInstanceUrl"
+                                      Label="Instance URL"
+                                      Placeholder="https://lingva.ml"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Lingva instance URL. Default: https://lingva.ml" />
+
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                            Lingva is a free, privacy-respecting Google Translate frontend. No API key required.
+                        </MudAlert>
+                        break;
+
+                    case "libretranslate":
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">LibreTranslate Configuration</MudText>
+
+                        <MudTextField T="string"
+                                      @bind-Value="_libreApiUrl"
+                                      Label="API URL"
+                                      Placeholder="https://libretranslate.com"
+                                      Variant="Variant.Outlined"
+                                      HelperText="LibreTranslate instance URL. API key may be optional for public instances." />
+                        break;
+
+                    case "mymemory":
+                        <MudAlert Severity="Severity.Info" Dense="true">
+                            MyMemory is a free translation service. No configuration required.
+                            Rate limited to ~5000 characters/day for anonymous usage.
+                        </MudAlert>
+                        break;
+
+                    case "google":
+                    case "deepl":
+                        <!-- These providers only need API key, no additional config -->
+                        break;
+                }
+
+                <!-- Rate Limit (common to all configurable providers) -->
+                @if (HasConfigOptions(Provider.Name))
+                {
+                    <MudDivider Class="my-2" />
+                    <MudNumericField T="int?" @bind-Value="_rateLimitPerMinute"
+                                     Label="Rate Limit (requests/minute)"
+                                     Variant="Variant.Outlined"
+                                     Min="1"
+                                     Max="1000"
+                                     HelperText="Optional: Limit API calls per minute" />
+                }
+
+                <!-- Test Result -->
+                @if (_testResult != null)
+                {
+                    <MudAlert Severity="@(_testResult.IsValid ? Severity.Success : Severity.Error)" Dense="true">
+                        @if (_testResult.IsValid)
+                        {
+                            <MudText>@(_testResult.ProviderMessage ?? "Configuration is valid!")</MudText>
+                        }
+                        else
+                        {
+                            <MudText>@(_testResult.Error ?? "Invalid configuration")</MudText>
+                        }
+                    </MudAlert>
+                }
             }
         </MudStack>
     </DialogContent>
 
     <DialogActions>
         <MudButton OnClick="Cancel" Disabled="_isSaving">Cancel</MudButton>
-        <MudButton Color="Color.Secondary"
-                   Variant="Variant.Outlined"
-                   OnClick="TestApiKey"
-                   Disabled="@(string.IsNullOrEmpty(_apiKey) || _isTesting || _isSaving)">
-            @if (_isTesting)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Test
-        </MudButton>
+        @if (Provider.RequiresApiKey)
+        {
+            <MudButton Color="Color.Secondary"
+                       Variant="Variant.Outlined"
+                       OnClick="TestConfiguration"
+                       Disabled="@(string.IsNullOrEmpty(_apiKey) && _existingConfig?.HasApiKey != true || _isTesting || _isSaving)">
+                @if (_isTesting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Test
+            </MudButton>
+        }
         <MudButton Color="Color.Primary"
                    Variant="Variant.Filled"
                    OnClick="Save"
-                   Disabled="@(string.IsNullOrEmpty(_apiKey) || _isSaving)">
+                   Disabled="@(!IsValid() || _isSaving)">
             @if (_isSaving)
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
@@ -83,13 +291,181 @@
     [Parameter, EditorRequired]
     public TranslationProviderDto Provider { get; set; } = null!;
 
+    /// <summary>
+    /// Configuration level: "user", "organization", "project"
+    /// </summary>
+    [Parameter]
+    public string Level { get; set; } = "user";
+
+    /// <summary>
+    /// Entity ID (user ID, org ID, or project ID depending on Level)
+    /// </summary>
+    [Parameter]
+    public int? EntityId { get; set; }
+
+    /// <summary>
+    /// Whether to show API key field for providers that don't require it
+    /// </summary>
+    [Parameter]
+    public bool ShowApiKeyField { get; set; } = false;
+
+    // Common fields
     private string _apiKey = string.Empty;
     private bool _showKey = false;
+    private int? _rateLimitPerMinute;
+    private string? _customSystemPrompt;
+
+    // Provider-specific fields
+    private string? _ollamaApiUrl;
+    private string? _ollamaModel;
+    private string? _openaiModel;
+    private string? _claudeModel;
+    private string? _azureEndpoint;
+    private string? _azureDeploymentName;
+    private string? _azureRegion;
+    private string? _lingvaInstanceUrl;
+    private string? _libreApiUrl;
+
+    // State
+    private bool _isLoading = true;
     private bool _isTesting = false;
     private bool _isSaving = false;
     private TestApiKeyResponse? _testResult;
+    private ProviderConfigDto? _existingConfig;
+    private string? _inheritedKeySource; // e.g., "Organization" if key comes from org level
 
-    private async Task TestApiKey()
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadExistingConfigAsync();
+    }
+
+    private async Task LoadExistingConfigAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            // Load config at this level
+            _existingConfig = Level.ToLowerInvariant() switch
+            {
+                "user" => await TranslationService.GetUserProviderConfigAsync(Provider.Name),
+                "organization" when EntityId.HasValue =>
+                    await TranslationService.GetOrganizationProviderConfigAsync(EntityId.Value, Provider.Name),
+                "project" when EntityId.HasValue =>
+                    await TranslationService.GetProjectProviderConfigAsync(EntityId.Value, Provider.Name),
+                _ => null
+            };
+
+            if (_existingConfig?.Config != null)
+            {
+                PopulateFieldsFromConfig(_existingConfig.Config);
+            }
+
+            // Check if there's an inherited API key from a higher level
+            if (_existingConfig?.HasApiKey != true && Provider.RequiresApiKey)
+            {
+                // Check the provider's ApiKeySource from the list
+                if (!string.IsNullOrEmpty(Provider.ApiKeySource))
+                {
+                    _inheritedKeySource = Provider.ApiKeySource;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Config doesn't exist yet, that's fine
+            Console.WriteLine($"No existing config: {ex.Message}");
+
+            // Still check for inherited key
+            if (Provider.RequiresApiKey && !string.IsNullOrEmpty(Provider.ApiKeySource))
+            {
+                _inheritedKeySource = Provider.ApiKeySource;
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void PopulateFieldsFromConfig(Dictionary<string, object?> config)
+    {
+        // Common
+        _rateLimitPerMinute = GetIntValue(config, "rateLimitPerMinute");
+        _customSystemPrompt = GetStringValue(config, "customSystemPrompt");
+
+        // Provider-specific
+        _ollamaApiUrl = GetStringValue(config, "apiUrl");
+        _ollamaModel = GetStringValue(config, "model");
+        _openaiModel = GetStringValue(config, "model");
+        _claudeModel = GetStringValue(config, "model");
+        _azureEndpoint = GetStringValue(config, "endpoint");
+        _azureDeploymentName = GetStringValue(config, "deploymentName");
+        _azureRegion = GetStringValue(config, "region");
+        _lingvaInstanceUrl = GetStringValue(config, "instanceUrl");
+        _libreApiUrl = GetStringValue(config, "apiUrl");
+    }
+
+    private Dictionary<string, object?> BuildConfigDictionary()
+    {
+        var config = new Dictionary<string, object?>();
+
+        // Add rate limit if set
+        if (_rateLimitPerMinute.HasValue)
+            config["rateLimitPerMinute"] = _rateLimitPerMinute.Value;
+
+        // Add custom system prompt if set
+        if (!string.IsNullOrWhiteSpace(_customSystemPrompt))
+            config["customSystemPrompt"] = _customSystemPrompt;
+
+        // Provider-specific config
+        switch (Provider.Name.ToLowerInvariant())
+        {
+            case "ollama":
+                if (!string.IsNullOrWhiteSpace(_ollamaApiUrl))
+                    config["apiUrl"] = _ollamaApiUrl;
+                if (!string.IsNullOrWhiteSpace(_ollamaModel))
+                    config["model"] = _ollamaModel;
+                break;
+
+            case "openai":
+                if (!string.IsNullOrWhiteSpace(_openaiModel))
+                    config["model"] = _openaiModel;
+                break;
+
+            case "claude":
+                if (!string.IsNullOrWhiteSpace(_claudeModel))
+                    config["model"] = _claudeModel;
+                break;
+
+            case "azureopenai":
+                if (!string.IsNullOrWhiteSpace(_azureEndpoint))
+                    config["endpoint"] = _azureEndpoint;
+                if (!string.IsNullOrWhiteSpace(_azureDeploymentName))
+                    config["deploymentName"] = _azureDeploymentName;
+                break;
+
+            case "azuretranslator":
+                if (!string.IsNullOrWhiteSpace(_azureRegion))
+                    config["region"] = _azureRegion;
+                if (!string.IsNullOrWhiteSpace(_azureEndpoint))
+                    config["endpoint"] = _azureEndpoint;
+                break;
+
+            case "lingva":
+                if (!string.IsNullOrWhiteSpace(_lingvaInstanceUrl))
+                    config["instanceUrl"] = _lingvaInstanceUrl;
+                break;
+
+            case "libretranslate":
+                if (!string.IsNullOrWhiteSpace(_libreApiUrl))
+                    config["apiUrl"] = _libreApiUrl;
+                break;
+        }
+
+        return config;
+    }
+
+    private async Task TestConfiguration()
     {
         _isTesting = true;
         _testResult = null;
@@ -99,7 +475,7 @@
             var request = new TestApiKeyRequest
             {
                 ProviderName = Provider.Name,
-                ApiKey = _apiKey
+                ApiKey = !string.IsNullOrEmpty(_apiKey) ? _apiKey : null!
             };
 
             _testResult = await TranslationService.TestApiKeyAsync(request);
@@ -124,22 +500,39 @@
 
         try
         {
-            var request = new SetApiKeyRequest
+            var config = BuildConfigDictionary();
+            var request = new SetProviderConfigRequest
             {
-                ProviderName = Provider.Name,
-                ApiKey = _apiKey
+                Provider = Provider.Name,
+                ApiKey = !string.IsNullOrEmpty(_apiKey) ? _apiKey : null,
+                Config = config.Count > 0 ? config : null
             };
 
-            var result = await TranslationService.SetUserApiKeyAsync(request);
+            ServiceResult result;
+            switch (Level.ToLowerInvariant())
+            {
+                case "user":
+                    result = await TranslationService.SetUserProviderConfigAsync(Provider.Name, request);
+                    break;
+                case "organization" when EntityId.HasValue:
+                    result = await TranslationService.SetOrganizationProviderConfigAsync(EntityId.Value, Provider.Name, request);
+                    break;
+                case "project" when EntityId.HasValue:
+                    result = await TranslationService.SetProjectProviderConfigAsync(EntityId.Value, Provider.Name, request);
+                    break;
+                default:
+                    result = ServiceResult.Failure("Invalid configuration level");
+                    break;
+            }
 
             if (result.IsSuccess)
             {
-                Snackbar.Add($"API key for {Provider.DisplayName} saved successfully", Severity.Success);
+                Snackbar.Add($"{Provider.DisplayName} configuration saved successfully", Severity.Success);
                 MudDialog.Close(DialogResult.Ok(true));
             }
             else
             {
-                Snackbar.Add(result.ErrorMessage ?? "Failed to save API key", Severity.Error);
+                Snackbar.Add(result.ErrorMessage ?? "Failed to save configuration", Severity.Error);
             }
         }
         catch (Exception ex)
@@ -157,15 +550,86 @@
         MudDialog.Cancel();
     }
 
-    private static string GetApiKeyHelpText(string provider) => provider switch
+    private bool IsValid()
     {
-        "google" => "Get your API key from Google Cloud Console → APIs & Services → Credentials",
-        "deepl" => "Get your API key from DeepL Pro account → Account → Authentication Key",
-        "openai" => "Get your API key from OpenAI Platform → API Keys",
-        "claude" => "Get your API key from Anthropic Console → API Keys",
-        "azuretranslator" => "Get your key from Azure Portal → Cognitive Services → Translator",
-        "azureopenai" => "Get your key from Azure Portal → Azure OpenAI Service → Keys",
+        // If provider requires API key, must have one (either new, existing at this level, or inherited)
+        if (Provider.RequiresApiKey)
+        {
+            var hasKeyAtThisLevel = !string.IsNullOrEmpty(_apiKey) || _existingConfig?.HasApiKey == true;
+            var hasInheritedKey = _inheritedKeySource != null;
+
+            // Need either a key at this level OR an inherited key (options-only save is OK with inherited key)
+            if (!hasKeyAtThisLevel && !hasInheritedKey)
+                return false;
+        }
+
+        // Provider-specific validation (only if setting config at this level)
+        return Provider.Name.ToLowerInvariant() switch
+        {
+            // Azure OpenAI requires endpoint and deployment only if user is entering them
+            "azureopenai" when !string.IsNullOrEmpty(_apiKey) =>
+                !string.IsNullOrWhiteSpace(_azureEndpoint) && !string.IsNullOrWhiteSpace(_azureDeploymentName),
+            _ => true
+        };
+    }
+
+    private bool HasConfigOptions(string provider) => provider.ToLowerInvariant() switch
+    {
+        "ollama" or "openai" or "claude" or "azureopenai" or "azuretranslator" or "lingva" or "libretranslate" => true,
+        _ => false
+    };
+
+    private Color GetLevelColor() => Level.ToLowerInvariant() switch
+    {
+        "user" => Color.Primary,
+        "organization" => Color.Secondary,
+        "project" => Color.Success,
+        _ => Color.Default
+    };
+
+    private string GetLevelDisplayName() => Level.ToLowerInvariant() switch
+    {
+        "user" => "User Level",
+        "organization" => "Organization Level",
+        "project" => "Project Level",
+        _ => Level
+    };
+
+    private string GetApiKeyPlaceholder()
+    {
+        if (_existingConfig?.HasApiKey == true)
+            return "(leave blank to keep current)";
+        if (_inheritedKeySource != null)
+            return $"(optional - using {_inheritedKeySource} key)";
+        return "Enter your API key...";
+    }
+
+    private static string GetApiKeyHelpText(string provider) => provider.ToLowerInvariant() switch
+    {
+        "google" => "Get your API key from Google Cloud Console -> APIs & Services -> Credentials",
+        "deepl" => "Get your API key from DeepL Pro account -> Account -> Authentication Key",
+        "openai" => "Get your API key from OpenAI Platform -> API Keys",
+        "claude" => "Get your API key from Anthropic Console -> API Keys",
+        "azuretranslator" => "Get your key from Azure Portal -> Cognitive Services -> Translator",
+        "azureopenai" => "Get your key from Azure Portal -> Azure OpenAI Service -> Keys",
         "libretranslate" => "API key is optional for public instances. Required for private instances.",
         _ => "Enter your API key for this provider"
     };
+
+    private static string? GetStringValue(Dictionary<string, object?> config, string key)
+    {
+        if (config.TryGetValue(key, out var value) && value != null)
+        {
+            return value.ToString();
+        }
+        return null;
+    }
+
+    private static int? GetIntValue(Dictionary<string, object?> config, string key)
+    {
+        var str = GetStringValue(config, key);
+        if (str != null && int.TryParse(str, out var val))
+            return val;
+        return null;
+    }
 }

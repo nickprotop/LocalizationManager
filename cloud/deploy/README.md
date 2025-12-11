@@ -14,20 +14,20 @@ Self-hosted infrastructure for LRM Cloud using Docker Compose.
 │  │                                                                 │   │
 │  │  ┌──────────────┐                                               │   │
 │  │  │    nginx     │  Reverse proxy with SSL & rate limiting       │   │
-│  │  │  :80 / :443  │  Routes /api/* → API, /* → Web               │   │
+│  │  │  :80 / :443  │  Routes /api/* → API, /app/* → Web, / → WWW  │   │
 │  │  └──────┬───────┘                                               │   │
 │  │         │                                                       │   │
-│  │  ┌──────┴───────┐  ┌──────────────┐                             │   │
-│  │  │ /api/* → API │  │ /* → Web     │                             │   │
-│  │  │              │  │ (Blazor WASM)│                             │   │
-│  │  └──────┬───────┘  └──────┬───────┘                             │   │
-│  │         │                 │                                     │   │
-│  │  ┌──────▼───────┐  ┌──────▼───────┐                             │   │
-│  │  │     API      │  │     Web      │                             │   │
-│  │  │  (ASP.NET)   │  │   (nginx +   │                             │   │
-│  │  │   :8080      │  │ Blazor WASM) │                             │   │
-│  │  │              │  │    :80       │                             │   │
-│  │  └──────┬───────┘  └──────────────┘                             │   │
+│  │  ┌──────┴───────┐  ┌──────────────┐  ┌──────────────┐           │   │
+│  │  │ /api/* → API │  │ /app/* → Web │  │  / → WWW     │           │   │
+│  │  │              │  │ (Blazor WASM)│  │ (Landing)    │           │   │
+│  │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘           │   │
+│  │         │                 │                 │                   │   │
+│  │  ┌──────▼───────┐  ┌──────▼───────┐  ┌──────▼───────┐           │   │
+│  │  │     API      │  │     Web      │  │     WWW      │           │   │
+│  │  │  (ASP.NET)   │  │   (nginx +   │  │   (nginx +   │           │   │
+│  │  │   :8080      │  │ Blazor WASM) │  │   static)    │           │   │
+│  │  │              │  │    :80       │  │    :80       │           │   │
+│  │  └──────┬───────┘  └──────────────┘  └──────────────┘           │   │
 │  │         │                                                       │   │
 │  │  ┌──────▼───────┐  ┌──────────────┐  ┌──────────────┐           │   │
 │  │  │  PostgreSQL  │  │    Redis     │  │    MinIO     │           │   │
@@ -53,7 +53,8 @@ Self-hosted infrastructure for LRM Cloud using Docker Compose.
 |-----------|-------|---------------|---------|
 | `lrmcloud-nginx` | nginx:alpine | 80, 443 | Reverse proxy, SSL termination, rate limiting |
 | `lrmcloud-api` | Custom (Dockerfile.api) | 8080 | ASP.NET Core Web API |
-| `lrmcloud-web` | Custom (Dockerfile.web) | 80 | Blazor WASM static files (served by nginx inside) |
+| `lrmcloud-web` | Custom (Dockerfile.web) | 80 | Blazor WASM application (served at `/app/*`) |
+| `lrmcloud-www` | Custom (Dockerfile.www) | 80 | Static landing/marketing page (served at `/`) |
 | `lrmcloud-postgres` | postgres:16-alpine | 5432 | PostgreSQL database |
 | `lrmcloud-redis` | redis:7-alpine | 6379 | Session cache, rate limiting |
 | `lrmcloud-minio` | minio/minio:latest | 9000, 9001 | S3-compatible object storage |
@@ -81,18 +82,32 @@ Browser Request: https://lrm.cloud/api/projects
 │ PostgreSQL      │  │ Redis Cache     │
 └─────────────────┘  └─────────────────┘
 
-Browser Request: https://lrm.cloud/ (Blazor WASM)
+Browser Request: https://lrm.cloud/ (Landing Page)
     │
     ▼
 ┌─────────────────┐
 │ lrmcloud-nginx  │  Port 443 (or 80)
 │ nginx:alpine    │
 └────────┬────────┘
-         │ Route: /* → upstream web
+         │ Route: / → upstream www
+         ▼
+┌─────────────────┐
+│ lrmcloud-www    │  Port 80 (internal)
+│ nginx + static  │  Serves landing page (index.html, favicon)
+└─────────────────┘
+
+Browser Request: https://lrm.cloud/app/* (Blazor WASM)
+    │
+    ▼
+┌─────────────────┐
+│ lrmcloud-nginx  │  Port 443 (or 80)
+│ nginx:alpine    │
+└────────┬────────┘
+         │ Route: /app/* → upstream web
          ▼
 ┌─────────────────┐
 │ lrmcloud-web    │  Port 80 (internal)
-│ nginx + static  │  Serves index.html, _framework/*.dll, etc.
+│ nginx + static  │  Serves Blazor WASM (_framework/*.dll, etc.)
 └─────────────────┘
 ```
 
@@ -100,21 +115,24 @@ Browser Request: https://lrm.cloud/ (Blazor WASM)
 
 ### Standalone with SSL (self-hosted)
 ```
-Browser → nginx (HTTPS :443) → /api/* → API (:8080)
-                              → /*     → Web (Blazor WASM)
+Browser → nginx (HTTPS :443) → /api/*  → API (:8080)
+                              → /app/* → Web (Blazor WASM)
+                              → /      → WWW (Landing)
           HTTP :80 redirects to HTTPS
 ```
 
 ### Behind Existing Proxy (e.g., DigitalOcean, Cloudflare)
 ```
-Your nginx (HTTPS) → LRM nginx (HTTP :8080) → /api/* → API (:8080)
-                                            → /*     → Web (Blazor WASM)
+Your nginx (HTTPS) → LRM nginx (HTTP :8080) → /api/*  → API (:8080)
+                                             → /app/* → Web (Blazor WASM)
+                                             → /      → WWW (Landing)
 ```
 
 ### Development (with direct API access)
 ```
-Browser → nginx (HTTP :8080) → /api/* → API (:8080)
-                             → /*     → Web (Blazor WASM)
+Browser → nginx (HTTP :8080) → /api/*  → API (:8080)
+                              → /app/* → Web (Blazor WASM)
+                              → /      → WWW (Landing)
           Direct API (:5000) for debugging
 ```
 
@@ -156,14 +174,19 @@ Dockerfile.web:
     1. Uses sdk:9.0 to build Blazor WASM
     2. Output: /app/publish/wwwroot (static files)
     3. Uses nginx:alpine to serve static files
-    4. Entry point: nginx serves /, handles SPA fallback to index.html
+    4. Entry point: nginx serves /app/*, handles SPA fallback to index.html
+
+Dockerfile.www:
+    1. Uses nginx:alpine (no build step)
+    2. Copies static files from src/www/ (index.html, favicon.png, icon-192.png)
+    3. Entry point: nginx serves / (landing page)
 ```
 
 ### Service Dependencies
 
 ```
 lrmcloud-nginx
-    └── depends on: api, web (waits for /health endpoint)
+    └── depends on: api, web, www (waits for /health endpoint)
 
 lrmcloud-api
     ├── depends on: postgres (healthy)
@@ -171,6 +194,9 @@ lrmcloud-api
     └── depends on: minio (healthy)
 
 lrmcloud-web
+    └── no dependencies (static files only)
+
+lrmcloud-www
     └── no dependencies (static files only)
 
 lrmcloud-postgres
@@ -186,14 +212,19 @@ lrmcloud-minio
 ### nginx Routing
 
 ```nginx
-# All API requests → API container
+# API requests → API container
 location /api/ {
     proxy_pass http://api:8080;
 }
 
-# All other requests → Web container (Blazor WASM)
-location / {
+# Blazor WASM app → Web container
+location /app/ {
     proxy_pass http://web:80;
+}
+
+# Landing page (default) → WWW container
+location / {
+    proxy_pass http://www:80;
 }
 
 # Health check (returns 204 from nginx itself)
@@ -332,7 +363,7 @@ journalctl-like log viewer for all services with filtering and follow mode.
 ./logs.sh --no-color          # Disable colors (for piping)
 ```
 
-**Services:** `nginx` (cyan), `api` (green), `postgres` (blue), `redis` (red), `minio` (magenta), `all`
+**Services:** `nginx` (cyan), `api` (green), `web` (yellow), `www` (white), `postgres` (blue), `redis` (red), `minio` (magenta), `all`
 
 ## Files
 
@@ -344,6 +375,8 @@ journalctl-like log viewer for all services with filtering and follow mode.
 | `logs.sh` | ✓ | Unified log viewer |
 | `docker-compose.yml` | ✓ | Container definitions |
 | `Dockerfile.api` | ✓ | API container build |
+| `Dockerfile.web` | ✓ | Web (Blazor WASM) container build |
+| `Dockerfile.www` | ✓ | WWW (landing page) container build |
 | `config.example.json` | ✓ | Configuration template |
 | `init-db.sql` | ✓ | PostgreSQL initialization |
 | `nginx/nginx.conf.template` | ✓ | nginx config template |
