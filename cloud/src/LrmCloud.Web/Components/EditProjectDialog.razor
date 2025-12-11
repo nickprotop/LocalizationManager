@@ -5,6 +5,7 @@
 @inject ResourceService ResourceService
 @inject TranslationService TranslationService
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <MudDialog @bind-Visible="_visible" Options="_dialogOptions">
     <TitleContent>
@@ -355,57 +356,6 @@
     </DialogActions>
 </MudDialog>
 
-@* Set Provider API Key Dialog *@
-<MudDialog @bind-Visible="_setProviderKeyDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Configure @_selectedProvider?.DisplayName</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudForm @ref="_providerKeyForm">
-            <MudTextField @bind-Value="_newProviderApiKey"
-                          Label="API Key"
-                          InputType="InputType.Password"
-                          Required="true"
-                          RequiredError="API key is required"
-                          HelperText="Your API key will be encrypted and stored securely"
-                          Class="mb-3" />
-
-            @if (_selectedProvider?.Name == "azureopenai")
-            {
-                <MudTextField @bind-Value="_azureEndpoint"
-                              Label="Azure Endpoint (Optional)"
-                              Placeholder="https://your-resource.openai.azure.com/"
-                              HelperText="Required for Azure OpenAI deployments"
-                              Class="mb-3" />
-            }
-        </MudForm>
-
-        @if (!string.IsNullOrEmpty(_providerTestResult))
-        {
-            <MudAlert Severity="@(_providerTestSuccess ? Severity.Success : Severity.Error)" Dense="true" Class="mt-2">
-                @_providerTestResult
-            </MudAlert>
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _setProviderKeyDialogVisible = false)">Cancel</MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="TestProviderKey" Disabled="_testingProviderKey">
-            @if (_testingProviderKey)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Test
-        </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveProviderKey" Disabled="_savingProviderKey">
-            @if (_savingProviderKey)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Save
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
 @* Remove Provider Key Confirmation *@
 <MudDialog @bind-Visible="_removeProviderKeyDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
     <TitleContent>
@@ -467,16 +417,8 @@
     private bool _loadingProviders;
     private bool _providersLoaded;
 
-    // Set provider key
-    private bool _setProviderKeyDialogVisible;
-    private MudForm? _providerKeyForm;
+    // Provider key management
     private TranslationProviderDto? _selectedProvider;
-    private string _newProviderApiKey = "";
-    private string _azureEndpoint = "";
-    private bool _savingProviderKey;
-    private bool _testingProviderKey;
-    private string? _providerTestResult;
-    private bool _providerTestSuccess;
 
     // Remove provider key
     private bool _removeProviderKeyDialogVisible;
@@ -688,92 +630,31 @@
         }
     }
 
-    private void OpenSetProviderKeyDialog(TranslationProviderDto provider)
+    private async Task OpenSetProviderKeyDialog(TranslationProviderDto provider)
     {
-        _selectedProvider = provider;
-        _newProviderApiKey = "";
-        _azureEndpoint = "";
-        _providerTestResult = null;
-        _setProviderKeyDialogVisible = true;
-    }
+        if (_project == null) return;
 
-    private async Task TestProviderKey()
-    {
-        if (string.IsNullOrWhiteSpace(_newProviderApiKey) || _selectedProvider == null) return;
-
-        _testingProviderKey = true;
-        _providerTestResult = null;
-        try
+        var parameters = new DialogParameters
         {
-            var request = new TestApiKeyRequest
-            {
-                ProviderName = _selectedProvider.Name,
-                ApiKey = _newProviderApiKey
-            };
+            { nameof(ConfigureProviderDialog.Provider), provider },
+            { nameof(ConfigureProviderDialog.Level), "project" },
+            { nameof(ConfigureProviderDialog.EntityId), _project.Id }
+        };
 
-            if (!string.IsNullOrEmpty(_azureEndpoint))
-            {
-                request.AdditionalConfig = new Dictionary<string, string> { ["endpoint"] = _azureEndpoint };
-            }
-
-            var result = await TranslationService.TestApiKeyAsync(request);
-            _providerTestSuccess = result.IsValid;
-            _providerTestResult = result.IsValid
-                ? result.ProviderMessage ?? "Key is valid!"
-                : result.Error ?? "Key validation failed";
-        }
-        catch (Exception ex)
+        var options = new DialogOptions
         {
-            _providerTestSuccess = false;
-            _providerTestResult = $"Test failed: {ex.Message}";
-        }
-        finally
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfigureProviderDialog>($"Configure {provider.DisplayName}", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
         {
-            _testingProviderKey = false;
-        }
-    }
-
-    private async Task SaveProviderKey()
-    {
-        if (_providerKeyForm != null)
-        {
-            await _providerKeyForm.Validate();
-            if (!_providerKeyForm.IsValid) return;
-        }
-
-        if (_project == null || _selectedProvider == null) return;
-
-        _savingProviderKey = true;
-        try
-        {
-            var request = new SetApiKeyRequest
-            {
-                ProviderName = _selectedProvider.Name,
-                ApiKey = _newProviderApiKey
-            };
-
-            if (!string.IsNullOrEmpty(_azureEndpoint))
-            {
-                request.AdditionalConfig = new Dictionary<string, string> { ["endpoint"] = _azureEndpoint };
-            }
-
-            var result = await TranslationService.SetProjectApiKeyAsync(_project.Id, request);
-
-            if (result.IsSuccess)
-            {
-                Snackbar.Add($"{_selectedProvider.DisplayName} API key saved for project", Severity.Success);
-                _setProviderKeyDialogVisible = false;
-                _providersLoaded = false;
-                await LoadTranslationProviders();
-            }
-            else
-            {
-                Snackbar.Add(result.ErrorMessage ?? "Failed to save API key", Severity.Error);
-            }
-        }
-        finally
-        {
-            _savingProviderKey = false;
+            _providersLoaded = false;
+            await LoadTranslationProviders();
         }
     }
 
