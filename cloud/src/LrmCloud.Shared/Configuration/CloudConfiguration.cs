@@ -44,6 +44,11 @@ public sealed class CloudConfiguration
     /// Should be a long random string (32+ characters).
     /// </summary>
     public string? ApiKeyMasterSecret { get; init; }
+
+    /// <summary>
+    /// LRM managed translation provider configuration.
+    /// </summary>
+    public LrmProviderConfiguration LrmProvider { get; init; } = new();
 }
 
 /// <summary>
@@ -404,4 +409,31 @@ public sealed class LimitsConfiguration
     /// </summary>
     [Range(1, 10000)]
     public int ApiRateLimit { get; init; } = 60;
+}
+
+/// <summary>
+/// LRM managed translation provider configuration.
+/// Controls which backends are used when users select "LRM Translation".
+/// </summary>
+public sealed class LrmProviderConfiguration
+{
+    /// <summary>
+    /// Enabled backend providers for LRM, in priority order.
+    /// First available provider will be used.
+    /// Example: ["mymemory", "lingva", "deepl", "google"]
+    /// </summary>
+    public List<string> EnabledBackends { get; init; } = new() { "mymemory", "lingva" };
+
+    /// <summary>
+    /// Backend selection strategy.
+    /// "priority" = Use first available in EnabledBackends order.
+    /// "roundrobin" = Rotate between available backends.
+    /// </summary>
+    public string SelectionStrategy { get; init; } = "priority";
+
+    /// <summary>
+    /// Whether LRM provider is enabled.
+    /// When disabled, users can only use BYOK.
+    /// </summary>
+    public bool Enabled { get; init; } = true;
 }

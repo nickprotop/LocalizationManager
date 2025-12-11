@@ -71,6 +71,13 @@ public class User
     [Column("translation_chars_reset_at")]
     public DateTime? TranslationCharsResetAt { get; set; }
 
+    /// <summary>
+    /// BYOK (Bring Your Own Key) translation characters used.
+    /// Tracked separately from LRM usage. Not limited, just monitored.
+    /// </summary>
+    [Column("byok_chars_used")]
+    public long ByokCharsUsed { get; set; }
+
     // Security
     [MaxLength(255)]
     [Column("password_reset_token_hash")]
