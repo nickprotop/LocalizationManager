@@ -1,10 +1,12 @@
 using System.Diagnostics;
 using LrmCloud.Api.Data;
+using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.DTOs.Translation;
 using LrmCloud.Shared.Entities;
 using LocalizationManager.Core.Configuration;
 using LocalizationManager.Core.Translation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace LrmCloud.Api.Services.Translation;
 
@@ -16,15 +18,21 @@ public class CloudTranslationService : ICloudTranslationService
 {
     private readonly AppDbContext _db;
     private readonly IApiKeyHierarchyService _keyHierarchy;
+    private readonly ILrmTranslationProvider _lrmProvider;
+    private readonly CloudConfiguration _config;
     private readonly ILogger<CloudTranslationService> _logger;
 
     public CloudTranslationService(
         AppDbContext db,
         IApiKeyHierarchyService keyHierarchy,
+        ILrmTranslationProvider lrmProvider,
+        IOptions<CloudConfiguration> config,
         ILogger<CloudTranslationService> logger)
     {
         _db = db;
         _keyHierarchy = keyHierarchy;
+        _lrmProvider = lrmProvider;
+        _config = config.Value;
         _logger = logger;
     }
 
@@ -33,10 +41,32 @@ public class CloudTranslationService : ICloudTranslationService
         int? userId = null,
         int? organizationId = null)
     {
+        var result = new List<TranslationProviderDto>();
+
+        // Add LRM provider first (our managed translation service)
+        if (_config.LrmProvider.Enabled && userId.HasValue)
+        {
+            var (available, reason) = await _lrmProvider.IsAvailableAsync(userId.Value);
+            var remaining = userId.HasValue ? await _lrmProvider.GetRemainingCharsAsync(userId.Value) : 0;
+
+            result.Add(new TranslationProviderDto
+            {
+                Name = "lrm",
+                DisplayName = "LRM Translation",
+                RequiresApiKey = false,
+                IsConfigured = available,
+                Type = "managed",
+                IsAiProvider = false,
+                Description = available
+                    ? $"LRM managed translation ({remaining:N0} chars remaining)"
+                    : reason ?? "LRM translation unavailable",
+                ApiKeySource = null
+            });
+        }
+
+        // Add BYOK providers (user's own API keys)
         var providers = TranslationProviderFactory.GetProviderInfos();
         var configuredProviders = await _keyHierarchy.GetConfiguredProvidersAsync(projectId, userId, organizationId);
-
-        var result = new List<TranslationProviderDto>();
 
         foreach (var provider in providers)
         {
@@ -88,12 +118,19 @@ public class CloudTranslationService : ICloudTranslationService
                 return response;
             }
 
-            // Create provider instance
-            var provider = await CreateProviderAsync(providerName, projectId, userId, project.OrganizationId);
-            if (provider == null)
+            // Check if using LRM provider
+            var isLrmProvider = providerName.Equals("lrm", StringComparison.OrdinalIgnoreCase);
+
+            ITranslationProvider? provider = null;
+            if (!isLrmProvider)
             {
-                response.Errors.Add($"Failed to initialize provider: {providerName}");
-                return response;
+                // Create BYOK provider instance
+                provider = await CreateProviderAsync(providerName, projectId, userId, project.OrganizationId);
+                if (provider == null)
+                {
+                    response.Errors.Add($"Failed to initialize provider: {providerName}");
+                    return response;
+                }
             }
 
             response.Provider = providerName;
@@ -153,24 +190,55 @@ public class CloudTranslationService : ICloudTranslationService
 
                     try
                     {
-                        var translationRequest = new TranslationRequest
+                        string? translatedText;
+                        bool fromCache = false;
+
+                        if (isLrmProvider)
                         {
-                            SourceText = sourceTranslation.Value,
-                            SourceLanguage = sourceLanguage,
-                            TargetLanguage = targetLang,
-                            Context = request.Context ?? key.Comment
-                        };
+                            // Use LRM managed provider
+                            var lrmResult = await _lrmProvider.TranslateAsync(
+                                userId,
+                                sourceTranslation.Value,
+                                sourceLanguage,
+                                targetLang,
+                                request.Context ?? key.Comment);
 
-                        var translationResponse = await provider.TranslateAsync(translationRequest);
+                            if (!lrmResult.Success)
+                            {
+                                result.Success = false;
+                                result.Error = lrmResult.Error;
+                                response.FailedCount++;
+                                response.Results.Add(result);
+                                continue;
+                            }
 
-                        result.TranslatedText = translationResponse.TranslatedText;
+                            translatedText = lrmResult.TranslatedText;
+                            fromCache = lrmResult.FromCache;
+                        }
+                        else
+                        {
+                            // Use BYOK provider
+                            var translationRequest = new TranslationRequest
+                            {
+                                SourceText = sourceTranslation.Value,
+                                SourceLanguage = sourceLanguage,
+                                TargetLanguage = targetLang,
+                                Context = request.Context ?? key.Comment
+                            };
+
+                            var translationResponse = await provider!.TranslateAsync(translationRequest);
+                            translatedText = translationResponse.TranslatedText;
+                            fromCache = translationResponse.FromCache;
+                        }
+
+                        result.TranslatedText = translatedText;
                         result.Success = true;
-                        result.FromCache = translationResponse.FromCache;
+                        result.FromCache = fromCache;
 
                         // Update or create translation in database
                         if (existingTranslation != null)
                         {
-                            existingTranslation.Value = translationResponse.TranslatedText;
+                            existingTranslation.Value = translatedText;
                             existingTranslation.Status = "translated";
                             existingTranslation.UpdatedAt = DateTime.UtcNow;
                         }
@@ -180,7 +248,7 @@ public class CloudTranslationService : ICloudTranslationService
                             {
                                 ResourceKeyId = key.Id,
                                 LanguageCode = targetLang,
-                                Value = translationResponse.TranslatedText,
+                                Value = translatedText,
                                 Status = "translated"
                             });
                         }
@@ -204,8 +272,11 @@ public class CloudTranslationService : ICloudTranslationService
             // Save changes
             await _db.SaveChangesAsync();
 
-            // TODO: Track usage
-            // await TrackUsageAsync(userId, providerName, response.CharactersTranslated);
+            // Track BYOK usage (LRM usage is tracked in LrmTranslationProvider)
+            if (!isLrmProvider && response.CharactersTranslated > 0)
+            {
+                await TrackByokUsageAsync(userId, response.CharactersTranslated);
+            }
 
             response.Success = response.FailedCount == 0;
         }
@@ -245,27 +316,56 @@ public class CloudTranslationService : ICloudTranslationService
                 return response;
             }
 
-            var provider = await CreateProviderAsync(providerName, projectId, userId, organizationId);
-            if (provider == null)
-            {
-                response.Error = $"Failed to initialize provider: {providerName}";
-                return response;
-            }
-
-            var translationRequest = new TranslationRequest
-            {
-                SourceText = request.Text,
-                SourceLanguage = request.SourceLanguage,
-                TargetLanguage = request.TargetLanguage,
-                Context = request.Context
-            };
-
-            var result = await provider.TranslateAsync(translationRequest);
-
-            response.Success = true;
-            response.TranslatedText = result.TranslatedText;
+            var isLrmProvider = providerName.Equals("lrm", StringComparison.OrdinalIgnoreCase);
             response.Provider = providerName;
-            response.FromCache = result.FromCache;
+
+            if (isLrmProvider)
+            {
+                // Use LRM managed provider
+                var lrmResult = await _lrmProvider.TranslateAsync(
+                    userId,
+                    request.Text,
+                    request.SourceLanguage,
+                    request.TargetLanguage,
+                    request.Context);
+
+                if (!lrmResult.Success)
+                {
+                    response.Error = lrmResult.Error;
+                    return response;
+                }
+
+                response.Success = true;
+                response.TranslatedText = lrmResult.TranslatedText;
+                response.FromCache = lrmResult.FromCache;
+            }
+            else
+            {
+                // Use BYOK provider
+                var provider = await CreateProviderAsync(providerName, projectId, userId, organizationId);
+                if (provider == null)
+                {
+                    response.Error = $"Failed to initialize provider: {providerName}";
+                    return response;
+                }
+
+                var translationRequest = new TranslationRequest
+                {
+                    SourceText = request.Text,
+                    SourceLanguage = request.SourceLanguage,
+                    TargetLanguage = request.TargetLanguage,
+                    Context = request.Context
+                };
+
+                var result = await provider.TranslateAsync(translationRequest);
+
+                response.Success = true;
+                response.TranslatedText = result.TranslatedText;
+                response.FromCache = result.FromCache;
+
+                // Track BYOK usage
+                await TrackByokUsageAsync(userId, request.Text.Length);
+            }
         }
         catch (Exception ex)
         {
@@ -276,17 +376,40 @@ public class CloudTranslationService : ICloudTranslationService
         return response;
     }
 
-    public Task<TranslationUsageDto> GetUsageAsync(int userId)
+    public async Task<TranslationUsageDto> GetUsageAsync(int userId)
     {
-        // TODO: Implement usage tracking
-        return Task.FromResult(new TranslationUsageDto
+        var user = await _db.Users
+            .Where(u => u.Id == userId)
+            .Select(u => new
+            {
+                u.TranslationCharsUsed,
+                u.TranslationCharsLimit,
+                u.TranslationCharsResetAt,
+                u.ByokCharsUsed,
+                u.Plan
+            })
+            .FirstOrDefaultAsync();
+
+        if (user == null)
         {
-            CharactersUsed = 0,
-            CharacterLimit = null, // Unlimited for now
-            ApiCallsUsed = 0,
-            ApiCallLimit = null,
-            Plan = "free"
-        });
+            return new TranslationUsageDto
+            {
+                Plan = "free",
+                CharactersUsed = 0,
+                CharacterLimit = _config.Limits.FreeTranslationChars
+            };
+        }
+
+        return new TranslationUsageDto
+        {
+            // LRM usage (counts against plan)
+            CharactersUsed = user.TranslationCharsUsed,
+            CharacterLimit = user.TranslationCharsLimit,
+            ResetsAt = user.TranslationCharsResetAt,
+            Plan = user.Plan,
+            // BYOK usage (tracked but unlimited)
+            ByokCharactersUsed = user.ByokCharsUsed
+        };
     }
 
     public Task<List<ProviderUsageDto>> GetUsageByProviderAsync(int userId)
@@ -298,7 +421,17 @@ public class CloudTranslationService : ICloudTranslationService
     private async Task<string?> GetBestAvailableProviderAsync(
         int? projectId, int userId, int? organizationId)
     {
-        // Priority: free providers first, then by quality
+        // Check LRM provider first (preferred - our managed service)
+        if (_config.LrmProvider.Enabled)
+        {
+            var (available, _) = await _lrmProvider.IsAvailableAsync(userId);
+            if (available)
+            {
+                return "lrm";
+            }
+        }
+
+        // Fallback to BYOK providers
         var preferredOrder = new[]
         {
             "mymemory",  // Free, no API key needed
@@ -332,6 +465,18 @@ public class CloudTranslationService : ICloudTranslationService
         }
 
         return null;
+    }
+
+    private async Task TrackByokUsageAsync(int userId, long charsUsed)
+    {
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return;
+
+        user.ByokCharsUsed += charsUsed;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        _logger.LogDebug("BYOK usage tracked: {Chars} chars for user {UserId}", charsUsed, userId);
     }
 
     private async Task<ITranslationProvider?> CreateProviderAsync(

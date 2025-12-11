@@ -116,6 +116,7 @@ public class Program
             // Translation Services
             builder.Services.AddSingleton<IApiKeyEncryptionService, ApiKeyEncryptionService>();
             builder.Services.AddScoped<IApiKeyHierarchyService, ApiKeyHierarchyService>();
+            builder.Services.AddScoped<ILrmTranslationProvider, LrmTranslationProvider>();
             builder.Services.AddScoped<ICloudTranslationService, CloudTranslationService>();
 
             // CLI API Key Service
