@@ -2,6 +2,7 @@ using System.Security.Claims;
 using LrmCloud.Api.Controllers;
 using LrmCloud.Api.Data;
 using LrmCloud.Api.Services.Translation;
+using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.DTOs.Translation;
 using LrmCloud.Shared.Entities;
 using Microsoft.AspNetCore.Http;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -22,6 +24,7 @@ public class TranslationControllerTests : IDisposable
     private readonly ICloudTranslationService _translationService;
     private readonly TranslationController _controller;
     private readonly User _testUser;
+    private readonly CloudConfiguration _cloudConfiguration;
 
     public TranslationControllerTests()
     {
@@ -32,19 +35,30 @@ public class TranslationControllerTests : IDisposable
 
         _db = new AppDbContext(options);
 
-        // Setup configuration
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                { "ApiKeyMasterSecret", "test-master-secret-for-unit-tests-only-12345" }
-            })
-            .Build();
+        // Setup cloud configuration
+        _cloudConfiguration = new CloudConfiguration
+        {
+            Server = new ServerConfiguration { Urls = "http://localhost:5000", Environment = "Test" },
+            Database = new DatabaseConfiguration { ConnectionString = "test" },
+            Redis = new RedisConfiguration { ConnectionString = "test" },
+            Storage = new StorageConfiguration { Endpoint = "test", AccessKey = "test", SecretKey = "test", Bucket = "test" },
+            Encryption = new EncryptionConfiguration { TokenKey = "test-token-key-for-unit-tests-123456" },
+            Auth = new AuthConfiguration { JwtSecret = "test-jwt-secret-for-unit-tests-only-12345678901234567890" },
+            Mail = new MailConfiguration { Host = "localhost", FromAddress = "test@test.com", FromName = "Test" },
+            Features = new FeaturesConfiguration(),
+            Limits = new LimitsConfiguration(),
+            ApiKeyMasterSecret = "test-master-secret-for-unit-tests-only-12345",
+            LrmProvider = new LrmProviderConfiguration { Enabled = true, EnabledBackends = new List<string> { "mymemory", "lingva" } }
+        };
 
-        _encryptionService = new ApiKeyEncryptionService(configuration);
-        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, configuration);
+        _encryptionService = new ApiKeyEncryptionService(_cloudConfiguration);
+        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, _cloudConfiguration);
 
         var translationLoggerMock = new Mock<ILogger<CloudTranslationService>>();
-        _translationService = new CloudTranslationService(_db, _hierarchyService, translationLoggerMock.Object);
+        var lrmProviderMock = new Mock<ILrmTranslationProvider>();
+        lrmProviderMock.Setup(x => x.IsAvailableAsync(It.IsAny<int>())).ReturnsAsync((true, (string?)null));
+        lrmProviderMock.Setup(x => x.GetRemainingCharsAsync(It.IsAny<int>())).ReturnsAsync(10000);
+        _translationService = new CloudTranslationService(_db, _hierarchyService, lrmProviderMock.Object, Options.Create(_cloudConfiguration), translationLoggerMock.Object);
 
         var controllerLoggerMock = new Mock<ILogger<TranslationController>>();
         _controller = new TranslationController(

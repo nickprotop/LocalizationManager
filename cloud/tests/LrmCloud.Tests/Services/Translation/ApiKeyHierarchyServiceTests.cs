@@ -1,5 +1,6 @@
 using LrmCloud.Api.Data;
 using LrmCloud.Api.Services.Translation;
+using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -13,7 +14,7 @@ public class ApiKeyHierarchyServiceTests : IDisposable
     private readonly AppDbContext _db;
     private readonly IApiKeyEncryptionService _encryptionService;
     private readonly IApiKeyHierarchyService _hierarchyService;
-    private readonly IConfiguration _configuration;
+    private readonly CloudConfiguration _cloudConfiguration;
 
     public ApiKeyHierarchyServiceTests()
     {
@@ -24,17 +25,24 @@ public class ApiKeyHierarchyServiceTests : IDisposable
 
         _db = new AppDbContext(options);
 
-        // Setup configuration
-        _configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                { "ApiKeyMasterSecret", "test-master-secret-for-unit-tests-only-12345" },
-                { "TranslationProviders:google:ApiKey", "platform-google-key" }
-            })
-            .Build();
+        // Setup cloud configuration
+        _cloudConfiguration = new CloudConfiguration
+        {
+            Server = new ServerConfiguration { Urls = "http://localhost:5000", Environment = "Test" },
+            Database = new DatabaseConfiguration { ConnectionString = "test" },
+            Redis = new RedisConfiguration { ConnectionString = "test" },
+            Storage = new StorageConfiguration { Endpoint = "test", AccessKey = "test", SecretKey = "test", Bucket = "test" },
+            Encryption = new EncryptionConfiguration { TokenKey = "test-token-key-for-unit-tests-123456" },
+            Auth = new AuthConfiguration { JwtSecret = "test-jwt-secret-for-unit-tests-only-12345678901234567890" },
+            Mail = new MailConfiguration { Host = "localhost", FromAddress = "test@test.com", FromName = "Test" },
+            Features = new FeaturesConfiguration(),
+            Limits = new LimitsConfiguration(),
+            ApiKeyMasterSecret = "test-master-secret-for-unit-tests-only-12345",
+            LrmProvider = new LrmProviderConfiguration()
+        };
 
-        _encryptionService = new ApiKeyEncryptionService(_configuration);
-        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, _configuration);
+        _encryptionService = new ApiKeyEncryptionService(_cloudConfiguration);
+        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, _cloudConfiguration);
     }
 
     public void Dispose()

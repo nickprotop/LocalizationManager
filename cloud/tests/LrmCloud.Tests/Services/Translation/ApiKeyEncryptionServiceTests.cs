@@ -1,4 +1,5 @@
 using LrmCloud.Api.Services.Translation;
+using LrmCloud.Shared.Configuration;
 using Microsoft.Extensions.Configuration;
 using Moq;
 using Xunit;
@@ -8,18 +9,27 @@ namespace LrmCloud.Tests.Services.Translation;
 public class ApiKeyEncryptionServiceTests
 {
     private readonly IApiKeyEncryptionService _encryptionService;
+    private readonly CloudConfiguration _cloudConfiguration;
 
     public ApiKeyEncryptionServiceTests()
     {
-        // Setup configuration with a test master secret
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                { "ApiKeyMasterSecret", "test-master-secret-for-unit-tests-only-12345" }
-            })
-            .Build();
+        // Setup cloud configuration with a test master secret
+        _cloudConfiguration = new CloudConfiguration
+        {
+            Server = new ServerConfiguration { Urls = "http://localhost:5000", Environment = "Test" },
+            Database = new DatabaseConfiguration { ConnectionString = "test" },
+            Redis = new RedisConfiguration { ConnectionString = "test" },
+            Storage = new StorageConfiguration { Endpoint = "test", AccessKey = "test", SecretKey = "test", Bucket = "test" },
+            Encryption = new EncryptionConfiguration { TokenKey = "test-token-key-for-unit-tests-123456" },
+            Auth = new AuthConfiguration { JwtSecret = "test-jwt-secret-for-unit-tests-only-12345678901234567890" },
+            Mail = new MailConfiguration { Host = "localhost", FromAddress = "test@test.com", FromName = "Test" },
+            Features = new FeaturesConfiguration(),
+            Limits = new LimitsConfiguration(),
+            ApiKeyMasterSecret = "test-master-secret-for-unit-tests-only-12345",
+            LrmProvider = new LrmProviderConfiguration()
+        };
 
-        _encryptionService = new ApiKeyEncryptionService(configuration);
+        _encryptionService = new ApiKeyEncryptionService(_cloudConfiguration);
     }
 
     [Fact]
@@ -160,12 +170,23 @@ public class ApiKeyEncryptionServiceTests
     [Fact]
     public void Constructor_ShouldThrowWithoutMasterSecret()
     {
-        // Arrange
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>())
-            .Build();
+        // Arrange - CloudConfiguration without ApiKeyMasterSecret
+        var configWithoutSecret = new CloudConfiguration
+        {
+            Server = new ServerConfiguration { Urls = "http://localhost:5000", Environment = "Test" },
+            Database = new DatabaseConfiguration { ConnectionString = "test" },
+            Redis = new RedisConfiguration { ConnectionString = "test" },
+            Storage = new StorageConfiguration { Endpoint = "test", AccessKey = "test", SecretKey = "test", Bucket = "test" },
+            Encryption = new EncryptionConfiguration { TokenKey = "test-token-key-for-unit-tests-123456" },
+            Auth = new AuthConfiguration { JwtSecret = "test-jwt-secret-for-unit-tests-only-12345678901234567890" },
+            Mail = new MailConfiguration { Host = "localhost", FromAddress = "test@test.com", FromName = "Test" },
+            Features = new FeaturesConfiguration(),
+            Limits = new LimitsConfiguration(),
+            ApiKeyMasterSecret = null, // No master secret
+            LrmProvider = new LrmProviderConfiguration()
+        };
 
         // Act & Assert
-        Assert.Throws<InvalidOperationException>(() => new ApiKeyEncryptionService(configuration));
+        Assert.Throws<InvalidOperationException>(() => new ApiKeyEncryptionService(configWithoutSecret));
     }
 }

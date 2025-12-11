@@ -1,10 +1,12 @@
 using LrmCloud.Api.Data;
 using LrmCloud.Api.Services.Translation;
+using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.DTOs.Translation;
 using LrmCloud.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -16,8 +18,9 @@ public class CloudTranslationServiceTests : IDisposable
     private readonly IApiKeyEncryptionService _encryptionService;
     private readonly IApiKeyHierarchyService _hierarchyService;
     private readonly ICloudTranslationService _translationService;
-    private readonly IConfiguration _configuration;
+    private readonly CloudConfiguration _cloudConfiguration;
     private readonly Mock<ILogger<CloudTranslationService>> _loggerMock;
+    private readonly Mock<ILrmTranslationProvider> _lrmProviderMock;
 
     public CloudTranslationServiceTests()
     {
@@ -28,21 +31,38 @@ public class CloudTranslationServiceTests : IDisposable
 
         _db = new AppDbContext(options);
 
-        // Setup configuration with platform keys for free providers
-        _configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                { "ApiKeyMasterSecret", "test-master-secret-for-unit-tests-only-12345" }
-            })
-            .Build();
+        // Setup cloud configuration
+        _cloudConfiguration = new CloudConfiguration
+        {
+            Server = new ServerConfiguration { Urls = "http://localhost:5000", Environment = "Test" },
+            Database = new DatabaseConfiguration { ConnectionString = "test" },
+            Redis = new RedisConfiguration { ConnectionString = "test" },
+            Storage = new StorageConfiguration { Endpoint = "test", AccessKey = "test", SecretKey = "test", Bucket = "test" },
+            Encryption = new EncryptionConfiguration { TokenKey = "test-token-key-for-unit-tests-123456" },
+            Auth = new AuthConfiguration { JwtSecret = "test-jwt-secret-for-unit-tests-only-12345678901234567890" },
+            Mail = new MailConfiguration { Host = "localhost", FromAddress = "test@test.com", FromName = "Test" },
+            Features = new FeaturesConfiguration(),
+            Limits = new LimitsConfiguration(),
+            ApiKeyMasterSecret = "test-master-secret-for-unit-tests-only-12345",
+            LrmProvider = new LrmProviderConfiguration { Enabled = true, EnabledBackends = new List<string> { "mymemory", "lingva" } }
+        };
 
-        _encryptionService = new ApiKeyEncryptionService(_configuration);
-        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, _configuration);
+        _encryptionService = new ApiKeyEncryptionService(_cloudConfiguration);
+        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, _cloudConfiguration);
         _loggerMock = new Mock<ILogger<CloudTranslationService>>();
+        _lrmProviderMock = new Mock<ILrmTranslationProvider>();
+
+        // Setup LRM provider mock defaults
+        _lrmProviderMock.Setup(x => x.IsAvailableAsync(It.IsAny<int>()))
+            .ReturnsAsync((true, (string?)null));
+        _lrmProviderMock.Setup(x => x.GetRemainingCharsAsync(It.IsAny<int>()))
+            .ReturnsAsync(10000);
 
         _translationService = new CloudTranslationService(
             _db,
             _hierarchyService,
+            _lrmProviderMock.Object,
+            Options.Create(_cloudConfiguration),
             _loggerMock.Object);
     }
 
@@ -288,25 +308,35 @@ public class CloudTranslationServiceTests : IDisposable
     [Fact]
     public async Task TranslateKeys_ShouldReturnError_WhenNoProviderConfigured()
     {
-        // Arrange - Create a special config without any platform keys
+        // Arrange - Create a special config without any platform keys and LRM disabled
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
         using var db = new AppDbContext(options);
 
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                { "ApiKeyMasterSecret", "test-master-secret-for-unit-tests-only-12345" }
-                // No platform translation keys configured
-            })
-            .Build();
+        var cloudConfig = new CloudConfiguration
+        {
+            Server = new ServerConfiguration { Urls = "http://localhost:5000", Environment = "Test" },
+            Database = new DatabaseConfiguration { ConnectionString = "test" },
+            Redis = new RedisConfiguration { ConnectionString = "test" },
+            Storage = new StorageConfiguration { Endpoint = "test", AccessKey = "test", SecretKey = "test", Bucket = "test" },
+            Encryption = new EncryptionConfiguration { TokenKey = "test-token-key-for-unit-tests-123456" },
+            Auth = new AuthConfiguration { JwtSecret = "test-jwt-secret-for-unit-tests-only-12345678901234567890" },
+            Mail = new MailConfiguration { Host = "localhost", FromAddress = "test@test.com", FromName = "Test" },
+            Features = new FeaturesConfiguration(),
+            Limits = new LimitsConfiguration(),
+            ApiKeyMasterSecret = "test-master-secret-for-unit-tests-only-12345",
+            // LRM disabled to test fallback behavior
+            LrmProvider = new LrmProviderConfiguration { Enabled = false, EnabledBackends = new List<string>() }
+        };
 
-        var encryptionService = new ApiKeyEncryptionService(config);
-        var hierarchyService = new ApiKeyHierarchyService(db, encryptionService, config);
+        var encryptionService = new ApiKeyEncryptionService(cloudConfig);
+        var hierarchyService = new ApiKeyHierarchyService(db, encryptionService, cloudConfig);
         var loggerMock = new Mock<ILogger<CloudTranslationService>>();
-        var translationService = new CloudTranslationService(db, hierarchyService, loggerMock.Object);
+        var lrmProviderMock = new Mock<ILrmTranslationProvider>();
+        lrmProviderMock.Setup(x => x.IsAvailableAsync(It.IsAny<int>())).ReturnsAsync((false, "LRM disabled"));
+        var translationService = new CloudTranslationService(db, hierarchyService, lrmProviderMock.Object, Options.Create(cloudConfig), loggerMock.Object);
 
         var user = new User
         {
