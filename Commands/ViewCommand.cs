@@ -1433,7 +1433,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
             return (input, null);
 
         // Match pattern like "KeyName [2]" at the end
-        var match = Regex.Match(input, @"^(.+?)\s*\[(\d+)\]$");
+        var match = Regex.Match(input, @"^(.+?)\s*\[(\d+)\]$", RegexOptions.None, TimeSpan.FromSeconds(1));
         if (match.Success)
         {
             var key = match.Groups[1].Value.Trim();

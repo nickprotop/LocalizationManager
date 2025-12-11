@@ -2,24 +2,36 @@ using System.Text.RegularExpressions;
 
 namespace LrmCloud.Api.Helpers;
 
-public static class PasswordValidator
+public static partial class PasswordValidator
 {
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
+
     public static (bool IsValid, string? ErrorMessage) Validate(string password)
     {
         if (password.Length < 12)
+        {
             return (false, "Password must be at least 12 characters");
+        }
 
-        if (!Regex.IsMatch(password, @"[A-Z]"))
+        if (!Regex.IsMatch(password, @"[A-Z]", RegexOptions.None, RegexTimeout))
+        {
             return (false, "Password must contain at least one uppercase letter");
+        }
 
-        if (!Regex.IsMatch(password, @"[a-z]"))
+        if (!Regex.IsMatch(password, @"[a-z]", RegexOptions.None, RegexTimeout))
+        {
             return (false, "Password must contain at least one lowercase letter");
+        }
 
-        if (!Regex.IsMatch(password, @"[0-9]"))
+        if (!Regex.IsMatch(password, @"[0-9]", RegexOptions.None, RegexTimeout))
+        {
             return (false, "Password must contain at least one digit");
+        }
 
-        if (!Regex.IsMatch(password, @"[^a-zA-Z0-9]"))
+        if (!Regex.IsMatch(password, @"[^a-zA-Z0-9]", RegexOptions.None, RegexTimeout))
+        {
             return (false, "Password must contain at least one special character");
+        }
 
         return (true, null);
     }

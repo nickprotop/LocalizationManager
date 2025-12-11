@@ -125,7 +125,7 @@ public class AuthService : IAuthService
 
             var html = await template.RenderAsync(new
             {
-                email = email,
+                email,
                 login_link = loginLink,
                 reset_link = resetLink
             });
@@ -149,20 +149,30 @@ public class AuthService : IAuthService
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email.ToLowerInvariant());
 
         if (user == null)
+        {
             return (false, "Invalid verification link");
+        }
 
         if (user.EmailVerified)
+        {
             return (false, "Email already verified");
+        }
 
         if (user.EmailVerificationExpiresAt == null || user.EmailVerificationExpiresAt < DateTime.UtcNow)
+        {
             return (false, "Verification link expired");
+        }
 
         if (string.IsNullOrEmpty(user.EmailVerificationTokenHash))
+        {
             return (false, "Invalid verification token");
+        }
 
         // Verify token by hashing and comparing
         if (!BCrypt.Net.BCrypt.Verify(token, user.EmailVerificationTokenHash))
+        {
             return (false, "Invalid verification token");
+        }
 
         // Mark as verified
         user.EmailVerified = true;
@@ -259,14 +269,20 @@ public class AuthService : IAuthService
             return (false, "Password reset is only available for email accounts");
 
         if (string.IsNullOrEmpty(user.PasswordResetTokenHash))
+        {
             return (false, "No password reset requested");
+        }
 
         if (user.PasswordResetExpires == null || user.PasswordResetExpires < DateTime.UtcNow)
+        {
             return (false, "Password reset link expired");
+        }
 
         // Verify token by hashing and comparing
         if (!BCrypt.Net.BCrypt.Verify(request.Token, user.PasswordResetTokenHash))
+        {
             return (false, "Invalid password reset token");
+        }
 
         // Hash new password
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword, 12);
@@ -663,24 +679,34 @@ public class AuthService : IAuthService
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
 
         if (user == null)
+        {
             return (false, "User not found");
+        }
 
         // Only allow password change for email auth users
         if (user.AuthType != "email")
+        {
             return (false, "Password change is only available for email/password accounts");
+        }
 
         // Verify current password
         if (string.IsNullOrEmpty(user.PasswordHash) || !BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+        {
             return (false, "Current password is incorrect");
+        }
 
         // Validate new password strength
         var (isValid, validationError) = PasswordValidator.Validate(request.NewPassword);
         if (!isValid)
+        {
             return (false, validationError);
+        }
 
         // Check if new password is same as current
         if (BCrypt.Net.BCrypt.Verify(request.NewPassword, user.PasswordHash))
+        {
             return (false, "New password must be different from current password");
+        }
 
         // Hash new password
         var newPasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword, 12);
@@ -727,12 +753,16 @@ public class AuthService : IAuthService
 
         // Check if new email is same as current
         if (newEmail == currentEmail)
+        {
             return (false, "New email is the same as current email");
+        }
 
         // Check if new email is already in use by another user
         var emailExists = await _db.Users.AnyAsync(u => u.Email!.ToLower() == newEmail && u.Id != userId);
         if (emailExists)
+        {
             return (false, "This email address is already in use");
+        }
 
         // Generate verification token
         var verificationToken = TokenGenerator.GenerateSecureToken(32);
@@ -765,11 +795,15 @@ public class AuthService : IAuthService
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
 
         if (user == null)
+        {
             return (false, "User not found");
+        }
 
         // Check if there's a pending email change
         if (string.IsNullOrEmpty(user.PendingEmail) || string.IsNullOrEmpty(user.PendingEmailTokenHash))
+        {
             return (false, "No pending email change found");
+        }
 
         // Check if token expired
         if (user.PendingEmailExpiresAt == null || user.PendingEmailExpiresAt < DateTime.UtcNow)
@@ -785,7 +819,9 @@ public class AuthService : IAuthService
 
         // Verify token
         if (!BCrypt.Net.BCrypt.Verify(token, user.PendingEmailTokenHash))
+        {
             return (false, "Invalid verification token");
+        }
 
         // Check if new email is still available (might have been taken during verification period)
         var newEmailLower = user.PendingEmail.ToLowerInvariant();
@@ -1004,11 +1040,15 @@ public class AuthService : IAuthService
             .FirstOrDefaultAsync(rt => rt.Id == sessionId && rt.UserId == userId);
 
         if (session == null)
+        {
             return (false, "Session not found");
+        }
 
         // Check if already revoked
         if (session.RevokedAt != null)
+        {
             return (false, "Session already revoked");
+        }
 
         // Revoke the session
         session.RevokedAt = DateTime.UtcNow;
@@ -1040,7 +1080,9 @@ public class AuthService : IAuthService
         }
 
         if (currentSession == null)
+        {
             return (false, 0, "Current session not found");
+        }
 
         // Revoke all sessions except current
         int revokedCount = 0;
@@ -1065,13 +1107,17 @@ public class AuthService : IAuthService
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null)
+        {
             return (false, "User not found");
+        }
 
         // Verify password for confirmation (only if user has password set)
         if (!string.IsNullOrEmpty(user.PasswordHash))
         {
             if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            {
                 return (false, "Incorrect password");
+            }
         }
         else
         {
@@ -1111,7 +1157,9 @@ public class AuthService : IAuthService
     private async Task SendAccountDeletionConfirmationAsync(User user)
     {
         if (string.IsNullOrEmpty(user.Email))
+        {
             return;
+        }
 
         try
         {
