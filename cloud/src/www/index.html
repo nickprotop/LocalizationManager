@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="LRM Cloud - Manage translations for your .NET and web applications with 10 AI translation providers. CLI, TUI, and Web interfaces.">
-    <meta name="keywords" content="localization, translation, i18n, .NET, resx, json, AI translation, DeepL, Google Translate, OpenAI">
+    <meta name="description" content="LRM - Open source localization management. Validate, edit, and translate .resx, JSON, and i18next files. Self-host for free or use LRM Cloud for team collaboration.">
+    <meta name="keywords" content="localization, translation, i18n, .NET, resx, json, open source, self-hosted, BYOK, DeepL, Google Translate, OpenAI">
     <meta name="theme-color" content="#6366f1">
     <meta name="author" content="LRM Cloud">
 
     <!-- Open Graph -->
-    <meta property="og:title" content="LRM Cloud - Localization Made Simple">
-    <meta property="og:description" content="Manage translations for your .NET and web apps with 10 AI translation providers">
+    <meta property="og:title" content="LRM - Open Source Localization Management">
+    <meta property="og:description" content="Validate, edit, and translate your localization files. Free CLI for developers, Cloud platform for teams.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://lrmcloud.io">
 
-    <title>LRM Cloud - Localization Made Simple</title>
+    <title>LRM - Open Source Localization Management</title>
 
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -366,6 +366,71 @@
             font-size: 2rem;
         }
 
+        /* Translation Options */
+        .translation-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .translation-option {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .translation-option:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .translation-option.featured {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 1px var(--primary);
+        }
+
+        .option-icon {
+            font-size: 2.5rem;
+            margin-bottom: 16px;
+        }
+
+        .translation-option h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .option-desc {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 20px;
+        }
+
+        .option-list {
+            list-style: none;
+            text-align: left;
+        }
+
+        .option-list li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            font-size: 0.9375rem;
+            color: var(--text-muted);
+        }
+
+        .option-list li::before {
+            content: '✓';
+            color: var(--primary);
+            font-weight: 700;
+        }
+
         /* Pricing */
         .pricing {
             padding: 80px 0;
@@ -490,6 +555,24 @@
         .cta .btn:hover {
             background: var(--bg-alt);
             color: var(--primary);
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-cta-secondary {
+            background: transparent;
+            border: 2px solid white;
+            color: white;
+        }
+
+        .btn-cta-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
         }
 
         /* Footer */
@@ -621,26 +704,26 @@
     <!-- Hero -->
     <section class="hero">
         <div class="container">
-            <h1>Localization <span>Made Simple</span></h1>
-            <p>Manage translations for your .NET and web applications with 10 AI translation providers, team collaboration, and CLI/TUI/Web interfaces.</p>
+            <h1>Open Source <span>Localization Management</span></h1>
+            <p>Validate, edit, and translate your .resx, JSON, and i18next files. Free CLI for developers. Cloud platform for teams.</p>
 
             <div class="hero-buttons">
-                <a href="/app/register" class="btn btn-primary btn-lg" id="hero-cta">Get Started Free</a>
+                <a href="/app/register" class="btn btn-primary btn-lg" id="hero-cta">Try Cloud Free</a>
                 <a href="https://github.com/nickprotop/LocalizationManager" class="btn btn-secondary btn-lg" target="_blank">View on GitHub</a>
             </div>
 
             <div class="hero-stats">
                 <div class="hero-stat">
-                    <div class="hero-stat-value">10+</div>
-                    <div class="hero-stat-label">AI Providers</div>
+                    <div class="hero-stat-value">MIT</div>
+                    <div class="hero-stat-label">Open Source License</div>
                 </div>
                 <div class="hero-stat">
                     <div class="hero-stat-value">3</div>
                     <div class="hero-stat-label">Interfaces (CLI/TUI/Web)</div>
                 </div>
                 <div class="hero-stat">
-                    <div class="hero-stat-value">Free</div>
-                    <div class="hero-stat-label">Open Source CLI</div>
+                    <div class="hero-stat-value">10+</div>
+                    <div class="hero-stat-label">Translation Providers</div>
                 </div>
             </div>
         </div>
@@ -656,84 +739,84 @@
 
             <div class="features-grid">
                 <div class="feature-card">
+                    <div class="feature-icon">📋</div>
+                    <h3>Localization Management</h3>
+                    <p>Validate, edit, and organize your translation files. Catch missing keys, duplicates, and inconsistencies.</p>
+                </div>
+
+                <div class="feature-card">
                     <div class="feature-icon">🤖</div>
-                    <h3>10 AI Translation Providers</h3>
-                    <p>Google, DeepL, OpenAI, Claude, Azure, Ollama, and more. Use free providers or bring your own API keys.</p>
+                    <h3>Smart Translation</h3>
+                    <p>Free providers included. Bring your own API keys for Google, DeepL, OpenAI, and more. Or let us manage it.</p>
                 </div>
 
                 <div class="feature-card">
                     <div class="feature-icon">⌨️</div>
                     <h3>CLI + TUI + Web</h3>
-                    <p>Work your way. Command line for CI/CD, terminal UI for focused editing, or web browser for team collaboration.</p>
+                    <p>Command line for automation, terminal UI for focused editing, web dashboard for team collaboration.</p>
                 </div>
 
                 <div class="feature-card">
-                    <div class="feature-icon">👥</div>
-                    <h3>Team Collaboration</h3>
-                    <p>Organizations with role-based access. Invite team members, manage permissions, and work together.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🔑</div>
-                    <h3>Bring Your Own Keys</h3>
-                    <p>Use LRM managed translations or bring your own API keys. Your keys, your data, your control.</p>
+                    <div class="feature-icon">🔓</div>
+                    <h3>Open Source</h3>
+                    <p>MIT licensed. Self-host everything or use LRM Cloud. Your choice, no lock-in.</p>
                 </div>
 
                 <div class="feature-card">
                     <div class="feature-icon">📁</div>
                     <h3>Multiple Formats</h3>
-                    <p>Support for .resx, JSON, and i18next formats. Perfect for .NET, React, Vue, Angular, and more.</p>
+                    <p>Support for .resx, JSON, and i18next. Perfect for .NET, React, Vue, Angular, and more.</p>
                 </div>
 
                 <div class="feature-card">
-                    <div class="feature-icon">🔍</div>
-                    <h3>Code Scanner</h3>
-                    <p>Find unused and missing localization keys in your codebase. Keep your translations clean and complete.</p>
+                    <div class="feature-icon">🔄</div>
+                    <h3>CI/CD Ready</h3>
+                    <p>JSON output for automation. Integrate with GitHub Actions, GitLab CI, or any pipeline.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Providers -->
-    <section class="providers">
+    <!-- Translation Options -->
+    <section class="providers" id="translation">
         <div class="container">
             <div class="section-title">
-                <h2>Supported Translation Providers</h2>
-                <p>Choose from free, paid, or self-hosted options</p>
+                <h2>Flexible Translation Options</h2>
+                <p>Use what works for you</p>
             </div>
 
-            <div class="provider-logos">
-                <div class="provider-logo">
-                    <span>🟢</span>
-                    Google
+            <div class="translation-options">
+                <div class="translation-option">
+                    <div class="option-icon">🆓</div>
+                    <h3>Free Providers</h3>
+                    <p class="option-desc">Lingva, MyMemory</p>
+                    <ul class="option-list">
+                        <li>No API key needed</li>
+                        <li>Great for getting started</li>
+                        <li>Works with CLI & Cloud</li>
+                    </ul>
                 </div>
-                <div class="provider-logo">
-                    <span>🔵</span>
-                    DeepL
+
+                <div class="translation-option">
+                    <div class="option-icon">🔑</div>
+                    <h3>Bring Your Own Keys</h3>
+                    <p class="option-desc">Google, DeepL, Azure, OpenAI, Claude, Ollama</p>
+                    <ul class="option-list">
+                        <li>Full control, your costs</li>
+                        <li>Unlimited usage</li>
+                        <li>Your data stays yours</li>
+                    </ul>
                 </div>
-                <div class="provider-logo">
-                    <span>⚫</span>
-                    OpenAI
-                </div>
-                <div class="provider-logo">
-                    <span>🟤</span>
-                    Claude
-                </div>
-                <div class="provider-logo">
-                    <span>🔷</span>
-                    Azure
-                </div>
-                <div class="provider-logo">
-                    <span>🦙</span>
-                    Ollama
-                </div>
-                <div class="provider-logo">
-                    <span>🆓</span>
-                    Lingva
-                </div>
-                <div class="provider-logo">
-                    <span>🆓</span>
-                    MyMemory
+
+                <div class="translation-option featured">
+                    <div class="option-icon">☁️</div>
+                    <h3>LRM Managed</h3>
+                    <p class="option-desc">Cloud plans include translations</p>
+                    <ul class="option-list">
+                        <li>We handle the APIs</li>
+                        <li>No setup required</li>
+                        <li>Included in your plan</li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -744,7 +827,7 @@
         <div class="container">
             <div class="section-title">
                 <h2>Simple, Transparent Pricing</h2>
-                <p>Start free, upgrade when you need more</p>
+                <p>The CLI is always free and open source. Cloud plans for teams.</p>
             </div>
 
             <div class="pricing-grid">
@@ -753,12 +836,12 @@
                     <div class="price">$0 <span>/month</span></div>
                     <p class="description">Perfect for getting started</p>
                     <ul>
-                        <li>10K LRM Translation chars/mo</li>
-                        <li>50K Other Providers chars/mo</li>
-                        <li>Free providers (Lingva, MyMemory)</li>
+                        <li>10K managed translation chars</li>
+                        <li>Unlimited with your own keys</li>
+                        <li>Free providers included</li>
                         <li>5 projects</li>
-                        <li>Bring your own API keys</li>
-                        <li>CLI + TUI + Web access</li>
+                        <li>Web dashboard</li>
+                        <li>Community support</li>
                     </ul>
                     <a href="/app/register" class="btn btn-secondary">Get Started</a>
                 </div>
@@ -768,12 +851,11 @@
                     <div class="price">$29 <span>/month</span></div>
                     <p class="description">For teams and organizations</p>
                     <ul>
-                        <li>100K LRM Translation chars/mo</li>
-                        <li>500K Other Providers chars/mo</li>
-                        <li>All translation providers</li>
+                        <li>100K managed translation chars</li>
+                        <li>Unlimited with your own keys</li>
                         <li>Unlimited projects</li>
                         <li>Up to 20 team members</li>
-                        <li>Organization management</li>
+                        <li>Team collaboration</li>
                         <li>Priority support</li>
                     </ul>
                     <a href="/app/register?plan=team" class="btn btn-primary">Start Team Trial</a>
@@ -784,13 +866,12 @@
                     <div class="price">Custom</div>
                     <p class="description">For large organizations</p>
                     <ul>
-                        <li>10M LRM Translation chars/mo</li>
-                        <li>50M Other Providers chars/mo</li>
-                        <li>All providers + custom</li>
-                        <li>Unlimited projects</li>
+                        <li>10M+ managed translation chars</li>
+                        <li>Unlimited everything</li>
                         <li>Unlimited team members</li>
                         <li>SSO/SAML support</li>
                         <li>Dedicated support</li>
+                        <li>Custom integrations</li>
                     </ul>
                     <a href="mailto:sales@lrmcloud.io" class="btn btn-secondary">Contact Sales</a>
                 </div>
@@ -802,8 +883,11 @@
     <section class="cta">
         <div class="container">
             <h2>Ready to Simplify Your Localization?</h2>
-            <p>Join developers who trust LRM Cloud for their translation workflows.</p>
-            <a href="/app/register" class="btn btn-lg" id="cta-button">Get Started Free</a>
+            <p>Start free with the CLI, scale with Cloud when you need team features.</p>
+            <div class="cta-buttons">
+                <a href="/app/register" class="btn btn-lg" id="cta-button">Try Cloud Free</a>
+                <a href="https://github.com/nickprotop/LocalizationManager/releases" class="btn btn-lg btn-cta-secondary" target="_blank">Download CLI</a>
+            </div>
         </div>
     </section>
 
@@ -814,8 +898,8 @@
                 <div class="footer-links">
                     <a href="/docs">Documentation</a>
                     <a href="https://github.com/nickprotop/LocalizationManager" target="_blank">GitHub</a>
-                    <a href="/privacy">Privacy</a>
-                    <a href="/terms">Terms</a>
+                    <a href="/privacy.html">Privacy</a>
+                    <a href="/terms.html">Terms</a>
                 </div>
                 <div class="footer-copy">
                     &copy; 2025 LRM Cloud. All rights reserved.
