@@ -257,44 +257,31 @@ public class CloudApiClient : IDisposable
         _onTokenRefreshed = onTokenRefreshed;
     }
 
-    private async Task<bool> TryRefreshTokenAsync(CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Gets the current authenticated user's profile.
+    /// </summary>
+    public async Task<UserProfile> GetCurrentUserAsync(CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_projectDirectory))
-            return false;
+        var url = $"{_remoteUrl.ApiBaseUrl}/auth/me";
+        var response = await GetAsync<UserProfile>(url, cancellationToken);
+        return response ?? throw new CloudApiException("Failed to retrieve user profile");
+    }
 
-        try
-        {
-            var refreshToken = await AuthTokenManager.GetRefreshTokenAsync(
-                _projectDirectory, _remoteUrl.Host, cancellationToken);
+    /// <summary>
+    /// Gets all organizations the current user is a member of.
+    /// </summary>
+    public async Task<List<CloudOrganization>> GetUserOrganizationsAsync(CancellationToken cancellationToken = default)
+    {
+        var url = $"{_remoteUrl.ApiBaseUrl}/organizations";
+        var response = await GetAsync<List<CloudOrganization>>(url, cancellationToken);
+        return response ?? new List<CloudOrganization>();
+    }
 
-            if (string.IsNullOrEmpty(refreshToken))
-                return false;
-
-            var response = await RefreshTokenAsync(refreshToken, cancellationToken);
-
-            // Save new tokens
-            await AuthTokenManager.SetAuthenticationAsync(
-                _projectDirectory,
-                _remoteUrl.Host,
-                response.Token,
-                response.ExpiresAt,
-                response.RefreshToken,
-                response.RefreshTokenExpiresAt,
-                cancellationToken);
-
-            // Update client
-            SetAccessToken(response.Token);
-
-            // Notify callback
-            if (_onTokenRefreshed != null)
-                await _onTokenRefreshed();
-
-            return true;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
+    private Task<bool> TryRefreshTokenAsync(CancellationToken cancellationToken = default)
+    {
+        // Auto-refresh is currently disabled.
+        // Callers should handle token refresh externally using CloudConfigManager.
+        return Task.FromResult(false);
     }
 
     #endregion
@@ -574,6 +561,43 @@ public class UserInfo
     public string Username { get; set; } = string.Empty;
     public string? DisplayName { get; set; }
     public bool EmailVerified { get; set; }
+}
+
+/// <summary>
+/// Extended user profile with subscription and usage information.
+/// </summary>
+public class UserProfile
+{
+    public int Id { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
+    public string? DisplayName { get; set; }
+    public string? AvatarUrl { get; set; }
+    public bool EmailVerified { get; set; }
+    public string AuthType { get; set; } = "email";
+    public long? GitHubId { get; set; }
+    public string Plan { get; set; } = "free";
+    public int TranslationCharsUsed { get; set; }
+    public int TranslationCharsLimit { get; set; }
+    public DateTime? TranslationCharsResetAt { get; set; }
+    public DateTime? LastLoginAt { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Organization information for the current user.
+/// </summary>
+public class CloudOrganization
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public int OwnerId { get; set; }
+    public string Plan { get; set; } = "free";
+    public int MemberCount { get; set; }
+    public string UserRole { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
 }
 
 /// <summary>

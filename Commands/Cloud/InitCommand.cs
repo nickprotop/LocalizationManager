@@ -16,9 +16,9 @@ namespace LocalizationManager.Commands.Cloud;
 /// </summary>
 public class CloudInitCommandSettings : BaseCommandSettings
 {
-    [CommandOption("--host <HOST>")]
-    [Description("Cloud host (default: lrm.cloud)")]
-    public string? Host { get; set; }
+    [CommandArgument(0, "[URL]")]
+    [Description("Remote URL (e.g., https://lrm.cloud/org/project). Interactive if not provided.")]
+    public string? Url { get; set; }
 
     [CommandOption("-n|--name <NAME>")]
     [Description("Project name (skip selection if matches existing project)")]
@@ -54,69 +54,24 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
             AnsiConsole.MarkupLine("[blue]Initializing cloud connection...[/]");
             AnsiConsole.WriteLine();
 
-            // 1. Determine host
-            var (host, port, useHttps) = DetermineHost(projectDirectory, settings.Host, cancellationToken);
+            // Load existing config
+            var config = CloudConfigManager.LoadAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
 
-            // 2. Check/trigger authentication
-            var (authenticated, user) = EnsureAuthenticated(projectDirectory, host, port, useHttps, cancellationToken);
-            if (!authenticated || user == null)
+            // Check for API key from environment
+            var envApiKey = CloudConfigManager.GetApiKeyFromEnvironment();
+            if (!string.IsNullOrWhiteSpace(envApiKey) && string.IsNullOrWhiteSpace(config.ApiKey))
             {
-                AnsiConsole.MarkupLine("[red]✗ Authentication required to initialize cloud connection[/]");
-                return 1;
+                config.ApiKey = envApiKey;
             }
 
-            // 3. Fetch user's projects
-            var projects = FetchUserProjects(host, port, useHttps, projectDirectory, cancellationToken);
-
-            // 4. Select or create project
-            CloudProject? selectedProject = null;
-            string remoteUrl;
-
-            if (!string.IsNullOrWhiteSpace(settings.ProjectName))
+            // If URL provided directly, use it
+            if (!string.IsNullOrWhiteSpace(settings.Url))
             {
-                // Try to find existing project by name
-                selectedProject = projects.FirstOrDefault(p =>
-                    p.Name.Equals(settings.ProjectName, StringComparison.OrdinalIgnoreCase));
-
-                if (selectedProject == null)
-                {
-                    // Create new project with provided name
-                    var (format, defaultLanguage) = DetectProjectSettings(projectDirectory, cancellationToken);
-                    selectedProject = CreateNewProject(host, port, useHttps, projectDirectory,
-                        settings.ProjectName, null, settings.Organization, format, defaultLanguage, cancellationToken);
-
-                    if (selectedProject == null)
-                        return 1;
-                }
-            }
-            else if (projects.Count == 0)
-            {
-                // No existing projects, must create new
-                AnsiConsole.MarkupLine("[dim]No existing projects found.[/]");
-                selectedProject = PromptCreateNewProject(host, port, useHttps, projectDirectory, user.Username, cancellationToken);
-
-                if (selectedProject == null)
-                    return 1;
-            }
-            else
-            {
-                // Interactive selection
-                selectedProject = PromptSelectOrCreateProject(projects, host, port, useHttps, projectDirectory, user.Username, cancellationToken);
-
-                if (selectedProject == null)
-                    return 0; // User cancelled
+                return InitWithDirectUrl(projectDirectory, config, settings.Url, cancellationToken);
             }
 
-            // 5. Build remote URL
-            remoteUrl = BuildRemoteUrl(host, port, useHttps, selectedProject, user.Username);
-
-            // 6. Save remote configuration
-            SaveRemoteConfiguration(projectDirectory, remoteUrl, cancellationToken);
-
-            // 7. Display success
-            DisplaySuccess(selectedProject.Name, remoteUrl);
-
-            return 0;
+            // Interactive flow
+            return InitInteractive(projectDirectory, config, settings, cancellationToken);
         }
         catch (CloudApiException ex)
         {
@@ -130,34 +85,126 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
         }
     }
 
-    private (string host, int port, bool useHttps) DetermineHost(string projectDirectory, string? providedHost, CancellationToken cancellationToken)
+    private int InitWithDirectUrl(string projectDirectory, CloudConfig config, string url, CancellationToken cancellationToken)
     {
-        // If host provided via CLI, use it
-        if (!string.IsNullOrWhiteSpace(providedHost))
+        // Parse the URL
+        if (!RemoteUrlParser.TryParse(url, out var remoteUrl))
         {
-            return ParseHost(providedHost);
+            AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL:[/] {url.EscapeMarkup()}");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[dim]Expected format: https://host/owner/project[/]");
+            AnsiConsole.MarkupLine("[dim]Examples:[/]");
+            AnsiConsole.MarkupLine("[dim]  https://lrm.cloud/org/project[/]");
+            AnsiConsole.MarkupLine("[dim]  https://lrm.cloud/@username/project[/]");
+            AnsiConsole.MarkupLine("[dim]  http://localhost:3000/org/project[/]");
+            return 1;
         }
 
-        // Try to load from remotes configuration
-        try
+        // Check authentication
+        if (!config.IsLoggedIn)
         {
-            var remotesConfig = LrmConfigurationManager
-                .LoadRemotesConfigurationAsync(projectDirectory, cancellationToken)
-                .GetAwaiter()
-                .GetResult();
+            AnsiConsole.MarkupLine("[yellow]Not authenticated.[/]");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"[dim]Use 'lrm cloud login {remoteUrl!.Host}' first, or set LRM_CLOUD_API_KEY env var.[/]");
+            return 1;
+        }
 
-            if (!string.IsNullOrWhiteSpace(remotesConfig.Remote))
+        // Set the remote
+        config.Remote = url;
+        CloudConfigManager.SaveAsync(projectDirectory, config, cancellationToken).GetAwaiter().GetResult();
+
+        // Ensure .lrm is in .gitignore
+        LrmConfigurationManager.EnsureGitIgnoreAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
+
+        DisplaySuccess(remoteUrl!.ProjectName, url);
+        return 0;
+    }
+
+    private int InitInteractive(string projectDirectory, CloudConfig config, CloudInitCommandSettings settings, CancellationToken cancellationToken)
+    {
+        // 1. Determine host
+        var (host, port, useHttps) = DetermineHost(config);
+
+        // 2. Check/trigger authentication
+        var (authenticated, user) = EnsureAuthenticated(projectDirectory, config, host, port, useHttps, cancellationToken);
+        if (!authenticated || user == null)
+        {
+            AnsiConsole.MarkupLine("[red]✗ Authentication required to initialize cloud connection[/]");
+            return 1;
+        }
+
+        // 3. Fetch user's projects
+        var projects = FetchUserProjects(host, port, useHttps, config, cancellationToken);
+
+        // 4. Select or create project
+        CloudProject? selectedProject = null;
+
+        if (!string.IsNullOrWhiteSpace(settings.ProjectName))
+        {
+            // Try to find existing project by name
+            selectedProject = projects.FirstOrDefault(p =>
+                p.Name.Equals(settings.ProjectName, StringComparison.OrdinalIgnoreCase));
+
+            if (selectedProject == null)
             {
-                if (RemoteUrlParser.TryParse(remotesConfig.Remote, out var remoteUrl))
-                {
-                    AnsiConsole.MarkupLine($"[dim]Using host from configured remote: {remoteUrl!.Host}[/]");
-                    return (remoteUrl.Host, remoteUrl.Port, remoteUrl.UseHttps);
-                }
+                // Create new project with provided name
+                var (format, defaultLanguage) = DetectProjectSettings(projectDirectory, cancellationToken);
+                selectedProject = CreateNewProject(host, port, useHttps, config, projectDirectory,
+                    settings.ProjectName, null, settings.Organization, format, defaultLanguage, cancellationToken);
+
+                if (selectedProject == null)
+                    return 1;
             }
         }
-        catch
+        else if (projects.Count == 0)
         {
-            // Ignore errors loading remotes config
+            // No existing projects, must create new
+            AnsiConsole.MarkupLine("[dim]No existing projects found.[/]");
+            selectedProject = PromptCreateNewProject(host, port, useHttps, config, projectDirectory, user.Username, cancellationToken);
+
+            if (selectedProject == null)
+                return 1;
+        }
+        else
+        {
+            // Interactive selection
+            selectedProject = PromptSelectOrCreateProject(projects, host, port, useHttps, config, projectDirectory, user.Username, cancellationToken);
+
+            if (selectedProject == null)
+                return 0; // User cancelled
+        }
+
+        // 5. Build remote URL
+        var remoteUrl = BuildRemoteUrl(host, port, useHttps, selectedProject, user.Username);
+
+        // 6. Save configuration
+        config.Remote = remoteUrl;
+        CloudConfigManager.SaveAsync(projectDirectory, config, cancellationToken).GetAwaiter().GetResult();
+
+        // Ensure .lrm is in .gitignore
+        LrmConfigurationManager.EnsureGitIgnoreAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
+
+        // 7. Display success
+        DisplaySuccess(selectedProject.Name, remoteUrl);
+
+        return 0;
+    }
+
+    private (string host, int port, bool useHttps) DetermineHost(CloudConfig config)
+    {
+        // If already have a remote, extract host from it
+        if (!string.IsNullOrWhiteSpace(config.Remote) && RemoteUrlParser.TryParse(config.Remote, out var remoteUrl))
+        {
+            AnsiConsole.MarkupLine($"[dim]Using host from configured remote: {remoteUrl!.Host}[/]");
+            return (remoteUrl.Host, remoteUrl.Port, remoteUrl.UseHttps);
+        }
+
+        // If logged in with host-only remote, extract host
+        if (!string.IsNullOrWhiteSpace(config.Host))
+        {
+            var isLocalhost = config.Host.Contains("localhost") || config.Host.Contains("127.0.0.1");
+            var port = config.Port ?? (isLocalhost ? 3000 : 443);
+            return (config.Host, port, config.UseHttps);
         }
 
         // Default to lrm.cloud
@@ -185,19 +232,13 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
     }
 
     private (bool authenticated, UserInfo? user) EnsureAuthenticated(
-        string projectDirectory, string host, int port, bool useHttps, CancellationToken cancellationToken)
+        string projectDirectory, CloudConfig config, string host, int port, bool useHttps, CancellationToken cancellationToken)
     {
-        // Check if already authenticated
-        var existingToken = AuthTokenManager.GetTokenAsync(projectDirectory, host, cancellationToken)
-            .GetAwaiter().GetResult();
-
-        if (!string.IsNullOrWhiteSpace(existingToken))
+        // Check if already authenticated (via API key or access token)
+        if (config.IsLoggedIn)
         {
-            // Validate token by trying to get user info (we'll get projects anyway)
             AnsiConsole.MarkupLine("[dim]Using existing authentication...[/]");
-
-            // We need to get user info - for now, we'll get it during project fetch
-            // Return a placeholder and get real user later
+            // Return a placeholder - we'll get real user info during project fetch
             return (true, new UserInfo { Username = "_placeholder" });
         }
 
@@ -233,11 +274,17 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
             return (false, null);
         }
 
-        // Save tokens
-        AuthTokenManager.SetAuthenticationAsync(
-            projectDirectory, host, response.Token, response.ExpiresAt,
-            response.RefreshToken, response.RefreshTokenExpiresAt, cancellationToken)
-            .GetAwaiter().GetResult();
+        // Save tokens to config
+        var protocol = useHttps ? "https" : "http";
+        var portSuffix = (useHttps && port == 443) || (!useHttps && port == 80) ? "" : $":{port}";
+        config.Remote = $"{protocol}://{host}{portSuffix}"; // Host-only for now, will be replaced with full URL
+
+        config.AccessToken = response.Token;
+        config.ExpiresAt = response.ExpiresAt;
+        config.RefreshToken = response.RefreshToken;
+        config.RefreshTokenExpiresAt = response.RefreshTokenExpiresAt;
+
+        CloudConfigManager.SaveAsync(projectDirectory, config, cancellationToken).GetAwaiter().GetResult();
 
         AnsiConsole.MarkupLine($"[green]✓ Logged in as {response.User.Email.EscapeMarkup()}[/]");
         AnsiConsole.WriteLine();
@@ -267,20 +314,25 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
     }
 
     private List<CloudProject> FetchUserProjects(
-        string host, int port, bool useHttps, string projectDirectory, CancellationToken cancellationToken)
+        string host, int port, bool useHttps, CloudConfig config, CancellationToken cancellationToken)
     {
         var remoteUrl = CreateAuthRemoteUrl(host, port, useHttps);
-        var token = AuthTokenManager.GetTokenAsync(projectDirectory, host, cancellationToken)
-            .GetAwaiter().GetResult();
-
         List<CloudProject> projects = new();
 
         AnsiConsole.Status()
             .Start("Fetching your projects...", ctx =>
             {
                 using var apiClient = new CloudApiClient(remoteUrl);
-                apiClient.SetAccessToken(token);
-                apiClient.EnableAutoRefresh(projectDirectory);
+
+                if (!string.IsNullOrWhiteSpace(config.ApiKey))
+                {
+                    apiClient.SetApiKey(config.ApiKey);
+                }
+                else
+                {
+                    apiClient.SetAccessToken(config.AccessToken);
+                }
+
                 projects = apiClient.GetUserProjectsAsync(cancellationToken).GetAwaiter().GetResult();
             });
 
@@ -289,7 +341,7 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
 
     private CloudProject? PromptSelectOrCreateProject(
         List<CloudProject> projects, string host, int port, bool useHttps,
-        string projectDirectory, string username, CancellationToken cancellationToken)
+        CloudConfig config, string projectDirectory, string username, CancellationToken cancellationToken)
     {
         // First ask: link existing or create new
         var action = AnsiConsole.Prompt(
@@ -299,7 +351,7 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
 
         if (action == "Create new project")
         {
-            return PromptCreateNewProject(host, port, useHttps, projectDirectory, username, cancellationToken);
+            return PromptCreateNewProject(host, port, useHttps, config, projectDirectory, username, cancellationToken);
         }
 
         // Show project selection with format info
@@ -351,8 +403,8 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
     }
 
     private CloudProject? PromptCreateNewProject(
-        string host, int port, bool useHttps, string projectDirectory,
-        string username, CancellationToken cancellationToken)
+        string host, int port, bool useHttps, CloudConfig config,
+        string projectDirectory, string username, CancellationToken cancellationToken)
     {
         var name = AnsiConsole.Ask<string>("Project name:");
         var description = AnsiConsole.Prompt(
@@ -369,7 +421,7 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
 
         // For now, create as personal project
         // TODO: Add organization selection if user belongs to organizations
-        return CreateNewProject(host, port, useHttps, projectDirectory, name, description, null, format, defaultLanguage, cancellationToken);
+        return CreateNewProject(host, port, useHttps, config, projectDirectory, name, description, null, format, defaultLanguage, cancellationToken);
     }
 
     private (string format, string defaultLanguage) DetectProjectSettings(string projectDirectory, CancellationToken cancellationToken)
@@ -410,22 +462,26 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
     }
 
     private CloudProject? CreateNewProject(
-        string host, int port, bool useHttps, string projectDirectory,
-        string name, string? description, string? organization,
+        string host, int port, bool useHttps, CloudConfig config,
+        string projectDirectory, string name, string? description, string? organization,
         string format, string defaultLanguage, CancellationToken cancellationToken)
     {
         var remoteUrl = CreateAuthRemoteUrl(host, port, useHttps);
-        var token = AuthTokenManager.GetTokenAsync(projectDirectory, host, cancellationToken)
-            .GetAwaiter().GetResult();
-
         CloudProject? project = null;
 
         AnsiConsole.Status()
             .Start($"Creating project '{name}'...", ctx =>
             {
                 using var apiClient = new CloudApiClient(remoteUrl);
-                apiClient.SetAccessToken(token);
-                apiClient.EnableAutoRefresh(projectDirectory);
+
+                if (!string.IsNullOrWhiteSpace(config.ApiKey))
+                {
+                    apiClient.SetApiKey(config.ApiKey);
+                }
+                else
+                {
+                    apiClient.SetAccessToken(config.AccessToken);
+                }
 
                 var request = new CreateProjectRequest
                 {
@@ -459,22 +515,6 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
         return $"{protocol}://{host}{portSuffix}/{owner}/{project.Name}";
     }
 
-    private void SaveRemoteConfiguration(string projectDirectory, string remoteUrl, CancellationToken cancellationToken)
-    {
-        var remotesConfig = new RemotesConfiguration
-        {
-            Remote = remoteUrl,
-            Enabled = true
-        };
-
-        LrmConfigurationManager.SaveRemotesConfigurationAsync(projectDirectory, remotesConfig, cancellationToken)
-            .GetAwaiter().GetResult();
-
-        // Ensure .lrm is in .gitignore
-        LrmConfigurationManager.EnsureGitIgnoreAsync(projectDirectory, cancellationToken)
-            .GetAwaiter().GetResult();
-    }
-
     private void DisplaySuccess(string projectName, string remoteUrl)
     {
         AnsiConsole.WriteLine();
@@ -488,7 +528,7 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
 
         table.AddRow("Project", projectName.EscapeMarkup());
         table.AddRow("Remote URL", remoteUrl.EscapeMarkup());
-        table.AddRow("Config saved", ".lrm/remotes.json");
+        table.AddRow("Config saved", ".lrm/cloud.json");
 
         AnsiConsole.Write(table);
 

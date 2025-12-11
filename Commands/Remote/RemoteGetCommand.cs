@@ -29,41 +29,40 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
             var projectDirectory = settings.GetResourcePath();
             var format = settings.GetOutputFormat();
 
-            // Load remotes configuration
-            var remotesConfig = Core.Configuration.ConfigurationManager.LoadRemotesConfigurationAsync(projectDirectory).GetAwaiter().GetResult();
+            // Load cloud configuration
+            var config = CloudConfigManager.LoadAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
 
             // Check if remote is configured
-            if (string.IsNullOrWhiteSpace(remotesConfig.Remote))
+            if (string.IsNullOrWhiteSpace(config.Remote))
             {
                 if (format == Core.Enums.OutputFormat.Json)
                 {
-                    Console.WriteLine(OutputFormatter.FormatJson(new { remote = (string?)null, enabled = false, configured = false }));
+                    Console.WriteLine(OutputFormatter.FormatJson(new { remote = (string?)null, configured = false }));
                 }
                 else
                 {
                     AnsiConsole.MarkupLine("[yellow]No remote URL configured[/]");
                     AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine("[dim]Use 'lrm remote set <url>' to configure a remote URL[/]");
+                    AnsiConsole.MarkupLine("[dim]Use 'lrm remote set <url>' or 'lrm cloud init' to configure a remote[/]");
                 }
                 return 1;
             }
 
             // Parse the remote URL
-            if (!RemoteUrlParser.TryParse(remotesConfig.Remote, out var remoteUrl))
+            if (!RemoteUrlParser.TryParse(config.Remote, out var remoteUrl))
             {
                 if (format == Core.Enums.OutputFormat.Json)
                 {
                     Console.WriteLine(OutputFormatter.FormatJson(new
                     {
-                        remote = remotesConfig.Remote,
-                        enabled = remotesConfig.Enabled,
+                        remote = config.Remote,
                         configured = true,
                         error = "Invalid URL format"
                     }));
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL:[/] {remotesConfig.Remote.EscapeMarkup()}");
+                    AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL:[/] {config.Remote.EscapeMarkup()}");
                 }
                 return 1;
             }
@@ -72,14 +71,14 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
             switch (format)
             {
                 case Core.Enums.OutputFormat.Json:
-                    DisplayJson(remoteUrl!, remotesConfig);
+                    DisplayJson(remoteUrl!, config);
                     break;
                 case Core.Enums.OutputFormat.Simple:
-                    DisplaySimple(remoteUrl!, remotesConfig);
+                    DisplaySimple(remoteUrl!, config);
                     break;
                 case Core.Enums.OutputFormat.Table:
                 default:
-                    DisplayTable(remoteUrl!, remotesConfig);
+                    DisplayTable(remoteUrl!, config);
                     break;
             }
 
@@ -92,7 +91,7 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
         }
     }
 
-    private void DisplayTable(RemoteUrl remoteUrl, RemotesConfiguration remotesConfig)
+    private void DisplayTable(RemoteUrl remoteUrl, CloudConfig config)
     {
         AnsiConsole.MarkupLine("[blue]Remote Configuration:[/]");
         AnsiConsole.WriteLine();
@@ -116,16 +115,16 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
         table.AddRow("API Base URL", remoteUrl.ApiBaseUrl.EscapeMarkup());
         table.AddRow("Project API URL", remoteUrl.ProjectApiUrl.EscapeMarkup());
 
-        var statusColor = remotesConfig.Enabled ? "green" : "yellow";
-        var statusText = remotesConfig.Enabled ? "Enabled" : "Disabled";
-        table.AddRow("Status", $"[{statusColor}]{statusText}[/]");
+        var authColor = config.IsLoggedIn ? "green" : "yellow";
+        var authText = config.IsLoggedIn ? "Authenticated" : "Not authenticated";
+        table.AddRow("Auth Status", $"[{authColor}]{authText}[/]");
 
         AnsiConsole.Write(table);
 
-        if (!remotesConfig.Enabled)
+        if (!config.IsLoggedIn)
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[yellow]💡 Use 'lrm remote set <url> --enable' to enable cloud synchronization[/]");
+            AnsiConsole.MarkupLine($"[dim]Use 'lrm cloud login {remoteUrl.Host}' to authenticate[/]");
         }
 
         // Warn if using HTTP for non-localhost
@@ -136,7 +135,7 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
         }
     }
 
-    private void DisplaySimple(RemoteUrl remoteUrl, RemotesConfiguration remotesConfig)
+    private void DisplaySimple(RemoteUrl remoteUrl, CloudConfig config)
     {
         Console.WriteLine($"Remote URL: {remoteUrl}");
         Console.WriteLine($"Type: {(remoteUrl.IsPersonalProject ? $"Personal (@{remoteUrl.Username})" : $"Organization ({remoteUrl.Organization})")}");
@@ -149,10 +148,10 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
         }
         Console.WriteLine($"API Base URL: {remoteUrl.ApiBaseUrl}");
         Console.WriteLine($"Project API URL: {remoteUrl.ProjectApiUrl}");
-        Console.WriteLine($"Status: {(remotesConfig.Enabled ? "Enabled" : "Disabled")}");
+        Console.WriteLine($"Auth Status: {(config.IsLoggedIn ? "Authenticated" : "Not authenticated")}");
     }
 
-    private void DisplayJson(RemoteUrl remoteUrl, RemotesConfiguration remotesConfig)
+    private void DisplayJson(RemoteUrl remoteUrl, CloudConfig config)
     {
         var output = new
         {
@@ -165,7 +164,7 @@ public class RemoteGetCommand : Command<RemoteGetCommandSettings>
             protocol = remoteUrl.UseHttps ? "https" : "http",
             apiBaseUrl = remoteUrl.ApiBaseUrl,
             projectApiUrl = remoteUrl.ProjectApiUrl,
-            enabled = remotesConfig.Enabled,
+            authenticated = config.IsLoggedIn,
             configured = true
         };
 

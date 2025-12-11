@@ -17,16 +17,6 @@ public class RemoteSetCommandSettings : BaseCommandSettings
     [CommandArgument(0, "<url>")]
     [Description("Remote URL (e.g., https://lrm.cloud/org/project or https://lrm.cloud/@username/project)")]
     public string Url { get; set; } = string.Empty;
-
-    [CommandOption("--enable")]
-    [Description("Enable cloud synchronization")]
-    [DefaultValue(false)]
-    public bool Enable { get; set; }
-
-    [CommandOption("--disable")]
-    [Description("Disable cloud synchronization")]
-    [DefaultValue(false)]
-    public bool Disable { get; set; }
 }
 
 /// <summary>
@@ -51,35 +41,14 @@ public class RemoteSetCommand : Command<RemoteSetCommandSettings>
                 return 1;
             }
 
-            // Load current remotes configuration
-            var remotesConfig = Core.Configuration.ConfigurationManager.LoadRemotesConfigurationAsync(projectDirectory).GetAwaiter().GetResult();
+            // Load current cloud configuration
+            var config = CloudConfigManager.LoadAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
 
             // Set the remote URL
-            remotesConfig.Remote = remoteUrl!.ToString();
+            config.Remote = remoteUrl!.ToString();
 
-            // Handle enable/disable flags
-            if (settings.Enable && settings.Disable)
-            {
-                AnsiConsole.MarkupLine("[red]✗ Cannot use --enable and --disable together![/]");
-                return 1;
-            }
-
-            if (settings.Enable)
-            {
-                remotesConfig.Enabled = true;
-            }
-            else if (settings.Disable)
-            {
-                remotesConfig.Enabled = false;
-            }
-            else
-            {
-                // Default: enable when setting a remote
-                remotesConfig.Enabled = true;
-            }
-
-            // Save remotes configuration to .lrm/remotes.json
-            Core.Configuration.ConfigurationManager.SaveRemotesConfigurationAsync(projectDirectory, remotesConfig).GetAwaiter().GetResult();
+            // Save configuration
+            CloudConfigManager.SaveAsync(projectDirectory, config, cancellationToken).GetAwaiter().GetResult();
 
             // Display success message
             AnsiConsole.MarkupLine($"[green]✓ Remote URL set to:[/] {remoteUrl.ToString().EscapeMarkup()}");
@@ -95,22 +64,20 @@ public class RemoteSetCommand : Command<RemoteSetCommandSettings>
 
             AnsiConsole.MarkupLine($"[dim]  Project: {remoteUrl.ProjectName}[/]");
             AnsiConsole.MarkupLine($"[dim]  API URL: {remoteUrl.ApiBaseUrl.EscapeMarkup()}[/]");
-            AnsiConsole.MarkupLine($"[dim]  Saved to: .lrm/remotes.json[/]");
-
-            var statusText = remotesConfig.Enabled ? "[green]enabled[/]" : "[yellow]disabled[/]";
-            AnsiConsole.MarkupLine($"[dim]  Status: Cloud sync is {statusText}[/]");
-
-            if (!remotesConfig.Enabled)
-            {
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("[yellow]💡 Use 'lrm remote set <url> --enable' to enable cloud synchronization[/]");
-            }
+            AnsiConsole.MarkupLine($"[dim]  Saved to: .lrm/cloud.json[/]");
 
             // Warn if using HTTP for non-localhost
             if (!remoteUrl.UseHttps && !IsLocalhost(remoteUrl.Host))
             {
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine("[yellow]⚠ Warning: Using HTTP instead of HTTPS for non-localhost connection![/]");
+            }
+
+            // Hint about authentication
+            if (!config.IsLoggedIn)
+            {
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine($"[dim]Next: 'lrm cloud login {remoteUrl.Host}' to authenticate[/]");
             }
 
             return 0;

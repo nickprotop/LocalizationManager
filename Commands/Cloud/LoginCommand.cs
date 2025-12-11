@@ -14,6 +14,10 @@ namespace LocalizationManager.Commands.Cloud;
 /// </summary>
 public class LoginCommandSettings : BaseCommandSettings
 {
+    [CommandArgument(0, "[HOST]")]
+    [Description("Cloud host (e.g., lrm.cloud, localhost:3000). Uses configured remote if not provided.")]
+    public string? Host { get; set; }
+
     [CommandOption("--email <EMAIL>")]
     [Description("Email address for authentication")]
     public string? Email { get; set; }
@@ -21,10 +25,6 @@ public class LoginCommandSettings : BaseCommandSettings
     [CommandOption("--password <PASSWORD>")]
     [Description("Password (not recommended - will prompt if not provided)")]
     public string? Password { get; set; }
-
-    [CommandOption("--host <HOST>")]
-    [Description("Remote host (e.g., lrm.cloud). Auto-detected from remote URL if configured")]
-    public string? Host { get; set; }
 }
 
 /// <summary>
@@ -45,21 +45,24 @@ public class LoginCommand : Command<LoginCommandSettings>
             AnsiConsole.MarkupLine("[blue]Authenticating with cloud...[/]");
             AnsiConsole.WriteLine();
 
-            // 1. Determine host
-            var (host, port, useHttps) = DetermineHost(projectDirectory, settings.Host, cancellationToken);
+            // 1. Load existing config
+            var config = CloudConfigManager.LoadAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
 
-            // 2. Get credentials (prompt if not provided)
+            // 2. Determine host (from argument, existing remote, or error)
+            var (host, port, useHttps) = DetermineHost(settings.Host, config);
+
+            // 3. Get credentials (prompt if not provided)
             string email = GetEmail(settings.Email);
             string password = GetPassword(settings.Password);
 
-            // 3. Validate inputs
+            // 4. Validate inputs
             if (!IsValidEmail(email))
             {
-                AnsiConsole.MarkupLine("[red]✗ Invalid email address[/]");
+                AnsiConsole.MarkupLine("[red]Invalid email address[/]");
                 return 1;
             }
 
-            // 4. Create API client and authenticate
+            // 5. Create API client and authenticate
             var remoteUrl = CreateRemoteUrl(host, port, useHttps);
             LoginResponse? response = null;
 
@@ -72,14 +75,28 @@ public class LoginCommand : Command<LoginCommandSettings>
 
             if (response == null)
             {
-                AnsiConsole.MarkupLine("[red]✗ Authentication failed[/]");
+                AnsiConsole.MarkupLine("[red]Authentication failed[/]");
                 return 1;
             }
 
-            // 5. Save authentication tokens
-            SaveAuthenticationTokens(projectDirectory, host, response, cancellationToken);
+            // 6. Update config with remote (if not set) and tokens
+            var remoteBaseUrl = BuildRemoteUrl(host, port, useHttps);
 
-            // 6. Display success message
+            // If no remote is set, or if it's just a host (no project), set the host-only remote
+            if (!config.HasProject)
+            {
+                config.Remote = remoteBaseUrl;
+            }
+
+            // Set tokens
+            config.AccessToken = response.Token;
+            config.ExpiresAt = response.ExpiresAt;
+            config.RefreshToken = response.RefreshToken;
+            config.RefreshTokenExpiresAt = response.RefreshTokenExpiresAt;
+
+            CloudConfigManager.SaveAsync(projectDirectory, config, cancellationToken).GetAwaiter().GetResult();
+
+            // 7. Display success message
             DisplaySuccessMessage(response.User, host);
 
             return 0;
@@ -91,65 +108,66 @@ public class LoginCommand : Command<LoginCommandSettings>
         catch (Exception ex)
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[red]✗ Error: {ex.Message.EscapeMarkup()}[/]");
+            AnsiConsole.MarkupLine($"[red]Error: {ex.Message.EscapeMarkup()}[/]");
             return 1;
         }
     }
 
-    private (string host, int port, bool useHttps) DetermineHost(string projectDirectory, string? providedHost, CancellationToken cancellationToken)
+    private (string host, int port, bool useHttps) DetermineHost(string? providedHost, CloudConfig config)
     {
-        // If host provided via CLI, use it
+        // 1. If host provided as argument, use it
         if (!string.IsNullOrWhiteSpace(providedHost))
         {
-            // Parse port from host if present (e.g., "localhost:3000")
-            if (providedHost.Contains(':'))
-            {
-                var parts = providedHost.Split(':');
-                var host = parts[0];
-                var port = int.Parse(parts[1]);
-                var useHttps = !host.Contains("localhost") && !host.Contains("127.0.0.1");
-                return (host, port, useHttps);
-            }
-
-            var https = !providedHost.Contains("localhost") && !providedHost.Contains("127.0.0.1");
-            return (providedHost, https ? 443 : 80, https);
+            return ParseHost(providedHost);
         }
 
-        // Try to load from remotes configuration
-        try
+        // 2. If remote is configured, extract host from it
+        if (!string.IsNullOrWhiteSpace(config.Remote))
         {
-            var remotesConfig = Core.Configuration.ConfigurationManager
-                .LoadRemotesConfigurationAsync(projectDirectory, cancellationToken)
-                .GetAwaiter()
-                .GetResult();
-
-            if (!string.IsNullOrWhiteSpace(remotesConfig.Remote))
-            {
-                if (RemoteUrlParser.TryParse(remotesConfig.Remote, out var remoteUrl))
-                {
-                    AnsiConsole.MarkupLine($"[dim]Using host from configured remote: {remoteUrl!.Host}:{remoteUrl.Port}[/]");
-                    return (remoteUrl.Host, remoteUrl.Port, remoteUrl.UseHttps);
-                }
-            }
-        }
-        catch
-        {
-            // Ignore errors loading remotes config
+            var host = config.Host;
+            var port = config.Port ?? (config.UseHttps ? 443 : 80);
+            AnsiConsole.MarkupLine($"[dim]Using host from remote: {host}[/]");
+            return (host!, port, config.UseHttps);
         }
 
-        // Prompt for host
-        var hostInput = AnsiConsole.Ask<string>("Cloud host:", "lrm.cloud");
-        if (hostInput.Contains(':'))
+        // 3. No host available - error
+        AnsiConsole.MarkupLine("[red]No host specified and no remote configured.[/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[dim]Usage: lrm cloud login <host>[/]");
+        AnsiConsole.MarkupLine("[dim]Example: lrm cloud login lrm.cloud[/]");
+        AnsiConsole.MarkupLine("[dim]Example: lrm cloud login localhost:3000[/]");
+        throw new InvalidOperationException("No host specified");
+    }
+
+    private (string host, int port, bool useHttps) ParseHost(string hostString)
+    {
+        // Handle full URL
+        if (hostString.StartsWith("http://") || hostString.StartsWith("https://"))
         {
-            var parts = hostInput.Split(':');
+            var uri = new Uri(hostString);
+            return (uri.Host, uri.IsDefaultPort ? (uri.Scheme == "https" ? 443 : 80) : uri.Port, uri.Scheme == "https");
+        }
+
+        // Parse host:port format
+        if (hostString.Contains(':'))
+        {
+            var parts = hostString.Split(':');
             var host = parts[0];
             var port = int.Parse(parts[1]);
             var useHttps = !host.Contains("localhost") && !host.Contains("127.0.0.1");
             return (host, port, useHttps);
         }
 
-        var defaultHttps = !hostInput.Contains("localhost") && !hostInput.Contains("127.0.0.1");
-        return (hostInput, defaultHttps ? 443 : 80, defaultHttps);
+        // Just host
+        var https = !hostString.Contains("localhost") && !hostString.Contains("127.0.0.1");
+        return (hostString, https ? 443 : 80, https);
+    }
+
+    private string BuildRemoteUrl(string host, int port, bool useHttps)
+    {
+        var protocol = useHttps ? "https" : "http";
+        var portSuffix = (useHttps && port == 443) || (!useHttps && port == 80) ? "" : $":{port}";
+        return $"{protocol}://{host}{portSuffix}";
     }
 
     private string GetEmail(string? providedEmail)
@@ -185,7 +203,6 @@ public class LoginCommand : Command<LoginCommandSettings>
     private RemoteUrl CreateRemoteUrl(string host, int port, bool useHttps)
     {
         // Create a minimal RemoteUrl for authentication
-        // Use dummy organization/project since they're not needed for auth
         var protocol = useHttps ? "https" : "http";
         var portSuffix = (useHttps && port == 443) || (!useHttps && port == 80) ? "" : $":{port}";
 
@@ -200,38 +217,20 @@ public class LoginCommand : Command<LoginCommandSettings>
         };
     }
 
-    private void SaveAuthenticationTokens(
-        string projectDirectory,
-        string host,
-        LoginResponse response,
-        CancellationToken cancellationToken)
-    {
-        AuthTokenManager.SetAuthenticationAsync(
-            projectDirectory,
-            host,
-            response.Token,
-            response.ExpiresAt,
-            response.RefreshToken,
-            response.RefreshTokenExpiresAt,
-            cancellationToken
-        ).GetAwaiter().GetResult();
-    }
-
     private void DisplaySuccessMessage(UserInfo user, string host)
     {
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[green]✓ Successfully authenticated![/]");
+        AnsiConsole.MarkupLine("[green]Successfully authenticated![/]");
         AnsiConsole.WriteLine();
 
         var displayName = !string.IsNullOrWhiteSpace(user.DisplayName) ? user.DisplayName : user.Username;
         AnsiConsole.MarkupLine($"[dim]Logged in as:[/] {displayName.EscapeMarkup()} ({user.Email.EscapeMarkup()})");
         AnsiConsole.MarkupLine($"[dim]Host:[/] {host.EscapeMarkup()}");
-        AnsiConsole.MarkupLine("[dim]Tokens stored in .lrm/auth.json[/]");
 
         if (!user.EmailVerified)
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[yellow]⚠ Your email is not verified. Please check your inbox.[/]");
+            AnsiConsole.MarkupLine("[yellow]Your email is not verified. Please check your inbox.[/]");
         }
     }
 
@@ -242,47 +241,40 @@ public class LoginCommand : Command<LoginCommandSettings>
         switch (ex.StatusCode)
         {
             case 401:
-                AnsiConsole.MarkupLine("[red]✗ Invalid email or password[/]");
+                AnsiConsole.MarkupLine("[red]Invalid email or password[/]");
                 break;
 
             case 403:
                 if (ex.Message.ToLower().Contains("verif") || ex.Message.ToLower().Contains("email"))
                 {
-                    AnsiConsole.MarkupLine("[red]✗ Email not verified[/]");
+                    AnsiConsole.MarkupLine("[red]Email not verified[/]");
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine("[dim]Please check your inbox and click the verification link.[/]");
-                    AnsiConsole.MarkupLine("[dim]Didn't receive the email? Contact support or check spam folder.[/]");
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ Access denied: {ex.Message.EscapeMarkup()}[/]");
+                    AnsiConsole.MarkupLine($"[red]Access denied: {ex.Message.EscapeMarkup()}[/]");
                 }
                 break;
 
             case 429:
-                AnsiConsole.MarkupLine("[red]✗ Too many login attempts[/]");
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("[dim]Please try again later.[/]");
+                AnsiConsole.MarkupLine("[red]Too many login attempts. Please try again later.[/]");
                 break;
 
             case 500:
             case 502:
             case 503:
-                AnsiConsole.MarkupLine("[red]✗ Server error[/]");
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("[dim]The authentication server is experiencing issues. Please try again later.[/]");
+                AnsiConsole.MarkupLine("[red]Server error. Please try again later.[/]");
                 break;
 
             default:
                 if (ex.Message.Contains("Unable to connect") || ex.Message.Contains("connection"))
                 {
-                    AnsiConsole.MarkupLine("[red]✗ Unable to connect to authentication server[/]");
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine("[dim]Please check your internet connection and try again.[/]");
+                    AnsiConsole.MarkupLine("[red]Unable to connect to server. Check your internet connection.[/]");
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ Authentication failed: {ex.Message.EscapeMarkup()}[/]");
+                    AnsiConsole.MarkupLine($"[red]Authentication failed: {ex.Message.EscapeMarkup()}[/]");
                 }
                 break;
         }

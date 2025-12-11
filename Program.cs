@@ -257,7 +257,7 @@ app.Configure(config =>
         cfg.AddCommand<CloudInitCommand>("init")
             .WithDescription("Connect local project to cloud (authenticate and link/create project)")
             .WithExample(new[] { "cloud", "init" })
-            .WithExample(new[] { "cloud", "init", "--host", "staging.lrm.cloud" })
+            .WithExample(new[] { "cloud", "init", "https://lrm.cloud/org/project" })
             .WithExample(new[] { "cloud", "init", "--name", "my-project" });
 
         cfg.AddCommand<PushCommand>("push")
@@ -284,26 +284,24 @@ app.Configure(config =>
 
         cfg.AddCommand<LoginCommand>("login")
             .WithDescription("Authenticate with the cloud using email and password")
-            .WithExample(new[] { "cloud", "login" })
-            .WithExample(new[] { "cloud", "login", "--email", "user@example.com" })
-            .WithExample(new[] { "cloud", "login", "--host", "staging.lrm.cloud" });
+            .WithExample(new[] { "cloud", "login", "lrm.cloud" })
+            .WithExample(new[] { "cloud", "login", "localhost:3000" })
+            .WithExample(new[] { "cloud", "login", "lrm.cloud", "--email", "user@example.com" });
 
         cfg.AddCommand<LogoutCommand>("logout")
             .WithDescription("Clear stored authentication tokens")
-            .WithExample(new[] { "cloud", "logout" })
-            .WithExample(new[] { "cloud", "logout", "--host", "staging.lrm.cloud" })
-            .WithExample(new[] { "cloud", "logout", "--all" });
+            .WithExample(new[] { "cloud", "logout" });
 
         cfg.AddCommand<SetTokenCommand>("set-token")
             .WithDescription("Manually set an authentication token for cloud access")
-            .WithExample(new[] { "cloud", "set-token", "--host", "lrm.cloud", "--token", "your-token" })
-            .WithExample(new[] { "cloud", "set-token" });
+            .WithExample(new[] { "cloud", "set-token" })
+            .WithExample(new[] { "cloud", "set-token", "your-token" })
+            .WithExample(new[] { "cloud", "set-token", "your-token", "--expires", "2025-12-31T23:59:59Z" });
 
         cfg.AddCommand<LocalizationManager.Commands.Cloud.SetApiKeyCommand>("set-api-key")
             .WithDescription("Store a CLI API key for cloud authentication")
             .WithExample(new[] { "cloud", "set-api-key" })
-            .WithExample(new[] { "cloud", "set-api-key", "--key", "lrm_abc123..." })
-            .WithExample(new[] { "cloud", "set-api-key", "--host", "staging.lrm.cloud" })
+            .WithExample(new[] { "cloud", "set-api-key", "lrm_abc123..." })
             .WithExample(new[] { "cloud", "set-api-key", "--remove" });
 
         cfg.AddBranch("remote", remoteCfg =>
@@ -314,8 +312,7 @@ app.Configure(config =>
                 .WithDescription("Set the remote URL for cloud synchronization")
                 .WithExample(new[] { "cloud", "remote", "set", "https://lrm.cloud/acme-corp/mobile-app" })
                 .WithExample(new[] { "cloud", "remote", "set", "https://lrm.cloud/@john/personal-project" })
-                .WithExample(new[] { "cloud", "remote", "set", "https://lrm.cloud/my-org/project", "--enable" })
-                .WithExample(new[] { "cloud", "remote", "set", "https://staging.lrm.cloud/test-org/app" });
+                .WithExample(new[] { "cloud", "remote", "set", "http://localhost:3000/org/project" });
 
             remoteCfg.AddCommand<RemoteGetCommand>("get")
                 .WithDescription("Display the current remote URL configuration")

@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Nikolaos Protopapas
 // Licensed under the MIT License
 
-using LocalizationManager.Core.Configuration;
+using LocalizationManager.Core.Cloud;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using System.ComponentModel;
@@ -30,17 +30,17 @@ public class RemoteUnsetCommand : Command<RemoteUnsetCommandSettings>
         {
             var projectDirectory = settings.GetResourcePath();
 
-            // Load remotes configuration
-            var remotesConfig = Core.Configuration.ConfigurationManager.LoadRemotesConfigurationAsync(projectDirectory).GetAwaiter().GetResult();
+            // Load cloud configuration
+            var config = CloudConfigManager.LoadAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
 
             // Check if remote is configured
-            if (string.IsNullOrWhiteSpace(remotesConfig.Remote))
+            if (string.IsNullOrWhiteSpace(config.Remote))
             {
                 AnsiConsole.MarkupLine("[yellow]No remote URL configured[/]");
                 return 0;
             }
 
-            var remoteUrl = remotesConfig.Remote;
+            var remoteUrl = config.Remote;
 
             // Ask for confirmation unless --yes is provided
             if (!settings.SkipConfirmation)
@@ -56,16 +56,15 @@ public class RemoteUnsetCommand : Command<RemoteUnsetCommandSettings>
                 }
             }
 
-            // Clear remotes configuration
-            remotesConfig.Remote = null;
-            remotesConfig.Enabled = false;
+            // Clear remote (keep auth credentials)
+            config.Remote = null;
 
             // Save configuration
-            Core.Configuration.ConfigurationManager.SaveRemotesConfigurationAsync(projectDirectory, remotesConfig).GetAwaiter().GetResult();
+            CloudConfigManager.SaveAsync(projectDirectory, config, cancellationToken).GetAwaiter().GetResult();
 
             AnsiConsole.MarkupLine("[green]✓ Remote URL removed[/]");
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[dim]Use 'lrm remote set <url>' to configure a new remote URL[/]");
+            AnsiConsole.MarkupLine("[dim]Use 'lrm remote set <url>' or 'lrm cloud init' to configure a new remote[/]");
 
             return 0;
         }

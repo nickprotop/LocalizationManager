@@ -13,12 +13,8 @@ namespace LocalizationManager.Commands.Cloud;
 /// </summary>
 public class SetTokenCommandSettings : BaseCommandSettings
 {
-    [CommandOption("--host <HOST>")]
-    [Description("Remote host (e.g., lrm.cloud)")]
-    public string? Host { get; set; }
-
-    [CommandOption("--token <TOKEN>")]
-    [Description("Access token")]
+    [CommandArgument(0, "[TOKEN]")]
+    [Description("Access token (will prompt if not provided)")]
     public string? Token { get; set; }
 
     [CommandOption("--expires <DATETIME>")]
@@ -36,31 +32,7 @@ public class SetTokenCommand : Command<SetTokenCommandSettings>
         try
         {
             var projectDirectory = settings.GetResourcePath();
-
-            // Get host from remote config if not provided
-            string? host = settings.Host;
-
-            if (string.IsNullOrWhiteSpace(host))
-            {
-                var remotesConfig = Core.Configuration.ConfigurationManager.LoadRemotesConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
-
-                if (string.IsNullOrWhiteSpace(remotesConfig.Remote))
-                {
-                    AnsiConsole.MarkupLine("[red]✗ No remote URL configured and --host not provided![/]");
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine("[dim]Either configure a remote URL with 'lrm remote set <url>'[/]");
-                    AnsiConsole.MarkupLine("[dim]or provide --host explicitly[/]");
-                    return 1;
-                }
-
-                if (!RemoteUrlParser.TryParse(remotesConfig.Remote, out var remoteUrl))
-                {
-                    AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL in configuration:[/] {remotesConfig.Remote.EscapeMarkup()}");
-                    return 1;
-                }
-
-                host = remoteUrl!.Host;
-            }
+            var config = CloudConfigManager.LoadAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
 
             // Prompt for token if not provided
             string? token = settings.Token;
@@ -74,7 +46,7 @@ public class SetTokenCommand : Command<SetTokenCommandSettings>
 
             if (string.IsNullOrWhiteSpace(token))
             {
-                AnsiConsole.MarkupLine("[red]✗ Token cannot be empty![/]");
+                AnsiConsole.MarkupLine("[red]Token cannot be empty[/]");
                 return 1;
             }
 
@@ -85,7 +57,7 @@ public class SetTokenCommand : Command<SetTokenCommandSettings>
             {
                 if (!DateTime.TryParse(settings.Expires, out var parsedExpires))
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ Invalid expiration date:[/] {settings.Expires.EscapeMarkup()}");
+                    AnsiConsole.MarkupLine($"[red]Invalid expiration date:[/] {settings.Expires.EscapeMarkup()}");
                     AnsiConsole.MarkupLine("[dim]Expected ISO 8601 format, e.g., 2025-12-31T23:59:59Z[/]");
                     return 1;
                 }
@@ -94,23 +66,28 @@ public class SetTokenCommand : Command<SetTokenCommandSettings>
             }
 
             // Save token
-            AuthTokenManager.SetTokenAsync(projectDirectory, host, token, expiresAt, cancellationToken).GetAwaiter().GetResult();
+            config.AccessToken = token;
+            config.ExpiresAt = expiresAt;
+            CloudConfigManager.SaveAsync(projectDirectory, config, cancellationToken).GetAwaiter().GetResult();
 
-            AnsiConsole.MarkupLine($"[green]✓ Token saved for host:[/] {host.EscapeMarkup()}");
+            var host = config.Host ?? "not configured";
+            AnsiConsole.MarkupLine($"[green]Token saved[/]");
+
+            if (config.Host != null)
+            {
+                AnsiConsole.MarkupLine($"[dim]Host:[/] {host.EscapeMarkup()}");
+            }
 
             if (expiresAt.HasValue)
             {
-                AnsiConsole.MarkupLine($"[dim]Expires: {expiresAt.Value:yyyy-MM-dd HH:mm:ss} UTC[/]");
+                AnsiConsole.MarkupLine($"[dim]Expires:[/] {expiresAt.Value:yyyy-MM-dd HH:mm:ss} UTC");
             }
-
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[dim]Token stored in .lrm/auth.json (git-ignored)[/]");
 
             return 0;
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"[red]✗ Error: {ex.Message.EscapeMarkup()}[/]");
+            AnsiConsole.MarkupLine($"[red]Error: {ex.Message.EscapeMarkup()}[/]");
             return 1;
         }
     }

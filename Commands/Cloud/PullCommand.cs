@@ -60,30 +60,29 @@ public class PullCommand : Command<PullCommandSettings>
             AnsiConsole.MarkupLine("[blue]Pulling changes from cloud...[/]");
             AnsiConsole.WriteLine();
 
-            // Load remotes configuration
-            var remotesConfig = Core.Configuration.ConfigurationManager.LoadRemotesConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
+            // Load cloud configuration
+            var cloudConfig = CloudConfigManager.LoadAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
 
-            // Validate remote configuration
-            if (string.IsNullOrWhiteSpace(remotesConfig.Remote))
+            // Check for API key from environment
+            var envApiKey = CloudConfigManager.GetApiKeyFromEnvironment();
+            if (!string.IsNullOrWhiteSpace(envApiKey) && string.IsNullOrWhiteSpace(cloudConfig.ApiKey))
             {
-                AnsiConsole.MarkupLine("[red]✗ No remote URL configured![/]");
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("[dim]Use 'lrm remote set <url>' to configure a remote URL[/]");
-                return 1;
+                cloudConfig.ApiKey = envApiKey;
             }
 
-            if (!remotesConfig.Enabled)
+            // Validate remote configuration
+            if (!cloudConfig.HasProject)
             {
-                AnsiConsole.MarkupLine("[yellow]⚠ Cloud synchronization is disabled[/]");
+                AnsiConsole.MarkupLine("[red]✗ No remote project configured![/]");
                 AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("[dim]Use 'lrm remote set <url> --enable' to enable cloud synchronization[/]");
+                AnsiConsole.MarkupLine("[dim]Use 'lrm cloud init <url>' to connect to a project[/]");
                 return 1;
             }
 
             // Parse remote URL
-            if (!RemoteUrlParser.TryParse(remotesConfig.Remote, out var remoteUrl))
+            if (!RemoteUrlParser.TryParse(cloudConfig.Remote!, out var remoteUrl))
             {
-                AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL:[/] {remotesConfig.Remote.EscapeMarkup()}");
+                AnsiConsole.MarkupLine($"[red]✗ Invalid remote URL:[/] {cloudConfig.Remote?.EscapeMarkup()}");
                 return 1;
             }
 
@@ -106,42 +105,28 @@ public class PullCommand : Command<PullCommandSettings>
                 return 1;
             }
 
-            // Check authentication - API key takes priority over JWT
-            // 1. Check environment variable
-            var apiKey = AuthTokenManager.GetApiKeyFromEnvironment();
-
-            // 2. Check stored API key
-            if (string.IsNullOrWhiteSpace(apiKey))
+            // Check authentication
+            if (!cloudConfig.IsLoggedIn)
             {
-                apiKey = AuthTokenManager.GetApiKeyAsync(projectDirectory, remoteUrl.Host, cancellationToken).GetAwaiter().GetResult();
+                AnsiConsole.MarkupLine("[red]✗ Not authenticated![/]");
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine($"[dim]Use 'lrm cloud login {remoteUrl.Host}' to authenticate[/]");
+                AnsiConsole.MarkupLine($"[dim]Or set an API key: lrm cloud set-api-key[/]");
+                AnsiConsole.MarkupLine($"[dim]Or use environment variable: LRM_CLOUD_API_KEY[/]");
+                return 1;
             }
 
             // Create API client
             using var apiClient = new CloudApiClient(remoteUrl);
 
-            if (!string.IsNullOrWhiteSpace(apiKey))
+            if (!string.IsNullOrWhiteSpace(cloudConfig.ApiKey))
             {
-                // Use API key authentication
-                apiClient.SetApiKey(apiKey);
+                apiClient.SetApiKey(cloudConfig.ApiKey);
                 AnsiConsole.MarkupLine("[dim]Using API key authentication[/]");
             }
             else
             {
-                // Fall back to JWT token
-                var token = AuthTokenManager.GetTokenAsync(projectDirectory, remoteUrl.Host, cancellationToken).GetAwaiter().GetResult();
-
-                if (string.IsNullOrWhiteSpace(token))
-                {
-                    AnsiConsole.MarkupLine("[red]✗ Not authenticated![/]");
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine($"[dim]Use 'lrm cloud login {remoteUrl.Host}' to authenticate[/]");
-                    AnsiConsole.MarkupLine($"[dim]Or set an API key: lrm cloud set-api-key --host {remoteUrl.Host.EscapeMarkup()}[/]");
-                    AnsiConsole.MarkupLine($"[dim]Or use environment variable: LRM_CLOUD_API_KEY[/]");
-                    return 1;
-                }
-
-                apiClient.SetAccessToken(token);
-                apiClient.EnableAutoRefresh(projectDirectory);
+                apiClient.SetAccessToken(cloudConfig.AccessToken);
             }
 
             // Fetch remote project info and validate format compatibility

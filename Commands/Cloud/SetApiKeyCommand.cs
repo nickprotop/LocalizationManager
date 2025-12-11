@@ -13,13 +13,9 @@ namespace LocalizationManager.Commands.Cloud;
 /// </summary>
 public class SetApiKeyCommandSettings : BaseCommandSettings
 {
-    [CommandOption("--key <KEY>")]
+    [CommandArgument(0, "[KEY]")]
     [Description("API key (will prompt if not provided)")]
     public string? Key { get; set; }
-
-    [CommandOption("--host <HOST>")]
-    [Description("Remote host (e.g., lrm.cloud). Auto-detected from remote URL if configured")]
-    public string? Host { get; set; }
 
     [CommandOption("--remove")]
     [Description("Remove stored API key instead of setting one")]
@@ -37,17 +33,15 @@ public class SetApiKeyCommand : Command<SetApiKeyCommandSettings>
         try
         {
             var projectDirectory = settings.GetResourcePath();
-
-            // 1. Determine host
-            var host = DetermineHost(projectDirectory, settings.Host, cancellationToken);
+            var config = CloudConfigManager.LoadAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
 
             if (settings.Remove)
             {
-                return RemoveApiKey(projectDirectory, host, cancellationToken);
+                return RemoveApiKey(projectDirectory, config, cancellationToken);
             }
             else
             {
-                return SetApiKey(projectDirectory, host, settings.Key, cancellationToken);
+                return SetApiKey(projectDirectory, config, settings.Key, cancellationToken);
             }
         }
         catch (Exception ex)
@@ -58,7 +52,7 @@ public class SetApiKeyCommand : Command<SetApiKeyCommandSettings>
         }
     }
 
-    private int SetApiKey(string projectDirectory, string host, string? providedKey, CancellationToken cancellationToken)
+    private int SetApiKey(string projectDirectory, CloudConfig config, string? providedKey, CancellationToken cancellationToken)
     {
         AnsiConsole.MarkupLine("[blue]Setting CLI API key...[/]");
         AnsiConsole.WriteLine();
@@ -92,16 +86,19 @@ public class SetApiKeyCommand : Command<SetApiKeyCommandSettings>
         }
 
         // Save API key
-        AuthTokenManager.SetApiKeyAsync(projectDirectory, host, apiKey, cancellationToken)
-            .GetAwaiter().GetResult();
+        config.ApiKey = apiKey;
+        CloudConfigManager.SaveAsync(projectDirectory, config, cancellationToken).GetAwaiter().GetResult();
 
         // Display success
+        var host = config.Host ?? "not set";
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[green]API key saved successfully![/]");
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[dim]Host:[/] {host.EscapeMarkup()}");
         AnsiConsole.MarkupLine($"[dim]Key:[/] {apiKey[..10].EscapeMarkup()}...");
-        AnsiConsole.MarkupLine("[dim]Stored in .lrm/auth.json[/]");
+        if (config.Host != null)
+        {
+            AnsiConsole.MarkupLine($"[dim]Host:[/] {host.EscapeMarkup()}");
+        }
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[dim]The API key will be used for cloud operations (push, pull, status).[/]");
         AnsiConsole.MarkupLine("[dim]You can also set LRM_CLOUD_API_KEY environment variable for CI/CD.[/]");
@@ -109,75 +106,24 @@ public class SetApiKeyCommand : Command<SetApiKeyCommandSettings>
         return 0;
     }
 
-    private int RemoveApiKey(string projectDirectory, string host, CancellationToken cancellationToken)
+    private int RemoveApiKey(string projectDirectory, CloudConfig config, CancellationToken cancellationToken)
     {
         AnsiConsole.MarkupLine("[blue]Removing CLI API key...[/]");
         AnsiConsole.WriteLine();
 
         // Check if key exists
-        var existingKey = AuthTokenManager.GetApiKeyAsync(projectDirectory, host, cancellationToken)
-            .GetAwaiter().GetResult();
-
-        if (string.IsNullOrWhiteSpace(existingKey))
+        if (string.IsNullOrWhiteSpace(config.ApiKey))
         {
-            AnsiConsole.MarkupLine("[yellow]No API key found for this host[/]");
+            AnsiConsole.MarkupLine("[yellow]No API key stored[/]");
             return 0;
         }
 
         // Remove API key
-        AuthTokenManager.RemoveApiKeyAsync(projectDirectory, host, cancellationToken)
-            .GetAwaiter().GetResult();
+        config.ApiKey = null;
+        CloudConfigManager.SaveAsync(projectDirectory, config, cancellationToken).GetAwaiter().GetResult();
 
         AnsiConsole.MarkupLine("[green]API key removed successfully![/]");
-        AnsiConsole.MarkupLine($"[dim]Host:[/] {host.EscapeMarkup()}");
 
         return 0;
-    }
-
-    private string DetermineHost(string projectDirectory, string? providedHost, CancellationToken cancellationToken)
-    {
-        // If host provided via CLI, use it
-        if (!string.IsNullOrWhiteSpace(providedHost))
-        {
-            // Strip port if present for storage key
-            if (providedHost.Contains(':'))
-            {
-                return providedHost.Split(':')[0];
-            }
-            return providedHost;
-        }
-
-        // Try to load from remotes configuration
-        try
-        {
-            var remotesConfig = Core.Configuration.ConfigurationManager
-                .LoadRemotesConfigurationAsync(projectDirectory, cancellationToken)
-                .GetAwaiter()
-                .GetResult();
-
-            if (!string.IsNullOrWhiteSpace(remotesConfig.Remote))
-            {
-                if (RemoteUrlParser.TryParse(remotesConfig.Remote, out var remoteUrl))
-                {
-                    AnsiConsole.MarkupLine($"[dim]Using host from configured remote: {remoteUrl!.Host}[/]");
-                    return remoteUrl.Host;
-                }
-            }
-        }
-        catch
-        {
-            // Ignore errors loading remotes config
-        }
-
-        // Prompt for host
-        var hostInput = AnsiConsole.Ask<string>("Cloud host:", "lrm.cloud");
-
-        // Strip port if present
-        if (hostInput.Contains(':'))
-        {
-            return hostInput.Split(':')[0];
-        }
-
-        return hostInput;
     }
 }
