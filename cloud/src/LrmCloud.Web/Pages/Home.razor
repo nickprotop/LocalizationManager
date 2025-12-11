@@ -1,6 +1,8 @@
 @page "/"
 @attribute [Authorize]
+@using LrmCloud.Shared.DTOs.Usage
 @inject ProjectService ProjectService
+@inject UsageService UsageService
 @inject OrganizationContextService OrgContext
 @inject NavigationManager Navigation
 @implements IDisposable
@@ -60,10 +62,16 @@ else
             <MudPaper Class="pa-4" Elevation="2">
                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                     <div>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Usage</MudText>
-                        <MudText Typo="Typo.h4">@FormatUsage()</MudText>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">LRM Usage</MudText>
+                        <MudText Typo="Typo.h4">@FormatLrmUsage()</MudText>
+                        @if (_usageStats?.ByokCharsUsed > 0)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                + @FormatChars(_usageStats.ByokCharsUsed) other
+                            </MudText>
+                        }
                     </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Analytics" Color="Color.Warning" Size="Size.Large" />
+                    <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Warning" Size="Size.Large" />
                 </MudStack>
             </MudPaper>
         </MudItem>
@@ -167,6 +175,7 @@ else
     private List<ProjectDto> _projects = new();
     private List<ProjectDto> _filteredProjects = new();
     private DashboardStats _stats = new();
+    private UsageStatsDto? _usageStats;
     private bool _isLoading = true;
     private CreateProjectDialog? _createDialog;
     private EditProjectDialog? _editDialog;
@@ -193,6 +202,7 @@ else
             _projects = await ProjectService.GetProjectsAsync();
             FilterProjects();
             _stats = await ProjectService.GetDashboardStatsAsync();
+            _usageStats = await UsageService.GetStatsAsync();
         }
         catch
         {
@@ -274,11 +284,26 @@ else
         Navigation.NavigateTo($"projects/{projectId}/editor");
     }
 
-    private string FormatUsage()
+    private string FormatLrmUsage()
     {
-        if (_stats.CharsUsed >= 1000)
-            return $"{_stats.CharsUsed / 1000}K / {_stats.CharsLimit / 1000}K";
-        return $"{_stats.CharsUsed} / {_stats.CharsLimit / 1000}K";
+        if (_usageStats == null)
+            return "0 / 10K";
+
+        var used = _usageStats.TranslationCharsUsed;
+        var limit = _usageStats.TranslationCharsLimit;
+
+        if (used >= 1000)
+            return $"{used / 1000}K / {limit / 1000}K";
+        return $"{used} / {limit / 1000}K";
+    }
+
+    private static string FormatChars(long chars)
+    {
+        if (chars >= 1_000_000)
+            return $"{chars / 1_000_000.0:F1}M";
+        if (chars >= 1000)
+            return $"{chars / 1000}K";
+        return chars.ToString();
     }
 
     private static Color GetFormatColor(string format) => format.ToLower() switch

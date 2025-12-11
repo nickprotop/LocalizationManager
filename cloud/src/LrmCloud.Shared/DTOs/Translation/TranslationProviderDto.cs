@@ -26,9 +26,14 @@ public class TranslationProviderDto
     public bool IsConfigured { get; set; }
 
     /// <summary>
-    /// Provider type: "api" for cloud APIs, "local" for self-hosted.
+    /// Provider type: "managed" for LRM, "api" for cloud APIs, "local" for self-hosted.
     /// </summary>
     public string Type { get; set; } = "api";
+
+    /// <summary>
+    /// Whether this is the LRM managed translation service.
+    /// </summary>
+    public bool IsManagedProvider { get; set; }
 
     /// <summary>
     /// Whether this is an AI/LLM-based provider.

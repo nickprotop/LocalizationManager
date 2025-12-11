@@ -72,11 +72,24 @@ public class User
     public DateTime? TranslationCharsResetAt { get; set; }
 
     /// <summary>
-    /// BYOK (Bring Your Own Key) translation characters used.
-    /// Tracked separately from LRM usage. Not limited, just monitored.
+    /// Other providers (BYOK + free community) characters used.
+    /// Tracked separately from LRM usage.
     /// </summary>
-    [Column("byok_chars_used")]
-    public long ByokCharsUsed { get; set; }
+    [Column("other_chars_used")]
+    public long OtherCharsUsed { get; set; }
+
+    /// <summary>
+    /// Other providers character limit per month.
+    /// Free: 50,000, Team: 500,000, Enterprise: unlimited (int.MaxValue)
+    /// </summary>
+    [Column("other_chars_limit")]
+    public long OtherCharsLimit { get; set; } = 50000;
+
+    /// <summary>
+    /// When the other providers usage counter resets.
+    /// </summary>
+    [Column("other_chars_reset_at")]
+    public DateTime? OtherCharsResetAt { get; set; }
 
     // Security
     [MaxLength(255)]

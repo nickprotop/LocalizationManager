@@ -112,7 +112,7 @@ public class OrganizationServiceTests : IDisposable
             Name = name,
             Slug = slug,
             OwnerId = ownerId,
-            Plan = "free",
+            Plan = "team", // Use team plan to allow member invitations in tests
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

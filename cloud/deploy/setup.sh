@@ -182,16 +182,18 @@ fi
 
 echo ""
 echo -e "${BLUE}Database & Cache Ports:${NC}"
-read -p "PostgreSQL Port [$CURRENT_POSTGRES_PORT]: " POSTGRES_PORT
+print_info "Set port to 0 to keep service internal-only (accessible via Docker network)"
+echo ""
+read -p "PostgreSQL Port (0=internal only) [$CURRENT_POSTGRES_PORT]: " POSTGRES_PORT
 POSTGRES_PORT=${POSTGRES_PORT:-$CURRENT_POSTGRES_PORT}
 
-read -p "Redis Port [$CURRENT_REDIS_PORT]: " REDIS_PORT
+read -p "Redis Port (0=internal only) [$CURRENT_REDIS_PORT]: " REDIS_PORT
 REDIS_PORT=${REDIS_PORT:-$CURRENT_REDIS_PORT}
 
-read -p "MinIO API Port [$CURRENT_MINIO_PORT]: " MINIO_PORT
+read -p "MinIO API Port (0=internal only) [$CURRENT_MINIO_PORT]: " MINIO_PORT
 MINIO_PORT=${MINIO_PORT:-$CURRENT_MINIO_PORT}
 
-read -p "MinIO Console Port [$CURRENT_MINIO_CONSOLE]: " MINIO_CONSOLE
+read -p "MinIO Console Port (0=internal only) [$CURRENT_MINIO_CONSOLE]: " MINIO_CONSOLE
 MINIO_CONSOLE=${MINIO_CONSOLE:-$CURRENT_MINIO_CONSOLE}
 
 read -p "Environment [$CURRENT_ENV]: " ENVIRONMENT
@@ -293,8 +295,24 @@ CURRENT_JWT_EXPIRY=$(config_get '.auth.jwtExpiryHours' '24')
 CURRENT_REG=$(config_get '.features.registration' 'true')
 CURRENT_GITHUB=$(config_get '.features.githubSync' 'true')
 CURRENT_FREE_TRANS=$(config_get '.features.freeTranslations' 'true')
-CURRENT_FREE_CHARS=$(config_get '.limits.freeTranslationChars' '10000')
-CURRENT_MAX_PROJECTS=$(config_get '.limits.maxProjectsPerUser' '5')
+
+# Free tier limits
+CURRENT_FREE_TRANSLATION_CHARS=$(config_get '.limits.freeTranslationChars' '10000')
+CURRENT_FREE_OTHER_CHARS=$(config_get '.limits.freeOtherChars' '50000')
+CURRENT_FREE_MAX_PROJECTS=$(config_get '.limits.freeMaxProjects' '5')
+CURRENT_FREE_MAX_API_KEYS=$(config_get '.limits.freeMaxApiKeys' '3')
+
+# Team tier limits
+CURRENT_TEAM_TRANSLATION_CHARS=$(config_get '.limits.teamTranslationChars' '100000')
+CURRENT_TEAM_OTHER_CHARS=$(config_get '.limits.teamOtherChars' '500000')
+CURRENT_TEAM_MAX_MEMBERS=$(config_get '.limits.teamMaxMembers' '20')
+CURRENT_TEAM_MAX_API_KEYS=$(config_get '.limits.teamMaxApiKeys' '10')
+
+# Enterprise tier limits (10M LRM, 50M Other)
+CURRENT_ENTERPRISE_TRANSLATION_CHARS=$(config_get '.limits.enterpriseTranslationChars' '10000000')
+CURRENT_ENTERPRISE_OTHER_CHARS=$(config_get '.limits.enterpriseOtherChars' '50000000')
+
+# General limits
 CURRENT_MAX_KEYS=$(config_get '.limits.maxKeysPerProject' '10000')
 
 # Write merged config.json
@@ -343,8 +361,16 @@ cat > "$CONFIG_FILE" <<EOF
     "freeTranslations": ${CURRENT_FREE_TRANS}
   },
   "limits": {
-    "freeTranslationChars": ${CURRENT_FREE_CHARS},
-    "maxProjectsPerUser": ${CURRENT_MAX_PROJECTS},
+    "freeTranslationChars": ${CURRENT_FREE_TRANSLATION_CHARS},
+    "freeOtherChars": ${CURRENT_FREE_OTHER_CHARS},
+    "freeMaxProjects": ${CURRENT_FREE_MAX_PROJECTS},
+    "freeMaxApiKeys": ${CURRENT_FREE_MAX_API_KEYS},
+    "teamTranslationChars": ${CURRENT_TEAM_TRANSLATION_CHARS},
+    "teamOtherChars": ${CURRENT_TEAM_OTHER_CHARS},
+    "teamMaxMembers": ${CURRENT_TEAM_MAX_MEMBERS},
+    "teamMaxApiKeys": ${CURRENT_TEAM_MAX_API_KEYS},
+    "enterpriseTranslationChars": ${CURRENT_ENTERPRISE_TRANSLATION_CHARS},
+    "enterpriseOtherChars": ${CURRENT_ENTERPRISE_OTHER_CHARS},
     "maxKeysPerProject": ${CURRENT_MAX_KEYS}
   }
 }
@@ -458,6 +484,55 @@ if [ -n "$API_PORT" ]; then
   api:
     ports:
       - "${API_PORT}:8080"
+EOF
+fi
+
+# Add PostgreSQL port if not 0 (internal only)
+if [ -n "$POSTGRES_PORT" ] && [ "$POSTGRES_PORT" != "0" ]; then
+    cat >> "$OVERRIDE_FILE" <<EOF
+
+  postgres:
+    ports:
+      - "${POSTGRES_PORT}:5432"
+EOF
+fi
+
+# Add Redis port if not 0 (internal only)
+if [ -n "$REDIS_PORT" ] && [ "$REDIS_PORT" != "0" ]; then
+    cat >> "$OVERRIDE_FILE" <<EOF
+
+  redis:
+    ports:
+      - "${REDIS_PORT}:6379"
+EOF
+fi
+
+# Add MinIO ports if not 0 (internal only)
+if [ -n "$MINIO_PORT" ] && [ "$MINIO_PORT" != "0" ]; then
+    # Check if console port is also exposed
+    if [ -n "$MINIO_CONSOLE" ] && [ "$MINIO_CONSOLE" != "0" ]; then
+        cat >> "$OVERRIDE_FILE" <<EOF
+
+  minio:
+    ports:
+      - "${MINIO_PORT}:9000"
+      - "${MINIO_CONSOLE}:9001"
+EOF
+    else
+        cat >> "$OVERRIDE_FILE" <<EOF
+
+  minio:
+    ports:
+      - "${MINIO_PORT}:9000"
+EOF
+    fi
+elif [ -n "$MINIO_CONSOLE" ] && [ "$MINIO_CONSOLE" != "0" ]; then
+    # Only console port exposed
+    cat >> "$OVERRIDE_FILE" <<EOF
+
+  minio:
+    ports:
+      - "${MINIO_CONSOLE}:9001"
 EOF
 fi
 
@@ -608,13 +683,29 @@ if [ -n "$HTTPS_PORT" ]; then
 else
     echo "  • nginx:         http://localhost:${NGINX_PORT}"
 fi
-if [ -n "$API_PORT" ]; then
+if [ -n "$API_PORT" ] && [ "$API_PORT" != "0" ]; then
     echo "  • API (direct):  http://localhost:${API_PORT}"
 fi
-echo "  • PostgreSQL:    localhost:${POSTGRES_PORT}"
-echo "  • Redis:         localhost:${REDIS_PORT}"
-echo "  • MinIO API:     http://localhost:${MINIO_PORT}"
-echo "  • MinIO Console: http://localhost:${MINIO_CONSOLE}"
+if [ -n "$POSTGRES_PORT" ] && [ "$POSTGRES_PORT" != "0" ]; then
+    echo "  • PostgreSQL:    localhost:${POSTGRES_PORT}"
+else
+    echo "  • PostgreSQL:    (internal only)"
+fi
+if [ -n "$REDIS_PORT" ] && [ "$REDIS_PORT" != "0" ]; then
+    echo "  • Redis:         localhost:${REDIS_PORT}"
+else
+    echo "  • Redis:         (internal only)"
+fi
+if [ -n "$MINIO_PORT" ] && [ "$MINIO_PORT" != "0" ]; then
+    echo "  • MinIO API:     http://localhost:${MINIO_PORT}"
+else
+    echo "  • MinIO API:     (internal only)"
+fi
+if [ -n "$MINIO_CONSOLE" ] && [ "$MINIO_CONSOLE" != "0" ]; then
+    echo "  • MinIO Console: http://localhost:${MINIO_CONSOLE}"
+else
+    echo "  • MinIO Console: (internal only)"
+fi
 echo ""
 echo "Configuration: $CONFIG_FILE"
 echo ""

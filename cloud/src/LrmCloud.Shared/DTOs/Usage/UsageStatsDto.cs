@@ -13,11 +13,34 @@ public class UsageStatsDto
         ? Math.Round((double)TranslationCharsUsed / TranslationCharsLimit * 100, 1)
         : 0;
 
+    // Other providers usage (BYOK + free community)
+
     /// <summary>
-    /// BYOK (Bring Your Own Key) translation characters used.
-    /// Tracked separately from LRM usage. Unlimited, but monitored.
+    /// Other providers characters used this period.
     /// </summary>
-    public long ByokCharsUsed { get; set; }
+    public long OtherCharsUsed { get; set; }
+
+    /// <summary>
+    /// Other providers character limit per month.
+    /// </summary>
+    public long OtherCharsLimit { get; set; }
+
+    /// <summary>
+    /// When the other providers usage counter resets.
+    /// </summary>
+    public DateTime? OtherCharsResetAt { get; set; }
+
+    /// <summary>
+    /// Percentage of other providers limit used (0-100).
+    /// </summary>
+    public double OtherUsagePercent => OtherCharsLimit > 0
+        ? Math.Round((double)OtherCharsUsed / OtherCharsLimit * 100, 1)
+        : 0;
+
+    /// <summary>
+    /// Legacy property - maps to OtherCharsUsed.
+    /// </summary>
+    public long ByokCharsUsed => OtherCharsUsed;
 
     // Project stats
     public int ProjectCount { get; set; }

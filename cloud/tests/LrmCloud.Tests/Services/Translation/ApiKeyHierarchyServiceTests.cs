@@ -42,7 +42,10 @@ public class ApiKeyHierarchyServiceTests : IDisposable
         };
 
         _encryptionService = new ApiKeyEncryptionService(_cloudConfiguration);
-        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, _cloudConfiguration);
+
+        // Create a mock IConfiguration for ApiKeyHierarchyService
+        var mockConfiguration = new Mock<IConfiguration>();
+        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, mockConfiguration.Object);
     }
 
     public void Dispose()
@@ -161,18 +164,18 @@ public class ApiKeyHierarchyServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ResolveApiKey_ShouldReturnPlatformKey_WhenNoOtherKeys()
+    public async Task ResolveApiKey_ShouldReturnNull_WhenNoKeysConfigured()
     {
         // Arrange
         var user = await CreateTestUserAsync();
         var project = await CreateTestProjectAsync(userId: user.Id);
 
-        // Act - google has a platform key configured
+        // Act - no keys configured at any level
         var (apiKey, source) = await _hierarchyService.ResolveApiKeyAsync("google", project.Id, user.Id);
 
-        // Assert
-        Assert.Equal("platform-google-key", apiKey);
-        Assert.Equal("platform", source);
+        // Assert - should return null when no keys are configured
+        Assert.Null(apiKey);
+        Assert.Null(source);
     }
 
     [Fact]
@@ -222,7 +225,7 @@ public class ApiKeyHierarchyServiceTests : IDisposable
         var savedKey = await _db.UserApiKeys.FirstOrDefaultAsync(k => k.UserId == user.Id && k.Provider == "deepl");
         Assert.NotNull(savedKey);
 
-        var decrypted = _encryptionService.Decrypt(savedKey.EncryptedKey);
+        var decrypted = _encryptionService.Decrypt(savedKey!.EncryptedKey!);
         Assert.Equal("my-deepl-key", decrypted);
     }
 
@@ -240,7 +243,7 @@ public class ApiKeyHierarchyServiceTests : IDisposable
         var keys = await _db.UserApiKeys.Where(k => k.UserId == user.Id && k.Provider == "deepl").ToListAsync();
         Assert.Single(keys);
 
-        var decrypted = _encryptionService.Decrypt(keys[0].EncryptedKey);
+        var decrypted = _encryptionService.Decrypt(keys[0].EncryptedKey!);
         Assert.Equal("new-key", decrypted);
     }
 
@@ -258,7 +261,7 @@ public class ApiKeyHierarchyServiceTests : IDisposable
         var savedKey = await _db.ProjectApiKeys.FirstOrDefaultAsync(k => k.ProjectId == project.Id && k.Provider == "openai");
         Assert.NotNull(savedKey);
 
-        var decrypted = _encryptionService.Decrypt(savedKey.EncryptedKey);
+        var decrypted = _encryptionService.Decrypt(savedKey!.EncryptedKey!);
         Assert.Equal("project-openai-key", decrypted);
     }
 
@@ -276,7 +279,7 @@ public class ApiKeyHierarchyServiceTests : IDisposable
         var savedKey = await _db.OrganizationApiKeys.FirstOrDefaultAsync(k => k.OrganizationId == org.Id && k.Provider == "claude");
         Assert.NotNull(savedKey);
 
-        var decrypted = _encryptionService.Decrypt(savedKey.EncryptedKey);
+        var decrypted = _encryptionService.Decrypt(savedKey!.EncryptedKey!);
         Assert.Equal("org-claude-key", decrypted);
     }
 
@@ -339,15 +342,13 @@ public class ApiKeyHierarchyServiceTests : IDisposable
         // Act
         var configured = await _hierarchyService.GetConfiguredProvidersAsync(project.Id, user.Id, org.Id);
 
-        // Assert
+        // Assert - only user, organization, and project keys (no platform keys anymore)
         Assert.Contains("deepl", configured.Keys);
         Assert.Contains("openai", configured.Keys);
         Assert.Contains("claude", configured.Keys);
-        Assert.Contains("google", configured.Keys); // platform key
 
         Assert.Equal("user", configured["deepl"]);
         Assert.Equal("organization", configured["openai"]);
         Assert.Equal("project", configured["claude"]);
-        Assert.Equal("platform", configured["google"]);
     }
 }

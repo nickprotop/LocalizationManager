@@ -48,7 +48,8 @@ public class CloudTranslationServiceTests : IDisposable
         };
 
         _encryptionService = new ApiKeyEncryptionService(_cloudConfiguration);
-        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, _cloudConfiguration);
+        var mockConfiguration = new Mock<IConfiguration>();
+        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, mockConfiguration.Object);
         _loggerMock = new Mock<ILogger<CloudTranslationService>>();
         _lrmProviderMock = new Mock<ILrmTranslationProvider>();
 
@@ -332,7 +333,8 @@ public class CloudTranslationServiceTests : IDisposable
         };
 
         var encryptionService = new ApiKeyEncryptionService(cloudConfig);
-        var hierarchyService = new ApiKeyHierarchyService(db, encryptionService, cloudConfig);
+        var mockConfiguration = new Mock<IConfiguration>();
+        var hierarchyService = new ApiKeyHierarchyService(db, encryptionService, mockConfiguration.Object);
         var loggerMock = new Mock<ILogger<CloudTranslationService>>();
         var lrmProviderMock = new Mock<ILrmTranslationProvider>();
         lrmProviderMock.Setup(x => x.IsAvailableAsync(It.IsAny<int>())).ReturnsAsync((false, "LRM disabled"));

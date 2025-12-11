@@ -49,13 +49,39 @@ public class TranslationUsageDto
     /// </summary>
     public bool IsOverLimit => CharacterLimit.HasValue && CharactersUsed >= CharacterLimit.Value;
 
-    // BYOK (Bring Your Own Key) usage - tracked but unlimited
+    // Other providers usage (BYOK + free community)
 
     /// <summary>
-    /// BYOK characters translated (using user's own API keys).
-    /// Tracked separately from LRM usage. Unlimited, but monitored.
+    /// Other providers characters translated this period.
     /// </summary>
-    public long ByokCharactersUsed { get; set; }
+    public long OtherCharactersUsed { get; set; }
+
+    /// <summary>
+    /// Other providers character limit (null = unlimited).
+    /// </summary>
+    public long? OtherCharacterLimit { get; set; }
+
+    /// <summary>
+    /// When the other providers usage counter resets.
+    /// </summary>
+    public DateTime? OtherResetsAt { get; set; }
+
+    /// <summary>
+    /// Percentage of other providers limit used (0-100).
+    /// </summary>
+    public double OtherUsagePercentage => OtherCharacterLimit.HasValue && OtherCharacterLimit.Value > 0
+        ? (double)OtherCharactersUsed / OtherCharacterLimit.Value * 100
+        : 0;
+
+    /// <summary>
+    /// Whether the user has exceeded their other providers limit.
+    /// </summary>
+    public bool IsOtherOverLimit => OtherCharacterLimit.HasValue && OtherCharactersUsed >= OtherCharacterLimit.Value;
+
+    /// <summary>
+    /// Legacy property - maps to OtherCharactersUsed.
+    /// </summary>
+    public long ByokCharactersUsed => OtherCharactersUsed;
 }
 
 /// <summary>

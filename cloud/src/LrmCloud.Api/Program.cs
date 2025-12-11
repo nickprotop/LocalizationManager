@@ -2,6 +2,7 @@ namespace LrmCloud.Api;
 
 using LrmCloud.Api.Authentication;
 using LrmCloud.Api.Authorization;
+using LrmCloud.Api.BackgroundJobs;
 using LrmCloud.Api.Data;
 using LrmCloud.Api.Middleware;
 using LrmCloud.Api.Services;
@@ -127,6 +128,9 @@ public class Program
 
             // Authorization Service
             builder.Services.AddScoped<ILrmAuthorizationService, LrmAuthorizationService>();
+
+            // Background Jobs
+            builder.Services.AddHostedService<UsageResetService>();
 
             // =============================================================================
             // Database (PostgreSQL + EF Core)

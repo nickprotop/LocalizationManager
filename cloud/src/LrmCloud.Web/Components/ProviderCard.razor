@@ -7,7 +7,13 @@
                 <MudIcon Icon="@GetProviderIcon(Provider.Name)" Size="Size.Medium" />
                 <MudStack Spacing="0">
                     <MudText Typo="Typo.subtitle1">@Provider.DisplayName</MudText>
-                    @if (!Provider.RequiresApiKey)
+                    @if (Provider.IsManagedProvider)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">
+                            Managed
+                        </MudChip>
+                    }
+                    else if (!Provider.RequiresApiKey)
                     {
                         <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">
                             Free
@@ -109,6 +115,7 @@
 
     private static string GetProviderIcon(string provider) => provider switch
     {
+        "lrm" => Icons.Material.Filled.Star,
         "google" => Icons.Custom.Brands.Google,
         "deepl" => Icons.Material.Filled.Language,
         "openai" => Icons.Material.Filled.Psychology,

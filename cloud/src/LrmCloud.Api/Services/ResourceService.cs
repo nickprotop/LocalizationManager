@@ -872,7 +872,7 @@ public class ResourceService : IResourceService
         // Get all translations grouped by language
         // For plural keys, each form counts as a separate translation slot
         var languageData = await _db.Translations
-            .Where(t => t.ResourceKey.ProjectId == projectId)
+            .Where(t => t.ResourceKey!.ProjectId == projectId)
             .GroupBy(t => t.LanguageCode)
             .Select(g => new
             {
@@ -910,7 +910,7 @@ public class ResourceService : IResourceService
 
             // Check if language already exists
             var exists = await _db.Translations
-                .AnyAsync(t => t.ResourceKey.ProjectId == projectId && t.LanguageCode == request.LanguageCode);
+                .AnyAsync(t => t.ResourceKey!.ProjectId == projectId && t.LanguageCode == request.LanguageCode);
 
             if (exists)
                 return (false, null, $"Language '{request.LanguageCode}' already exists in this project");
@@ -997,7 +997,7 @@ public class ResourceService : IResourceService
 
             // Get all translations for this language
             var translations = await _db.Translations
-                .Where(t => t.ResourceKey.ProjectId == projectId && t.LanguageCode == request.LanguageCode)
+                .Where(t => t.ResourceKey!.ProjectId == projectId && t.LanguageCode == request.LanguageCode)
                 .ToListAsync();
 
             if (translations.Count == 0)

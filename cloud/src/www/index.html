@@ -607,9 +607,9 @@
                         <a href="/docs">Docs</a>
                     </div>
 
-                    <div class="nav-buttons">
-                        <a href="/app/login" class="btn btn-secondary">Log In</a>
-                        <a href="/app/register" class="btn btn-primary">Get Started</a>
+                    <div class="nav-buttons" id="nav-buttons">
+                        <a href="/app/login" class="btn btn-secondary" id="nav-login">Log In</a>
+                        <a href="/app/register" class="btn btn-primary" id="nav-register">Get Started</a>
                     </div>
 
                     <button class="mobile-menu-btn" aria-label="Menu">☰</button>
@@ -625,7 +625,7 @@
             <p>Manage translations for your .NET and web applications with 10 AI translation providers, team collaboration, and CLI/TUI/Web interfaces.</p>
 
             <div class="hero-buttons">
-                <a href="/app/register" class="btn btn-primary btn-lg">Get Started Free</a>
+                <a href="/app/register" class="btn btn-primary btn-lg" id="hero-cta">Get Started Free</a>
                 <a href="https://github.com/nickprotop/LocalizationManager" class="btn btn-secondary btn-lg" target="_blank">View on GitHub</a>
             </div>
 
@@ -676,7 +676,7 @@
                 <div class="feature-card">
                     <div class="feature-icon">🔑</div>
                     <h3>Bring Your Own Keys</h3>
-                    <p>Use platform translations or configure your own API keys. Your keys, your data, your control.</p>
+                    <p>Use LRM managed translations or bring your own API keys. Your keys, your data, your control.</p>
                 </div>
 
                 <div class="feature-card">
@@ -753,41 +753,46 @@
                     <div class="price">$0 <span>/month</span></div>
                     <p class="description">Perfect for getting started</p>
                     <ul>
-                        <li>10,000 characters/month</li>
+                        <li>10K LRM Translation chars/mo</li>
+                        <li>50K Other Providers chars/mo</li>
                         <li>Free providers (Lingva, MyMemory)</li>
-                        <li>2 projects</li>
+                        <li>5 projects</li>
                         <li>Bring your own API keys</li>
-                        <li>CLI + TUI access</li>
+                        <li>CLI + TUI + Web access</li>
                     </ul>
                     <a href="/app/register" class="btn btn-secondary">Get Started</a>
                 </div>
 
                 <div class="price-card popular">
-                    <h3>Pro</h3>
-                    <div class="price">$9 <span>/month</span></div>
-                    <p class="description">For professional developers</p>
-                    <ul>
-                        <li>100,000 characters/month</li>
-                        <li>Google + DeepL included</li>
-                        <li>Unlimited projects</li>
-                        <li>Priority support</li>
-                        <li>Translation cache</li>
-                    </ul>
-                    <a href="/app/register?plan=pro" class="btn btn-primary">Start Pro Trial</a>
-                </div>
-
-                <div class="price-card">
                     <h3>Team</h3>
                     <div class="price">$29 <span>/month</span></div>
                     <p class="description">For teams and organizations</p>
                     <ul>
-                        <li>500,000 characters/month</li>
-                        <li>All premium providers</li>
-                        <li>Unlimited team members</li>
+                        <li>100K LRM Translation chars/mo</li>
+                        <li>500K Other Providers chars/mo</li>
+                        <li>All translation providers</li>
+                        <li>Unlimited projects</li>
+                        <li>Up to 20 team members</li>
                         <li>Organization management</li>
-                        <li>API access</li>
+                        <li>Priority support</li>
                     </ul>
-                    <a href="/app/register?plan=team" class="btn btn-secondary">Contact Sales</a>
+                    <a href="/app/register?plan=team" class="btn btn-primary">Start Team Trial</a>
+                </div>
+
+                <div class="price-card">
+                    <h3>Enterprise</h3>
+                    <div class="price">Custom</div>
+                    <p class="description">For large organizations</p>
+                    <ul>
+                        <li>10M LRM Translation chars/mo</li>
+                        <li>50M Other Providers chars/mo</li>
+                        <li>All providers + custom</li>
+                        <li>Unlimited projects</li>
+                        <li>Unlimited team members</li>
+                        <li>SSO/SAML support</li>
+                        <li>Dedicated support</li>
+                    </ul>
+                    <a href="mailto:sales@lrmcloud.io" class="btn btn-secondary">Contact Sales</a>
                 </div>
             </div>
         </div>
@@ -798,7 +803,7 @@
         <div class="container">
             <h2>Ready to Simplify Your Localization?</h2>
             <p>Join developers who trust LRM Cloud for their translation workflows.</p>
-            <a href="/app/register" class="btn btn-lg">Get Started Free</a>
+            <a href="/app/register" class="btn btn-lg" id="cta-button">Get Started Free</a>
         </div>
     </section>
 
@@ -820,6 +825,55 @@
     </footer>
 
     <script>
+        // Check authentication state from localStorage
+        (function() {
+            let token = localStorage.getItem('lrm_access_token');
+            let expiry = localStorage.getItem('lrm_token_expiry');
+
+            // Try to parse as JSON (Blazored format) or use as-is
+            try {
+                if (token && token.startsWith('"')) token = JSON.parse(token);
+                if (expiry && expiry.startsWith('"')) expiry = JSON.parse(expiry);
+            } catch (e) {
+                // If parsing fails, use the raw values
+            }
+
+            // Parse expiry date - handle high-precision ISO 8601 format from .NET
+            // JavaScript Date() only handles up to 3 decimal places for milliseconds
+            let expiryDate = null;
+            if (expiry) {
+                // Truncate fractional seconds to 3 digits (milliseconds)
+                // e.g., "2025-12-12T23:14:00.7083036Z" -> "2025-12-12T23:14:00.708Z"
+                const normalizedExpiry = expiry.replace(/\.(\d{3})\d*Z$/, '.$1Z');
+                expiryDate = new Date(normalizedExpiry);
+            }
+
+            // Check if user is logged in and token is not expired
+            const isLoggedIn = token && expiryDate && !isNaN(expiryDate.getTime()) && expiryDate > new Date();
+
+            if (isLoggedIn) {
+                // Update navigation buttons
+                const navButtons = document.getElementById('nav-buttons');
+                if (navButtons) {
+                    navButtons.innerHTML = '<a href="/app/" class="btn btn-primary">Dashboard</a>';
+                }
+
+                // Update hero CTA
+                const heroCta = document.getElementById('hero-cta');
+                if (heroCta) {
+                    heroCta.href = '/app/';
+                    heroCta.textContent = 'Go to Dashboard';
+                }
+
+                // Update bottom CTA
+                const ctaButton = document.getElementById('cta-button');
+                if (ctaButton) {
+                    ctaButton.href = '/app/';
+                    ctaButton.textContent = 'Go to Dashboard';
+                }
+            }
+        })();
+
         // Smooth scroll for anchor links
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {

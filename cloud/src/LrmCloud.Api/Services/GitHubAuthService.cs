@@ -280,6 +280,9 @@ public class GitHubAuthService : IGitHubAuthService
             GitHubTokenExpiresAt = null,
             Plan = "free",
             TranslationCharsLimit = _config.Limits.FreeTranslationChars,
+            TranslationCharsResetAt = DateTime.UtcNow.AddMonths(1),
+            OtherCharsLimit = _config.Limits.FreeOtherChars,
+            OtherCharsResetAt = DateTime.UtcNow.AddMonths(1),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

@@ -89,8 +89,7 @@ services:
     image: postgres:16-alpine
     container_name: lrmcloud-postgres
     restart: unless-stopped
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # Ports configured in docker-compose.override.yml (0=internal only)
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -106,8 +105,7 @@ services:
     image: redis:7-alpine
     container_name: lrmcloud-redis
     restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    # Ports configured in docker-compose.override.yml (0=internal only)
     volumes:
       - ./data/redis:/data
     command: redis-server --requirepass ${REDIS_PASSWORD}
@@ -119,9 +117,7 @@ services:
     image: minio/minio:latest
     container_name: lrmcloud-minio
     restart: unless-stopped
-    ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE:-9001}:9001"
+    # Ports configured in docker-compose.override.yml (0=internal only)
     volumes:
       - ./data/minio:/data
     environment:

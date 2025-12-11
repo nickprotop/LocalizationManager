@@ -692,7 +692,7 @@ public class ProjectServiceTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(2, result.KeyCount);
         Assert.Equal(3, result.TranslationCount);
-        Assert.Equal(50.0, result.CompletionPercentage); // 2 non-pending / 4 expected (2 keys * 2 languages) = 50%
+        Assert.Equal(100.0, result.CompletionPercentage); // All 3 translations have non-empty values
     }
 
     [Fact]

@@ -54,7 +54,15 @@
   },
   "limits": {
     "freeTranslationChars": 10000,
-    "maxProjectsPerUser": 5,
+    "freeOtherChars": 50000,
+    "freeMaxProjects": 5,
+    "freeMaxApiKeys": 3,
+    "teamTranslationChars": 100000,
+    "teamOtherChars": 500000,
+    "teamMaxMembers": 20,
+    "teamMaxApiKeys": 10,
+    "enterpriseTranslationChars": 10000000,
+    "enterpriseOtherChars": 50000000,
     "maxKeysPerProject": 10000
   }
 }

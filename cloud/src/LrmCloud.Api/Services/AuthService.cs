@@ -64,6 +64,8 @@ public class AuthService : IAuthService
             Plan = "free",
             TranslationCharsLimit = _config.Limits.FreeTranslationChars,
             TranslationCharsResetAt = DateTime.UtcNow.AddMonths(1),
+            OtherCharsLimit = _config.Limits.FreeOtherChars,
+            OtherCharsResetAt = DateTime.UtcNow.AddMonths(1),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -586,7 +588,9 @@ public class AuthService : IAuthService
             TranslationCharsUsed = user.TranslationCharsUsed,
             TranslationCharsLimit = user.TranslationCharsLimit,
             TranslationCharsResetAt = user.TranslationCharsResetAt,
-            ByokCharsUsed = user.ByokCharsUsed,
+            OtherCharsUsed = user.OtherCharsUsed,
+            OtherCharsLimit = user.OtherCharsLimit,
+            OtherCharsResetAt = user.OtherCharsResetAt,
             LastLoginAt = user.LastLoginAt,
             CreatedAt = user.CreatedAt
         };
@@ -644,7 +648,9 @@ public class AuthService : IAuthService
             TranslationCharsUsed = user.TranslationCharsUsed,
             TranslationCharsLimit = user.TranslationCharsLimit,
             TranslationCharsResetAt = user.TranslationCharsResetAt,
-            ByokCharsUsed = user.ByokCharsUsed,
+            OtherCharsUsed = user.OtherCharsUsed,
+            OtherCharsLimit = user.OtherCharsLimit,
+            OtherCharsResetAt = user.OtherCharsResetAt,
             LastLoginAt = user.LastLoginAt,
             CreatedAt = user.CreatedAt
         };
@@ -1165,5 +1171,67 @@ public class AuthService : IAuthService
                 "Failed to send account deletion confirmation to {Email}. Account was deleted but confirmation email failed.",
                 user.Email);
         }
+    }
+
+    // ============================================================================
+    // Plan Management Methods
+    // ============================================================================
+
+    public async Task<(bool Success, string? ErrorMessage)> UpdatePlanAsync(int userId, string newPlan)
+    {
+        var validPlans = new[] { "free", "team", "enterprise" };
+        var normalizedPlan = newPlan?.ToLowerInvariant() ?? "free";
+
+        if (!validPlans.Contains(normalizedPlan))
+        {
+            return (false, $"Invalid plan: {newPlan}. Valid plans are: {string.Join(", ", validPlans)}");
+        }
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null)
+        {
+            return (false, "User not found");
+        }
+
+        var oldPlan = user.Plan;
+
+        // Update plan
+        user.Plan = normalizedPlan;
+
+        // Update limits based on new plan
+        user.TranslationCharsLimit = _config.Limits.GetTranslationCharsLimit(normalizedPlan);
+        user.OtherCharsLimit = _config.Limits.GetOtherCharsLimit(normalizedPlan);
+
+        // If upgrading, reset counters to give user fresh quota
+        if (IsUpgrade(oldPlan, normalizedPlan))
+        {
+            user.TranslationCharsUsed = 0;
+            user.OtherCharsUsed = 0;
+            user.TranslationCharsResetAt = DateTime.UtcNow.AddMonths(1);
+            user.OtherCharsResetAt = DateTime.UtcNow.AddMonths(1);
+        }
+
+        user.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("User {UserId} plan changed from {OldPlan} to {NewPlan}",
+            userId, oldPlan, normalizedPlan);
+
+        return (true, null);
+    }
+
+    private static bool IsUpgrade(string oldPlan, string newPlan)
+    {
+        var planOrder = new Dictionary<string, int>
+        {
+            ["free"] = 0,
+            ["team"] = 1,
+            ["enterprise"] = 2
+        };
+
+        var oldOrder = planOrder.GetValueOrDefault(oldPlan?.ToLowerInvariant() ?? "free", 0);
+        var newOrder = planOrder.GetValueOrDefault(newPlan?.ToLowerInvariant() ?? "free", 0);
+
+        return newOrder > oldOrder;
     }
 }

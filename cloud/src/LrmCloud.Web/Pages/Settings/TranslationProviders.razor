@@ -39,16 +39,53 @@
 
         <!-- Hierarchy Explanation -->
         <MudExpansionPanels>
-            <MudExpansionPanel Text="How does configuration hierarchy work?">
+            <MudExpansionPanel Text="How do translation providers work?">
                 <MudStack Spacing="3">
                     <MudText Typo="Typo.body2">
-                        LRM Cloud supports configuration at multiple levels. Higher levels override lower levels:
+                        LRM Cloud offers two types of translation providers:
+                    </MudText>
+
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <thead>
+                            <tr>
+                                <th>Provider Type</th>
+                                <th>Description</th>
+                                <th>Limits</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="background-color: var(--mud-palette-warning-lighten);">
+                                <td>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Warning" />
+                                        <strong>LRM Translation</strong>
+                                    </MudStack>
+                                </td>
+                                <td>Our managed translation service. No API key needed - we handle everything.</td>
+                                <td>Free: 10K/mo, Team: 100K/mo, Enterprise: Unlimited</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudIcon Icon="@Icons.Material.Filled.CloudQueue" Size="Size.Small" Color="Color.Secondary" />
+                                        <strong>Other Providers</strong>
+                                    </MudStack>
+                                </td>
+                                <td>BYOK (your own API keys) + free community providers (MyMemory, Lingva).</td>
+                                <td>Free: 50K/mo, Team: 500K/mo, Enterprise: Unlimited</td>
+                            </tr>
+                        </tbody>
+                    </MudSimpleTable>
+
+                    <MudDivider />
+
+                    <MudText Typo="Typo.subtitle2">API Key Configuration Hierarchy</MudText>
+                    <MudText Typo="Typo.body2">
+                        For BYOK providers, API keys can be configured at multiple levels. Higher levels override lower levels:
                     </MudText>
 
                     <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Justify="Justify.Center">
-                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Default">Platform</MudChip>
-                            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
                             <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Secondary">Organization</MudChip>
                             <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
                             <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary">User (You)</MudChip>
@@ -67,14 +104,9 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td><MudChip T="string" Size="Size.Small" Color="Color.Default">Platform</MudChip></td>
-                                <td>Server configuration</td>
-                                <td>System administrator</td>
-                            </tr>
-                            <tr>
                                 <td><MudChip T="string" Size="Size.Small" Color="Color.Secondary">Organization</MudChip></td>
                                 <td>
-                                    <MudLink Href="organizations">Organizations</MudLink> &rarr; Settings
+                                    <MudLink Href="organizations">Organizations</MudLink> &rarr; API Keys
                                 </td>
                                 <td>Organization admin/owner</td>
                             </tr>
@@ -85,7 +117,7 @@
                             </tr>
                             <tr>
                                 <td><MudChip T="string" Size="Size.Small" Color="Color.Success">Project</MudChip></td>
-                                <td>Projects &rarr; [Project] &rarr; Translation</td>
+                                <td>Projects &rarr; [Project] &rarr; Settings</td>
                                 <td>Project owner</td>
                             </tr>
                         </tbody>
@@ -100,13 +132,34 @@
         }
         else
         {
-            <MudText Typo="Typo.h6" Class="mt-4">Free Providers</MudText>
+            @* LRM Managed Translation Service *@
+            @if (LrmProvider != null)
+            {
+                <MudText Typo="Typo.h6" Class="mt-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Warning" Size="Size.Small" Style="vertical-align: middle;" />
+                    LRM Managed Translation
+                </MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                    Our managed translation service. Free tier: 10,000 characters/month. No API key required - we handle everything.
+                </MudText>
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <ProviderCard Provider="LrmProvider" OnConfigure="OpenConfigureDialog" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+            }
+
+            @* Free Community Providers *@
+            <MudText Typo="Typo.h6">Free Community Providers</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-                These providers work without an API key. Some have optional configuration options.
+                Open source and community-powered providers. No API key required, but may have rate limits.
             </MudText>
 
             <MudGrid Spacing="2">
-                @foreach (var provider in _providers.Where(p => !p.RequiresApiKey))
+                @foreach (var provider in _providers.Where(p => !p.RequiresApiKey && !p.IsManagedProvider))
                 {
                     <MudItem xs="12" sm="6">
                         <ProviderCard Provider="provider" OnConfigure="OpenConfigureDialog" />
@@ -116,9 +169,10 @@
 
             <MudDivider Class="my-4" />
 
-            <MudText Typo="Typo.h6">API Key Required</MudText>
+            @* BYOK Providers *@
+            <MudText Typo="Typo.h6">Bring Your Own Key (BYOK)</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-                Add your own API keys for these premium providers. Bring Your Own Key (BYOK) - you only pay for what you use.
+                Add your own API keys for premium providers. You pay the provider directly for usage.
             </MudText>
 
             <MudGrid Spacing="2">
@@ -142,7 +196,7 @@
                     <MudStack Spacing="1">
                         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                <MudIcon Icon="@Icons.Material.Filled.Translate" Color="Color.Primary" Size="Size.Small" />
+                                <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Warning" Size="Size.Small" />
                                 <MudText Typo="Typo.body1">
                                     <strong>LRM Translation</strong>
                                 </MudText>
@@ -166,27 +220,40 @@
                         }
                     </MudStack>
 
-                    <!-- BYOK Usage -->
-                    @if (_usage.ByokCharactersUsed > 0)
-                    {
-                        <MudDivider />
-                        <MudStack Spacing="1">
-                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                    <MudIcon Icon="@Icons.Material.Filled.Key" Color="Color.Secondary" Size="Size.Small" />
-                                    <MudText Typo="Typo.body1">
-                                        <strong>Your API Keys (BYOK)</strong>
-                                    </MudText>
-                                </MudStack>
-                                <MudText Typo="Typo.body2">
-                                    @_usage.ByokCharactersUsed.ToString("N0") chars
+                    <!-- Other Providers Usage -->
+                    <MudDivider />
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudIcon Icon="@Icons.Material.Filled.CloudQueue" Color="Color.Secondary" Size="Size.Small" />
+                                <MudText Typo="Typo.body1">
+                                    <strong>Other Providers</strong>
                                 </MudText>
                             </MudStack>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                Using your own API keys - unlimited
-                            </MudText>
+                            @if (_usage.OtherCharacterLimit.HasValue)
+                            {
+                                <MudText Typo="Typo.body2">
+                                    @_usage.OtherCharactersUsed.ToString("N0") / @_usage.OtherCharacterLimit.Value.ToString("N0") chars
+                                </MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2">
+                                    @_usage.OtherCharactersUsed.ToString("N0") chars
+                                </MudText>
+                            }
                         </MudStack>
-                    }
+                        @if (_usage.OtherCharacterLimit.HasValue)
+                        {
+                            <MudProgressLinear Value="@_usage.OtherUsagePercentage"
+                                               Color="@GetUsageColor(_usage.OtherUsagePercentage)"
+                                               Rounded="true"
+                                               Size="Size.Medium" />
+                        }
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            BYOK + free community providers (MyMemory, Lingva)
+                        </MudText>
+                    </MudStack>
 
                     <!-- Reset Date -->
                     @if (_usage.ResetsAt.HasValue)
@@ -225,6 +292,9 @@
     private List<TranslationProviderDto> _providers = new();
     private TranslationUsageDto? _usage;
     private bool _isLoading = true;
+
+    // Computed property for the LRM managed provider
+    private TranslationProviderDto? LrmProvider => _providers.FirstOrDefault(p => p.IsManagedProvider);
 
     protected override async Task OnInitializedAsync()
     {

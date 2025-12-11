@@ -20,4 +20,9 @@ public interface IAuthService
     Task<(bool Success, string? ErrorMessage)> RevokeSessionAsync(int userId, int sessionId);
     Task<(bool Success, int RevokedCount, string? ErrorMessage)> RevokeAllOtherSessionsAsync(int userId, string currentRefreshToken);
     Task<(bool Success, string? ErrorMessage)> DeleteAccountAsync(int userId, DeleteAccountRequest request);
+
+    /// <summary>
+    /// Update user plan and adjust limits accordingly.
+    /// </summary>
+    Task<(bool Success, string? ErrorMessage)> UpdatePlanAsync(int userId, string newPlan);
 }

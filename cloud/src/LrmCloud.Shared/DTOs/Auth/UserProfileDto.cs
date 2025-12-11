@@ -26,8 +26,13 @@ public class UserProfileDto
     public int TranslationCharsLimit { get; set; }
     public DateTime? TranslationCharsResetAt { get; set; }
 
-    // BYOK Usage (tracked but unlimited)
-    public long ByokCharsUsed { get; set; }
+    // Other providers usage (BYOK + free community)
+    public long OtherCharsUsed { get; set; }
+    public long OtherCharsLimit { get; set; }
+    public DateTime? OtherCharsResetAt { get; set; }
+
+    // Legacy property for backward compatibility
+    public long ByokCharsUsed => OtherCharsUsed;
 
     // Timestamps
     public DateTime? LastLoginAt { get; set; }

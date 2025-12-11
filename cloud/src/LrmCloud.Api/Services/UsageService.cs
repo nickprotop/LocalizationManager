@@ -35,17 +35,17 @@ public class UsageService : IUsageService
 
         // Get resource key count from user's accessible projects
         var totalKeyCount = await _db.ResourceKeys
-            .Where(rk => rk.Project.UserId == userId ||
-                        (rk.Project.OrganizationId.HasValue &&
-                         rk.Project.Organization!.Members.Any(m => m.UserId == userId)))
+            .Where(rk => rk.Project!.UserId == userId ||
+                        (rk.Project!.OrganizationId.HasValue &&
+                         rk.Project!.Organization!.Members.Any(m => m.UserId == userId)))
             .CountAsync();
 
         // Count unique languages used across translations
         var resourceFileCount = await _db.Translations
-            .Where(t => t.ResourceKey.Project.UserId == userId ||
-                       (t.ResourceKey.Project.OrganizationId.HasValue &&
-                        t.ResourceKey.Project.Organization!.Members.Any(m => m.UserId == userId)))
-            .Select(t => new { t.ResourceKey.ProjectId, t.LanguageCode })
+            .Where(t => t.ResourceKey!.Project!.UserId == userId ||
+                       (t.ResourceKey!.Project!.OrganizationId.HasValue &&
+                        t.ResourceKey!.Project!.Organization!.Members.Any(m => m.UserId == userId)))
+            .Select(t => new { t.ResourceKey!.ProjectId, t.LanguageCode })
             .Distinct()
             .CountAsync();
 
@@ -65,8 +65,10 @@ public class UsageService : IUsageService
             TranslationCharsUsed = user.TranslationCharsUsed,
             TranslationCharsLimit = user.TranslationCharsLimit,
             TranslationCharsResetAt = user.TranslationCharsResetAt,
-            // BYOK usage (tracked but unlimited)
-            ByokCharsUsed = user.ByokCharsUsed,
+            // Other providers usage (BYOK + free community)
+            OtherCharsUsed = user.OtherCharsUsed,
+            OtherCharsLimit = user.OtherCharsLimit,
+            OtherCharsResetAt = user.OtherCharsResetAt,
             // Other stats
             ProjectCount = projectCount,
             ResourceFileCount = resourceFileCount, // Using this for unique language/project combos

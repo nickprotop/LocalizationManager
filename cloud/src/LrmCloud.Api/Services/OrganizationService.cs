@@ -296,10 +296,29 @@ public class OrganizationService : IOrganizationService
                 return (false, "Cannot invite someone as owner. Transfer ownership instead.");
 
             var org = await _db.Organizations
+                .Include(o => o.Members)
                 .FirstOrDefaultAsync(o => o.Id == organizationId);
 
             if (org == null)
                 return (false, "Organization not found.");
+
+            // Check team member limit based on organization's plan
+            var maxMembers = _config.Limits.GetMaxTeamMembers(org.Plan);
+            var currentMemberCount = org.Members.Count;
+            var pendingInvitationCount = await _db.OrganizationInvitations
+                .CountAsync(i => i.OrganizationId == organizationId &&
+                                 i.AcceptedAt == null &&
+                                 i.ExpiresAt > DateTime.UtcNow);
+
+            var totalPotentialMembers = currentMemberCount + pendingInvitationCount;
+
+            if (totalPotentialMembers >= maxMembers)
+            {
+                _logger.LogWarning(
+                    "Organization {OrgId} has reached team member limit ({CurrentCount} members + {PendingCount} pending / {MaxMembers} max) for plan {Plan}",
+                    organizationId, currentMemberCount, pendingInvitationCount, maxMembers, org.Plan);
+                return (false, $"Team member limit reached ({totalPotentialMembers}/{maxMembers}). Upgrade your organization's plan to invite more members.");
+            }
 
             var normalizedEmail = request.Email.ToLowerInvariant();
 
@@ -403,6 +422,23 @@ public class OrganizationService : IOrganizationService
                 matchingInvitation.AcceptedAt = DateTime.UtcNow;
                 await _db.SaveChangesAsync();
                 return (false, "You are already a member of this organization.");
+            }
+
+            // Check team member limit (race condition protection)
+            var org = await _db.Organizations
+                .Include(o => o.Members)
+                .FirstOrDefaultAsync(o => o.Id == matchingInvitation.OrganizationId);
+
+            if (org != null)
+            {
+                var maxMembers = _config.Limits.GetMaxTeamMembers(org.Plan);
+                if (org.Members.Count >= maxMembers)
+                {
+                    _logger.LogWarning(
+                        "Organization {OrgId} has reached team member limit ({CurrentCount}/{MaxMembers}) when accepting invitation",
+                        matchingInvitation.OrganizationId, org.Members.Count, maxMembers);
+                    return (false, "This organization has reached its team member limit. Please contact the organization owner.");
+                }
             }
 
             // Add user as member
@@ -519,6 +555,23 @@ public class OrganizationService : IOrganizationService
                 invitation.AcceptedAt = DateTime.UtcNow;
                 await _db.SaveChangesAsync();
                 return (false, "You are already a member of this organization.");
+            }
+
+            // Check team member limit (race condition protection)
+            var org = await _db.Organizations
+                .Include(o => o.Members)
+                .FirstOrDefaultAsync(o => o.Id == invitation.OrganizationId);
+
+            if (org != null)
+            {
+                var maxMembers = _config.Limits.GetMaxTeamMembers(org.Plan);
+                if (org.Members.Count >= maxMembers)
+                {
+                    _logger.LogWarning(
+                        "Organization {OrgId} has reached team member limit ({CurrentCount}/{MaxMembers}) when accepting invitation by ID",
+                        invitation.OrganizationId, org.Members.Count, maxMembers);
+                    return (false, "This organization has reached its team member limit. Please contact the organization owner.");
+                }
             }
 
             // Add user as member

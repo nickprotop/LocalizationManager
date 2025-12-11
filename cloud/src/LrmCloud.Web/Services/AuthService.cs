@@ -165,13 +165,21 @@ public class AuthService
                 }
             }
 
-            // Refresh failed, clear tokens
-            await LogoutAsync();
+            // Only clear tokens if server explicitly rejects the refresh token (401/403)
+            // Don't clear on network errors or 5xx errors - those are transient
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+                response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                await _tokenStorage.ClearTokensAsync();
+                _authStateProvider.NotifyUserLogout();
+            }
+
             return false;
         }
         catch
         {
-            await LogoutAsync();
+            // Network error - don't clear tokens, just return false
+            // The user may still be able to retry later
             return false;
         }
     }

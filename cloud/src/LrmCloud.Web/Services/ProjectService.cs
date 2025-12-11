@@ -202,6 +202,15 @@ public class DashboardStats
     public int ProjectCount { get; set; }
     public int TotalKeys { get; set; }
     public double AverageCompletion { get; set; }
-    public int CharsUsed { get; set; }
-    public int CharsLimit { get; set; } = 10000; // Default free tier
+
+    // LRM Translation usage (managed service)
+    public int LrmCharsUsed { get; set; }
+    public int LrmCharsLimit { get; set; } = 10000; // Default free tier
+
+    // Other providers usage (BYOK + free community)
+    public long OtherCharsUsed { get; set; }
+
+    // Legacy properties for backward compatibility
+    public int CharsUsed => LrmCharsUsed;
+    public int CharsLimit => LrmCharsLimit;
 }

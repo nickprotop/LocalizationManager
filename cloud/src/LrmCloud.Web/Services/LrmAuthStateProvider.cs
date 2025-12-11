@@ -12,13 +12,16 @@ public class LrmAuthStateProvider : AuthenticationStateProvider
 {
     private readonly TokenStorageService _tokenStorage;
     private readonly HttpClient _httpClient;
+    private readonly IServiceProvider _serviceProvider;
     private UserDto? _cachedUser;
     private bool _isInitialized;
+    private bool _isRefreshing;
 
-    public LrmAuthStateProvider(TokenStorageService tokenStorage, HttpClient httpClient)
+    public LrmAuthStateProvider(TokenStorageService tokenStorage, HttpClient httpClient, IServiceProvider serviceProvider)
     {
         _tokenStorage = tokenStorage;
         _httpClient = httpClient;
+        _serviceProvider = serviceProvider;
     }
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
@@ -33,14 +36,42 @@ public class LrmAuthStateProvider : AuthenticationStateProvider
         // Check if token is expired
         if (await _tokenStorage.IsTokenExpiredAsync())
         {
-            // Token expired, check if we can refresh
-            if (await _tokenStorage.CanRefreshAsync())
+            // Token expired, try to refresh if possible
+            if (await _tokenStorage.CanRefreshAsync() && !_isRefreshing)
             {
-                // Signal that a refresh is needed (handled by AuthenticatedHttpHandler)
-                // For now, return unauthenticated state - the handler will refresh
+                _isRefreshing = true;
+                try
+                {
+                    // Attempt to refresh the token using AuthService
+                    var authService = _serviceProvider.GetService<AuthService>();
+                    if (authService != null && await authService.RefreshTokenAsync())
+                    {
+                        // Refresh succeeded - the AuthService already notified us
+                        // and updated the cached user, so we can proceed
+                        token = await _tokenStorage.GetAccessTokenAsync();
+                    }
+                    else
+                    {
+                        // Refresh failed - return unauthenticated
+                        return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                    }
+                }
+                catch
+                {
+                    // Error during refresh - return unauthenticated
+                    return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                }
+                finally
+                {
+                    _isRefreshing = false;
+                }
             }
-
-            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            else if (!_isRefreshing)
+            {
+                // Can't refresh and not currently refreshing - return unauthenticated
+                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            }
+            // If _isRefreshing is true, we're in a refresh cycle, proceed with current token
         }
 
         // Try to get user info from cache or fetch from API

@@ -90,6 +90,15 @@
     [SupplyParameterFromQuery(Name = "returnUrl")]
     public string? ReturnUrl { get; set; }
 
+    protected override async Task OnInitializedAsync()
+    {
+        // If user is already authenticated, redirect to home or return URL
+        if (await AuthService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo(ReturnUrl ?? "", forceLoad: false);
+        }
+    }
+
     private async Task HandleLogin()
     {
         _isLoading = true;

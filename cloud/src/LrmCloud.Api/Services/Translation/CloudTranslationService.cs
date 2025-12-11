@@ -53,14 +53,15 @@ public class CloudTranslationService : ICloudTranslationService
             {
                 Name = "lrm",
                 DisplayName = "LRM Translation",
-                RequiresApiKey = false,
+                RequiresApiKey = false, // User doesn't need to provide API key
                 IsConfigured = available,
                 Type = "managed",
+                IsManagedProvider = true, // This is our managed service, not free
                 IsAiProvider = false,
                 Description = available
                     ? $"LRM managed translation ({remaining:N0} chars remaining)"
                     : reason ?? "LRM translation unavailable",
-                ApiKeySource = null
+                ApiKeySource = "platform"
             });
         }
 
@@ -231,7 +232,7 @@ public class CloudTranslationService : ICloudTranslationService
                             fromCache = translationResponse.FromCache;
                         }
 
-                        result.TranslatedText = translatedText;
+                        result.TranslatedText = translatedText ?? string.Empty;
                         result.Success = true;
                         result.FromCache = fromCache;
 
@@ -272,10 +273,10 @@ public class CloudTranslationService : ICloudTranslationService
             // Save changes
             await _db.SaveChangesAsync();
 
-            // Track BYOK usage (LRM usage is tracked in LrmTranslationProvider)
+            // Track other providers usage (LRM usage is tracked in LrmTranslationProvider)
             if (!isLrmProvider && response.CharactersTranslated > 0)
             {
-                await TrackByokUsageAsync(userId, response.CharactersTranslated);
+                await TrackOtherUsageAsync(userId, response.CharactersTranslated);
             }
 
             response.Success = response.FailedCount == 0;
@@ -336,7 +337,7 @@ public class CloudTranslationService : ICloudTranslationService
                 }
 
                 response.Success = true;
-                response.TranslatedText = lrmResult.TranslatedText;
+                response.TranslatedText = lrmResult.TranslatedText ?? string.Empty;
                 response.FromCache = lrmResult.FromCache;
             }
             else
@@ -363,8 +364,8 @@ public class CloudTranslationService : ICloudTranslationService
                 response.TranslatedText = result.TranslatedText;
                 response.FromCache = result.FromCache;
 
-                // Track BYOK usage
-                await TrackByokUsageAsync(userId, request.Text.Length);
+                // Track other providers usage
+                await TrackOtherUsageAsync(userId, request.Text.Length);
             }
         }
         catch (Exception ex)
@@ -385,7 +386,9 @@ public class CloudTranslationService : ICloudTranslationService
                 u.TranslationCharsUsed,
                 u.TranslationCharsLimit,
                 u.TranslationCharsResetAt,
-                u.ByokCharsUsed,
+                u.OtherCharsUsed,
+                u.OtherCharsLimit,
+                u.OtherCharsResetAt,
                 u.Plan
             })
             .FirstOrDefaultAsync();
@@ -396,7 +399,9 @@ public class CloudTranslationService : ICloudTranslationService
             {
                 Plan = "free",
                 CharactersUsed = 0,
-                CharacterLimit = _config.Limits.FreeTranslationChars
+                CharacterLimit = _config.Limits.FreeTranslationChars,
+                OtherCharactersUsed = 0,
+                OtherCharacterLimit = _config.Limits.FreeOtherChars
             };
         }
 
@@ -407,8 +412,10 @@ public class CloudTranslationService : ICloudTranslationService
             CharacterLimit = user.TranslationCharsLimit,
             ResetsAt = user.TranslationCharsResetAt,
             Plan = user.Plan,
-            // BYOK usage (tracked but unlimited)
-            ByokCharactersUsed = user.ByokCharsUsed
+            // Other providers usage (BYOK + free community)
+            OtherCharactersUsed = user.OtherCharsUsed,
+            OtherCharacterLimit = user.OtherCharsLimit,
+            OtherResetsAt = user.OtherCharsResetAt
         };
     }
 
@@ -467,16 +474,40 @@ public class CloudTranslationService : ICloudTranslationService
         return null;
     }
 
-    private async Task TrackByokUsageAsync(int userId, long charsUsed)
+    private async Task TrackOtherUsageAsync(int userId, long charsUsed)
     {
         var user = await _db.Users.FindAsync(userId);
         if (user == null) return;
 
-        user.ByokCharsUsed += charsUsed;
+        user.OtherCharsUsed += charsUsed;
         user.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        _logger.LogDebug("BYOK usage tracked: {Chars} chars for user {UserId}", charsUsed, userId);
+        _logger.LogDebug("Other providers usage tracked: {Chars} chars for user {UserId}", charsUsed, userId);
+    }
+
+    private async Task<(bool allowed, string? reason)> CheckOtherLimitAsync(int userId, long charsToUse)
+    {
+        var user = await _db.Users
+            .Where(u => u.Id == userId)
+            .Select(u => new { u.OtherCharsUsed, u.OtherCharsLimit, u.Plan })
+            .FirstOrDefaultAsync();
+
+        if (user == null)
+            return (false, "User not found");
+
+        // Enterprise has unlimited
+        if (user.Plan.Equals("enterprise", StringComparison.OrdinalIgnoreCase))
+            return (true, null);
+
+        var remaining = user.OtherCharsLimit - user.OtherCharsUsed;
+        if (remaining <= 0)
+            return (false, $"Other providers limit reached ({user.OtherCharsLimit:N0} chars/month). Upgrade your plan for more.");
+
+        if (charsToUse > remaining)
+            return (false, $"Request exceeds remaining limit ({remaining:N0} chars remaining)");
+
+        return (true, null);
     }
 
     private async Task<ITranslationProvider?> CreateProviderAsync(

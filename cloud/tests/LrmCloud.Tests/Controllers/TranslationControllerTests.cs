@@ -52,7 +52,8 @@ public class TranslationControllerTests : IDisposable
         };
 
         _encryptionService = new ApiKeyEncryptionService(_cloudConfiguration);
-        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, _cloudConfiguration);
+        var mockConfiguration = new Mock<IConfiguration>();
+        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, mockConfiguration.Object);
 
         var translationLoggerMock = new Mock<ILogger<CloudTranslationService>>();
         var lrmProviderMock = new Mock<ILrmTranslationProvider>();

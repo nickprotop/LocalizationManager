@@ -53,7 +53,25 @@ public class ProjectService : IProjectService
             }
             else
             {
-                // Personal project
+                // Personal project - check project limit based on user's plan
+                var user = await _db.Users
+                    .Where(u => u.Id == userId)
+                    .Select(u => new { u.Plan })
+                    .FirstOrDefaultAsync();
+
+                if (user == null)
+                    return (false, null, "User not found");
+
+                var currentProjectCount = await _db.Projects.CountAsync(p => p.UserId == userId);
+                var maxProjects = _config.Limits.GetMaxProjects(user.Plan);
+
+                if (currentProjectCount >= maxProjects)
+                {
+                    _logger.LogWarning("User {UserId} has reached project limit ({CurrentCount}/{MaxProjects}) for plan {Plan}",
+                        userId, currentProjectCount, maxProjects, user.Plan);
+                    return (false, null, $"Project limit reached ({currentProjectCount}/{maxProjects}). Upgrade your plan to create more projects.");
+                }
+
                 projectUserId = userId;
             }
 

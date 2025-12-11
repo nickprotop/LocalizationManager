@@ -364,26 +364,98 @@ public sealed class FeaturesConfiguration
 }
 
 /// <summary>
-/// Usage limits.
+/// Usage limits per tier.
 /// </summary>
 public sealed class LimitsConfiguration
 {
+    // ==========================================================================
+    // Free Tier Limits
+    // ==========================================================================
+
     /// <summary>
-    /// Free translation character limit per month.
+    /// Free tier: LRM translation character limit per month.
     /// Default: 10,000 characters.
     /// </summary>
     [Range(0, int.MaxValue)]
     public int FreeTranslationChars { get; init; } = 10_000;
 
     /// <summary>
-    /// Maximum projects per free user.
+    /// Free tier: Other providers (BYOK + community) character limit per month.
+    /// Default: 50,000 characters.
+    /// </summary>
+    [Range(0, long.MaxValue)]
+    public long FreeOtherChars { get; init; } = 50_000;
+
+    /// <summary>
+    /// Free tier: Maximum projects.
     /// Default: 5 projects.
     /// </summary>
     [Range(1, 1000)]
-    public int MaxProjectsPerUser { get; init; } = 5;
+    public int FreeMaxProjects { get; init; } = 5;
 
     /// <summary>
-    /// Maximum keys per project (free tier).
+    /// Free tier: Maximum API keys (BYOK).
+    /// Default: 3 keys.
+    /// </summary>
+    [Range(1, 100)]
+    public int FreeMaxApiKeys { get; init; } = 3;
+
+    // ==========================================================================
+    // Team Tier Limits
+    // ==========================================================================
+
+    /// <summary>
+    /// Team tier: LRM translation character limit per month.
+    /// Default: 100,000 characters.
+    /// </summary>
+    [Range(0, int.MaxValue)]
+    public int TeamTranslationChars { get; init; } = 100_000;
+
+    /// <summary>
+    /// Team tier: Other providers (BYOK + community) character limit per month.
+    /// Default: 500,000 characters.
+    /// </summary>
+    [Range(0, long.MaxValue)]
+    public long TeamOtherChars { get; init; } = 500_000;
+
+    /// <summary>
+    /// Team tier: Maximum team members.
+    /// Default: 20 members.
+    /// </summary>
+    [Range(1, 1000)]
+    public int TeamMaxMembers { get; init; } = 20;
+
+    /// <summary>
+    /// Team tier: Maximum API keys (BYOK).
+    /// Default: 10 keys.
+    /// </summary>
+    [Range(1, 100)]
+    public int TeamMaxApiKeys { get; init; } = 10;
+
+    // ==========================================================================
+    // Enterprise Tier (unlimited, but configurable)
+    // ==========================================================================
+
+    /// <summary>
+    /// Enterprise tier: LRM translation character limit per month.
+    /// Default: 10M/month.
+    /// </summary>
+    [Range(0, int.MaxValue)]
+    public int EnterpriseTranslationChars { get; init; } = 10_000_000; // 10M/month
+
+    /// <summary>
+    /// Enterprise tier: Other providers character limit per month.
+    /// Default: 50M/month.
+    /// </summary>
+    [Range(0, long.MaxValue)]
+    public long EnterpriseOtherChars { get; init; } = 50_000_000; // 50M/month
+
+    // ==========================================================================
+    // General Limits (all tiers)
+    // ==========================================================================
+
+    /// <summary>
+    /// Maximum keys per project.
     /// Default: 10,000 keys.
     /// </summary>
     [Range(1, 1_000_000)]
@@ -396,12 +468,8 @@ public sealed class LimitsConfiguration
     [Range(1, 100_000_000)]
     public int MaxFileSize { get; init; } = 10_000_000;
 
-    /// <summary>
-    /// Maximum team members for team tier.
-    /// Default: 10 members.
-    /// </summary>
-    [Range(1, 1000)]
-    public int MaxTeamMembers { get; init; } = 10;
+    // Legacy properties for backward compatibility
+    public int MaxProjectsPerUser => FreeMaxProjects;
 
     /// <summary>
     /// API rate limit (requests per minute per user).
@@ -409,6 +477,59 @@ public sealed class LimitsConfiguration
     /// </summary>
     [Range(1, 10000)]
     public int ApiRateLimit { get; init; } = 60;
+
+    // ==========================================================================
+    // Helper Methods to get limits by plan
+    // ==========================================================================
+
+    /// <summary>
+    /// Get LRM translation character limit for a given plan.
+    /// </summary>
+    public int GetTranslationCharsLimit(string plan) => plan?.ToLowerInvariant() switch
+    {
+        "team" => TeamTranslationChars,
+        "enterprise" => EnterpriseTranslationChars,
+        _ => FreeTranslationChars
+    };
+
+    /// <summary>
+    /// Get other providers character limit for a given plan.
+    /// </summary>
+    public long GetOtherCharsLimit(string plan) => plan?.ToLowerInvariant() switch
+    {
+        "team" => TeamOtherChars,
+        "enterprise" => EnterpriseOtherChars,
+        _ => FreeOtherChars
+    };
+
+    /// <summary>
+    /// Get maximum projects for a given plan.
+    /// </summary>
+    public int GetMaxProjects(string plan) => plan?.ToLowerInvariant() switch
+    {
+        "team" or "enterprise" => int.MaxValue, // Unlimited
+        _ => FreeMaxProjects
+    };
+
+    /// <summary>
+    /// Get maximum API keys for a given plan.
+    /// </summary>
+    public int GetMaxApiKeys(string plan) => plan?.ToLowerInvariant() switch
+    {
+        "team" => TeamMaxApiKeys,
+        "enterprise" => int.MaxValue, // Unlimited
+        _ => FreeMaxApiKeys
+    };
+
+    /// <summary>
+    /// Get maximum team members for a given plan.
+    /// </summary>
+    public int GetMaxTeamMembers(string plan) => plan?.ToLowerInvariant() switch
+    {
+        "team" => TeamMaxMembers,
+        "enterprise" => int.MaxValue, // Unlimited
+        _ => 0 // Free tier has no team support
+    };
 }
 
 /// <summary>

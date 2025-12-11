@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using LrmCloud.Api.Data;
+using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.DTOs.Auth;
 using LrmCloud.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -12,11 +13,13 @@ namespace LrmCloud.Api.Services;
 public class CliApiKeyService : ICliApiKeyService
 {
     private readonly AppDbContext _db;
+    private readonly CloudConfiguration _config;
     private readonly ILogger<CliApiKeyService> _logger;
 
-    public CliApiKeyService(AppDbContext db, ILogger<CliApiKeyService> logger)
+    public CliApiKeyService(AppDbContext db, CloudConfiguration config, ILogger<CliApiKeyService> logger)
     {
         _db = db;
+        _config = config;
         _logger = logger;
     }
 
@@ -45,6 +48,28 @@ public class CliApiKeyService : ICliApiKeyService
 
     public async Task<(string ApiKey, CliApiKeyDto KeyInfo)?> CreateKeyAsync(int userId, CreateCliApiKeyRequest request)
     {
+        // Get user's plan and check API key limit
+        var user = await _db.Users
+            .Where(u => u.Id == userId)
+            .Select(u => new { u.Plan })
+            .FirstOrDefaultAsync();
+
+        if (user == null)
+        {
+            _logger.LogWarning("User {UserId} not found when creating API key", userId);
+            return null;
+        }
+
+        var currentKeyCount = await _db.ApiKeys.CountAsync(k => k.UserId == userId);
+        var maxKeys = _config.Limits.GetMaxApiKeys(user.Plan);
+
+        if (currentKeyCount >= maxKeys)
+        {
+            _logger.LogWarning("User {UserId} has reached API key limit ({CurrentCount}/{MaxKeys}) for plan {Plan}",
+                userId, currentKeyCount, maxKeys, user.Plan);
+            return null;
+        }
+
         // Validate project if specified
         if (request.ProjectId.HasValue)
         {

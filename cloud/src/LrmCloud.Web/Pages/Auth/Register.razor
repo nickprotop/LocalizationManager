@@ -112,6 +112,15 @@
     private string? _errorMessage;
     private string? _successMessage;
 
+    protected override async Task OnInitializedAsync()
+    {
+        // If user is already authenticated, redirect to home
+        if (await AuthService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("", forceLoad: false);
+        }
+    }
+
     private async Task HandleRegister()
     {
         if (_confirmPassword != _model.Password)
