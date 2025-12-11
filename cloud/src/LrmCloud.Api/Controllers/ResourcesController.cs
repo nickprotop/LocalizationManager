@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using LrmCloud.Api.Services;
 using LrmCloud.Shared.Api;
+using LrmCloud.Shared.DTOs;
 using LrmCloud.Shared.DTOs.Resources;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -62,6 +63,32 @@ public class ResourcesController : ApiControllerBase
             return NotFound("RES_KEY_NOT_FOUND", "Resource key not found or access denied");
 
         return Success(key);
+    }
+
+    /// <summary>
+    /// Gets resource keys with translations, paginated with search and sort support.
+    /// </summary>
+    /// <param name="projectId">Project ID</param>
+    /// <param name="page">Page number (1-indexed)</param>
+    /// <param name="pageSize">Number of items per page</param>
+    /// <param name="search">Search term for key name, comment, or translation value</param>
+    /// <param name="sortBy">Sort field: keyName, updatedAt, createdAt</param>
+    /// <param name="sortDesc">Sort descending</param>
+    /// <returns>Paginated list of resource keys with translations</returns>
+    [HttpGet("resources")]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<ResourceKeyDetailDto>>), 200)]
+    public async Task<ActionResult<ApiResponse<PagedResult<ResourceKeyDetailDto>>>> GetResourceKeysPaged(
+        int projectId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? search = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] bool sortDesc = false)
+    {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            projectId, userId, page, pageSize, search, sortBy, sortDesc);
+        return Success(result);
     }
 
     /// <summary>

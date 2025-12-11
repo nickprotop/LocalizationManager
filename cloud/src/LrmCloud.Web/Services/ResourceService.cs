@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using LrmCloud.Shared.Api;
+using LrmCloud.Shared.DTOs;
 using LrmCloud.Shared.DTOs.Resources;
 
 namespace LrmCloud.Web.Services;
@@ -41,6 +42,42 @@ public class ResourceService
 
         var result = await response.Content.ReadFromJsonAsync<ApiResponse<ResourceKeyDetailDto>>();
         return result?.Data;
+    }
+
+    /// <summary>
+    /// Gets resource keys with translations, paginated with search and sort support
+    /// </summary>
+    public async Task<PagedResult<ResourceKeyDetailDto>> GetResourceKeysPagedAsync(
+        int projectId,
+        int page = 1,
+        int pageSize = 50,
+        string? search = null,
+        string? sortBy = null,
+        bool sortDesc = false)
+    {
+        var queryParams = new List<string>
+        {
+            $"page={page}",
+            $"pageSize={pageSize}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(search))
+            queryParams.Add($"search={Uri.EscapeDataString(search)}");
+
+        if (!string.IsNullOrWhiteSpace(sortBy))
+            queryParams.Add($"sortBy={Uri.EscapeDataString(sortBy)}");
+
+        if (sortDesc)
+            queryParams.Add("sortDesc=true");
+
+        var queryString = string.Join("&", queryParams);
+        var response = await _httpClient.GetAsync($"projects/{projectId}/resources?{queryString}");
+
+        if (!response.IsSuccessStatusCode)
+            return new PagedResult<ResourceKeyDetailDto> { Page = page, PageSize = pageSize };
+
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResult<ResourceKeyDetailDto>>>();
+        return result?.Data ?? new PagedResult<ResourceKeyDetailDto> { Page = page, PageSize = pageSize };
     }
 
     /// <summary>

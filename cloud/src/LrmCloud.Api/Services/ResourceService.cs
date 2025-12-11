@@ -1,5 +1,6 @@
 using LrmCloud.Api.Data;
 using LrmCloud.Shared.Constants;
+using LrmCloud.Shared.DTOs;
 using LrmCloud.Shared.DTOs.Resources;
 using LrmCloud.Shared.DTOs.Sync;
 using LrmCloud.Shared.Entities;
@@ -59,6 +60,67 @@ public class ResourceService : IResourceService
             return null;
 
         return MapToResourceKeyDetailDto(key);
+    }
+
+    public async Task<PagedResult<ResourceKeyDetailDto>> GetResourceKeysPagedAsync(
+        int projectId,
+        int userId,
+        int page,
+        int pageSize,
+        string? search = null,
+        string? sortBy = null,
+        bool sortDescending = false)
+    {
+        // Check permission
+        if (!await _projectService.CanViewProjectAsync(projectId, userId))
+            return new PagedResult<ResourceKeyDetailDto> { Page = page, PageSize = pageSize };
+
+        // Build query
+        var query = _db.ResourceKeys
+            .Include(k => k.Translations)
+            .Where(k => k.ProjectId == projectId);
+
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchLower = search.ToLower();
+            query = query.Where(k =>
+                k.KeyName.ToLower().Contains(searchLower) ||
+                (k.Comment != null && k.Comment.ToLower().Contains(searchLower)) ||
+                k.Translations.Any(t => t.Value != null && t.Value.ToLower().Contains(searchLower)));
+        }
+
+        // Get total count before pagination
+        var totalCount = await query.CountAsync();
+
+        // Apply sorting
+        query = sortBy?.ToLower() switch
+        {
+            "keyname" => sortDescending
+                ? query.OrderByDescending(k => k.KeyName)
+                : query.OrderBy(k => k.KeyName),
+            "updatedat" => sortDescending
+                ? query.OrderByDescending(k => k.UpdatedAt)
+                : query.OrderBy(k => k.UpdatedAt),
+            "createdat" => sortDescending
+                ? query.OrderByDescending(k => k.CreatedAt)
+                : query.OrderBy(k => k.CreatedAt),
+            _ => query.OrderBy(k => k.KeyName) // Default sort
+        };
+
+        // Apply pagination
+        var keys = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new PagedResult<ResourceKeyDetailDto>
+        {
+            Items = keys.Select(MapToResourceKeyDetailDto).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
     }
 
     public async Task<(bool Success, ResourceKeyDto? Key, string? ErrorMessage)> CreateResourceKeyAsync(
@@ -392,6 +454,11 @@ public class ResourceService : IResourceService
             var languageCode = group.Key;
             var translations = group.ToList();
 
+            // For plural keys, each form is a separate translation slot
+            // So we count filled translations vs total translations for this language
+            var totalTranslationsForLang = translations.Count;
+            var filledTranslationsForLang = translations.Count(t => !string.IsNullOrWhiteSpace(t.Value));
+
             var languageStats = new LanguageStats
             {
                 LanguageCode = languageCode,
@@ -399,8 +466,8 @@ public class ResourceService : IResourceService
                 PendingCount = translations.Count(t => t.Status == TranslationStatus.Pending),
                 ReviewedCount = translations.Count(t => t.Status == TranslationStatus.Reviewed),
                 ApprovedCount = translations.Count(t => t.Status == TranslationStatus.Approved),
-                CompletionPercentage = stats.TotalKeys > 0
-                    ? Math.Round((double)translations.Count(t => !string.IsNullOrWhiteSpace(t.Value)) / stats.TotalKeys * 100, 2)
+                CompletionPercentage = totalTranslationsForLang > 0
+                    ? Math.Round((double)filledTranslationsForLang / totalTranslationsForLang * 100, 2)
                     : 0
             };
 
@@ -803,12 +870,14 @@ public class ResourceService : IResourceService
         var totalKeys = await _db.ResourceKeys.CountAsync(k => k.ProjectId == projectId);
 
         // Get all translations grouped by language
+        // For plural keys, each form counts as a separate translation slot
         var languageData = await _db.Translations
             .Where(t => t.ResourceKey.ProjectId == projectId)
             .GroupBy(t => t.LanguageCode)
             .Select(g => new
             {
                 LanguageCode = g.Key,
+                TotalCount = g.Count(),
                 TranslatedCount = g.Count(t => !string.IsNullOrWhiteSpace(t.Value)),
                 LastUpdated = g.Max(t => (DateTime?)t.UpdatedAt)
             })
@@ -821,7 +890,7 @@ public class ResourceService : IResourceService
             IsDefault = l.LanguageCode == project.DefaultLanguage,
             TranslatedCount = l.TranslatedCount,
             TotalKeys = totalKeys,
-            CompletionPercentage = totalKeys > 0 ? Math.Round((double)l.TranslatedCount / totalKeys * 100, 1) : 0,
+            CompletionPercentage = l.TotalCount > 0 ? Math.Round((double)l.TranslatedCount / l.TotalCount * 100, 1) : 0,
             LastUpdated = l.LastUpdated
         }).OrderBy(l => !l.IsDefault).ThenBy(l => l.LanguageCode).ToList();
     }

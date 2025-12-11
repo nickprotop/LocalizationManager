@@ -1,13 +1,14 @@
 @using LrmCloud.Web.Models
+@using MudBlazor
 @inject ISnackbar Snackbar
 
-<MudDataGrid T="TranslationGridRow"
-             Items="@Items"
+<MudDataGrid @ref="_dataGrid"
+             T="TranslationGridRow"
+             ServerData="@ServerDataFunc"
              Dense="true"
              Hover="true"
              Bordered="true"
              Striped="true"
-             Virtualize="true"
              FixedHeader="true"
              Height="calc(100vh - 300px)"
              RowClick="@OnRowClick"
@@ -21,13 +22,15 @@
              Class="translation-grid">
 
     <ToolBarContent>
-        <MudTextField @bind-Value="_searchText"
+        <MudTextField T="string"
+                      Value="@_searchText"
+                      ValueChanged="@OnSearchChanged"
                       Placeholder="Search keys..."
                       Adornment="Adornment.Start"
                       AdornmentIcon="@Icons.Material.Filled.Search"
                       IconSize="Size.Small"
                       Immediate="true"
-                      DebounceInterval="300"
+                      DebounceInterval="500"
                       Class="mt-0"
                       Style="max-width: 300px;" />
 
@@ -196,7 +199,7 @@
             <MudText Typo="Typo.subtitle1" Color="Color.Secondary">No translation keys found</MudText>
             @if (!string.IsNullOrEmpty(_searchText) || _statusFilter.HasValue)
             {
-                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ClearFilters">
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(async () => await ClearFilters())">
                     Clear Filters
                 </MudButton>
             }
@@ -236,8 +239,10 @@
 </style>
 
 @code {
+    private MudDataGrid<TranslationGridRow>? _dataGrid;
+
     [Parameter]
-    public List<TranslationGridRow> Items { get; set; } = new();
+    public Func<GridState<TranslationGridRow>, Task<GridData<TranslationGridRow>>>? ServerDataFunc { get; set; }
 
     [Parameter]
     public List<string> Languages { get; set; } = new();
@@ -260,19 +265,17 @@
     [Parameter]
     public EventCallback<(TranslationGridRow Row, string LanguageCode, string Value)> OnCellChanged { get; set; }
 
+    [Parameter]
+    public EventCallback<string> OnSearchTextChanged { get; set; }
+
     private string _searchText = string.Empty;
     private TranslationStatus? _statusFilter;
     private HashSet<TranslationGridRow> _selectedItems = new();
     private HashSet<string> _hiddenLanguages = new();
 
-    private IEnumerable<string> VisibleLanguages => Languages.Where(l => !_hiddenLanguages.Contains(l));
+    public string SearchText => _searchText;
 
-    private IEnumerable<TranslationGridRow> FilteredItems => Items
-        .Where(i => string.IsNullOrEmpty(_searchText) ||
-                    i.KeyName.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
-                    i.Translations.Values.Any(t => t.Value?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (i.Comment?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false))
-        .Where(i => !_statusFilter.HasValue || i.Status == _statusFilter.Value);
+    private IEnumerable<string> VisibleLanguages => Languages.Where(l => !_hiddenLanguages.Contains(l));
 
     private IEnumerable<TranslationGridRow> SelectedItems => _selectedItems;
 
@@ -284,11 +287,26 @@
         return title;
     }
 
-    private void ClearFilters()
+    private async Task OnSearchChanged(string value)
+    {
+        _searchText = value;
+        await OnSearchTextChanged.InvokeAsync(value);
+        if (_dataGrid != null)
+        {
+            await _dataGrid.ReloadServerData();
+        }
+    }
+
+    private async Task ClearFilters()
     {
         _searchText = string.Empty;
         _statusFilter = null;
         _hiddenLanguages.Clear();
+        await OnSearchTextChanged.InvokeAsync(string.Empty);
+        if (_dataGrid != null)
+        {
+            await _dataGrid.ReloadServerData();
+        }
     }
 
     private void ToggleLanguageVisibility(string langCode)
@@ -333,5 +351,16 @@
     private void OnDeleteSelected()
     {
         OnDeleteClicked.InvokeAsync(_selectedItems);
+    }
+
+    /// <summary>
+    /// Reloads the grid data from the server.
+    /// </summary>
+    public async Task ReloadAsync()
+    {
+        if (_dataGrid != null)
+        {
+            await _dataGrid.ReloadServerData();
+        }
     }
 }

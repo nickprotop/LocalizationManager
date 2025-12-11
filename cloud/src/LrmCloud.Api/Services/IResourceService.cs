@@ -1,3 +1,4 @@
+using LrmCloud.Shared.DTOs;
 using LrmCloud.Shared.DTOs.Resources;
 using LrmCloud.Shared.DTOs.Sync;
 
@@ -21,6 +22,18 @@ public interface IResourceService
     /// Gets a specific resource key with all translations.
     /// </summary>
     Task<ResourceKeyDetailDto?> GetResourceKeyAsync(int projectId, string keyName, int userId);
+
+    /// <summary>
+    /// Gets resource keys with translations, paginated with search and sort support.
+    /// </summary>
+    Task<PagedResult<ResourceKeyDetailDto>> GetResourceKeysPagedAsync(
+        int projectId,
+        int userId,
+        int page,
+        int pageSize,
+        string? search = null,
+        string? sortBy = null,
+        bool sortDescending = false);
 
     /// <summary>
     /// Creates a new resource key.

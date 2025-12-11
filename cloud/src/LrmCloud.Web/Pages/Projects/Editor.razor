@@ -9,6 +9,8 @@
 @implements IAsyncDisposable
 @using LrmCloud.Web.Models
 @using LrmCloud.Web.Components
+@using LrmCloud.Shared.DTOs.Resources
+@using MudBlazor
 
 <PageTitle>@(_project?.Name ?? "Editor") - LRM Cloud</PageTitle>
 
@@ -31,7 +33,7 @@ else
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
             <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                           OnClick="@(() => Navigation.NavigateTo($"/projects/{ProjectId}"))"
+                           OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))"
                            Size="Size.Small" />
             <MudText Typo="Typo.h5">@_project.Name</MudText>
             <MudChip T="string" Size="Size.Small" Color="@GetFormatColor(_project.Format)">@_project.Format</MudChip>
@@ -87,14 +89,16 @@ else
         </MudStack>
     }
 
-    <TranslationGrid Items="@_gridRows"
+    <TranslationGrid @ref="_translationGrid"
+                     ServerDataFunc="@LoadServerData"
                      Languages="@_languages"
                      DefaultLanguage="@_project.DefaultLanguage"
                      OnRowSelected="@OnRowSelected"
                      OnAddKeyClicked="@OpenAddKeyDialog"
                      OnTranslateClicked="@OnTranslateSelected"
                      OnDeleteClicked="@OnDeleteSelected"
-                     OnCellChanged="@OnCellChanged" />
+                     OnCellChanged="@OnCellChanged"
+                     OnSearchTextChanged="@OnSearchTextChanged" />
 
     <MudDrawer @bind-Open="_drawerOpen"
                Anchor="Anchor.Right"
@@ -131,7 +135,6 @@ else
 
     private ProjectDto? _project;
     private ProjectStatsDto? _stats;
-    private List<TranslationGridRow> _gridRows = new();
     private List<string> _languages = new();
     private bool _isLoading = true;
     private bool _isRefreshing;
@@ -143,6 +146,9 @@ else
     private AddKeyDialog? _addKeyDialog;
     private ConfirmDeleteDialog? _deleteDialog;
     private IEnumerable<TranslationGridRow>? _pendingDeleteRows;
+    private TranslationGrid? _translationGrid;
+    private string _searchText = string.Empty;
+    private Dictionary<string, TranslationGridRow> _editedRows = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -166,8 +172,7 @@ else
                     _languages.Remove(_project.DefaultLanguage);
                     _languages.Insert(0, _project.DefaultLanguage);
                 }
-
-                await LoadResourceKeysAsync();
+                // Grid will load data via ServerData callback
             }
         }
         catch (Exception ex)
@@ -180,16 +185,38 @@ else
         }
     }
 
-    private async Task LoadResourceKeysAsync()
+    /// <summary>
+    /// Server-side data loading callback for the grid.
+    /// </summary>
+    private async Task<GridData<TranslationGridRow>> LoadServerData(GridState<TranslationGridRow> state)
     {
-        var keys = await ResourceService.GetResourceKeysAsync(ProjectId);
-        _gridRows = new List<TranslationGridRow>();
-
-        foreach (var key in keys)
+        try
         {
-            var detail = await ResourceService.GetResourceKeyAsync(ProjectId, key.KeyName);
-            if (detail != null)
+            // Get sort info
+            var sortDef = state.SortDefinitions.FirstOrDefault();
+            var sortBy = sortDef?.SortBy;
+            var sortDesc = sortDef?.Descending ?? false;
+
+            // Call paginated API
+            var result = await ResourceService.GetResourceKeysPagedAsync(
+                ProjectId,
+                state.Page + 1,  // MudDataGrid uses 0-indexed pages
+                state.PageSize,
+                _searchText,
+                sortBy,
+                sortDesc);
+
+            // Map API results to grid rows
+            var rows = new List<TranslationGridRow>();
+            foreach (var detail in result.Items)
             {
+                // Check if we have a cached edited row
+                if (_editedRows.TryGetValue(detail.KeyName, out var editedRow))
+                {
+                    rows.Add(editedRow);
+                    continue;
+                }
+
                 var row = new TranslationGridRow
                 {
                     KeyId = detail.Id,
@@ -229,9 +256,25 @@ else
                     }
                 }
 
-                _gridRows.Add(row);
+                rows.Add(row);
             }
+
+            return new GridData<TranslationGridRow>
+            {
+                Items = rows,
+                TotalItems = result.TotalCount
+            };
         }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading data: {ex.Message}", Severity.Error);
+            return new GridData<TranslationGridRow> { Items = new List<TranslationGridRow>(), TotalItems = 0 };
+        }
+    }
+
+    private void OnSearchTextChanged(string search)
+    {
+        _searchText = search;
     }
 
     private async Task RefreshData()
@@ -246,7 +289,11 @@ else
         try
         {
             _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
-            await LoadResourceKeysAsync();
+            _editedRows.Clear();
+            if (_translationGrid != null)
+            {
+                await _translationGrid.ReloadAsync();
+            }
             Snackbar.Add("Data refreshed", Severity.Success);
         }
         catch (Exception ex)
@@ -267,7 +314,7 @@ else
 
         try
         {
-            foreach (var row in _gridRows)
+            foreach (var row in _editedRows.Values)
             {
                 foreach (var (langCode, cell) in row.Translations.Where(t => t.Value.IsDirty))
                 {
@@ -294,7 +341,17 @@ else
                 }
             }
 
-            _hasUnsavedChanges = _gridRows.Any(r => r.Translations.Values.Any(t => t.IsDirty));
+            // Remove rows that have no more dirty changes
+            var keysToRemove = _editedRows
+                .Where(kv => !kv.Value.Translations.Values.Any(t => t.IsDirty))
+                .Select(kv => kv.Key)
+                .ToList();
+            foreach (var key in keysToRemove)
+            {
+                _editedRows.Remove(key);
+            }
+
+            _hasUnsavedChanges = _editedRows.Any(kv => kv.Value.Translations.Values.Any(t => t.IsDirty));
 
             if (errorCount > 0)
                 Snackbar.Add($"Saved {savedCount} translations, {errorCount} failed", Severity.Warning);
@@ -328,6 +385,11 @@ else
 
     private void OnCellChanged((TranslationGridRow Row, string LanguageCode, string Value) args)
     {
+        // Track the edited row
+        if (!_editedRows.ContainsKey(args.Row.KeyName))
+        {
+            _editedRows[args.Row.KeyName] = args.Row;
+        }
         _hasUnsavedChanges = true;
     }
 
@@ -429,8 +491,14 @@ else
                 }
             }
 
+            // Remove from edited rows if no more dirty changes
+            if (!row.Translations.Values.Any(t => t.IsDirty))
+            {
+                _editedRows.Remove(row.KeyName);
+            }
+
             Snackbar.Add("Translations saved", Severity.Success);
-            _hasUnsavedChanges = _gridRows.Any(r => r.Translations.Values.Any(t => t.IsDirty));
+            _hasUnsavedChanges = _editedRows.Any(kv => kv.Value.Translations.Values.Any(t => t.IsDirty));
             _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
         }
         catch (Exception ex)
