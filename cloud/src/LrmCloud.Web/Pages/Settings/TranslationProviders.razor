@@ -133,40 +133,76 @@
 
         <MudDivider Class="my-4" />
 
-        <MudText Typo="Typo.h6">Usage</MudText>
+        <MudText Typo="Typo.h6">Your Usage This Month</MudText>
         @if (_usage != null)
         {
             <MudPaper Class="pa-4" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack>
-                        <MudText Typo="Typo.body1">
-                            <strong>@_usage.CharactersUsed.ToString("N0")</strong> characters translated
-                        </MudText>
+                <MudStack Spacing="3">
+                    <!-- LRM Translation Usage -->
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudIcon Icon="@Icons.Material.Filled.Translate" Color="Color.Primary" Size="Size.Small" />
+                                <MudText Typo="Typo.body1">
+                                    <strong>LRM Translation</strong>
+                                </MudText>
+                            </MudStack>
+                            @if (_usage.CharacterLimit.HasValue)
+                            {
+                                <MudText Typo="Typo.body2">
+                                    @_usage.CharactersUsed.ToString("N0") / @_usage.CharacterLimit.Value.ToString("N0") chars
+                                </MudText>
+                            }
+                        </MudStack>
                         @if (_usage.CharacterLimit.HasValue)
                         {
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                @_usage.CharacterLimit.Value.ToString("N0") limit (@_usage.Plan plan)
-                            </MudText>
-                        }
-                        else
-                        {
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                Unlimited (BYOK)
+                            <MudProgressLinear Value="@_usage.UsagePercentage"
+                                               Color="@GetUsageColor(_usage.UsagePercentage)"
+                                               Rounded="true"
+                                               Size="Size.Medium" />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Managed translation service - counts against your @_usage.Plan plan
                             </MudText>
                         }
                     </MudStack>
-                    @if (_usage.CharacterLimit.HasValue)
+
+                    <!-- BYOK Usage -->
+                    @if (_usage.ByokCharactersUsed > 0)
                     {
-                        <MudProgressLinear Value="@_usage.UsagePercentage"
-                                           Color="@GetUsageColor(_usage.UsagePercentage)"
-                                           Style="width: 200px;" />
+                        <MudDivider />
+                        <MudStack Spacing="1">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Key" Color="Color.Secondary" Size="Size.Small" />
+                                    <MudText Typo="Typo.body1">
+                                        <strong>Your API Keys (BYOK)</strong>
+                                    </MudText>
+                                </MudStack>
+                                <MudText Typo="Typo.body2">
+                                    @_usage.ByokCharactersUsed.ToString("N0") chars
+                                </MudText>
+                            </MudStack>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Using your own API keys - unlimited
+                            </MudText>
+                        </MudStack>
+                    }
+
+                    <!-- Reset Date -->
+                    @if (_usage.ResetsAt.HasValue)
+                    {
+                        <MudDivider />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Style="vertical-align: middle;" />
+                            Usage resets: @_usage.ResetsAt.Value.ToString("MMMM d, yyyy")
+                        </MudText>
                     }
                 </MudStack>
             </MudPaper>
         }
         else
         {
-            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" />
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="120px" />
         }
 
         <!-- Quick Links -->
