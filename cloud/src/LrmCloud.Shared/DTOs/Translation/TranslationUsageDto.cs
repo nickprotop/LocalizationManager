@@ -5,8 +5,10 @@ namespace LrmCloud.Shared.DTOs.Translation;
 /// </summary>
 public class TranslationUsageDto
 {
+    // LRM Translation usage (counts against plan)
+
     /// <summary>
-    /// Characters translated in current period.
+    /// LRM characters translated in current period.
     /// </summary>
     public long CharactersUsed { get; set; }
 
@@ -43,9 +45,17 @@ public class TranslationUsageDto
         : 0;
 
     /// <summary>
-    /// Whether the user has exceeded their limit.
+    /// Whether the user has exceeded their LRM limit.
     /// </summary>
     public bool IsOverLimit => CharacterLimit.HasValue && CharactersUsed >= CharacterLimit.Value;
+
+    // BYOK (Bring Your Own Key) usage - tracked but unlimited
+
+    /// <summary>
+    /// BYOK characters translated (using user's own API keys).
+    /// Tracked separately from LRM usage. Unlimited, but monitored.
+    /// </summary>
+    public long ByokCharactersUsed { get; set; }
 }
 
 /// <summary>

@@ -21,10 +21,13 @@ public class UserProfileDto
     public string Plan { get; set; } = "free";
     public string? StripeCustomerId { get; set; }
 
-    // Usage & Limits
+    // LRM Translation Usage & Limits (counts against plan)
     public int TranslationCharsUsed { get; set; }
     public int TranslationCharsLimit { get; set; }
     public DateTime? TranslationCharsResetAt { get; set; }
+
+    // BYOK Usage (tracked but unlimited)
+    public long ByokCharsUsed { get; set; }
 
     // Timestamps
     public DateTime? LastLoginAt { get; set; }
