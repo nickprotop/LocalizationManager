@@ -111,8 +111,9 @@ public class ResourceSyncService
             return;
 
         // Deserialize configuration or use defaults
+        var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var config = configJson != null
-            ? JsonSerializer.Deserialize<ConfigurationModel>(configJson) ?? new ConfigurationModel()
+            ? JsonSerializer.Deserialize<ConfigurationModel>(configJson, jsonOptions) ?? new ConfigurationModel()
             : new ConfigurationModel();
 
         // Create resource backend
@@ -232,6 +233,7 @@ public class ResourceSyncService
                 Value = value,
                 Comment = comment,
                 PluralForm = pluralForm,
+                Status = string.IsNullOrWhiteSpace(value) ? "pending" : "translated",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -241,6 +243,7 @@ public class ResourceSyncService
         {
             translation.Value = value;
             translation.Comment = comment;
+            translation.Status = string.IsNullOrWhiteSpace(value) ? "pending" : "translated";
             translation.UpdatedAt = DateTime.UtcNow;
         }
 
@@ -253,8 +256,9 @@ public class ResourceSyncService
     public async Task<List<FileDto>> GenerateFilesFromDatabaseAsync(int projectId, string? configJson)
     {
         // Deserialize configuration or use defaults
+        var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var config = configJson != null
-            ? JsonSerializer.Deserialize<ConfigurationModel>(configJson) ?? new ConfigurationModel()
+            ? JsonSerializer.Deserialize<ConfigurationModel>(configJson, jsonOptions) ?? new ConfigurationModel()
             : new ConfigurationModel();
 
         // Create backend

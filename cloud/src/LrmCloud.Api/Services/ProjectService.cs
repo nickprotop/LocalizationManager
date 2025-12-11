@@ -371,27 +371,16 @@ public class ProjectService : IProjectService
         var translationCount = project.ResourceKeys.Sum(k => k.Translations.Count);
 
         // Calculate completion percentage
+        // For plural keys, each form (one, other, few, many, zero) is a separate translation
+        // So we count actual translation slots, not keys × languages
         double completionPercentage = 0;
-        if (keyCount > 0)
+        if (translationCount > 0)
         {
             var translatedCount = project.ResourceKeys
                 .SelectMany(k => k.Translations)
-                .Count(t => t.Status != TranslationStatus.Pending && !string.IsNullOrWhiteSpace(t.Value));
+                .Count(t => !string.IsNullOrWhiteSpace(t.Value));
 
-            // Expected translations = keys * (unique languages)
-            var uniqueLanguages = project.ResourceKeys
-                .SelectMany(k => k.Translations)
-                .Select(t => t.LanguageCode)
-                .Distinct()
-                .Count();
-
-            if (uniqueLanguages > 0)
-            {
-                var expectedTranslations = keyCount * uniqueLanguages;
-                completionPercentage = expectedTranslations > 0
-                    ? Math.Round((double)translatedCount / expectedTranslations * 100, 2)
-                    : 0;
-            }
+            completionPercentage = Math.Round((double)translatedCount / translationCount * 100, 2);
         }
 
         return new ProjectDto
