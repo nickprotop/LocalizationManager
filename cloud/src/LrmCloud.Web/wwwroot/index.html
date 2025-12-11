@@ -51,20 +51,7 @@
 
     <script src="_framework/blazor.webassembly.js"></script>
 
-    <!-- Service Worker Registration -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/app/service-worker.js')
-                    .then(function(registration) {
-                        console.log('[SW] Service Worker registered with scope:', registration.scope);
-                    })
-                    .catch(function(error) {
-                        console.log('[SW] Service Worker registration failed:', error);
-                    });
-            });
-        }
-    </script>
+    <!-- Service Worker Registration handled by app.js (lrmServiceWorker module) -->
 </body>
 
 </html>

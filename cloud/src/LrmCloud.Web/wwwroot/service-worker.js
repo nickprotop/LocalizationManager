@@ -1,7 +1,10 @@
 // LRM Cloud Service Worker
 // Provides offline caching for static assets and read-only data
 
-const CACHE_NAME = 'lrm-cloud-v2';
+// Version placeholder - replaced by Dockerfile at build time
+// Git repo keeps placeholder; deployed version has build timestamp
+const SW_VERSION = '__BUILD_VERSION__';
+const CACHE_NAME = `lrm-cloud-${SW_VERSION}`;
 const OFFLINE_URL = 'offline.html';
 
 // Static assets to cache immediately (relative to /app/)
@@ -15,20 +18,22 @@ const STATIC_ASSETS = [
     'manifest.json'
 ];
 
-// Install event - cache static assets
+// Install event - cache static assets (don't auto-skipWaiting, let user control)
 self.addEventListener('install', (event) => {
+    console.log(`[SW ${SW_VERSION}] Installing...`);
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
-                console.log('[SW] Caching static assets');
+                console.log(`[SW ${SW_VERSION}] Caching static assets`);
                 return cache.addAll(STATIC_ASSETS);
             })
-            .then(() => self.skipWaiting())
+        // Note: skipWaiting() removed - now triggered via message from UI
     );
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
+    console.log(`[SW ${SW_VERSION}] Activating...`);
     event.waitUntil(
         caches.keys()
             .then((cacheNames) => {
@@ -36,7 +41,7 @@ self.addEventListener('activate', (event) => {
                     cacheNames
                         .filter((name) => name !== CACHE_NAME)
                         .map((name) => {
-                            console.log('[SW] Deleting old cache:', name);
+                            console.log(`[SW ${SW_VERSION}] Deleting old cache:`, name);
                             return caches.delete(name);
                         })
                 );
@@ -139,7 +144,8 @@ self.addEventListener('fetch', (event) => {
 
 // Handle messages from the main thread
 self.addEventListener('message', (event) => {
-    if (event.data === 'skipWaiting') {
+    if (event.data?.type === 'SKIP_WAITING') {
+        console.log(`[SW ${SW_VERSION}] Activating new version...`);
         self.skipWaiting();
     }
 });

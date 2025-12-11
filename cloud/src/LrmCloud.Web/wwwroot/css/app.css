@@ -250,3 +250,15 @@ html {
         padding: 0 !important;
     }
 }
+
+/* Update available banner */
+.update-banner {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border-left: 4px solid var(--mud-palette-info);
+}

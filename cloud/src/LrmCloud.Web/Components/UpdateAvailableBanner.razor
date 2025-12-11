@@ -1,0 +1,73 @@
+@* Update available banner - shows when a new version is ready *@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@if (_updateAvailable)
+{
+    <MudAlert Severity="Severity.Info"
+              Variant="Variant.Filled"
+              Class="update-banner"
+              Dense="true"
+              Icon="@Icons.Material.Filled.SystemUpdate">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="width: 100%;">
+            <span>A new version is available!</span>
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Inherit"
+                       Size="Size.Small"
+                       Disabled="_updating"
+                       OnClick="@ApplyUpdate">
+                @if (_updating)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Update Now
+            </MudButton>
+        </MudStack>
+    </MudAlert>
+}
+
+@code {
+    private bool _updateAvailable;
+    private bool _updating;
+    private DotNetObjectReference<UpdateAvailableBanner>? _dotNetRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("lrmServiceWorker.init", _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public void OnUpdateAvailable()
+    {
+        _updateAvailable = true;
+        StateHasChanged();
+    }
+
+    private async Task ApplyUpdate()
+    {
+        _updating = true;
+        StateHasChanged();
+        await JS.InvokeVoidAsync("lrmServiceWorker.applyUpdate");
+        // Page reloads automatically via controllerchange event
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_dotNetRef != null)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("lrmServiceWorker.dispose");
+            }
+            catch
+            {
+                // Ignore errors during disposal
+            }
+            _dotNetRef.Dispose();
+        }
+    }
+}

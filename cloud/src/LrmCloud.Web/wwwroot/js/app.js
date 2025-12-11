@@ -204,3 +204,65 @@ window.lrmTheme = {
         });
     }
 };
+
+// =============================================================================
+// Service Worker Update Detection
+// =============================================================================
+window.lrmServiceWorker = {
+    dotNetRef: null,
+    registration: null,
+
+    init: async function(dotNetReference) {
+        this.dotNetRef = dotNetReference;
+        if (!('serviceWorker' in navigator)) return;
+
+        try {
+            this.registration = await navigator.serviceWorker.register('/app/service-worker.js');
+            console.log('[SW] Registered, scope:', this.registration.scope);
+
+            // Check for waiting worker on page load
+            if (this.registration.waiting) {
+                this.notifyUpdateAvailable();
+            }
+
+            // Listen for new service worker installing
+            this.registration.addEventListener('updatefound', () => {
+                const newWorker = this.registration.installing;
+                if (newWorker) {
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            this.notifyUpdateAvailable();
+                        }
+                    });
+                }
+            });
+
+            // Reload when new SW takes control
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                window.location.reload();
+            });
+
+            // Check for updates periodically (every 60 seconds)
+            setInterval(() => this.registration?.update(), 60000);
+
+        } catch (error) {
+            console.error('[SW] Registration failed:', error);
+        }
+    },
+
+    dispose: function() {
+        this.dotNetRef = null;
+    },
+
+    notifyUpdateAvailable: function() {
+        if (this.dotNetRef) {
+            this.dotNetRef.invokeMethodAsync('OnUpdateAvailable');
+        }
+    },
+
+    applyUpdate: function() {
+        if (this.registration?.waiting) {
+            this.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+    }
+};
