@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using LrmCloud.Api.Authorization;
 using LrmCloud.Api.Controllers;
 using LrmCloud.Api.Data;
 using LrmCloud.Api.Services.Translation;
@@ -62,10 +63,16 @@ public class TranslationControllerTests : IDisposable
         _translationService = new CloudTranslationService(_db, _hierarchyService, lrmProviderMock.Object, Options.Create(_cloudConfiguration), translationLoggerMock.Object);
 
         var controllerLoggerMock = new Mock<ILogger<TranslationController>>();
+        var authServiceMock = new Mock<ILrmAuthorizationService>();
+        authServiceMock.Setup(x => x.HasProjectAccessAsync(It.IsAny<int>(), It.IsAny<int>())).ReturnsAsync(true);
+        authServiceMock.Setup(x => x.CanEditProjectAsync(It.IsAny<int>(), It.IsAny<int>())).ReturnsAsync(true);
+        authServiceMock.Setup(x => x.IsOrganizationAdminAsync(It.IsAny<int>(), It.IsAny<int>())).ReturnsAsync(true);
+        authServiceMock.Setup(x => x.IsOrganizationMemberAsync(It.IsAny<int>(), It.IsAny<int>())).ReturnsAsync(true);
         _controller = new TranslationController(
             _translationService,
             _hierarchyService,
             _encryptionService,
+            authServiceMock.Object,
             controllerLoggerMock.Object);
 
         // Create test user

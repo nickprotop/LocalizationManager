@@ -1,3 +1,4 @@
+using LrmCloud.Api.Authorization;
 using LrmCloud.Api.Services.Translation;
 using LrmCloud.Shared.DTOs.Translation;
 using Microsoft.AspNetCore.Authorization;
@@ -17,17 +18,20 @@ public class TranslationController : ControllerBase
     private readonly ICloudTranslationService _translationService;
     private readonly IApiKeyHierarchyService _keyHierarchy;
     private readonly IApiKeyEncryptionService _encryption;
+    private readonly ILrmAuthorizationService _authService;
     private readonly ILogger<TranslationController> _logger;
 
     public TranslationController(
         ICloudTranslationService translationService,
         IApiKeyHierarchyService keyHierarchy,
         IApiKeyEncryptionService encryption,
+        ILrmAuthorizationService authService,
         ILogger<TranslationController> logger)
     {
         _translationService = translationService;
         _keyHierarchy = keyHierarchy;
         _encryption = encryption;
+        _authService = authService;
         _logger = logger;
     }
 
@@ -163,7 +167,9 @@ public class TranslationController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        // TODO: Verify user has access to project
+        var userId = GetUserId();
+        if (!await _authService.CanEditProjectAsync(userId, projectId))
+            return Forbid();
 
         try
         {
@@ -183,7 +189,10 @@ public class TranslationController : ControllerBase
     [HttpDelete("keys/projects/{projectId}/{provider}")]
     public async Task<IActionResult> RemoveProjectApiKey(int projectId, string provider)
     {
-        // TODO: Verify user has access to project
+        var userId = GetUserId();
+        if (!await _authService.CanEditProjectAsync(userId, projectId))
+            return Forbid();
+
         var removed = await _keyHierarchy.RemoveApiKeyAsync(provider, "project", projectId);
 
         if (!removed)
@@ -201,7 +210,9 @@ public class TranslationController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        // TODO: Verify user is organization admin
+        var userId = GetUserId();
+        if (!await _authService.IsOrganizationAdminAsync(userId, organizationId))
+            return Forbid();
 
         try
         {
@@ -221,7 +232,10 @@ public class TranslationController : ControllerBase
     [HttpDelete("keys/organizations/{organizationId}/{provider}")]
     public async Task<IActionResult> RemoveOrganizationApiKey(int organizationId, string provider)
     {
-        // TODO: Verify user is organization admin
+        var userId = GetUserId();
+        if (!await _authService.IsOrganizationAdminAsync(userId, organizationId))
+            return Forbid();
+
         var removed = await _keyHierarchy.RemoveApiKeyAsync(provider, "organization", organizationId);
 
         if (!removed)
@@ -290,7 +304,10 @@ public class TranslationController : ControllerBase
     [HttpGet("config/organizations/{organizationId}/{provider}")]
     public async Task<ActionResult<ProviderConfigDto>> GetOrganizationProviderConfig(int organizationId, string provider)
     {
-        // TODO: Verify user has access to organization
+        var userId = GetUserId();
+        if (!await _authService.IsOrganizationMemberAsync(userId, organizationId))
+            return Forbid();
+
         var config = await _keyHierarchy.GetProviderConfigAsync(provider, "organization", organizationId);
 
         if (config == null)
@@ -305,7 +322,9 @@ public class TranslationController : ControllerBase
     [HttpPut("config/organizations/{organizationId}/{provider}")]
     public async Task<IActionResult> SetOrganizationProviderConfig(int organizationId, string provider, [FromBody] SetProviderConfigRequest request)
     {
-        // TODO: Verify user is organization admin
+        var userId = GetUserId();
+        if (!await _authService.IsOrganizationAdminAsync(userId, organizationId))
+            return Forbid();
 
         try
         {
@@ -325,7 +344,10 @@ public class TranslationController : ControllerBase
     [HttpDelete("config/organizations/{organizationId}/{provider}")]
     public async Task<IActionResult> RemoveOrganizationProviderConfig(int organizationId, string provider)
     {
-        // TODO: Verify user is organization admin
+        var userId = GetUserId();
+        if (!await _authService.IsOrganizationAdminAsync(userId, organizationId))
+            return Forbid();
+
         var removed = await _keyHierarchy.RemoveProviderConfigAsync(provider, "organization", organizationId);
 
         if (!removed)
@@ -340,7 +362,10 @@ public class TranslationController : ControllerBase
     [HttpGet("config/projects/{projectId}/{provider}")]
     public async Task<ActionResult<ProviderConfigDto>> GetProjectProviderConfig(int projectId, string provider)
     {
-        // TODO: Verify user has access to project
+        var userId = GetUserId();
+        if (!await _authService.HasProjectAccessAsync(userId, projectId))
+            return Forbid();
+
         var config = await _keyHierarchy.GetProviderConfigAsync(provider, "project", projectId);
 
         if (config == null)
@@ -355,7 +380,9 @@ public class TranslationController : ControllerBase
     [HttpPut("config/projects/{projectId}/{provider}")]
     public async Task<IActionResult> SetProjectProviderConfig(int projectId, string provider, [FromBody] SetProviderConfigRequest request)
     {
-        // TODO: Verify user has access to project
+        var userId = GetUserId();
+        if (!await _authService.CanEditProjectAsync(userId, projectId))
+            return Forbid();
 
         try
         {
@@ -375,7 +402,10 @@ public class TranslationController : ControllerBase
     [HttpDelete("config/projects/{projectId}/{provider}")]
     public async Task<IActionResult> RemoveProjectProviderConfig(int projectId, string provider)
     {
-        // TODO: Verify user has access to project
+        var userId = GetUserId();
+        if (!await _authService.CanEditProjectAsync(userId, projectId))
+            return Forbid();
+
         var removed = await _keyHierarchy.RemoveProviderConfigAsync(provider, "project", projectId);
 
         if (!removed)
