@@ -174,7 +174,8 @@
                                               Variant="Variant.Outlined"
                                               InputType="InputType.Password"
                                               Required="true"
-                                              RequiredError="Current password is required" />
+                                              RequiredError="Current password is required"
+                                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "current-password" } })" />
                             </MudItem>
                             <MudItem xs="12" sm="6">
                                 <MudTextField T="string"
@@ -184,7 +185,8 @@
                                               InputType="InputType.Password"
                                               Required="true"
                                               RequiredError="New password is required"
-                                              Validation="@(new Func<string, IEnumerable<string>>(ValidatePassword))" />
+                                              Validation="@(new Func<string, IEnumerable<string>>(ValidatePassword))"
+                                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "new-password" } })" />
                             </MudItem>
                             <MudItem xs="12" sm="6">
                                 <MudTextField T="string"
@@ -194,7 +196,8 @@
                                               InputType="InputType.Password"
                                               Required="true"
                                               RequiredError="Please confirm your password"
-                                              Validation="@(new Func<string, IEnumerable<string>>(ValidateConfirmPassword))" />
+                                              Validation="@(new Func<string, IEnumerable<string>>(ValidateConfirmPassword))"
+                                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "new-password" } })" />
                             </MudItem>
                         </MudGrid>
                     </MudForm>
@@ -255,7 +258,8 @@
                       Label="Password"
                       Variant="Variant.Outlined"
                       InputType="InputType.Password"
-                      Required="true" />
+                      Required="true"
+                      UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "current-password" } })" />
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="() => _showDeleteDialog = false">Cancel</MudButton>

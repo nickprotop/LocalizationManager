@@ -26,7 +26,8 @@
                           Variant="Variant.Outlined"
                           InputType="InputType.Email"
                           For="@(() => _model.Email)"
-                          Disabled="_isLoading" />
+                          Disabled="_isLoading"
+                          UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "username" } })" />
 
             <MudTextField @bind-Value="_model.Password"
                           Label="Password"
@@ -36,7 +37,8 @@
                           AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
                           OnAdornmentClick="@(() => _showPassword = !_showPassword)"
                           For="@(() => _model.Password)"
-                          Disabled="_isLoading" />
+                          Disabled="_isLoading"
+                          UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "current-password" } })" />
 
             <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                 <MudLink Href="forgot-password" Typo="Typo.body2">Forgot password?</MudLink>

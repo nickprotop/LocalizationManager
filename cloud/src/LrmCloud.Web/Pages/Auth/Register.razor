@@ -37,14 +37,16 @@
                               InputType="InputType.Email"
                               For="@(() => _model.Email)"
                               Disabled="_isLoading"
-                              HelperText="We'll send a verification email" />
+                              HelperText="We'll send a verification email"
+                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "email" } })" />
 
                 <MudTextField @bind-Value="_model.Username"
                               Label="Username"
                               Variant="Variant.Outlined"
                               For="@(() => _model.Username)"
                               Disabled="_isLoading"
-                              HelperText="3-50 characters, letters, numbers, - and _" />
+                              HelperText="3-50 characters, letters, numbers, - and _"
+                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "username" } })" />
 
                 <MudTextField @bind-Value="_model.Password"
                               Label="Password"
@@ -55,7 +57,8 @@
                               OnAdornmentClick="@(() => _showPassword = !_showPassword)"
                               For="@(() => _model.Password)"
                               Disabled="_isLoading"
-                              HelperText="Minimum 12 characters" />
+                              HelperText="Minimum 12 characters"
+                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "new-password" } })" />
 
                 <MudTextField @bind-Value="_confirmPassword"
                               Label="Confirm Password"
@@ -63,7 +66,8 @@
                               InputType="@(_showPassword ? InputType.Text : InputType.Password)"
                               Disabled="_isLoading"
                               Error="@(_confirmPassword != _model.Password && !string.IsNullOrEmpty(_confirmPassword))"
-                              ErrorText="Passwords do not match" />
+                              ErrorText="Passwords do not match"
+                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "new-password" } })" />
 
                 <MudButton ButtonType="ButtonType.Submit"
                            Variant="Variant.Filled"
