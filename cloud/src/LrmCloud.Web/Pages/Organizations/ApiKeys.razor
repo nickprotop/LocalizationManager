@@ -10,8 +10,7 @@
 
 <PageTitle>Translation API Keys - LRM Cloud</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
-    @if (_loading)
+@if (_loading)
     {
         <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
     }
@@ -162,7 +161,6 @@
             </MudList>
         </MudPaper>
     }
-</MudContainer>
 
 @* Set API Key Dialog *@
 <MudDialog @bind-Visible="_setKeyDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">

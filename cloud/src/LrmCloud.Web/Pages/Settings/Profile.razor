@@ -8,8 +8,7 @@
 
 <PageTitle>Profile Settings - LRM Cloud</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Medium" Class="py-6">
-    <MudText Typo="Typo.h4" Class="mb-6">Profile Settings</MudText>
+<MudText Typo="Typo.h4" Class="mb-6">Profile Settings</MudText>
 
     @if (_isLoading)
     {
@@ -239,7 +238,6 @@
             </MudCardContent>
         </MudCard>
     }
-</MudContainer>
 
 <!-- Delete Account Dialog -->
 <MudDialog @bind-Visible="_showDeleteDialog" Options="@(new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true })">

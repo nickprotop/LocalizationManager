@@ -8,8 +8,7 @@
 
 <PageTitle>CLI API Keys - LRM Cloud</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
-    <MudText Typo="Typo.h4" Class="mb-2">CLI API Keys</MudText>
+<MudText Typo="Typo.h4" Class="mb-2">CLI API Keys</MudText>
     <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
         API keys allow the LRM CLI to authenticate with your cloud account for syncing resources.
     </MudText>
@@ -122,7 +121,6 @@
             API keys take priority over JWT tokens when both are configured.
         </MudText>
     </MudPaper>
-</MudContainer>
 
 @* Create Key Dialog *@
 <MudDialog @bind-Visible="_createDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
