@@ -1,6 +1,29 @@
 namespace LrmCloud.Web.Models;
 
 /// <summary>
+/// Standard CLDR plural categories.
+/// </summary>
+public static class PluralForms
+{
+    public const string Zero = "zero";
+    public const string One = "one";
+    public const string Two = "two";
+    public const string Few = "few";
+    public const string Many = "many";
+    public const string Other = "other";
+
+    /// <summary>
+    /// Gets all plural form categories in display order.
+    /// </summary>
+    public static readonly string[] All = [One, Two, Few, Many, Other, Zero];
+
+    /// <summary>
+    /// Gets the most common plural forms (used by most languages).
+    /// </summary>
+    public static readonly string[] Common = [One, Other];
+}
+
+/// <summary>
 /// View model for a row in the translation grid.
 /// Combines the resource key with its translations for all languages.
 /// </summary>
@@ -15,9 +38,45 @@ public class TranslationGridRow
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>
-    /// Translations keyed by language code
+    /// Translations keyed by "{languageCode}" for non-plural keys,
+    /// or "{languageCode}:{pluralForm}" for plural keys.
     /// </summary>
     public Dictionary<string, TranslationCell> Translations { get; set; } = new();
+
+    /// <summary>
+    /// Gets the dictionary key for a translation cell.
+    /// </summary>
+    public static string GetKey(string languageCode, string? pluralForm = null)
+        => string.IsNullOrEmpty(pluralForm) ? languageCode : $"{languageCode}:{pluralForm}";
+
+    /// <summary>
+    /// Gets translation cells for a specific language (all plural forms if plural key).
+    /// </summary>
+    public IEnumerable<TranslationCell> GetTranslationsForLanguage(string languageCode)
+    {
+        if (!IsPlural)
+        {
+            if (Translations.TryGetValue(languageCode, out var cell))
+                yield return cell;
+            yield break;
+        }
+
+        foreach (var pluralForm in Models.PluralForms.All)
+        {
+            var key = GetKey(languageCode, pluralForm);
+            if (Translations.TryGetValue(key, out var cell))
+                yield return cell;
+        }
+    }
+
+    /// <summary>
+    /// Gets a specific translation cell.
+    /// </summary>
+    public TranslationCell? GetCell(string languageCode, string? pluralForm = null)
+    {
+        var key = GetKey(languageCode, pluralForm);
+        return Translations.GetValueOrDefault(key);
+    }
 
     /// <summary>
     /// Gets the translation status for this key across all languages
@@ -49,22 +108,24 @@ public class TranslationGridRow
     }
 
     /// <summary>
-    /// Sets or updates translation for a specific language
+    /// Sets or updates translation for a specific language.
     /// </summary>
-    public void SetTranslation(string languageCode, string? value, int? translationId = null)
+    public void SetTranslation(string languageCode, string? value, int? translationId = null, string? pluralForm = null)
     {
-        if (Translations.TryGetValue(languageCode, out var cell))
+        var key = GetKey(languageCode, pluralForm);
+        if (Translations.TryGetValue(key, out var cell))
         {
             cell.Value = value;
             cell.IsDirty = true;
         }
         else
         {
-            Translations[languageCode] = new TranslationCell
+            Translations[key] = new TranslationCell
             {
                 LanguageCode = languageCode,
                 Value = value,
                 TranslationId = translationId,
+                PluralForm = pluralForm ?? "",
                 IsDirty = true
             };
         }

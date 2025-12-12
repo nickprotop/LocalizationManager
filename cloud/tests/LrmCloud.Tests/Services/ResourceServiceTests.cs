@@ -567,21 +567,17 @@ public class ResourceServiceTests : IDisposable
         Assert.Equal(2, stats.TotalKeys);
         Assert.Equal(2, stats.Languages.Count);
 
-        // English stats
+        // English stats - both keys have non-empty translations
         var enStats = stats.Languages["en"];
-        Assert.Equal(1, enStats.TranslatedCount);
-        Assert.Equal(0, enStats.PendingCount);
-        Assert.Equal(0, enStats.ReviewedCount);
-        Assert.Equal(1, enStats.ApprovedCount);
-        Assert.Equal(100.0, enStats.CompletionPercentage); // 2 translations / 2 keys = 100%
+        Assert.Equal(2, enStats.TranslatedCount); // Keys with non-empty values
+        Assert.Equal(0, enStats.PendingCount);    // Keys without values
+        Assert.Equal(100.0, enStats.CompletionPercentage); // 2 keys with values / 2 keys = 100%
 
-        // French stats
+        // French stats - key1 has value, key2 is empty
         var frStats = stats.Languages["fr"];
-        Assert.Equal(0, frStats.TranslatedCount);
-        Assert.Equal(1, frStats.PendingCount);
-        Assert.Equal(1, frStats.ReviewedCount);
-        Assert.Equal(0, frStats.ApprovedCount);
-        Assert.Equal(50.0, frStats.CompletionPercentage); // 1 non-empty / 2 keys = 50%
+        Assert.Equal(1, frStats.TranslatedCount); // Keys with non-empty values
+        Assert.Equal(1, frStats.PendingCount);    // Keys without values (key2 has empty string)
+        Assert.Equal(50.0, frStats.CompletionPercentage); // 1 key with value / 2 keys = 50%
 
         // Overall completion
         Assert.Equal(75.0, stats.OverallCompletion); // Average of 100% and 50%

@@ -10,6 +10,7 @@
 @using LrmCloud.Web.Models
 @using LrmCloud.Web.Components
 @using LrmCloud.Shared.DTOs.Resources
+@using LrmCloud.Shared.DTOs.Translation
 @using MudBlazor
 
 <PageTitle>@(_project?.Name ?? "Editor") - LRM Cloud</PageTitle>
@@ -117,9 +118,12 @@ else
                 <KeyDetailDrawer Row="@_selectedRow"
                                  Languages="@_languages"
                                  DefaultLanguage="@_project.DefaultLanguage"
+                                 ProjectFormat="@_project.Format"
+                                 SupportsPluralKeys="@SupportsPluralKeys"
                                  OnSave="@SaveKeyDetails"
                                  OnTranslate="@TranslateKey"
                                  OnDelete="@DeleteKey"
+                                 OnTypeChanged="@OnKeyTypeChanged"
                                  IsSaving="_isSavingKey" />
             }
         </MudDrawerContainer>
@@ -149,6 +153,18 @@ else
     private TranslationGrid? _translationGrid;
     private string _searchText = string.Empty;
     private Dictionary<string, TranslationGridRow> _editedRows = new();
+
+    /// <summary>
+    /// Whether the current project format supports plural keys.
+    /// JSON/i18next support plurals, RESX does not.
+    /// </summary>
+    private bool SupportsPluralKeys => _project?.Format?.ToLowerInvariant() switch
+    {
+        "json" => true,
+        "i18next" => true,
+        "resx" => false,
+        _ => false
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -230,7 +246,12 @@ else
 
                 foreach (var translation in detail.Translations)
                 {
-                    row.Translations[translation.LanguageCode] = new TranslationCell
+                    // Use key that includes plural form for plural keys
+                    var key = detail.IsPlural
+                        ? TranslationGridRow.GetKey(translation.LanguageCode, translation.PluralForm)
+                        : translation.LanguageCode;
+
+                    row.Translations[key] = new TranslationCell
                     {
                         TranslationId = translation.Id,
                         LanguageCode = translation.LanguageCode,
@@ -242,17 +263,39 @@ else
                     };
                 }
 
-                // Ensure all languages have an entry
+                // Ensure all languages have entries
                 foreach (var lang in _languages)
                 {
-                    if (!row.Translations.ContainsKey(lang))
+                    if (detail.IsPlural)
                     {
-                        row.Translations[lang] = new TranslationCell
+                        // For plural keys, ensure all plural forms exist
+                        foreach (var pluralForm in PluralForms.Common)
                         {
-                            LanguageCode = lang,
-                            Value = null,
-                            OriginalValue = null
-                        };
+                            var key = TranslationGridRow.GetKey(lang, pluralForm);
+                            if (!row.Translations.ContainsKey(key))
+                            {
+                                row.Translations[key] = new TranslationCell
+                                {
+                                    LanguageCode = lang,
+                                    PluralForm = pluralForm,
+                                    Value = null,
+                                    OriginalValue = null
+                                };
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // For non-plural keys, ensure language exists
+                        if (!row.Translations.ContainsKey(lang))
+                        {
+                            row.Translations[lang] = new TranslationCell
+                            {
+                                LanguageCode = lang,
+                                Value = null,
+                                OriginalValue = null
+                            };
+                        }
                     }
                 }
 
@@ -407,12 +450,13 @@ else
     {
         if (_project == null) return;
 
+        var rowList = rows.ToList();
         var parameters = new DialogParameters
         {
             { nameof(TranslateDialog.ProjectId), ProjectId },
             { nameof(TranslateDialog.SourceLanguage), _project.DefaultLanguage },
             { nameof(TranslateDialog.AvailableLanguages), _languages },
-            { nameof(TranslateDialog.KeysToTranslate), rows.Select(r => r.KeyName).ToList() }
+            { nameof(TranslateDialog.KeysToTranslate), rowList.Select(r => r.KeyName).ToList() }
         };
 
         var options = new DialogOptions
@@ -426,10 +470,58 @@ else
         var dialog = await DialogService.ShowAsync<TranslateDialog>("Translate", parameters, options);
         var result = await dialog.Result;
 
-        if (result is { Canceled: false })
+        if (result is { Canceled: false, Data: TranslateResponseDto translationResult })
         {
-            // Refresh data after translation
-            await RefreshData();
+            // Apply translations to UI state instead of refreshing from DB
+            ApplyTranslationsToUI(rowList, translationResult);
+        }
+    }
+
+    /// <summary>
+    /// Applies translation results to the UI state, marking cells as dirty so Save button enables.
+    /// </summary>
+    private void ApplyTranslationsToUI(List<TranslationGridRow> rows, TranslateResponseDto translationResult)
+    {
+        var rowsByKey = rows.ToDictionary(r => r.KeyName);
+        var appliedCount = 0;
+
+        foreach (var translationRes in translationResult.Results.Where(r => r.Success))
+        {
+            if (!rowsByKey.TryGetValue(translationRes.Key, out var row))
+            {
+                continue;
+            }
+
+            if (!row.Translations.TryGetValue(translationRes.TargetLanguage, out var cell))
+            {
+                // Create new cell for this language
+                cell = new TranslationCell
+                {
+                    LanguageCode = translationRes.TargetLanguage,
+                    Value = null,
+                    OriginalValue = null
+                };
+                row.Translations[translationRes.TargetLanguage] = cell;
+            }
+
+            // Apply translated text and mark as dirty
+            cell.Value = translationRes.TranslatedText;
+            cell.IsDirty = true;
+
+            // Track edited row
+            if (!_editedRows.ContainsKey(row.KeyName))
+            {
+                _editedRows[row.KeyName] = row;
+            }
+
+            appliedCount++;
+        }
+
+        if (appliedCount > 0)
+        {
+            _hasUnsavedChanges = true;
+            Snackbar.Add($"Applied {appliedCount} translations. Click Save to persist changes.", Severity.Info);
+            StateHasChanged();
         }
     }
 
@@ -523,6 +615,19 @@ else
             "Delete Key",
             $"Are you sure you want to delete '{row.KeyName}'? This action cannot be undone.",
             new List<string> { row.KeyName });
+    }
+
+    private void OnKeyTypeChanged((TranslationGridRow Row, bool IsPlural) args)
+    {
+        // Track the edited row for the type change
+        if (!_editedRows.ContainsKey(args.Row.KeyName))
+        {
+            _editedRows[args.Row.KeyName] = args.Row;
+        }
+        _hasUnsavedChanges = true;
+
+        // Force grid to re-render to update the plural indicator
+        StateHasChanged();
     }
 
     private static Color GetFormatColor(string format) => format.ToLower() switch

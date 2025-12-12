@@ -480,30 +480,54 @@ public class ResourceService : IResourceService
             TotalKeys = keys.Count
         };
 
-        // Group translations by language
-        var translationsByLanguage = keys
+        // Get all unique languages from translations
+        var allLanguages = keys
             .SelectMany(k => k.Translations)
-            .GroupBy(t => t.LanguageCode);
+            .Select(t => t.LanguageCode)
+            .Distinct()
+            .ToList();
 
-        foreach (var group in translationsByLanguage)
+        foreach (var languageCode in allLanguages)
         {
-            var languageCode = group.Key;
-            var translations = group.ToList();
+            // Count keys that have a translation for this language
+            // For plural keys: count as translated if at least one plural form has a value
+            // For non-plural keys: count as translated if the value is non-empty
+            var translatedKeysCount = 0;
+            var pendingKeysCount = 0;
 
-            // For plural keys, each form is a separate translation slot
-            // So we count filled translations vs total translations for this language
-            var totalTranslationsForLang = translations.Count;
-            var filledTranslationsForLang = translations.Count(t => !string.IsNullOrWhiteSpace(t.Value));
+            foreach (var key in keys)
+            {
+                var translationsForLang = key.Translations
+                    .Where(t => t.LanguageCode == languageCode)
+                    .ToList();
+
+                if (translationsForLang.Count == 0)
+                {
+                    pendingKeysCount++;
+                    continue;
+                }
+
+                // A key is considered translated if it has at least one non-empty value
+                var hasValue = translationsForLang.Any(t => !string.IsNullOrWhiteSpace(t.Value));
+                if (hasValue)
+                {
+                    translatedKeysCount++;
+                }
+                else
+                {
+                    pendingKeysCount++;
+                }
+            }
 
             var languageStats = new LanguageStats
             {
                 LanguageCode = languageCode,
-                TranslatedCount = translations.Count(t => t.Status == TranslationStatus.Translated),
-                PendingCount = translations.Count(t => t.Status == TranslationStatus.Pending),
-                ReviewedCount = translations.Count(t => t.Status == TranslationStatus.Reviewed),
-                ApprovedCount = translations.Count(t => t.Status == TranslationStatus.Approved),
-                CompletionPercentage = totalTranslationsForLang > 0
-                    ? Math.Round((double)filledTranslationsForLang / totalTranslationsForLang * 100, 2)
+                TranslatedCount = translatedKeysCount,
+                PendingCount = pendingKeysCount,
+                ReviewedCount = 0, // TODO: track review status per key, not per translation
+                ApprovedCount = 0,
+                CompletionPercentage = keys.Count > 0
+                    ? Math.Round((double)translatedKeysCount / keys.Count * 100, 2)
                     : 0
             };
 

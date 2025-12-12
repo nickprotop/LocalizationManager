@@ -157,12 +157,39 @@
             <TemplateColumn T="TranslationGridRow" Title="@GetLanguageTitle(lang)" CellStyle="min-width: 200px;">
                 <CellTemplate>
                     @{
-                        var cell = context.Item.Translations.GetValueOrDefault(langCode);
+                        // For plural keys, show "other" form; for non-plural, show direct value
+                        var cell = context.Item.IsPlural
+                            ? context.Item.GetCell(langCode, PluralForms.Other)
+                            : context.Item.Translations.GetValueOrDefault(langCode);
                         var value = cell?.Value ?? "";
-                        var isDirty = cell?.IsDirty ?? false;
+                        var isDirty = context.Item.IsPlural
+                            ? context.Item.GetTranslationsForLanguage(langCode).Any(c => c.IsDirty)
+                            : (cell?.IsDirty ?? false);
+
+                        // For plural keys, show summary of all forms
+                        var pluralSummary = context.Item.IsPlural
+                            ? GetPluralSummary(context.Item, langCode)
+                            : null;
                     }
                     <MudStack Row="true" AlignItems="AlignItems.Center" Class="@(isDirty ? "dirty-cell" : "")">
-                        @if (string.IsNullOrEmpty(value))
+                        @if (context.Item.IsPlural && pluralSummary != null)
+                        {
+                            <MudTooltip Text="@pluralSummary">
+                                @if (string.IsNullOrEmpty(value))
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="font-italic">
+                                        (empty)
+                                    </MudText>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.body2" Style="@(value.Length > 50 ? "overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;" : "")">
+                                        @value
+                                    </MudText>
+                                }
+                            </MudTooltip>
+                        }
+                        else if (string.IsNullOrEmpty(value))
                         {
                             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="font-italic">
                                 (empty)
@@ -178,16 +205,36 @@
                 </CellTemplate>
                 <EditTemplate>
                     @{
-                        var cell = context.Item.Translations.GetValueOrDefault(langCode);
+                        // For plural keys, edit "other" form in grid; use drawer for all forms
+                        var cell = context.Item.IsPlural
+                            ? context.Item.GetCell(langCode, PluralForms.Other)
+                            : context.Item.Translations.GetValueOrDefault(langCode);
                         var currentValue = cell?.Value ?? "";
                     }
-                    <MudTextField T="string"
-                                  Value="@currentValue"
-                                  ValueChanged="@(v => OnCellValueChanged(context.Item, langCode, v))"
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense"
-                                  FullWidth="true"
-                                  AutoFocus="true" />
+                    @if (context.Item.IsPlural)
+                    {
+                        <MudStack>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">other:</MudText>
+                            <MudTextField T="string"
+                                          Value="@currentValue"
+                                          ValueChanged="@(v => OnCellValueChanged(context.Item, langCode, v, PluralForms.Other))"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          FullWidth="true"
+                                          AutoFocus="true"
+                                          HelperText="Click row to edit all plural forms" />
+                        </MudStack>
+                    }
+                    else
+                    {
+                        <MudTextField T="string"
+                                      Value="@currentValue"
+                                      ValueChanged="@(v => OnCellValueChanged(context.Item, langCode, v, null))"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      FullWidth="true"
+                                      AutoFocus="true" />
+                    }
                 </EditTemplate>
             </TemplateColumn>
         }
@@ -327,10 +374,26 @@
         _selectedItems = items;
     }
 
-    private void OnCellValueChanged(TranslationGridRow row, string languageCode, string value)
+    private void OnCellValueChanged(TranslationGridRow row, string languageCode, string value, string? pluralForm)
     {
-        row.SetTranslation(languageCode, value);
+        row.SetTranslation(languageCode, value, null, pluralForm);
         OnCellChanged.InvokeAsync((row, languageCode, value));
+    }
+
+    private static string GetPluralSummary(TranslationGridRow row, string langCode)
+    {
+        var parts = new List<string>();
+        foreach (var pf in PluralForms.Common)
+        {
+            var cell = row.GetCell(langCode, pf);
+            var val = cell?.Value;
+            if (!string.IsNullOrEmpty(val))
+            {
+                var display = val.Length > 20 ? val[..20] + "..." : val;
+                parts.Add($"{pf}: {display}");
+            }
+        }
+        return parts.Count > 0 ? string.Join("\n", parts) : "No plural forms set";
     }
 
     private void OnCellCommitted(TranslationGridRow row)
