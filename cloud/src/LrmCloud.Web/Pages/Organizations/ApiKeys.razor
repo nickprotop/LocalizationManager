@@ -176,11 +176,15 @@
         <MudForm @ref="_setKeyForm">
             <MudTextField @bind-Value="_newApiKey"
                           Label="API Key"
-                          InputType="InputType.Password"
+                          InputType="InputType.Text"
                           Required="true"
                           RequiredError="API key is required"
                           HelperText="Your API key will be encrypted and stored securely"
-                          Class="mb-3" />
+                          Class="@("mb-3 " + (_showApiKey ? "" : "masked-input"))"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@(_showApiKey ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                          OnAdornmentClick="@(() => _showApiKey = !_showApiKey)"
+                          UserAttributes="@_noAutofillAttributes" />
 
             @if (_selectedProvider?.Name == "azureopenai")
             {
@@ -265,6 +269,7 @@
     private TranslationProviderDto? _selectedProvider;
     private string _newApiKey = "";
     private string _azureEndpoint = "";
+    private bool _showApiKey = false;
     private bool _saving;
     private bool _testing;
     private string? _testResult;
@@ -273,6 +278,15 @@
     // Remove dialog
     private bool _removeDialogVisible;
     private bool _removing;
+
+    // Prevent browser autofill on API key fields
+    private static readonly Dictionary<string, object> _noAutofillAttributes = new()
+    {
+        { "autocomplete", $"off-{Guid.NewGuid():N}" },
+        { "data-lpignore", "true" },
+        { "data-form-type", "other" },
+        { "data-1p-ignore", "true" }
+    };
 
     protected override async Task OnInitializedAsync()
     {

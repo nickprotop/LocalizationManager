@@ -262,3 +262,21 @@ html {
     border-radius: 8px;
     border-left: 4px solid var(--mud-palette-info);
 }
+
+/* =============================================================================
+   Masked Input (for API keys - prevents browser autofill)
+   Uses text input with CSS masking instead of password type.
+   Font-based solution for cross-browser support.
+   ============================================================================= */
+
+@font-face {
+    font-family: 'text-security-disc';
+    src: url('https://cdn.jsdelivr.net/npm/text-security@1.1.2/dist/text-security-disc.woff2') format('woff2'),
+         url('https://cdn.jsdelivr.net/npm/text-security@1.1.2/dist/text-security-disc.woff') format('woff');
+}
+
+.masked-input input {
+    font-family: 'text-security-disc', sans-serif !important;
+    /* Fallback for WebKit browsers */
+    -webkit-text-security: disc;
+}

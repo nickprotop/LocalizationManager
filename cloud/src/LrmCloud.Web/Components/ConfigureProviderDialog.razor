@@ -50,12 +50,14 @@
                                       Label="@(Level == "user" && _inheritedKeySource != null ? "Override API Key (optional)" : "API Key")"
                                       Placeholder="@GetApiKeyPlaceholder()"
                                       Variant="Variant.Outlined"
-                                      InputType="@(_showKey ? InputType.Text : InputType.Password)"
+                                      InputType="InputType.Text"
+                                      Class="@(_showKey ? "" : "masked-input")"
                                       Adornment="Adornment.End"
                                       AdornmentIcon="@(_showKey ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
                                       OnAdornmentClick="@(() => _showKey = !_showKey)"
                                       Required="@(Provider.RequiresApiKey && _inheritedKeySource == null && _existingConfig?.HasApiKey != true)"
-                                      HelperText="@GetApiKeyHelpText(Provider.Name)" />
+                                      HelperText="@GetApiKeyHelpText(Provider.Name)"
+                                      UserAttributes="@_noAutofillAttributes" />
 
                         @if (_existingConfig?.HasApiKey == true)
                         {
@@ -333,6 +335,15 @@
     private TestApiKeyResponse? _testResult;
     private ProviderConfigDto? _existingConfig;
     private string? _inheritedKeySource; // e.g., "Organization" if key comes from org level
+
+    // Prevent browser autofill on API key fields
+    private static readonly Dictionary<string, object> _noAutofillAttributes = new()
+    {
+        { "autocomplete", $"off-{Guid.NewGuid():N}" },
+        { "data-lpignore", "true" },
+        { "data-form-type", "other" },
+        { "data-1p-ignore", "true" }
+    };
 
     protected override async Task OnInitializedAsync()
     {
