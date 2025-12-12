@@ -249,14 +249,40 @@ public class Program
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddOpenApi();
 
-            // CORS (will be configured properly when we add the Blazor frontend)
+            // CORS Configuration
+            var corsConfig = config.Server.Cors;
+            var corsMode = corsConfig?.Mode?.ToLowerInvariant() ?? "allow-all";
+
             builder.Services.AddCors(options =>
             {
                 options.AddDefaultPolicy(policy =>
                 {
-                    policy.AllowAnyOrigin() // Will be restricted in production
-                        .AllowAnyMethod()
-                        .AllowAnyHeader();
+                    switch (corsMode)
+                    {
+                        case "same-origin":
+                            // No CORS - only same-origin requests allowed
+                            // Don't configure any CORS policy (effectively blocks cross-origin)
+                            break;
+
+                        case "whitelist" when corsConfig?.AllowedOrigins?.Count > 0:
+                            // Specific origins only
+                            policy.WithOrigins(corsConfig.AllowedOrigins.ToArray())
+                                .AllowAnyMethod()
+                                .AllowAnyHeader();
+                            if (corsConfig.AllowCredentials)
+                            {
+                                policy.AllowCredentials();
+                            }
+                            break;
+
+                        case "allow-all":
+                        default:
+                            // Allow any origin (default - for development/testing)
+                            policy.AllowAnyOrigin()
+                                .AllowAnyMethod()
+                                .AllowAnyHeader();
+                            break;
+                    }
                 });
             });
 

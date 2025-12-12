@@ -214,12 +214,26 @@ public class MinioStorageService : IStorageService
     /// </summary>
     private static string GetObjectName(int projectId, string filePath)
     {
+        // Security: Prevent path traversal attacks
+        if (filePath.Contains("..") || filePath.Contains("./"))
+        {
+            throw new ArgumentException("Invalid file path: path traversal not allowed", nameof(filePath));
+        }
+
         // Normalize path separators
         filePath = filePath.Replace('\\', '/');
 
         // Remove leading slash if present
         if (filePath.StartsWith('/'))
+        {
             filePath = filePath.Substring(1);
+        }
+
+        // Additional validation: ensure no path traversal after normalization
+        if (filePath.Contains(".."))
+        {
+            throw new ArgumentException("Invalid file path: path traversal not allowed", nameof(filePath));
+        }
 
         return $"projects/{projectId}/{filePath}";
     }

@@ -6,6 +6,7 @@ using LocalizationManager.Core.Configuration;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using System.ComponentModel;
+using System.Security;
 using System.Text.Json;
 
 namespace LocalizationManager.Commands.Cloud;
@@ -495,7 +496,9 @@ public class PullCommand : Command<PullCommandSettings>
         List<ConflictDetector.Conflict> conflicts,
         CancellationToken cancellationToken)
     {
-        // projectDirectory already points to the correct resource directory
+        // Get normalized base path for security validation
+        var basePath = Path.GetFullPath(projectDirectory);
+
         foreach (var resource in remoteResources)
         {
             var conflict = conflicts.FirstOrDefault(c => c.Path == resource.Path);
@@ -506,7 +509,13 @@ public class PullCommand : Command<PullCommandSettings>
                 continue;
             }
 
-            var fullPath = Path.Combine(projectDirectory, resource.Path);
+            // Security: Validate path doesn't escape project directory
+            var fullPath = Path.GetFullPath(Path.Combine(projectDirectory, resource.Path));
+            if (!fullPath.StartsWith(basePath + Path.DirectorySeparatorChar) && fullPath != basePath)
+            {
+                throw new SecurityException($"Security error: path traversal detected in '{resource.Path}'");
+            }
+
             var directory = Path.GetDirectoryName(fullPath);
 
             if (directory != null && !Directory.Exists(directory))
