@@ -166,7 +166,9 @@ public class CloudTranslationService : ICloudTranslationService
                 foreach (var targetLang in request.TargetLanguages)
                 {
                     if (targetLang == sourceLanguage)
+                    {
                         continue;
+                    }
 
                     var existingTranslation = key.Translations
                         .FirstOrDefault(t => t.LanguageCode == targetLang);
@@ -462,7 +464,10 @@ public class CloudTranslationService : ICloudTranslationService
             var info = TranslationProviderFactory.GetProviderInfos()
                 .FirstOrDefault(p => p.Name == provider);
 
-            if (info == null) continue;
+            if (info == null)
+            {
+                continue;
+            }
 
             // Provider doesn't require API key, or has one configured
             if (!info.RequiresApiKey || configuredProviders.ContainsKey(provider))
@@ -477,7 +482,10 @@ public class CloudTranslationService : ICloudTranslationService
     private async Task TrackOtherUsageAsync(int userId, long charsUsed)
     {
         var user = await _db.Users.FindAsync(userId);
-        if (user == null) return;
+        if (user == null)
+        {
+            return;
+        }
 
         user.OtherCharsUsed += charsUsed;
         user.UpdatedAt = DateTime.UtcNow;
@@ -494,18 +502,26 @@ public class CloudTranslationService : ICloudTranslationService
             .FirstOrDefaultAsync();
 
         if (user == null)
+        {
             return (false, "User not found");
+        }
 
         // Enterprise has unlimited
         if (user.Plan.Equals("enterprise", StringComparison.OrdinalIgnoreCase))
+        {
             return (true, null);
+        }
 
         var remaining = user.OtherCharsLimit - user.OtherCharsUsed;
         if (remaining <= 0)
+        {
             return (false, $"Other providers limit reached ({user.OtherCharsLimit:N0} chars/month). Upgrade your plan for more.");
+        }
 
         if (charsToUse > remaining)
+        {
             return (false, $"Request exceeds remaining limit ({remaining:N0} chars remaining)");
+        }
 
         return (true, null);
     }
@@ -654,7 +670,10 @@ public class CloudTranslationService : ICloudTranslationService
     /// </summary>
     private static string? GetConfigString(Dictionary<string, object?>? config, string key)
     {
-        if (config == null) return null;
+        if (config == null)
+        {
+            return null;
+        }
 
         // Try exact key first
         if (config.TryGetValue(key, out var value) && value != null)

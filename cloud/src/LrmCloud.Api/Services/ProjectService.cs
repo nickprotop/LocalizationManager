@@ -37,7 +37,9 @@ public class ProjectService : IProjectService
         {
             // Validate format
             if (!ProjectFormat.IsValid(request.Format))
+            {
                 return (false, null, $"Invalid format. Must be one of: {string.Join(", ", ProjectFormat.All)}");
+            }
 
             // Determine ownership
             int? projectUserId = null;
@@ -47,7 +49,9 @@ public class ProjectService : IProjectService
             {
                 // Organization project - verify user has permission
                 if (!await _organizationService.IsAdminOrOwnerAsync(request.OrganizationId.Value, userId))
+                {
                     return (false, null, "Only organization admins and owners can create projects");
+                }
 
                 projectOrganizationId = request.OrganizationId;
             }
@@ -60,7 +64,9 @@ public class ProjectService : IProjectService
                     .FirstOrDefaultAsync();
 
                 if (user == null)
+                {
                     return (false, null, "User not found");
+                }
 
                 var currentProjectCount = await _db.Projects.CountAsync(p => p.UserId == userId);
                 var maxProjects = _config.Limits.GetMaxProjects(user.Plan);
@@ -117,11 +123,15 @@ public class ProjectService : IProjectService
             .FirstOrDefaultAsync(p => p.Id == projectId);
 
         if (project == null)
+        {
             return null;
+        }
 
         // Check access
         if (!await CanViewProjectAsync(projectId, userId))
+        {
             return null;
+        }
 
         return MapToProjectDto(project, userId);
     }
@@ -133,7 +143,9 @@ public class ProjectService : IProjectService
             // Look up user by username
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username);
             if (user == null)
+            {
                 return null;
+            }
 
             // Look up project by name for that user (personal projects only)
             var project = await _db.Projects
@@ -143,11 +155,15 @@ public class ProjectService : IProjectService
                 .FirstOrDefaultAsync(p => p.Name == projectName && p.UserId == user.Id);
 
             if (project == null)
+            {
                 return null;
+            }
 
             // Verify access
             if (!await CanViewProjectAsync(project.Id, userId))
+            {
                 return null;
+            }
 
             return MapToProjectDto(project, userId);
         }
@@ -198,7 +214,9 @@ public class ProjectService : IProjectService
         {
             // Check permission
             if (!await CanEditProjectAsync(projectId, userId))
+            {
                 return (false, null, "You don't have permission to edit this project");
+            }
 
             var project = await _db.Projects
                 .Include(p => p.Organization)
@@ -207,39 +225,59 @@ public class ProjectService : IProjectService
                 .FirstOrDefaultAsync(p => p.Id == projectId);
 
             if (project == null)
+            {
                 return (false, null, "Project not found");
+            }
 
             // Update fields
             if (!string.IsNullOrWhiteSpace(request.Name))
+            {
                 project.Name = request.Name;
+            }
 
             if (request.Description != null)
+            {
                 project.Description = request.Description;
+            }
 
             if (!string.IsNullOrWhiteSpace(request.Format))
             {
                 if (!ProjectFormat.IsValid(request.Format))
+                {
                     return (false, null, $"Invalid format. Must be one of: {string.Join(", ", ProjectFormat.All)}");
+                }
                 project.Format = request.Format.ToLowerInvariant();
             }
 
             if (!string.IsNullOrWhiteSpace(request.DefaultLanguage))
+            {
                 project.DefaultLanguage = request.DefaultLanguage;
+            }
 
             if (!string.IsNullOrWhiteSpace(request.LocalizationPath))
+            {
                 project.LocalizationPath = request.LocalizationPath;
+            }
 
             if (request.GitHubRepo != null)
+            {
                 project.GitHubRepo = request.GitHubRepo;
+            }
 
             if (!string.IsNullOrWhiteSpace(request.GitHubDefaultBranch))
+            {
                 project.GitHubDefaultBranch = request.GitHubDefaultBranch;
+            }
 
             if (request.AutoTranslate.HasValue)
+            {
                 project.AutoTranslate = request.AutoTranslate.Value;
+            }
 
             if (request.AutoCreatePr.HasValue)
+            {
                 project.AutoCreatePr = request.AutoCreatePr.Value;
+            }
 
             project.UpdatedAt = DateTime.UtcNow;
 
@@ -263,13 +301,17 @@ public class ProjectService : IProjectService
         {
             // Check permission
             if (!await CanEditProjectAsync(projectId, userId))
+            {
                 return (false, "You don't have permission to delete this project");
+            }
 
             var project = await _db.Projects
                 .FirstOrDefaultAsync(p => p.Id == projectId);
 
             if (project == null)
+            {
                 return (false, "Project not found");
+            }
 
             // Hard delete (cascades to resource keys and translations)
             _db.Projects.Remove(project);
@@ -292,14 +334,20 @@ public class ProjectService : IProjectService
         {
             // Check permission
             if (!await CanEditProjectAsync(projectId, userId))
+            {
                 return (false, "You don't have permission to sync this project");
+            }
 
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null)
+            {
                 return (false, "Project not found");
+            }
 
             if (string.IsNullOrEmpty(project.GitHubRepo))
+            {
                 return (false, "Project does not have a GitHub repository configured");
+            }
 
             // Update status to syncing
             project.SyncStatus = SyncStatus.Syncing;
@@ -327,15 +375,21 @@ public class ProjectService : IProjectService
     {
         var project = await _db.Projects.FindAsync(projectId);
         if (project == null)
+        {
             return false;
+        }
 
         // Personal project - only owner can view
         if (project.UserId.HasValue)
+        {
             return project.UserId.Value == userId;
+        }
 
         // Organization project - any member can view
         if (project.OrganizationId.HasValue)
+        {
             return await _organizationService.IsMemberAsync(project.OrganizationId.Value, userId);
+        }
 
         return false;
     }
@@ -344,15 +398,21 @@ public class ProjectService : IProjectService
     {
         var project = await _db.Projects.FindAsync(projectId);
         if (project == null)
+        {
             return false;
+        }
 
         // Personal project - only owner can edit
         if (project.UserId.HasValue)
+        {
             return project.UserId.Value == userId;
+        }
 
         // Organization project - admin or owner can edit
         if (project.OrganizationId.HasValue)
+        {
             return await _organizationService.IsAdminOrOwnerAsync(project.OrganizationId.Value, userId);
+        }
 
         return false;
     }
@@ -361,11 +421,15 @@ public class ProjectService : IProjectService
     {
         var project = await _db.Projects.FindAsync(projectId);
         if (project == null)
+        {
             return false;
+        }
 
         // Personal project - only owner can manage
         if (project.UserId.HasValue)
+        {
             return project.UserId.Value == userId;
+        }
 
         // Organization project - member or above can manage
         if (project.OrganizationId.HasValue)
@@ -434,14 +498,18 @@ public class ProjectService : IProjectService
     public async Task<ConfigurationDto?> GetConfigurationAsync(int projectId, int userId)
     {
         if (!await CanViewProjectAsync(projectId, userId))
+        {
             return null;
+        }
 
         var project = await _db.Projects
             .Include(p => p.ConfigUpdater)
             .FirstOrDefaultAsync(p => p.Id == projectId);
 
         if (project == null || string.IsNullOrWhiteSpace(project.ConfigJson))
+        {
             return null;
+        }
 
         return new ConfigurationDto
         {
@@ -456,14 +524,18 @@ public class ProjectService : IProjectService
         int projectId, int userId, UpdateConfigurationRequest request)
     {
         if (!await CanEditProjectAsync(projectId, userId))
+        {
             return (false, null, "Configuration not found");
+        }
 
         var project = await _db.Projects
             .Include(p => p.ConfigUpdater)
             .FirstOrDefaultAsync(p => p.Id == projectId);
 
         if (project == null)
+        {
             return (false, null, "Configuration not found");
+        }
 
         // Check for optimistic locking conflict
         if (!string.IsNullOrWhiteSpace(request.BaseVersion))
@@ -509,7 +581,9 @@ public class ProjectService : IProjectService
     public async Task<List<ConfigurationHistoryDto>?> GetConfigurationHistoryAsync(int projectId, int userId, int limit)
     {
         if (!await CanViewProjectAsync(projectId, userId))
+        {
             return null;
+        }
 
         // Get configuration update audit logs
         var history = await _db.AuditLogs
@@ -533,11 +607,15 @@ public class ProjectService : IProjectService
     public async Task<SyncStatusDto?> GetSyncStatusAsync(int projectId, int userId)
     {
         if (!await CanViewProjectAsync(projectId, userId))
+        {
             return null;
+        }
 
         var project = await _db.Projects.FindAsync(projectId);
         if (project == null)
+        {
             return null;
+        }
 
         // Get last push (sync from CLI)
         var lastPush = await _db.SyncHistory

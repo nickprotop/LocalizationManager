@@ -265,19 +265,28 @@ public class ApiKeyHierarchyService : IApiKeyHierarchyService
             case "project":
                 var projectKey = await _db.ProjectApiKeys
                     .FirstOrDefaultAsync(k => k.ProjectId == entityId && k.Provider == provider);
-                if (projectKey == null) return null;
+                if (projectKey == null)
+                {
+                    return null;
+                }
                 return MapToDto(projectKey.Provider, "project", projectKey.EncryptedKey, projectKey.ConfigJson, projectKey.UpdatedAt);
 
             case "user":
                 var userKey = await _db.UserApiKeys
                     .FirstOrDefaultAsync(k => k.UserId == entityId && k.Provider == provider);
-                if (userKey == null) return null;
+                if (userKey == null)
+                {
+                    return null;
+                }
                 return MapToDto(userKey.Provider, "user", userKey.EncryptedKey, userKey.ConfigJson, userKey.UpdatedAt);
 
             case "organization":
                 var orgKey = await _db.OrganizationApiKeys
                     .FirstOrDefaultAsync(k => k.OrganizationId == entityId && k.Provider == provider);
-                if (orgKey == null) return null;
+                if (orgKey == null)
+                {
+                    return null;
+                }
                 return MapToDto(orgKey.Provider, "organization", orgKey.EncryptedKey, orgKey.ConfigJson, orgKey.UpdatedAt);
 
             default:
@@ -310,8 +319,14 @@ public class ApiKeyHierarchyService : IApiKeyHierarchyService
 
                 if (existingProject != null)
                 {
-                    if (encryptedKey != null) existingProject.EncryptedKey = encryptedKey;
-                    if (configJson != null) existingProject.ConfigJson = configJson;
+                    if (encryptedKey != null)
+                    {
+                        existingProject.EncryptedKey = encryptedKey;
+                    }
+                    if (configJson != null)
+                    {
+                        existingProject.ConfigJson = configJson;
+                    }
                     existingProject.UpdatedAt = now;
                 }
                 else
@@ -333,8 +348,14 @@ public class ApiKeyHierarchyService : IApiKeyHierarchyService
 
                 if (existingUser != null)
                 {
-                    if (encryptedKey != null) existingUser.EncryptedKey = encryptedKey;
-                    if (configJson != null) existingUser.ConfigJson = configJson;
+                    if (encryptedKey != null)
+                    {
+                        existingUser.EncryptedKey = encryptedKey;
+                    }
+                    if (configJson != null)
+                    {
+                        existingUser.ConfigJson = configJson;
+                    }
                     existingUser.UpdatedAt = now;
                 }
                 else
@@ -356,8 +377,14 @@ public class ApiKeyHierarchyService : IApiKeyHierarchyService
 
                 if (existingOrg != null)
                 {
-                    if (encryptedKey != null) existingOrg.EncryptedKey = encryptedKey;
-                    if (configJson != null) existingOrg.ConfigJson = configJson;
+                    if (encryptedKey != null)
+                    {
+                        existingOrg.EncryptedKey = encryptedKey;
+                    }
+                    if (configJson != null)
+                    {
+                        existingOrg.ConfigJson = configJson;
+                    }
                     existingOrg.UpdatedAt = now;
                 }
                 else
@@ -537,19 +564,30 @@ public class ApiKeyHierarchyService : IApiKeyHierarchyService
 
     private static string? GetConfigSummary(Dictionary<string, object?>? config)
     {
-        if (config == null || config.Count == 0) return null;
+        if (config == null || config.Count == 0)
+        {
+            return null;
+        }
 
         var parts = new List<string>();
 
         // Prioritize important fields
         if (config.TryGetValue("model", out var model) && model != null)
+        {
             parts.Add($"model: {model}");
+        }
         if (config.TryGetValue("apiUrl", out var apiUrl) && apiUrl != null)
+        {
             parts.Add($"url: {apiUrl}");
+        }
         if (config.TryGetValue("endpoint", out var endpoint) && endpoint != null)
+        {
             parts.Add($"endpoint: {endpoint}");
+        }
         if (config.TryGetValue("instanceUrl", out var instanceUrl) && instanceUrl != null)
+        {
             parts.Add($"instance: {instanceUrl}");
+        }
 
         return parts.Count > 0 ? string.Join(", ", parts) : null;
     }

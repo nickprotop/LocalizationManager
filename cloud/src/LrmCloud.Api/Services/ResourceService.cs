@@ -35,7 +35,9 @@ public class ResourceService : IResourceService
     {
         // Check permission
         if (!await _projectService.CanViewProjectAsync(projectId, userId))
+        {
             return new List<ResourceKeyDto>();
+        }
 
         var keys = await _db.ResourceKeys
             .Include(k => k.Translations)
@@ -50,14 +52,18 @@ public class ResourceService : IResourceService
     {
         // Check permission
         if (!await _projectService.CanViewProjectAsync(projectId, userId))
+        {
             return null;
+        }
 
         var key = await _db.ResourceKeys
             .Include(k => k.Translations)
             .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == keyName);
 
         if (key == null)
+        {
             return null;
+        }
 
         return MapToResourceKeyDetailDto(key);
     }
@@ -73,7 +79,9 @@ public class ResourceService : IResourceService
     {
         // Check permission
         if (!await _projectService.CanViewProjectAsync(projectId, userId))
+        {
             return new PagedResult<ResourceKeyDetailDto> { Page = page, PageSize = pageSize };
+        }
 
         // Build query
         var query = _db.ResourceKeys
@@ -130,14 +138,18 @@ public class ResourceService : IResourceService
         {
             // Check permission
             if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+            {
                 return (false, null, "You don't have permission to manage resources in this project");
+            }
 
             // Check if key already exists
             var exists = await _db.ResourceKeys
                 .AnyAsync(k => k.ProjectId == projectId && k.KeyName == request.KeyName);
 
             if (exists)
+            {
                 return (false, null, $"Resource key '{request.KeyName}' already exists");
+            }
 
             // Create resource key
             var resourceKey = new ResourceKey
@@ -200,24 +212,34 @@ public class ResourceService : IResourceService
         {
             // Check permission
             if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+            {
                 return (false, null, "You don't have permission to manage resources in this project");
+            }
 
             var resourceKey = await _db.ResourceKeys
                 .Include(k => k.Translations)
                 .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == keyName);
 
             if (resourceKey == null)
+            {
                 return (false, null, "Resource key not found");
+            }
 
             // Update fields
             if (request.KeyPath != null)
+            {
                 resourceKey.KeyPath = request.KeyPath;
+            }
 
             if (request.IsPlural.HasValue)
+            {
                 resourceKey.IsPlural = request.IsPlural.Value;
+            }
 
             if (request.Comment != null)
+            {
                 resourceKey.Comment = request.Comment;
+            }
 
             resourceKey.UpdatedAt = DateTime.UtcNow;
             resourceKey.Version++;
@@ -244,13 +266,17 @@ public class ResourceService : IResourceService
         {
             // Check permission
             if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+            {
                 return (false, "You don't have permission to manage resources in this project");
+            }
 
             var resourceKey = await _db.ResourceKeys
                 .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == keyName);
 
             if (resourceKey == null)
+            {
                 return (false, "Resource key not found");
+            }
 
             // Hard delete (cascades to translations)
             _db.ResourceKeys.Remove(resourceKey);
@@ -279,7 +305,9 @@ public class ResourceService : IResourceService
         {
             // Check permission
             if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+            {
                 return (false, null, "You don't have permission to manage resources in this project");
+            }
 
             // Get resource key
             var resourceKey = await _db.ResourceKeys
@@ -287,11 +315,15 @@ public class ResourceService : IResourceService
                 .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == keyName);
 
             if (resourceKey == null)
+            {
                 return (false, null, "Resource key not found");
+            }
 
             // Validate status
             if (!TranslationStatus.All.Contains(request.Status))
+            {
                 return (false, null, $"Invalid status. Must be one of: {string.Join(", ", TranslationStatus.All)}");
+            }
 
             // Find existing translation
             var translation = resourceKey.Translations
@@ -353,7 +385,9 @@ public class ResourceService : IResourceService
         {
             // Check permission
             if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+            {
                 return (false, 0, "You don't have permission to manage resources in this project");
+            }
 
             var updatedCount = 0;
 
@@ -432,7 +466,9 @@ public class ResourceService : IResourceService
     {
         // Check permission
         if (!await _projectService.CanViewProjectAsync(projectId, userId))
+        {
             return new ProjectStatsDto();
+        }
 
         var keys = await _db.ResourceKeys
             .Include(k => k.Translations)
@@ -488,7 +524,9 @@ public class ResourceService : IResourceService
     {
         // Check permission
         if (!await _projectService.CanViewProjectAsync(projectId, userId))
+        {
             return new ValidationResultDto { IsValid = false };
+        }
 
         var result = new ValidationResultDto { IsValid = true };
 
@@ -640,11 +678,15 @@ public class ResourceService : IResourceService
     {
         // Check permission
         if (!await _projectService.CanViewProjectAsync(projectId, userId))
+        {
             return new List<ResourceDto>();
+        }
 
         var project = await _db.Projects.FindAsync(projectId);
         if (project == null)
+        {
             return new List<ResourceDto>();
+        }
 
         // Get resource keys with translations
         var query = _db.ResourceKeys
@@ -712,11 +754,15 @@ public class ResourceService : IResourceService
         {
             // Check permission
             if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+            {
                 return (false, null, "You don't have permission to push resources to this project");
+            }
 
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null)
+            {
                 return (false, null, "Project not found");
+            }
 
             // Update configuration if provided
             if (request.Configuration != null)
@@ -797,11 +843,15 @@ public class ResourceService : IResourceService
         {
             // Check permission
             if (!await _projectService.CanViewProjectAsync(projectId, userId))
+            {
                 return (false, null, "You don't have permission to view this project");
+            }
 
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null)
+            {
                 return (false, null, "Project not found");
+            }
 
             // Generate files from database using Core's backends
             var files = await _syncService.GenerateFilesFromDatabaseAsync(projectId, project.ConfigJson);
@@ -861,11 +911,15 @@ public class ResourceService : IResourceService
     {
         // Check permission
         if (!await _projectService.CanViewProjectAsync(projectId, userId))
+        {
             return new List<ProjectLanguageDto>();
+        }
 
         var project = await _db.Projects.FindAsync(projectId);
         if (project == null)
+        {
             return new List<ProjectLanguageDto>();
+        }
 
         var totalKeys = await _db.ResourceKeys.CountAsync(k => k.ProjectId == projectId);
 
@@ -902,18 +956,24 @@ public class ResourceService : IResourceService
         {
             // Check permission
             if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+            {
                 return (false, null, "You don't have permission to manage languages in this project");
+            }
 
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null)
+            {
                 return (false, null, "Project not found");
+            }
 
             // Check if language already exists
             var exists = await _db.Translations
                 .AnyAsync(t => t.ResourceKey!.ProjectId == projectId && t.LanguageCode == request.LanguageCode);
 
             if (exists)
+            {
                 return (false, null, $"Language '{request.LanguageCode}' already exists in this project");
+            }
 
             // Get all resource keys
             var resourceKeys = await _db.ResourceKeys
@@ -981,19 +1041,27 @@ public class ResourceService : IResourceService
         {
             // Check permission
             if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+            {
                 return (false, "You don't have permission to manage languages in this project");
+            }
 
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null)
+            {
                 return (false, "Project not found");
+            }
 
             // Don't allow removing the default language
             if (request.LanguageCode == project.DefaultLanguage)
+            {
                 return (false, "Cannot remove the default language. Change the default language first.");
+            }
 
             // Require confirmation
             if (!request.ConfirmDelete)
+            {
                 return (false, "Please confirm deletion. This will permanently remove all translations for this language.");
+            }
 
             // Get all translations for this language
             var translations = await _db.Translations
@@ -1001,7 +1069,9 @@ public class ResourceService : IResourceService
                 .ToListAsync();
 
             if (translations.Count == 0)
+            {
                 return (false, $"Language '{request.LanguageCode}' not found in this project");
+            }
 
             // Delete all translations
             _db.Translations.RemoveRange(translations);
