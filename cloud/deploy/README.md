@@ -62,7 +62,7 @@ Self-hosted infrastructure for LRM Cloud using Docker Compose.
 ## Request Flow
 
 ```
-Browser Request: https://lrm.cloud/api/projects
+Browser Request: https://lrm-cloud.com/api/projects
     │
     ▼
 ┌─────────────────┐
@@ -82,7 +82,7 @@ Browser Request: https://lrm.cloud/api/projects
 │ PostgreSQL      │  │ Redis Cache     │
 └─────────────────┘  └─────────────────┘
 
-Browser Request: https://lrm.cloud/ (Landing Page)
+Browser Request: https://lrm-cloud.com/ (Landing Page)
     │
     ▼
 ┌─────────────────┐
@@ -96,7 +96,7 @@ Browser Request: https://lrm.cloud/ (Landing Page)
 │ nginx + static  │  Serves landing page (index.html, favicon)
 └─────────────────┘
 
-Browser Request: https://lrm.cloud/app/* (Blazor WASM)
+Browser Request: https://lrm-cloud.com/app/* (Blazor WASM)
     │
     ▼
 ┌─────────────────┐
@@ -279,7 +279,7 @@ Interactive script for first-time infrastructure setup. Can be re-run safely to 
 | Mail Port | 25 | SMTP port |
 | Mail Username | (empty) | SMTP auth (optional) |
 | Mail Password | (hidden) | SMTP auth (optional) |
-| Mail From Address | noreply@lrm.cloud | Sender email |
+| Mail From Address | noreply@lrm-cloud.com | Sender email |
 | Mail From Name | LRM Cloud | Sender display name |
 
 **Auto-generated secrets (preserved on re-run):**

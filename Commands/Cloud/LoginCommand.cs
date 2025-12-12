@@ -15,7 +15,7 @@ namespace LocalizationManager.Commands.Cloud;
 public class LoginCommandSettings : BaseCommandSettings
 {
     [CommandArgument(0, "[HOST]")]
-    [Description("Cloud host (e.g., lrm.cloud, localhost:3000). Uses configured remote if not provided.")]
+    [Description("Cloud host (e.g., lrm-cloud.com, localhost:3000). Uses configured remote if not provided.")]
     public string? Host { get; set; }
 
     [CommandOption("--email <EMAIL>")]
@@ -134,7 +134,7 @@ public class LoginCommand : Command<LoginCommandSettings>
         AnsiConsole.MarkupLine("[red]No host specified and no remote configured.[/]");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[dim]Usage: lrm cloud login <host>[/]");
-        AnsiConsole.MarkupLine("[dim]Example: lrm cloud login lrm.cloud[/]");
+        AnsiConsole.MarkupLine("[dim]Example: lrm cloud login lrm-cloud.com[/]");
         AnsiConsole.MarkupLine("[dim]Example: lrm cloud login localhost:3000[/]");
         throw new InvalidOperationException("No host specified");
     }

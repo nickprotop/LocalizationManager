@@ -58,7 +58,7 @@ public class AuthController : ApiControllerBase
                     title: "Internal Server Error",
                     detail: "An error occurred during registration. Please try again later.",
                     statusCode: StatusCodes.Status500InternalServerError,
-                    type: $"https://lrm.cloud/errors/{ErrorCodes.SRV_INTERNAL_ERROR.ToLowerInvariant().Replace('_', '-')}"
+                    type: $"https://lrm-cloud.com/errors/{ErrorCodes.SRV_INTERNAL_ERROR.ToLowerInvariant().Replace('_', '-')}"
                 )
             );
         }
@@ -110,7 +110,7 @@ public class AuthController : ApiControllerBase
                     title: "Internal Server Error",
                     detail: "An error occurred processing your request. Please try again later.",
                     statusCode: StatusCodes.Status500InternalServerError,
-                    type: $"https://lrm.cloud/errors/{ErrorCodes.SRV_INTERNAL_ERROR.ToLowerInvariant().Replace('_', '-')}"
+                    type: $"https://lrm-cloud.com/errors/{ErrorCodes.SRV_INTERNAL_ERROR.ToLowerInvariant().Replace('_', '-')}"
                 )
             );
         }
@@ -156,7 +156,7 @@ public class AuthController : ApiControllerBase
                 title: "Unauthorized",
                 detail: errorMessage!,
                 statusCode: StatusCodes.Status401Unauthorized,
-                type: $"https://lrm.cloud/errors/{ErrorCodes.AUTH_INVALID_CREDENTIALS.ToLowerInvariant().Replace('_', '-')}"
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_INVALID_CREDENTIALS.ToLowerInvariant().Replace('_', '-')}"
             ));
         }
 
@@ -181,7 +181,7 @@ public class AuthController : ApiControllerBase
                 title: "Unauthorized",
                 detail: errorMessage!,
                 statusCode: StatusCodes.Status401Unauthorized,
-                type: $"https://lrm.cloud/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
             ));
         }
 
@@ -223,7 +223,7 @@ public class AuthController : ApiControllerBase
                 title: "Unauthorized",
                 detail: "Invalid authentication token",
                 statusCode: StatusCodes.Status401Unauthorized,
-                type: $"https://lrm.cloud/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
             ));
         }
 
@@ -235,7 +235,7 @@ public class AuthController : ApiControllerBase
                 title: "Unauthorized",
                 detail: "User not found",
                 statusCode: StatusCodes.Status401Unauthorized,
-                type: $"https://lrm.cloud/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
             ));
         }
 
@@ -261,7 +261,7 @@ public class AuthController : ApiControllerBase
                 title: "Unauthorized",
                 detail: "Invalid authentication token",
                 statusCode: StatusCodes.Status401Unauthorized,
-                type: $"https://lrm.cloud/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
             ));
         }
 
@@ -294,7 +294,7 @@ public class AuthController : ApiControllerBase
                 title: "Unauthorized",
                 detail: "Invalid authentication token",
                 statusCode: StatusCodes.Status401Unauthorized,
-                type: $"https://lrm.cloud/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
             ));
         }
 
@@ -344,7 +344,7 @@ public class AuthController : ApiControllerBase
                     title: "Service Unavailable",
                     detail: "GitHub OAuth is not configured on this server",
                     statusCode: StatusCodes.Status500InternalServerError,
-                    type: $"https://lrm.cloud/errors/{ErrorCodes.SRV_INTERNAL_ERROR.ToLowerInvariant().Replace('_', '-')}"
+                    type: $"https://lrm-cloud.com/errors/{ErrorCodes.SRV_INTERNAL_ERROR.ToLowerInvariant().Replace('_', '-')}"
                 )
             );
         }
@@ -395,7 +395,7 @@ public class AuthController : ApiControllerBase
                     title: "Internal Server Error",
                     detail: "An error occurred during GitHub authentication",
                     statusCode: StatusCodes.Status500InternalServerError,
-                    type: $"https://lrm.cloud/errors/{ErrorCodes.SRV_INTERNAL_ERROR.ToLowerInvariant().Replace('_', '-')}"
+                    type: $"https://lrm-cloud.com/errors/{ErrorCodes.SRV_INTERNAL_ERROR.ToLowerInvariant().Replace('_', '-')}"
                 )
             );
         }
@@ -420,7 +420,7 @@ public class AuthController : ApiControllerBase
                 title: "Unauthorized",
                 detail: "Invalid authentication token",
                 statusCode: StatusCodes.Status401Unauthorized,
-                type: $"https://lrm.cloud/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
             ));
         }
 
@@ -458,7 +458,7 @@ public class AuthController : ApiControllerBase
                 title: "Unauthorized",
                 detail: "Invalid authentication token",
                 statusCode: StatusCodes.Status401Unauthorized,
-                type: $"https://lrm.cloud/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
             ));
         }
 
@@ -491,7 +491,7 @@ public class AuthController : ApiControllerBase
                 title: "Unauthorized",
                 detail: "Invalid authentication token",
                 statusCode: StatusCodes.Status401Unauthorized,
-                type: $"https://lrm.cloud/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
             ));
         }
 
@@ -527,7 +527,7 @@ public class AuthController : ApiControllerBase
                 title: "Unauthorized",
                 detail: "Invalid authentication token",
                 statusCode: StatusCodes.Status401Unauthorized,
-                type: $"https://lrm.cloud/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
             ));
         }
 
@@ -562,7 +562,7 @@ public class AuthController : ApiControllerBase
                 title: "Unauthorized",
                 detail: "Invalid authentication token",
                 statusCode: StatusCodes.Status401Unauthorized,
-                type: $"https://lrm.cloud/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
             ));
         }
 
@@ -595,7 +595,7 @@ public class AuthController : ApiControllerBase
                 title: "Unauthorized",
                 detail: "Invalid authentication token",
                 statusCode: StatusCodes.Status401Unauthorized,
-                type: $"https://lrm.cloud/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
             ));
         }
 
@@ -633,7 +633,7 @@ public class AuthController : ApiControllerBase
                 title: "Unauthorized",
                 detail: "Invalid authentication token",
                 statusCode: StatusCodes.Status401Unauthorized,
-                type: $"https://lrm.cloud/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
             ));
         }
 

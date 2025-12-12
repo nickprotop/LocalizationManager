@@ -122,7 +122,7 @@ All API endpoints follow a consistent response format using a hybrid approach:
 
 ```json
 {
-  "type": "https://lrm.cloud/errors/auth-invalid-credentials",
+  "type": "https://lrm-cloud.com/errors/auth-invalid-credentials",
   "title": "Unauthorized",
   "status": 401,
   "detail": "Invalid email or password",
@@ -241,7 +241,7 @@ cloud/src/LrmCloud.Api/
   },
 
   "cors": {
-    "origins": ["https://lrm.cloud", "http://localhost:3000"]
+    "origins": ["https://lrm-cloud.com", "http://localhost:3000"]
   },
 
   "database": {
@@ -268,9 +268,9 @@ cloud/src/LrmCloud.Api/
   "mail": {
     "host": "mail.yourdomain.com",
     "port": 587,
-    "username": "noreply@lrm.cloud",
+    "username": "noreply@lrm-cloud.com",
     "password": "xxxx",
-    "fromAddress": "noreply@lrm.cloud",
+    "fromAddress": "noreply@lrm-cloud.com",
     "fromName": "LRM Cloud"
   },
 
@@ -1000,7 +1000,7 @@ public class SendmailService : IMailService
     "Provider": "Sendmail",  // or "SendGrid", "Postmark" for future
     "Host": "mail.yourdomain.com",
     "Port": 587,
-    "FromAddress": "noreply@lrm.cloud",
+    "FromAddress": "noreply@lrm-cloud.com",
     "FromName": "LRM Cloud"
   }
 }
@@ -1144,8 +1144,8 @@ $$ LANGUAGE SQL;
 ### Setup
 - [ ] Create GitHub App at github.com/settings/apps/new
 - [ ] App name: "LRM Cloud"
-- [ ] Homepage: https://lrm.cloud
-- [ ] Webhook URL: https://lrm.cloud/webhooks/github
+- [ ] Homepage: https://lrm-cloud.com
+- [ ] Webhook URL: https://lrm-cloud.com/webhooks/github
 - [ ] Webhook secret: Generate and store securely
 - [ ] Generate private key (.pem file) - store in secrets
 

@@ -264,7 +264,7 @@ public class GitHubAuthService : IGitHubAuthService
         }
 
         // Create new user
-        var email = githubProfile.Email ?? $"github_{githubProfile.Id}@lrm.cloud";
+        var email = githubProfile.Email ?? $"github_{githubProfile.Id}@lrm-cloud.com";
         var username = await GenerateUniqueUsernameAsync(githubProfile.Login);
 
         var newUser = new User

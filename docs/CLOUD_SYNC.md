@@ -32,13 +32,13 @@ Configure your project's remote URL (Git-style):
 
 ```bash
 # Organization project
-lrm remote set https://lrm.cloud/acme-corp/my-project
+lrm remote set https://lrm-cloud.com/acme-corp/my-project
 
 # Personal project (with @username)
-lrm remote set https://lrm.cloud/@john/my-project
+lrm remote set https://lrm-cloud.com/@john/my-project
 
 # Custom host (self-hosted or staging)
-lrm remote set https://staging.lrm.cloud/myorg/project
+lrm remote set https://staging.lrm-cloud.com/myorg/project
 ```
 
 The remote URL is stored in `.lrm/cloud.json` (per-developer, git-ignored).
@@ -50,7 +50,7 @@ There are three ways to authenticate with LRM Cloud:
 #### Option A: Browser Login (Interactive)
 
 ```bash
-lrm cloud login lrm.cloud
+lrm cloud login lrm-cloud.com
 ```
 
 This opens a browser for authentication and stores a JWT token.
@@ -83,7 +83,7 @@ Check your current remote:
 
 ```bash
 lrm remote get
-# Output: https://lrm.cloud/acme-corp/my-project
+# Output: https://lrm-cloud.com/acme-corp/my-project
 ```
 
 View sync status:
@@ -98,13 +98,13 @@ lrm cloud status
 
 ```bash
 # Organization projects
-https://lrm.cloud/org-name/project-name
+https://lrm-cloud.com/org-name/project-name
 
 # Personal projects (with @ prefix)
-https://lrm.cloud/@username/project-name
+https://lrm-cloud.com/@username/project-name
 
 # Custom hosts
-https://api.lrm.cloud/org/project
+https://api.lrm-cloud.com/org/project
 http://localhost:5000/org/project
 ```
 
@@ -350,10 +350,10 @@ You can switch between different remotes:
 
 ```bash
 # Development environment
-lrm remote set https://dev.lrm.cloud/acme/project
+lrm remote set https://dev.lrm-cloud.com/acme/project
 
 # Production environment
-lrm remote set https://lrm.cloud/acme/project
+lrm remote set https://lrm-cloud.com/acme/project
 ```
 
 ### Sync Workflow

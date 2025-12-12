@@ -11,13 +11,13 @@ public class RemoteUrlParserTests
     public void Parse_OrganizationUrl_ReturnsCorrectProperties()
     {
         // Arrange
-        var url = "https://lrm.cloud/acme-corp/my-project";
+        var url = "https://lrm-cloud.com/acme-corp/my-project";
 
         // Act
         var result = RemoteUrlParser.Parse(url);
 
         // Assert
-        Assert.Equal("lrm.cloud", result.Host);
+        Assert.Equal("lrm-cloud.com", result.Host);
         Assert.Equal(443, result.Port);
         Assert.True(result.UseHttps);
         Assert.Equal("acme-corp", result.Organization);
@@ -30,13 +30,13 @@ public class RemoteUrlParserTests
     public void Parse_UsernameUrl_ReturnsCorrectProperties()
     {
         // Arrange
-        var url = "https://lrm.cloud/@johndoe/my-project";
+        var url = "https://lrm-cloud.com/@johndoe/my-project";
 
         // Act
         var result = RemoteUrlParser.Parse(url);
 
         // Assert
-        Assert.Equal("lrm.cloud", result.Host);
+        Assert.Equal("lrm-cloud.com", result.Host);
         Assert.Equal(443, result.Port);
         Assert.True(result.UseHttps);
         Assert.Null(result.Organization);
@@ -49,13 +49,13 @@ public class RemoteUrlParserTests
     public void Parse_CustomPort_ReturnsCorrectPort()
     {
         // Arrange
-        var url = "https://staging.lrm.cloud:8443/org/project";
+        var url = "https://staging.lrm-cloud.com:8443/org/project";
 
         // Act
         var result = RemoteUrlParser.Parse(url);
 
         // Assert
-        Assert.Equal("staging.lrm.cloud", result.Host);
+        Assert.Equal("staging.lrm-cloud.com", result.Host);
         Assert.Equal(8443, result.Port);
         Assert.True(result.UseHttps);
     }
@@ -94,7 +94,7 @@ public class RemoteUrlParserTests
     public void Parse_PreservesOriginalUrl()
     {
         // Arrange
-        var url = "https://lrm.cloud/org/project";
+        var url = "https://lrm-cloud.com/org/project";
 
         // Act
         var result = RemoteUrlParser.Parse(url);
@@ -107,7 +107,7 @@ public class RemoteUrlParserTests
     public void Parse_UrlWithHyphensAndUnderscores_Succeeds()
     {
         // Arrange
-        var url = "https://lrm.cloud/my-org_name/my-project_name";
+        var url = "https://lrm-cloud.com/my-org_name/my-project_name";
 
         // Act
         var result = RemoteUrlParser.Parse(url);
@@ -121,7 +121,7 @@ public class RemoteUrlParserTests
     public void Parse_UrlWithNumbers_Succeeds()
     {
         // Arrange
-        var url = "https://lrm.cloud/org123/project456";
+        var url = "https://lrm-cloud.com/org123/project456";
 
         // Act
         var result = RemoteUrlParser.Parse(url);
@@ -135,13 +135,13 @@ public class RemoteUrlParserTests
     public void Parse_SubdomainHost_Succeeds()
     {
         // Arrange
-        var url = "https://api.staging.lrm.cloud/org/project";
+        var url = "https://api.staging.lrm-cloud.com/org/project";
 
         // Act
         var result = RemoteUrlParser.Parse(url);
 
         // Assert
-        Assert.Equal("api.staging.lrm.cloud", result.Host);
+        Assert.Equal("api.staging.lrm-cloud.com", result.Host);
     }
 
     #endregion
@@ -176,7 +176,7 @@ public class RemoteUrlParserTests
     public void Parse_MissingProject_ThrowsArgumentException()
     {
         // Arrange
-        var url = "https://lrm.cloud/org";
+        var url = "https://lrm-cloud.com/org";
 
         // Act & Assert
         var ex = Assert.Throws<ArgumentException>(() => RemoteUrlParser.Parse(url));
@@ -187,7 +187,7 @@ public class RemoteUrlParserTests
     public void Parse_MissingOrgAndProject_ThrowsArgumentException()
     {
         // Arrange
-        var url = "https://lrm.cloud/";
+        var url = "https://lrm-cloud.com/";
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => RemoteUrlParser.Parse(url));
@@ -197,7 +197,7 @@ public class RemoteUrlParserTests
     public void Parse_NoPath_ThrowsArgumentException()
     {
         // Arrange
-        var url = "https://lrm.cloud";
+        var url = "https://lrm-cloud.com";
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => RemoteUrlParser.Parse(url));
@@ -207,7 +207,7 @@ public class RemoteUrlParserTests
     public void Parse_TooManyPathSegments_ThrowsArgumentException()
     {
         // Arrange
-        var url = "https://lrm.cloud/org/project/extra";
+        var url = "https://lrm-cloud.com/org/project/extra";
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => RemoteUrlParser.Parse(url));
@@ -217,7 +217,7 @@ public class RemoteUrlParserTests
     public void Parse_InvalidProtocol_ThrowsArgumentException()
     {
         // Arrange
-        var url = "ftp://lrm.cloud/org/project";
+        var url = "ftp://lrm-cloud.com/org/project";
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => RemoteUrlParser.Parse(url));
@@ -227,7 +227,7 @@ public class RemoteUrlParserTests
     public void Parse_MissingProtocol_ThrowsArgumentException()
     {
         // Arrange
-        var url = "lrm.cloud/org/project";
+        var url = "lrm-cloud.com/org/project";
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => RemoteUrlParser.Parse(url));
@@ -237,7 +237,7 @@ public class RemoteUrlParserTests
     public void Parse_InvalidCharactersInOrg_ThrowsArgumentException()
     {
         // Arrange
-        var url = "https://lrm.cloud/org name/project";
+        var url = "https://lrm-cloud.com/org name/project";
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => RemoteUrlParser.Parse(url));
@@ -247,7 +247,7 @@ public class RemoteUrlParserTests
     public void Parse_InvalidCharactersInProject_ThrowsArgumentException()
     {
         // Arrange
-        var url = "https://lrm.cloud/org/project name";
+        var url = "https://lrm-cloud.com/org/project name";
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => RemoteUrlParser.Parse(url));
@@ -261,7 +261,7 @@ public class RemoteUrlParserTests
     public void TryParse_ValidUrl_ReturnsTrue()
     {
         // Arrange
-        var url = "https://lrm.cloud/org/project";
+        var url = "https://lrm-cloud.com/org/project";
 
         // Act
         var success = RemoteUrlParser.TryParse(url, out var result);
@@ -315,13 +315,13 @@ public class RemoteUrlParserTests
     [Fact]
     public void IsValid_ValidOrgUrl_ReturnsTrue()
     {
-        Assert.True(RemoteUrlParser.IsValid("https://lrm.cloud/org/project"));
+        Assert.True(RemoteUrlParser.IsValid("https://lrm-cloud.com/org/project"));
     }
 
     [Fact]
     public void IsValid_ValidUsernameUrl_ReturnsTrue()
     {
-        Assert.True(RemoteUrlParser.IsValid("https://lrm.cloud/@user/project"));
+        Assert.True(RemoteUrlParser.IsValid("https://lrm-cloud.com/@user/project"));
     }
 
     [Fact]
@@ -344,22 +344,22 @@ public class RemoteUrlParserTests
     public void ApiBaseUrl_HttpsDefaultPort_NoPortInUrl()
     {
         // Arrange
-        var url = "https://lrm.cloud/org/project";
+        var url = "https://lrm-cloud.com/org/project";
         var result = RemoteUrlParser.Parse(url);
 
         // Act & Assert
-        Assert.Equal("https://lrm.cloud/api", result.ApiBaseUrl);
+        Assert.Equal("https://lrm-cloud.com/api", result.ApiBaseUrl);
     }
 
     [Fact]
     public void ApiBaseUrl_HttpsCustomPort_IncludesPort()
     {
         // Arrange
-        var url = "https://lrm.cloud:8443/org/project";
+        var url = "https://lrm-cloud.com:8443/org/project";
         var result = RemoteUrlParser.Parse(url);
 
         // Act & Assert
-        Assert.Equal("https://lrm.cloud:8443/api", result.ApiBaseUrl);
+        Assert.Equal("https://lrm-cloud.com:8443/api", result.ApiBaseUrl);
     }
 
     [Fact]
@@ -388,55 +388,55 @@ public class RemoteUrlParserTests
     public void ProjectApiUrl_OrganizationProject_UsesOrgPath()
     {
         // Arrange
-        var url = "https://lrm.cloud/acme/my-app";
+        var url = "https://lrm-cloud.com/acme/my-app";
         var result = RemoteUrlParser.Parse(url);
 
         // Act & Assert
-        Assert.Equal("https://lrm.cloud/api/projects/acme/my-app", result.ProjectApiUrl);
+        Assert.Equal("https://lrm-cloud.com/api/projects/acme/my-app", result.ProjectApiUrl);
     }
 
     [Fact]
     public void ProjectApiUrl_PersonalProject_UsesUserPath()
     {
         // Arrange
-        var url = "https://lrm.cloud/@johndoe/my-app";
+        var url = "https://lrm-cloud.com/@johndoe/my-app";
         var result = RemoteUrlParser.Parse(url);
 
         // Act & Assert
-        Assert.Equal("https://lrm.cloud/api/users/johndoe/projects/my-app", result.ProjectApiUrl);
+        Assert.Equal("https://lrm-cloud.com/api/users/johndoe/projects/my-app", result.ProjectApiUrl);
     }
 
     [Fact]
     public void ToString_OrganizationProject_ReturnsCorrectFormat()
     {
         // Arrange
-        var url = "https://lrm.cloud/acme/project";
+        var url = "https://lrm-cloud.com/acme/project";
         var result = RemoteUrlParser.Parse(url);
 
         // Act & Assert
-        Assert.Equal("https://lrm.cloud/acme/project", result.ToString());
+        Assert.Equal("https://lrm-cloud.com/acme/project", result.ToString());
     }
 
     [Fact]
     public void ToString_PersonalProject_ReturnsCorrectFormat()
     {
         // Arrange
-        var url = "https://lrm.cloud/@user/project";
+        var url = "https://lrm-cloud.com/@user/project";
         var result = RemoteUrlParser.Parse(url);
 
         // Act & Assert
-        Assert.Equal("https://lrm.cloud/@user/project", result.ToString());
+        Assert.Equal("https://lrm-cloud.com/@user/project", result.ToString());
     }
 
     [Fact]
     public void ToString_CustomPort_IncludesPort()
     {
         // Arrange
-        var url = "https://lrm.cloud:8443/org/project";
+        var url = "https://lrm-cloud.com:8443/org/project";
         var result = RemoteUrlParser.Parse(url);
 
         // Act & Assert
-        Assert.Equal("https://lrm.cloud:8443/org/project", result.ToString());
+        Assert.Equal("https://lrm-cloud.com:8443/org/project", result.ToString());
     }
 
     [Fact]
@@ -458,13 +458,13 @@ public class RemoteUrlParserTests
     public void Parse_TrimsWhitespace()
     {
         // Arrange
-        var url = "  https://lrm.cloud/org/project  ";
+        var url = "  https://lrm-cloud.com/org/project  ";
 
         // Act
         var result = RemoteUrlParser.Parse(url);
 
         // Assert
-        Assert.Equal("lrm.cloud", result.Host);
+        Assert.Equal("lrm-cloud.com", result.Host);
         Assert.Equal("org", result.Organization);
     }
 
@@ -472,7 +472,7 @@ public class RemoteUrlParserTests
     public void Parse_UsernameWithHyphen_Succeeds()
     {
         // Arrange
-        var url = "https://lrm.cloud/@john-doe/project";
+        var url = "https://lrm-cloud.com/@john-doe/project";
 
         // Act
         var result = RemoteUrlParser.Parse(url);
@@ -486,7 +486,7 @@ public class RemoteUrlParserTests
     public void Parse_UsernameWithUnderscore_Succeeds()
     {
         // Arrange
-        var url = "https://lrm.cloud/@john_doe/project";
+        var url = "https://lrm-cloud.com/@john_doe/project";
 
         // Act
         var result = RemoteUrlParser.Parse(url);
@@ -499,7 +499,7 @@ public class RemoteUrlParserTests
     public void Parse_SingleLetterOrgAndProject_Succeeds()
     {
         // Arrange
-        var url = "https://lrm.cloud/a/b";
+        var url = "https://lrm-cloud.com/a/b";
 
         // Act
         var result = RemoteUrlParser.Parse(url);

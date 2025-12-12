@@ -70,9 +70,38 @@ public sealed class ServerConfiguration
 
     /// <summary>
     /// Base URL for generating links in emails and redirects.
-    /// Example: "https://lrm.cloud" or "http://localhost:3000"
+    /// Example: "https://lrm-cloud.com" or "http://localhost:3000"
     /// </summary>
     public string BaseUrl { get; init; } = "http://localhost:3000";
+
+    /// <summary>
+    /// CORS configuration for API access.
+    /// </summary>
+    public CorsConfiguration? Cors { get; init; }
+}
+
+/// <summary>
+/// CORS configuration for API access.
+/// </summary>
+public sealed class CorsConfiguration
+{
+    /// <summary>
+    /// CORS mode: "allow-all" (allow any origin), "same-origin" (no CORS), "whitelist" (specific origins).
+    /// Default: "allow-all".
+    /// </summary>
+    public string Mode { get; init; } = "allow-all";
+
+    /// <summary>
+    /// Allowed origins when mode is "whitelist".
+    /// Example: ["https://app.lrm-cloud.com", "https://lrm-cloud.com"]
+    /// </summary>
+    public List<string> AllowedOrigins { get; init; } = new();
+
+    /// <summary>
+    /// Whether to allow credentials (cookies, auth headers).
+    /// Only applies to "whitelist" mode.
+    /// </summary>
+    public bool AllowCredentials { get; init; } = false;
 }
 
 /// <summary>
@@ -317,7 +346,7 @@ public sealed class MailConfiguration
 
     /// <summary>
     /// Sender email address.
-    /// Example: "noreply@lrm.cloud"
+    /// Example: "noreply@lrm-cloud.com"
     /// </summary>
     [Required]
     [EmailAddress]

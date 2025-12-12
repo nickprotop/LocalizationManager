@@ -15,7 +15,7 @@ namespace LocalizationManager.Commands.Remote;
 public class RemoteSetCommandSettings : BaseCommandSettings
 {
     [CommandArgument(0, "<url>")]
-    [Description("Remote URL (e.g., https://lrm.cloud/org/project or https://lrm.cloud/@username/project)")]
+    [Description("Remote URL (e.g., https://lrm-cloud.com/org/project or https://lrm-cloud.com/@username/project)")]
     public string Url { get; set; } = string.Empty;
 }
 
@@ -36,8 +36,8 @@ public class RemoteSetCommand : Command<RemoteSetCommandSettings>
                 AnsiConsole.MarkupLine("[red]✗ Invalid remote URL format![/]");
                 AnsiConsole.MarkupLine("[dim]Expected: https://host/org/project or https://host/@username/project[/]");
                 AnsiConsole.MarkupLine("[dim]Examples:[/]");
-                AnsiConsole.MarkupLine("[dim]  • https://lrm.cloud/acme-corp/mobile-app[/]");
-                AnsiConsole.MarkupLine("[dim]  • https://lrm.cloud/@john/personal-project[/]");
+                AnsiConsole.MarkupLine("[dim]  • https://lrm-cloud.com/acme-corp/mobile-app[/]");
+                AnsiConsole.MarkupLine("[dim]  • https://lrm-cloud.com/@john/personal-project[/]");
                 return 1;
             }
 

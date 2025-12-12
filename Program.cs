@@ -257,7 +257,7 @@ app.Configure(config =>
         cfg.AddCommand<CloudInitCommand>("init")
             .WithDescription("Connect local project to cloud (authenticate and link/create project)")
             .WithExample(new[] { "cloud", "init" })
-            .WithExample(new[] { "cloud", "init", "https://lrm.cloud/org/project" })
+            .WithExample(new[] { "cloud", "init", "https://lrm-cloud.com/org/project" })
             .WithExample(new[] { "cloud", "init", "--name", "my-project" });
 
         cfg.AddCommand<PushCommand>("push")
@@ -284,9 +284,9 @@ app.Configure(config =>
 
         cfg.AddCommand<LoginCommand>("login")
             .WithDescription("Authenticate with the cloud using email and password")
-            .WithExample(new[] { "cloud", "login", "lrm.cloud" })
+            .WithExample(new[] { "cloud", "login", "lrm-cloud.com" })
             .WithExample(new[] { "cloud", "login", "localhost:3000" })
-            .WithExample(new[] { "cloud", "login", "lrm.cloud", "--email", "user@example.com" });
+            .WithExample(new[] { "cloud", "login", "lrm-cloud.com", "--email", "user@example.com" });
 
         cfg.AddCommand<LogoutCommand>("logout")
             .WithDescription("Clear stored authentication tokens")
@@ -310,8 +310,8 @@ app.Configure(config =>
 
             remoteCfg.AddCommand<RemoteSetCommand>("set")
                 .WithDescription("Set the remote URL for cloud synchronization")
-                .WithExample(new[] { "cloud", "remote", "set", "https://lrm.cloud/acme-corp/mobile-app" })
-                .WithExample(new[] { "cloud", "remote", "set", "https://lrm.cloud/@john/personal-project" })
+                .WithExample(new[] { "cloud", "remote", "set", "https://lrm-cloud.com/acme-corp/mobile-app" })
+                .WithExample(new[] { "cloud", "remote", "set", "https://lrm-cloud.com/@john/personal-project" })
                 .WithExample(new[] { "cloud", "remote", "set", "http://localhost:3000/org/project" });
 
             remoteCfg.AddCommand<RemoteGetCommand>("get")

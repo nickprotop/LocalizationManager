@@ -3,7 +3,12 @@
   "server": {
     "urls": "http://0.0.0.0:8080",
     "environment": "Production",
-    "baseUrl": "https://lrm.cloud"
+    "baseUrl": "https://lrm-cloud.com",
+    "cors": {
+      "mode": "whitelist",
+      "allowedOrigins": ["https://app.lrm-cloud.com", "https://lrm-cloud.com"],
+      "allowCredentials": false
+    }
   },
   "database": {
     "connectionString": "Host=lrmcloud-postgres;Port=5432;Database=lrmcloud;Username=lrm;Password=CHANGE_ME",
@@ -44,7 +49,7 @@
     "port": 25,
     "username": "",
     "password": "",
-    "fromAddress": "noreply@lrm.cloud",
+    "fromAddress": "noreply@lrm-cloud.com",
     "fromName": "LRM Cloud"
   },
   "features": {

@@ -169,7 +169,7 @@ public class StatusCommand : Command<StatusCommandSettings>
                 AnsiConsole.MarkupLine("[yellow]Not logged in[/]");
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine("[dim]Use 'lrm cloud login <host>' to authenticate[/]");
-                AnsiConsole.MarkupLine("[dim]Example: lrm cloud login lrm.cloud[/]");
+                AnsiConsole.MarkupLine("[dim]Example: lrm cloud login lrm-cloud.com[/]");
             }
             return 0;
         }
@@ -178,7 +178,7 @@ public class StatusCommand : Command<StatusCommandSettings>
         var isLocalhost = host?.Contains("localhost") ?? false;
         var remoteUrl = new RemoteUrl
         {
-            Host = host ?? "lrm.cloud",
+            Host = host ?? "lrm-cloud.com",
             UseHttps = !isLocalhost,
             Port = config.Port ?? (isLocalhost ? 3000 : 443),
             ProjectName = "_account_"

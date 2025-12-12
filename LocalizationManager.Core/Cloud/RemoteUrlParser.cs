@@ -8,8 +8,8 @@ namespace LocalizationManager.Core.Cloud;
 /// <summary>
 /// Parses remote URL strings into structured RemoteUrl objects.
 /// Supports formats:
-/// - https://lrm.cloud/org-name/project-name
-/// - https://lrm.cloud/@username/project-name
+/// - https://lrm-cloud.com/org-name/project-name
+/// - https://lrm-cloud.com/@username/project-name
 /// - https://self-hosted.com:8080/org/project
 /// </summary>
 public static partial class RemoteUrlParser

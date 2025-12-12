@@ -92,7 +92,7 @@ public abstract class ApiControllerBase : ControllerBase
             title: "Bad Request",
             detail: detail,
             statusCode: StatusCodes.Status400BadRequest,
-            type: $"https://lrm.cloud/errors/{errorCode.ToLowerInvariant().Replace('_', '-')}"
+            type: $"https://lrm-cloud.com/errors/{errorCode.ToLowerInvariant().Replace('_', '-')}"
         );
     }
 
@@ -105,7 +105,7 @@ public abstract class ApiControllerBase : ControllerBase
             title: "Unauthorized",
             detail: detail,
             statusCode: StatusCodes.Status401Unauthorized,
-            type: $"https://lrm.cloud/errors/{errorCode.ToLowerInvariant().Replace('_', '-')}"
+            type: $"https://lrm-cloud.com/errors/{errorCode.ToLowerInvariant().Replace('_', '-')}"
         );
     }
 
@@ -118,7 +118,7 @@ public abstract class ApiControllerBase : ControllerBase
             title: "Forbidden",
             detail: detail,
             statusCode: StatusCodes.Status403Forbidden,
-            type: $"https://lrm.cloud/errors/{errorCode.ToLowerInvariant().Replace('_', '-')}"
+            type: $"https://lrm-cloud.com/errors/{errorCode.ToLowerInvariant().Replace('_', '-')}"
         );
     }
 
@@ -131,7 +131,7 @@ public abstract class ApiControllerBase : ControllerBase
             title: "Not Found",
             detail: detail,
             statusCode: StatusCodes.Status404NotFound,
-            type: $"https://lrm.cloud/errors/{errorCode.ToLowerInvariant().Replace('_', '-')}"
+            type: $"https://lrm-cloud.com/errors/{errorCode.ToLowerInvariant().Replace('_', '-')}"
         );
     }
 
@@ -152,7 +152,7 @@ public abstract class ApiControllerBase : ControllerBase
             title: "Conflict",
             detail: detail,
             statusCode: StatusCodes.Status409Conflict,
-            type: $"https://lrm.cloud/errors/{errorCode.ToLowerInvariant().Replace('_', '-')}"
+            type: $"https://lrm-cloud.com/errors/{errorCode.ToLowerInvariant().Replace('_', '-')}"
         );
     }
 
@@ -170,7 +170,7 @@ public abstract class ApiControllerBase : ControllerBase
             title: "Too Many Requests",
             detail: detail,
             statusCode: StatusCodes.Status429TooManyRequests,
-            type: "https://lrm.cloud/errors/srv-rate-limited"
+            type: "https://lrm-cloud.com/errors/srv-rate-limited"
         );
     }
 }

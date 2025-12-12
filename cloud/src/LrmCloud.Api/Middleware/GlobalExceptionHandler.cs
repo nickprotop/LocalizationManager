@@ -42,7 +42,7 @@ public static class GlobalExceptionHandler
 
                 var problemDetails = new ProblemDetails
                 {
-                    Type = $"https://lrm.cloud/errors/{errorCode.ToLowerInvariant().Replace('_', '-')}",
+                    Type = $"https://lrm-cloud.com/errors/{errorCode.ToLowerInvariant().Replace('_', '-')}",
                     Title = title,
                     Status = statusCode,
                     Instance = context.Request.Path,

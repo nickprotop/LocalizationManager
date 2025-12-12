@@ -13,7 +13,7 @@ namespace LocalizationManager.Core.Cloud;
 public class CloudConfig
 {
     /// <summary>
-    /// Remote URL (e.g., "https://lrm.cloud/org/project" or just "https://lrm.cloud").
+    /// Remote URL (e.g., "https://lrm-cloud.com/org/project" or just "https://lrm-cloud.com").
     /// </summary>
     [JsonPropertyName("remote")]
     public string? Remote { get; set; }

@@ -1198,7 +1198,7 @@ public class AuthService : IAuthService
                 </ul>
             </div>
 
-            <p>If you did not request this deletion, please contact our support team immediately at <a href=""mailto:support@lrm.cloud"">support@lrm.cloud</a>.</p>
+            <p>If you did not request this deletion, please contact our support team immediately at <a href=""mailto:support@lrm-cloud.com"">support@lrm-cloud.com</a>.</p>
 
             <p>We're sorry to see you go. If you'd like to share feedback about your experience, we'd love to hear from you.</p>
 

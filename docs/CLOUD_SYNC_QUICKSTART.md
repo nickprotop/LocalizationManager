@@ -6,7 +6,7 @@ Get started with LRM Cloud synchronization in 5 minutes.
 
 ```bash
 # 1. Set your remote URL
-lrm remote set https://lrm.cloud/your-org/your-project
+lrm remote set https://lrm-cloud.com/your-org/your-project
 
 # 2. Set your API token
 lrm cloud set-token YOUR_TOKEN_HERE

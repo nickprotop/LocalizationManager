@@ -123,7 +123,7 @@ CURRENT_MAIL_HOST=$(config_get '.mail.host' 'localhost')
 CURRENT_MAIL_PORT=$(config_get '.mail.port' '25')
 CURRENT_MAIL_USER=$(config_get '.mail.username' '')
 CURRENT_MAIL_PASS=$(config_get '.mail.password' '')
-CURRENT_MAIL_FROM=$(config_get '.mail.fromAddress' 'noreply@lrm.cloud')
+CURRENT_MAIL_FROM=$(config_get '.mail.fromAddress' 'noreply@lrm-cloud.com')
 CURRENT_MAIL_NAME=$(config_get '.mail.fromName' 'LRM Cloud')
 
 echo ""
@@ -224,6 +224,42 @@ MAIL_FROM=${MAIL_FROM:-$CURRENT_MAIL_FROM}
 read -p "Mail From Name [$CURRENT_MAIL_NAME]: " MAIL_NAME
 MAIL_NAME=${MAIL_NAME:-$CURRENT_MAIL_NAME}
 
+# ============================================================================
+# CORS Configuration
+# ============================================================================
+echo ""
+echo -e "${BLUE}CORS Configuration:${NC}"
+
+CURRENT_CORS_MODE=$(config_get '.server.cors.mode' 'allow-all')
+
+echo "CORS modes:"
+echo "  1) allow-all    - Allow any origin (default)"
+echo "  2) same-origin  - No cross-origin requests (API and web on same domain)"
+echo "  3) whitelist    - Specify allowed origins (production with separate domains)"
+echo ""
+read -p "CORS Mode [$CURRENT_CORS_MODE]: " CORS_MODE_INPUT
+
+case "$CORS_MODE_INPUT" in
+    1) CORS_MODE="allow-all" ;;
+    2) CORS_MODE="same-origin" ;;
+    3) CORS_MODE="whitelist" ;;
+    "") CORS_MODE="$CURRENT_CORS_MODE" ;;
+    *) CORS_MODE="$CORS_MODE_INPUT" ;;
+esac
+
+CORS_ORIGINS=""
+CORS_ORIGINS_JSON="[]"
+if [ "$CORS_MODE" = "whitelist" ]; then
+    CURRENT_ORIGINS=$(config_get '.server.cors.allowedOrigins | join(",")' '')
+    if [ -z "$CURRENT_ORIGINS" ]; then
+        CURRENT_ORIGINS="https://localhost:3000"
+    fi
+    read -p "Allowed Origins (comma-separated) [$CURRENT_ORIGINS]: " INPUT_ORIGINS
+    INPUT_ORIGINS=${INPUT_ORIGINS:-$CURRENT_ORIGINS}
+    # Convert to JSON array
+    CORS_ORIGINS_JSON=$(echo "$INPUT_ORIGINS" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; ""))')
+fi
+
 echo ""
 echo "Security credentials (press Enter to use default/existing, or type custom value):"
 echo ""
@@ -315,16 +351,37 @@ CURRENT_ENTERPRISE_OTHER_CHARS=$(config_get '.limits.enterpriseOtherChars' '5000
 # General limits
 CURRENT_MAX_KEYS=$(config_get '.limits.maxKeysPerProject' '10000')
 
+# Build CORS config JSON
+if [ "$CORS_MODE" = "whitelist" ]; then
+    CORS_CONFIG="{\"mode\": \"$CORS_MODE\", \"allowedOrigins\": $CORS_ORIGINS_JSON}"
+elif [ "$CORS_MODE" != "allow-all" ]; then
+    CORS_CONFIG="{\"mode\": \"$CORS_MODE\"}"
+else
+    CORS_CONFIG="null"
+fi
+
 # Write merged config.json
 # Note: Inside Docker container, API always listens on 8080 (mapped to API_PORT on host)
 print_step "Writing config.json..."
+
+# Build the server section based on CORS config
+if [ "$CORS_CONFIG" = "null" ]; then
+    SERVER_SECTION='"server": {
+    "urls": "http://0.0.0.0:8080",
+    "environment": "'"${ENVIRONMENT}"'"
+  }'
+else
+    SERVER_SECTION='"server": {
+    "urls": "http://0.0.0.0:8080",
+    "environment": "'"${ENVIRONMENT}"'",
+    "cors": '"${CORS_CONFIG}"'
+  }'
+fi
+
 cat > "$CONFIG_FILE" <<EOF
 {
   "\$schema": "./config.schema.json",
-  "server": {
-    "urls": "http://0.0.0.0:8080",
-    "environment": "${ENVIRONMENT}"
-  },
+  ${SERVER_SECTION},
   "database": {
     "connectionString": "Host=lrmcloud-postgres;Port=5432;Database=lrmcloud;Username=lrm;Password=${POSTGRES_PASSWORD}",
     "autoMigrate": true

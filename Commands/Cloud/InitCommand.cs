@@ -17,7 +17,7 @@ namespace LocalizationManager.Commands.Cloud;
 public class CloudInitCommandSettings : BaseCommandSettings
 {
     [CommandArgument(0, "[URL]")]
-    [Description("Remote URL (e.g., https://lrm.cloud/org/project). Interactive if not provided.")]
+    [Description("Remote URL (e.g., https://lrm-cloud.com/org/project). Interactive if not provided.")]
     public string? Url { get; set; }
 
     [CommandOption("-n|--name <NAME>")]
@@ -94,8 +94,8 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("[dim]Expected format: https://host/owner/project[/]");
             AnsiConsole.MarkupLine("[dim]Examples:[/]");
-            AnsiConsole.MarkupLine("[dim]  https://lrm.cloud/org/project[/]");
-            AnsiConsole.MarkupLine("[dim]  https://lrm.cloud/@username/project[/]");
+            AnsiConsole.MarkupLine("[dim]  https://lrm-cloud.com/org/project[/]");
+            AnsiConsole.MarkupLine("[dim]  https://lrm-cloud.com/@username/project[/]");
             AnsiConsole.MarkupLine("[dim]  http://localhost:3000/org/project[/]");
             return 1;
         }
@@ -207,8 +207,8 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
             return (config.Host, port, config.UseHttps);
         }
 
-        // Default to lrm.cloud
-        return ("lrm.cloud", 443, true);
+        // Default to lrm-cloud.com
+        return ("lrm-cloud.com", 443, true);
     }
 
     private (string host, int port, bool useHttps) ParseHost(string hostInput)

@@ -10,7 +10,7 @@ namespace LocalizationManager.Core.Cloud;
 public class RemoteUrl
 {
     /// <summary>
-    /// Host (e.g., "lrm.cloud", "staging.lrm.cloud", "localhost")
+    /// Host (e.g., "lrm-cloud.com", "staging.lrm-cloud.com", "localhost")
     /// </summary>
     public required string Host { get; init; }
 

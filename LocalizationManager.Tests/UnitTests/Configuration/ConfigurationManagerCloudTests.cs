@@ -45,7 +45,7 @@ public class ConfigurationManagerCloudTests : IDisposable
         var remotesPath = Path.Combine(lrmDir, "remotes.json");
         var config = new RemotesConfiguration
         {
-            Remote = "https://lrm.cloud/org/project",
+            Remote = "https://lrm-cloud.com/org/project",
             Enabled = false
         };
         await File.WriteAllTextAsync(remotesPath, JsonSerializer.Serialize(config));
@@ -54,7 +54,7 @@ public class ConfigurationManagerCloudTests : IDisposable
         var result = await ConfigurationManager.LoadRemotesConfigurationAsync(_testDirectory);
 
         // Assert
-        Assert.Equal("https://lrm.cloud/org/project", result.Remote);
+        Assert.Equal("https://lrm-cloud.com/org/project", result.Remote);
         Assert.False(result.Enabled);
     }
 
@@ -116,7 +116,7 @@ public class ConfigurationManagerCloudTests : IDisposable
         // Arrange
         var config = new RemotesConfiguration
         {
-            Remote = "https://lrm.cloud/org/project",
+            Remote = "https://lrm-cloud.com/org/project",
             Enabled = true
         };
 
@@ -133,7 +133,7 @@ public class ConfigurationManagerCloudTests : IDisposable
         // Arrange
         var config = new RemotesConfiguration
         {
-            Remote = "https://lrm.cloud/org/project",
+            Remote = "https://lrm-cloud.com/org/project",
             Enabled = false
         };
 
@@ -150,7 +150,7 @@ public class ConfigurationManagerCloudTests : IDisposable
             PropertyNameCaseInsensitive = true
         });
         Assert.NotNull(loaded);
-        Assert.Equal("https://lrm.cloud/org/project", loaded!.Remote);
+        Assert.Equal("https://lrm-cloud.com/org/project", loaded!.Remote);
         Assert.False(loaded.Enabled);
     }
 
@@ -561,7 +561,7 @@ public class ConfigurationManagerCloudTests : IDisposable
         // Arrange
         var original = new RemotesConfiguration
         {
-            Remote = "https://lrm.cloud/@user/project",
+            Remote = "https://lrm-cloud.com/@user/project",
             Enabled = false
         };
 

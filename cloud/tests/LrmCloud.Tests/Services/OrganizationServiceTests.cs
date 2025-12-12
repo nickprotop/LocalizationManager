@@ -29,7 +29,7 @@ public class OrganizationServiceTests : IDisposable
             {
                 Urls = "http://localhost:5000",
                 Environment = "Test",
-                BaseUrl = "https://test.lrm.cloud"
+                BaseUrl = "https://test.lrm-cloud.com"
             },
             Database = new DatabaseConfiguration
             {
