@@ -1,15 +1,18 @@
 @page "/projects"
 @attribute [Authorize]
 @inject ProjectService ProjectService
+@inject LimitsService LimitsService
 @inject NavigationManager Navigation
 
 <PageTitle>Projects - LRM Cloud</PageTitle>
 
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Projects</MudText>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreateDialog">
-        New Project
-    </MudButton>
+    <MudTooltip Text="@_limitMessage" Disabled="@_canCreateProject">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreateDialog" Disabled="@(!_canCreateProject)">
+            New Project
+        </MudButton>
+    </MudTooltip>
 </MudStack>
 
 <MudStack Row="true" Class="mb-4" Spacing="2">
@@ -51,9 +54,11 @@ else if (!FilteredProjects.Any())
             {
                 <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Size="Size.Large" Color="Color.Secondary" />
                 <MudText Typo="Typo.subtitle1" Color="Color.Secondary">No projects yet</MudText>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreateDialog" Class="mt-2">
-                    Create Your First Project
-                </MudButton>
+                <MudTooltip Text="@_limitMessage" Disabled="@_canCreateProject">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreateDialog" Class="mt-2" Disabled="@(!_canCreateProject)">
+                        Create Your First Project
+                    </MudButton>
+                </MudTooltip>
             }
             else
             {
@@ -121,6 +126,8 @@ else
     private string _formatFilter = string.Empty;
     private CreateProjectDialog? _createDialog;
     private EditProjectDialog? _editDialog;
+    private bool _canCreateProject = true;
+    private string? _limitMessage;
 
     private IEnumerable<ProjectDto> FilteredProjects => _projects
         .Where(p => string.IsNullOrEmpty(_searchText) ||
@@ -131,7 +138,14 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadProjectsAsync();
+        await Task.WhenAll(LoadProjectsAsync(), CheckLimitsAsync());
+    }
+
+    private async Task CheckLimitsAsync()
+    {
+        var (canCreate, reason) = await LimitsService.CanCreateProjectAsync();
+        _canCreateProject = canCreate;
+        _limitMessage = reason;
     }
 
     private async Task LoadProjectsAsync()
@@ -170,6 +184,8 @@ else
     private async Task OnProjectCreated(ProjectDto project)
     {
         _projects.Insert(0, project);
+        LimitsService.InvalidateCache();
+        await CheckLimitsAsync();
         StateHasChanged();
     }
 
@@ -186,6 +202,8 @@ else
     private async Task OnProjectDeleted(int projectId)
     {
         _projects.RemoveAll(p => p.Id == projectId);
+        LimitsService.InvalidateCache();
+        await CheckLimitsAsync();
         StateHasChanged();
     }
 

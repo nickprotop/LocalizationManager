@@ -2,6 +2,7 @@
 @using LrmCloud.Shared.DTOs.Auth
 @using LrmCloud.Web.Services
 @inject CliApiKeyService ApiKeyService
+@inject LimitsService LimitsService
 @inject ISnackbar Snackbar
 @attribute [Authorize]
 
@@ -16,10 +17,12 @@
     <MudPaper Class="pa-4 mb-4">
         <div class="d-flex justify-space-between align-center mb-4">
             <MudText Typo="Typo.h6">Your API Keys</MudText>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="OpenCreateDialog">
-                Create New Key
-            </MudButton>
+            <MudTooltip Text="@_limitMessage" Disabled="@_canCreateKey">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="OpenCreateDialog" Disabled="@(!_canCreateKey)">
+                    Create New Key
+                </MudButton>
+            </MudTooltip>
         </div>
 
         @if (_loading)
@@ -218,6 +221,8 @@
 @code {
     private List<CliApiKeyDto> _keys = new();
     private bool _loading = true;
+    private bool _canCreateKey = true;
+    private string? _limitMessage;
 
     // Create dialog
     private bool _createDialogVisible;
@@ -239,7 +244,14 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadKeys();
+        await Task.WhenAll(LoadKeys(), CheckLimitsAsync());
+    }
+
+    private async Task CheckLimitsAsync()
+    {
+        var (canCreate, reason) = await LimitsService.CanCreateApiKeyAsync();
+        _canCreateKey = canCreate;
+        _limitMessage = reason;
     }
 
     private async Task LoadKeys()
@@ -295,7 +307,8 @@
                 _newlyCreatedKey = result.ApiKey;
                 _createDialogVisible = false;
                 _showKeyDialogVisible = true;
-                await LoadKeys();
+                LimitsService.InvalidateCache();
+                await Task.WhenAll(LoadKeys(), CheckLimitsAsync());
             }
             else
             {
@@ -353,7 +366,8 @@
                 Snackbar.Add("API key deleted", Severity.Success);
                 _deleteDialogVisible = false;
                 _keyToDelete = null;
-                await LoadKeys();
+                LimitsService.InvalidateCache();
+                await Task.WhenAll(LoadKeys(), CheckLimitsAsync());
             }
             else
             {

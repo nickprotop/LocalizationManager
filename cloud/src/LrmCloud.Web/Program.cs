@@ -44,6 +44,7 @@ builder.Services.AddScoped<ResourceService>();
 builder.Services.AddScoped<TranslationService>();
 builder.Services.AddScoped<CliApiKeyService>();
 builder.Services.AddScoped<UsageService>();
+builder.Services.AddScoped<LimitsService>();
 builder.Services.AddScoped<OrganizationService>();
 builder.Services.AddScoped<OrganizationContextService>();
 

@@ -6,6 +6,7 @@
 @using LrmCloud.Web.Components
 @using LrmCloud.Web.Models
 @inject OrganizationService OrganizationService
+@inject LimitsService LimitsService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
@@ -38,12 +39,15 @@ else
         <MudText Typo="Typo.h5">Team Members</MudText>
         @if (_canInvite)
         {
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.PersonAdd"
-                       OnClick="@OpenInviteDialog">
-                Invite Member
-            </MudButton>
+            <MudTooltip Text="@_memberLimitMessage" Disabled="@_canInviteMember">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.PersonAdd"
+                           OnClick="@OpenInviteDialog"
+                           Disabled="@(!_canInviteMember)">
+                    Invite Member
+                </MudButton>
+            </MudTooltip>
         }
     </MudStack>
 
@@ -261,6 +265,8 @@ else
     private bool _canInvite;
     private bool _canManageMembers;
     private bool _isOwner;
+    private bool _canInviteMember = true;
+    private string? _memberLimitMessage;
     private List<BreadcrumbItem> _breadcrumbs = new();
 
     // Invite dialog
@@ -285,6 +291,13 @@ else
         await LoadDataAsync();
     }
 
+    private async Task CheckMemberLimitAsync()
+    {
+        var (canInvite, reason) = await LimitsService.CanInviteMemberAsync(_members.Count);
+        _canInviteMember = canInvite;
+        _memberLimitMessage = reason;
+    }
+
     private async Task LoadDataAsync()
     {
         _isLoading = true;
@@ -297,6 +310,9 @@ else
                 _isOwner = OrganizationRole.IsOwner(_organization.UserRole);
                 _canManageMembers = OrganizationRole.IsAdminOrOwner(_organization.UserRole);
                 _canInvite = _canManageMembers;
+
+                // Check member limit
+                await CheckMemberLimitAsync();
 
                 _breadcrumbs = new List<BreadcrumbItem>
                 {
@@ -347,6 +363,7 @@ else
             {
                 Snackbar.Add("Invitation sent successfully", Severity.Success);
                 CloseInviteDialog();
+                LimitsService.InvalidateCache();
                 await LoadDataAsync();
             }
             else
@@ -435,6 +452,8 @@ else
                 _members.RemoveAll(m => m.UserId == _selectedMember.UserId);
                 Snackbar.Add("Member removed successfully", Severity.Success);
                 CloseRemoveDialog();
+                LimitsService.InvalidateCache();
+                await CheckMemberLimitAsync();
             }
             else
             {

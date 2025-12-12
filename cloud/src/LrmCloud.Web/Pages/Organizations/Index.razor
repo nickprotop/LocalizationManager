@@ -6,6 +6,7 @@
 @using LrmCloud.Web.Components
 @using LrmCloud.Web.Models
 @inject OrganizationService OrganizationService
+@inject LimitsService LimitsService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
@@ -13,12 +14,15 @@
 
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Organizations</MudText>
-    <MudButton Variant="Variant.Filled"
-               Color="Color.Primary"
-               StartIcon="@Icons.Material.Filled.Add"
-               OnClick="@OpenCreateDialog">
-        New Organization
-    </MudButton>
+    <MudTooltip Text="@_limitMessage" Disabled="@_canCreateOrg">
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@OpenCreateDialog"
+                   Disabled="@(!_canCreateOrg)">
+            New Organization
+        </MudButton>
+    </MudTooltip>
 </MudStack>
 
 @* Pending Invitations Section *@
@@ -92,8 +96,8 @@ else if (!_organizations.Any())
 {
     <EmptyState Icon="@Icons.Material.Filled.Business"
                 Title="No organizations yet"
-                Description="Organizations let you collaborate with your team on translation projects. Create one to get started."
-                ShowAction="true"
+                Description="@(_canCreateOrg ? "Organizations let you collaborate with your team on translation projects. Create one to get started." : _limitMessage ?? "Organizations are not available on your current plan.")"
+                ShowAction="@_canCreateOrg"
                 ActionText="Create Organization"
                 ActionIcon="@Icons.Material.Filled.Add"
                 OnActionClick="@OpenCreateDialog" />
@@ -224,10 +228,19 @@ else
     private int? _processingInvitationId;
     private MudForm? _createForm;
     private CreateOrganizationRequest _createRequest = new() { Name = "" };
+    private bool _canCreateOrg = true;
+    private string? _limitMessage;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadDataAsync();
+        await Task.WhenAll(LoadDataAsync(), CheckLimitsAsync());
+    }
+
+    private async Task CheckLimitsAsync()
+    {
+        var (canCreate, reason) = await LimitsService.CanCreateOrganizationAsync();
+        _canCreateOrg = canCreate;
+        _limitMessage = reason;
     }
 
     private async Task LoadDataAsync()

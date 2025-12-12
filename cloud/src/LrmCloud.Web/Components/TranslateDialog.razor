@@ -1,6 +1,7 @@
 @using LrmCloud.Shared.DTOs.Translation
 @using LrmCloud.Web.Services
 @inject TranslationService TranslationService
+@inject LimitsService LimitsService
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -50,6 +51,17 @@
                 }
                 else
                 {
+                    @if (_usageWarning != null)
+                    {
+                        <MudAlert Severity="@(_usageBlocked ? Severity.Error : Severity.Warning)" Dense="true">
+                            @_usageWarning
+                            @if (_usageBlocked)
+                            {
+                                <MudLink Href="settings" Class="ml-2">Upgrade Plan</MudLink>
+                            }
+                        </MudAlert>
+                    }
+
                     <MudText Typo="Typo.body2" Color="Color.Secondary">
                         Translate @(_keysToTranslate.Count > 0 ? $"{_keysToTranslate.Count} selected keys" : "all keys")
                         to the selected languages.
@@ -174,11 +186,14 @@
     private bool _isLoadingProviders = true;
     private bool _isTranslating = false;
     private TranslateResponseDto? _translationResult;
+    private string? _usageWarning;
+    private bool _usageBlocked;
 
     private bool CanTranslate => !_isLoadingProviders &&
                                   !_isTranslating &&
                                   !string.IsNullOrEmpty(_selectedProvider) &&
-                                  _selectedLanguages.Any();
+                                  _selectedLanguages.Any() &&
+                                  !_usageBlocked;
 
     protected override async Task OnInitializedAsync()
     {
@@ -189,7 +204,17 @@
             .Where(l => l != SourceLanguage)
             .ToHashSet();
 
-        await LoadProvidersAsync();
+        await Task.WhenAll(LoadProvidersAsync(), CheckUsageLimitsAsync());
+    }
+
+    private async Task CheckUsageLimitsAsync()
+    {
+        var (isWarning, isBlocked, message) = await LimitsService.GetTranslationUsageWarningAsync();
+        if (isWarning)
+        {
+            _usageWarning = message;
+            _usageBlocked = isBlocked;
+        }
     }
 
     private async Task LoadProvidersAsync()
@@ -245,6 +270,9 @@
             if (_translationResult.Success)
             {
                 Snackbar.Add($"Translated {_translationResult.TranslatedCount} keys successfully", Severity.Success);
+                // Refresh usage limits
+                LimitsService.InvalidateCache();
+                await CheckUsageLimitsAsync();
             }
             else if (_translationResult.Errors.Any())
             {

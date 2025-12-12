@@ -1,6 +1,8 @@
 using LrmCloud.Api.Data;
+using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.DTOs.Usage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace LrmCloud.Api.Services;
 
@@ -11,11 +13,13 @@ public class UsageService : IUsageService
 {
     private readonly AppDbContext _db;
     private readonly ILogger<UsageService> _logger;
+    private readonly LimitsConfiguration _limits;
 
-    public UsageService(AppDbContext db, ILogger<UsageService> logger)
+    public UsageService(AppDbContext db, ILogger<UsageService> logger, IOptions<CloudConfiguration> config)
     {
         _db = db;
         _logger = logger;
+        _limits = config.Value.Limits;
     }
 
     public async Task<UsageStatsDto> GetUserStatsAsync(int userId)
@@ -76,7 +80,11 @@ public class UsageService : IUsageService
             ApiKeyCount = apiKeyCount,
             ActiveApiKeyCount = activeApiKeyCount,
             Plan = user.Plan,
-            MemberSince = user.CreatedAt
+            MemberSince = user.CreatedAt,
+            // Plan limits
+            MaxProjects = _limits.GetMaxProjects(user.Plan),
+            MaxApiKeys = _limits.GetMaxApiKeys(user.Plan),
+            MaxTeamMembers = _limits.GetMaxTeamMembers(user.Plan)
         };
     }
 }
