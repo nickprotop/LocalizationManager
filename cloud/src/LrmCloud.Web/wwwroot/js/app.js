@@ -263,6 +263,8 @@ window.lrmServiceWorker = {
     applyUpdate: function() {
         if (this.registration?.waiting) {
             this.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            // Fallback reload in case controllerchange doesn't fire
+            setTimeout(() => window.location.reload(), 1000);
         }
     }
 };

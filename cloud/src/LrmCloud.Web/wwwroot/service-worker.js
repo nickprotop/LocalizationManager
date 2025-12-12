@@ -2,7 +2,6 @@
 // Provides offline caching for static assets and read-only data
 
 // Version placeholder - replaced by Dockerfile at build time
-// Git repo keeps placeholder; deployed version has build timestamp
 const SW_VERSION = '__BUILD_VERSION__';
 const CACHE_NAME = `lrm-cloud-${SW_VERSION}`;
 const OFFLINE_URL = 'offline.html';
