@@ -51,17 +51,15 @@ WORKDIR /app
 COPY --from=build /app/publish .
 
 # Create entrypoint script inline (fixes permissions, then drops to non-root user)
-RUN cat > /app/entrypoint.sh << 'EOF'
-#!/bin/sh
-set -e
-# Fix ownership of log directory (mounted from host with unknown UID)
-if [ -d "/var/log/lrmcloud/api" ]; then
-    chown -R lrmcloud:lrmcloud /var/log/lrmcloud/api 2>/dev/null || true
-fi
-# Drop to non-root user and run the app
-exec su-exec lrmcloud dotnet LrmCloud.Api.dll "$@"
-EOF
-RUN chmod +x /app/entrypoint.sh
+RUN printf '#!/bin/sh\n\
+set -e\n\
+# Fix ownership of log directory (mounted from host with unknown UID)\n\
+if [ -d "/var/log/lrmcloud/api" ]; then\n\
+    chown -R lrmcloud:lrmcloud /var/log/lrmcloud/api 2>/dev/null || true\n\
+fi\n\
+# Drop to non-root user and run the app\n\
+exec su-exec lrmcloud dotnet LrmCloud.Api.dll "$@"\n\
+' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Create log directory
 RUN mkdir -p /var/log/lrmcloud/api
