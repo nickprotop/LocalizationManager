@@ -48,6 +48,13 @@ public class TranslateRequestDto
     /// Whether to preserve placeholders like {0}, {{name}}, etc.
     /// </summary>
     public bool PreservePlaceholders { get; set; } = true;
+
+    /// <summary>
+    /// Whether to save translations directly to the database.
+    /// When false, translations are returned but not persisted (preview mode for UI).
+    /// Defaults to true for CLI compatibility.
+    /// </summary>
+    public bool SaveToDatabase { get; set; } = true;
 }
 
 /// <summary>

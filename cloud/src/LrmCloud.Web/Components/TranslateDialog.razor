@@ -127,8 +127,8 @@
         @if (_translationResult != null)
         {
             <MudButton OnClick="CloseResult">Translate More</MudButton>
-            <MudButton Color="Color.Primary" OnClick="@(() => MudDialog.Close(DialogResult.Ok(true)))">
-                Done
+            <MudButton Color="Color.Primary" OnClick="@ApplyAndClose">
+                Apply to Editor
             </MudButton>
         }
         else
@@ -236,7 +236,8 @@
                 Provider = _selectedProvider,
                 OnlyMissing = _onlyMissing,
                 Overwrite = _overwrite,
-                Context = _context
+                Context = _context,
+                SaveToDatabase = false  // Return translations for UI preview, don't save yet
             };
 
             _translationResult = await TranslationService.TranslateKeysAsync(ProjectId, request);
@@ -268,6 +269,12 @@
     private void CloseResult()
     {
         _translationResult = null;
+    }
+
+    private void ApplyAndClose()
+    {
+        // Return the translation result to the parent so it can update the UI
+        MudDialog.Close(DialogResult.Ok(_translationResult));
     }
 
     private void Cancel()

@@ -238,22 +238,25 @@ public class CloudTranslationService : ICloudTranslationService
                         result.Success = true;
                         result.FromCache = fromCache;
 
-                        // Update or create translation in database
-                        if (existingTranslation != null)
+                        // Only save to database if requested (default for CLI, skip for UI preview)
+                        if (request.SaveToDatabase)
                         {
-                            existingTranslation.Value = translatedText;
-                            existingTranslation.Status = "translated";
-                            existingTranslation.UpdatedAt = DateTime.UtcNow;
-                        }
-                        else
-                        {
-                            key.Translations.Add(new Shared.Entities.Translation
+                            if (existingTranslation != null)
                             {
-                                ResourceKeyId = key.Id,
-                                LanguageCode = targetLang,
-                                Value = translatedText,
-                                Status = "translated"
-                            });
+                                existingTranslation.Value = translatedText;
+                                existingTranslation.Status = "translated";
+                                existingTranslation.UpdatedAt = DateTime.UtcNow;
+                            }
+                            else
+                            {
+                                key.Translations.Add(new Shared.Entities.Translation
+                                {
+                                    ResourceKeyId = key.Id,
+                                    LanguageCode = targetLang,
+                                    Value = translatedText,
+                                    Status = "translated"
+                                });
+                            }
                         }
 
                         response.TranslatedCount++;
@@ -272,8 +275,11 @@ public class CloudTranslationService : ICloudTranslationService
                 }
             }
 
-            // Save changes
-            await _db.SaveChangesAsync();
+            // Save changes only if requested
+            if (request.SaveToDatabase)
+            {
+                await _db.SaveChangesAsync();
+            }
 
             // Track other providers usage (LRM usage is tracked in LrmTranslationProvider)
             if (!isLrmProvider && response.CharactersTranslated > 0)
