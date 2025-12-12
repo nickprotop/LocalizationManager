@@ -16,6 +16,8 @@ using Serilog.Events;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 
 public class Program
 {
@@ -259,6 +261,48 @@ public class Program
             });
 
             // =============================================================================
+            // Rate Limiting
+            // =============================================================================
+
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+                // Global rate limit: 100 requests/minute per IP
+                options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 100,
+                            Window = TimeSpan.FromMinutes(1)
+                        }));
+
+                // Strict auth rate limit: 10 requests/minute per IP
+                options.AddPolicy("auth", context =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 10,
+                            Window = TimeSpan.FromMinutes(1)
+                        }));
+
+                // Rate limit exceeded response
+                options.OnRejected = async (context, cancellationToken) =>
+                {
+                    context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                    await context.HttpContext.Response.WriteAsJsonAsync(new
+                    {
+                        error = "Too many requests. Please try again later.",
+                        retryAfter = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter)
+                            ? retryAfter.TotalSeconds
+                            : 60
+                    }, cancellationToken);
+                };
+            });
+
+            // =============================================================================
             // Build App
             // =============================================================================
 
@@ -309,6 +353,9 @@ public class Program
                 context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
                 await next();
             });
+
+            // Rate limiting (before routing to block excessive requests early)
+            app.UseRateLimiter();
 
             app.UseCors();
 

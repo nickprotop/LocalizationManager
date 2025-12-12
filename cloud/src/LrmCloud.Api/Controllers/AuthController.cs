@@ -4,12 +4,14 @@ using LrmCloud.Shared.Api;
 using LrmCloud.Shared.DTOs.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace LrmCloud.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[EnableRateLimiting("auth")]
 public class AuthController : ApiControllerBase
 {
     private readonly IAuthService _authService;
