@@ -38,6 +38,11 @@ public class ResourceFileParser
     /// <exception cref="InvalidOperationException">Thrown when the XML is malformed.</exception>
     public ResourceFile Parse(LanguageInfo language)
     {
+        if (string.IsNullOrEmpty(language.FilePath))
+        {
+            throw new ArgumentException("FilePath is required for file-based parsing", nameof(language));
+        }
+
         if (!File.Exists(language.FilePath))
         {
             throw new FileNotFoundException($"Resource file not found: {language.FilePath}");
@@ -46,41 +51,70 @@ public class ResourceFileParser
         try
         {
             var xdoc = XDocument.Load(language.FilePath);
-            var entries = new List<ResourceEntry>();
-
-            // Parse data elements from .resx XML
-            var dataElements = xdoc.Root?.Elements("data") ?? Enumerable.Empty<XElement>();
-
-            foreach (var dataElement in dataElements)
-            {
-                var key = dataElement.Attribute("name")?.Value;
-                if (string.IsNullOrEmpty(key))
-                {
-                    continue; // Skip entries without a name
-                }
-
-                var value = dataElement.Element("value")?.Value;
-                var comment = dataElement.Element("comment")?.Value;
-
-                entries.Add(new ResourceEntry
-                {
-                    Key = key,
-                    Value = value,
-                    Comment = comment
-                });
-            }
-
-            return new ResourceFile
-            {
-                Language = language,
-                Entries = entries
-            };
+            return ParseXDocument(xdoc, language);
         }
         catch (Exception ex)
         {
             throw new InvalidOperationException(
                 $"Failed to parse .resx file '{language.FilePath}': {ex.Message}", ex);
         }
+    }
+
+    /// <summary>
+    /// Parses .resx content from a TextReader (stream-based, no file access).
+    /// </summary>
+    /// <param name="reader">TextReader containing the .resx content.</param>
+    /// <param name="metadata">Language metadata (FilePath not required).</param>
+    /// <returns>Parsed resource file.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the XML is malformed.</exception>
+    public ResourceFile Parse(TextReader reader, LanguageInfo metadata)
+    {
+        try
+        {
+            var xdoc = XDocument.Load(reader);
+            return ParseXDocument(xdoc, metadata);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Failed to parse .resx content: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Internal method to parse an XDocument into a ResourceFile.
+    /// </summary>
+    private ResourceFile ParseXDocument(XDocument xdoc, LanguageInfo language)
+    {
+        var entries = new List<ResourceEntry>();
+
+        // Parse data elements from .resx XML
+        var dataElements = xdoc.Root?.Elements("data") ?? Enumerable.Empty<XElement>();
+
+        foreach (var dataElement in dataElements)
+        {
+            var key = dataElement.Attribute("name")?.Value;
+            if (string.IsNullOrEmpty(key))
+            {
+                continue; // Skip entries without a name
+            }
+
+            var value = dataElement.Element("value")?.Value;
+            var comment = dataElement.Element("comment")?.Value;
+
+            entries.Add(new ResourceEntry
+            {
+                Key = key,
+                Value = value,
+                Comment = comment
+            });
+        }
+
+        return new ResourceFile
+        {
+            Language = language,
+            Entries = entries
+        };
     }
 
     /// <summary>

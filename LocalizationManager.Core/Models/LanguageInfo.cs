@@ -28,8 +28,9 @@ public class LanguageInfo
 {
     /// <summary>
     /// Base name of the resource file (e.g., "SharedResource").
+    /// Optional for stream-based operations where no file is involved.
     /// </summary>
-    public required string BaseName { get; set; }
+    public string BaseName { get; set; } = string.Empty;
 
     /// <summary>
     /// Culture code (e.g., "en", "el", "fr").
@@ -47,9 +48,10 @@ public class LanguageInfo
     public bool IsDefault { get; set; }
 
     /// <summary>
-    /// Full file path to the .resx file.
+    /// Full file path to the resource file.
+    /// Optional for stream-based operations where content is provided directly.
     /// </summary>
-    public required string FilePath { get; set; }
+    public string? FilePath { get; set; }
 
     /// <summary>
     /// Gets a display-friendly language code.

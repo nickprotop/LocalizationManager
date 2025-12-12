@@ -43,6 +43,11 @@ public class JsonResourceReader : IResourceReader
     /// <inheritdoc />
     public ResourceFile Read(LanguageInfo language)
     {
+        if (string.IsNullOrEmpty(language.FilePath))
+        {
+            throw new ArgumentException("FilePath is required for file-based reading", nameof(language));
+        }
+
         if (!File.Exists(language.FilePath))
         {
             throw new ResourceNotFoundException(
@@ -75,6 +80,35 @@ public class JsonResourceReader : IResourceReader
     /// <inheritdoc />
     public Task<ResourceFile> ReadAsync(LanguageInfo language, CancellationToken ct = default)
         => Task.FromResult(Read(language));
+
+    /// <inheritdoc />
+    public ResourceFile Read(TextReader reader, LanguageInfo metadata)
+    {
+        try
+        {
+            var content = reader.ReadToEnd();
+            var entries = ParseJson(content);
+
+            return new ResourceFile
+            {
+                Language = metadata,
+                Entries = entries
+            };
+        }
+        catch (JsonException ex)
+        {
+            throw new ResourceParseException(
+                $"Failed to parse JSON content. {ex.Message}",
+                filePath: null,
+                lineNumber: (int?)ex.LineNumber,
+                position: (int?)ex.BytePositionInLine,
+                inner: ex);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<ResourceFile> ReadAsync(TextReader reader, LanguageInfo metadata, CancellationToken ct = default)
+        => Task.FromResult(Read(reader, metadata));
 
     /// <summary>
     /// Parses JSON content into a list of resource entries.

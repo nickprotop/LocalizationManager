@@ -44,4 +44,24 @@ public interface IResourceReader
     /// <param name="language">Language information including file path.</param>
     /// <returns>Parsed resource file.</returns>
     ResourceFile Read(LanguageInfo language);
+
+    /// <summary>
+    /// Parse resource content from a TextReader (stream-based, no file access).
+    /// </summary>
+    /// <param name="reader">TextReader containing the resource content.</param>
+    /// <param name="metadata">Language metadata (FilePath not required).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Parsed resource file.</returns>
+    Task<ResourceFile> ReadAsync(
+        TextReader reader,
+        LanguageInfo metadata,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Synchronous stream-based parsing.
+    /// </summary>
+    /// <param name="reader">TextReader containing the resource content.</param>
+    /// <param name="metadata">Language metadata (FilePath not required).</param>
+    /// <returns>Parsed resource file.</returns>
+    ResourceFile Read(TextReader reader, LanguageInfo metadata);
 }

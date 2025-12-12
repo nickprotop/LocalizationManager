@@ -39,4 +39,12 @@ public class ResxResourceReader : IResourceReader
     /// <inheritdoc />
     public Task<ResourceFile> ReadAsync(LanguageInfo language, CancellationToken ct = default)
         => Task.FromResult(Read(language));
+
+    /// <inheritdoc />
+    public ResourceFile Read(TextReader reader, LanguageInfo metadata)
+        => _parser.Parse(reader, metadata);
+
+    /// <inheritdoc />
+    public Task<ResourceFile> ReadAsync(TextReader reader, LanguageInfo metadata, CancellationToken ct = default)
+        => Task.FromResult(Read(reader, metadata));
 }

@@ -101,6 +101,7 @@ public class ResourceSyncService
 
     /// <summary>
     /// Parses files using Core's backends and saves to database.
+    /// Uses stream-based reading to avoid temp folder security risks.
     /// </summary>
     public async Task ParseFilesToDatabaseAsync(
         int projectId,
@@ -118,49 +119,27 @@ public class ResourceSyncService
 
         // Create resource backend
         var backend = CreateBackendFromConfig(config);
-        var tempDir = Path.Combine(Path.GetTempPath(), "lrm-sync", Guid.NewGuid().ToString());
-        Directory.CreateDirectory(tempDir);
 
-        try
+        foreach (var fileDto in files)
         {
-            foreach (var fileDto in files)
+            // Extract language code from filename
+            var langCode = ExtractLanguageCodeFromPath(fileDto.Path, config);
+
+            // Create LanguageInfo metadata (no FilePath needed for stream-based reading)
+            var langInfo = new LanguageInfo
             {
-                // Extract language code from filename
-                var langCode = ExtractLanguageCodeFromPath(fileDto.Path, config);
+                BaseName = config.Json?.BaseName ?? "strings",
+                Code = langCode,
+                Name = langCode,  // Use language code as display name
+                IsDefault = langCode == config.DefaultLanguageCode
+            };
 
-                // Write file to temp location
-                var tempFile = Path.Combine(tempDir, fileDto.Path);
-                var tempFileDir = Path.GetDirectoryName(tempFile);
-                if (tempFileDir != null)
-                {
-                    Directory.CreateDirectory(tempFileDir);
-                }
-                await File.WriteAllTextAsync(tempFile, fileDto.Content);
+            // Use Core's backend to parse content directly from string (no temp file)
+            using var reader = new StringReader(fileDto.Content);
+            var resourceFile = backend.Reader.Read(reader, langInfo);
 
-                // Create LanguageInfo for backend
-                var langInfo = new LanguageInfo
-                {
-                    BaseName = config.Json?.BaseName ?? "strings",
-                    Code = langCode,
-                    Name = langCode,  // Use language code as display name
-                    IsDefault = langCode == config.DefaultLanguageCode,
-                    FilePath = tempFile
-                };
-
-                // Use Core's backend to parse file
-                var resourceFile = backend.Reader.Read(langInfo);
-
-                // Save to database
-                await SaveResourceFileToDatabaseAsync(projectId, langCode, resourceFile.Entries);
-            }
-        }
-        finally
-        {
-            // Cleanup temp directory
-            if (Directory.Exists(tempDir))
-            {
-                Directory.Delete(tempDir, true);
-            }
+            // Save to database
+            await SaveResourceFileToDatabaseAsync(projectId, langCode, resourceFile.Entries);
         }
     }
 
