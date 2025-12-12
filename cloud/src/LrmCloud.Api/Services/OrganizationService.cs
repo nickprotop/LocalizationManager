@@ -57,7 +57,9 @@ public class OrganizationService : IOrganizationService
                     .FirstOrDefaultAsync(o => o.Slug == slug);
 
                 if (existingOrg != null)
+                {
                     return (false, null, "Organization slug is already in use. Please try a different name.");
+                }
             }
 
             // Create organization
@@ -121,12 +123,16 @@ public class OrganizationService : IOrganizationService
             .FirstOrDefaultAsync(o => o.Id == organizationId);
 
         if (org == null)
+        {
             return null;
+        }
 
         // Check if user is a member
         var membership = org.Members.FirstOrDefault(m => m.UserId == userId);
         if (membership == null)
+        {
             return null;
+        }
 
         return new OrganizationDto
         {
@@ -171,21 +177,29 @@ public class OrganizationService : IOrganizationService
         {
             // Check if user is owner
             if (!await IsOwnerAsync(organizationId, userId))
+            {
                 return (false, null, "Only the organization owner can update organization details.");
+            }
 
             var org = await _db.Organizations
                 .Include(o => o.Members)
                 .FirstOrDefaultAsync(o => o.Id == organizationId);
 
             if (org == null)
+            {
                 return (false, null, "Organization not found.");
+            }
 
             // Update fields
             if (!string.IsNullOrWhiteSpace(request.Name))
+            {
                 org.Name = request.Name;
+            }
 
             if (request.Description != null)
+            {
                 org.Description = request.Description;
+            }
 
             org.UpdatedAt = DateTime.UtcNow;
 
@@ -221,13 +235,17 @@ public class OrganizationService : IOrganizationService
         {
             // Check if user is owner
             if (!await IsOwnerAsync(organizationId, userId))
+            {
                 return (false, "Only the organization owner can delete the organization.");
+            }
 
             var org = await _db.Organizations
                 .FirstOrDefaultAsync(o => o.Id == organizationId);
 
             if (org == null)
+            {
                 return (false, "Organization not found.");
+            }
 
             // Soft delete
             org.DeletedAt = DateTime.UtcNow;
@@ -285,22 +303,30 @@ public class OrganizationService : IOrganizationService
         {
             // Check if user is admin or owner
             if (!await IsAdminOrOwnerAsync(organizationId, userId))
+            {
                 return (false, "Only organization admins and owners can invite members.");
+            }
 
             // Validate role
             if (!OrganizationRole.IsValid(request.Role))
+            {
                 return (false, "Invalid role specified.");
+            }
 
             // Don't allow inviting as owner
             if (request.Role == OrganizationRole.Owner)
+            {
                 return (false, "Cannot invite someone as owner. Transfer ownership instead.");
+            }
 
             var org = await _db.Organizations
                 .Include(o => o.Members)
                 .FirstOrDefaultAsync(o => o.Id == organizationId);
 
             if (org == null)
+            {
                 return (false, "Organization not found.");
+            }
 
             // Check team member limit based on organization's plan
             var maxMembers = _config.Limits.GetMaxTeamMembers(org.Plan);
@@ -330,7 +356,9 @@ public class OrganizationService : IOrganizationService
                     m.User!.Email == normalizedEmail);
 
             if (existingMember != null)
+            {
                 return (false, "This user is already a member of the organization.");
+            }
 
             // Check if there's a pending invitation
             var existingInvitation = await _db.OrganizationInvitations
@@ -341,7 +369,9 @@ public class OrganizationService : IOrganizationService
                     i.ExpiresAt > DateTime.UtcNow);
 
             if (existingInvitation != null)
+            {
                 return (false, "There is already a pending invitation for this email address.");
+            }
 
             // Generate invitation token
             var invitationToken = TokenGenerator.GenerateSecureToken(32);
@@ -383,7 +413,9 @@ public class OrganizationService : IOrganizationService
             // Find invitations for the user's email
             var user = await _db.Users.FindAsync(userId);
             if (user == null || string.IsNullOrEmpty(user.Email))
+            {
                 return (false, "User not found.");
+            }
 
             var invitations = await _db.OrganizationInvitations
                 .Include(i => i.Organization)
@@ -394,7 +426,9 @@ public class OrganizationService : IOrganizationService
                 .ToListAsync();
 
             if (invitations.Count == 0)
+            {
                 return (false, "No valid invitation found.");
+            }
 
             // Find the invitation that matches the token
             OrganizationInvitation? matchingInvitation = null;
@@ -408,7 +442,9 @@ public class OrganizationService : IOrganizationService
             }
 
             if (matchingInvitation == null)
+            {
                 return (false, "Invalid or expired invitation token.");
+            }
 
             // Check if already a member (race condition protection)
             var existingMember = await _db.OrganizationMembers
@@ -482,7 +518,9 @@ public class OrganizationService : IOrganizationService
             // Find invitations for the user's email
             var user = await _db.Users.FindAsync(userId);
             if (user == null || string.IsNullOrEmpty(user.Email))
+            {
                 return (false, "User not found.");
+            }
 
             var invitations = await _db.OrganizationInvitations
                 .Where(i =>
@@ -492,7 +530,9 @@ public class OrganizationService : IOrganizationService
                 .ToListAsync();
 
             if (invitations.Count == 0)
+            {
                 return (false, "No valid invitation found.");
+            }
 
             // Find the invitation that matches the token
             OrganizationInvitation? matchingInvitation = null;
@@ -506,7 +546,9 @@ public class OrganizationService : IOrganizationService
             }
 
             if (matchingInvitation == null)
+            {
                 return (false, "Invalid or expired invitation token.");
+            }
 
             // Delete the invitation (declined)
             _db.OrganizationInvitations.Remove(matchingInvitation);
@@ -530,7 +572,9 @@ public class OrganizationService : IOrganizationService
         {
             var user = await _db.Users.FindAsync(userId);
             if (user == null || string.IsNullOrEmpty(user.Email))
+            {
                 return (false, "User not found.");
+            }
 
             // Find invitation by ID and verify it belongs to this user's email
             var invitation = await _db.OrganizationInvitations
@@ -542,7 +586,9 @@ public class OrganizationService : IOrganizationService
                     i.ExpiresAt > DateTime.UtcNow);
 
             if (invitation == null)
+            {
                 return (false, "Invitation not found or has expired.");
+            }
 
             // Check if already a member
             var existingMember = await _db.OrganizationMembers
@@ -612,7 +658,9 @@ public class OrganizationService : IOrganizationService
         {
             var user = await _db.Users.FindAsync(userId);
             if (user == null || string.IsNullOrEmpty(user.Email))
+            {
                 return (false, "User not found.");
+            }
 
             // Find invitation by ID and verify it belongs to this user's email
             var invitation = await _db.OrganizationInvitations
@@ -623,7 +671,9 @@ public class OrganizationService : IOrganizationService
                     i.ExpiresAt > DateTime.UtcNow);
 
             if (invitation == null)
+            {
                 return (false, "Invitation not found or has expired.");
+            }
 
             // Delete the invitation
             _db.OrganizationInvitations.Remove(invitation);
@@ -707,17 +757,23 @@ public class OrganizationService : IOrganizationService
                     m.UserId == userId);
 
             if (member == null)
+            {
                 return (false, "You are not a member of this organization.");
+            }
 
             // Check if user is the owner
             var org = await _db.Organizations
                 .FirstOrDefaultAsync(o => o.Id == organizationId);
 
             if (org == null)
+            {
                 return (false, "Organization not found.");
+            }
 
             if (org.OwnerId == userId)
+            {
                 return (false, "The owner cannot leave the organization. Transfer ownership first or delete the organization.");
+            }
 
             // Remove membership
             _db.OrganizationMembers.Remove(member);
@@ -741,17 +797,23 @@ public class OrganizationService : IOrganizationService
         {
             // Check if user is admin or owner
             if (!await IsAdminOrOwnerAsync(organizationId, userId))
+            {
                 return (false, "Only organization admins and owners can remove members.");
+            }
 
             // Cannot remove the owner
             var org = await _db.Organizations
                 .FirstOrDefaultAsync(o => o.Id == organizationId);
 
             if (org == null)
+            {
                 return (false, "Organization not found.");
+            }
 
             if (org.OwnerId == memberUserId)
+            {
                 return (false, "Cannot remove the organization owner.");
+            }
 
             // Find member
             var member = await _db.OrganizationMembers
@@ -760,7 +822,9 @@ public class OrganizationService : IOrganizationService
                     m.UserId == memberUserId);
 
             if (member == null)
+            {
                 return (false, "Member not found.");
+            }
 
             _db.OrganizationMembers.Remove(member);
             await _db.SaveChangesAsync();
@@ -785,25 +849,35 @@ public class OrganizationService : IOrganizationService
         {
             // Check if user is owner
             if (!await IsOwnerAsync(organizationId, userId))
+            {
                 return (false, "Only the organization owner can update member roles.");
+            }
 
             // Validate role
             if (!OrganizationRole.IsValid(newRole))
+            {
                 return (false, "Invalid role specified.");
+            }
 
             // Cannot change owner's role
             var org = await _db.Organizations
                 .FirstOrDefaultAsync(o => o.Id == organizationId);
 
             if (org == null)
+            {
                 return (false, "Organization not found.");
+            }
 
             if (org.OwnerId == memberUserId && newRole != OrganizationRole.Owner)
+            {
                 return (false, "Cannot change the owner's role. Transfer ownership first.");
+            }
 
             // Cannot promote someone to owner (use transfer ownership instead)
             if (newRole == OrganizationRole.Owner)
+            {
                 return (false, "Cannot promote to owner. Use transfer ownership instead.");
+            }
 
             // Find member
             var member = await _db.OrganizationMembers
@@ -812,7 +886,9 @@ public class OrganizationService : IOrganizationService
                     m.UserId == memberUserId);
 
             if (member == null)
+            {
                 return (false, "Member not found.");
+            }
 
             member.Role = newRole;
             await _db.SaveChangesAsync();
@@ -840,10 +916,14 @@ public class OrganizationService : IOrganizationService
                 .FirstOrDefaultAsync(o => o.Id == organizationId);
 
             if (org == null)
+            {
                 return (false, "Organization not found.");
+            }
 
             if (org.OwnerId != currentOwnerId)
+            {
                 return (false, "Only the current owner can transfer ownership.");
+            }
 
             // Verify new owner is a member
             var newOwnerMember = await _db.OrganizationMembers
@@ -853,7 +933,9 @@ public class OrganizationService : IOrganizationService
                     m.UserId == newOwnerId);
 
             if (newOwnerMember == null)
+            {
                 return (false, "The new owner must be a member of the organization.");
+            }
 
             // Get current owner's membership
             var currentOwnerMember = await _db.OrganizationMembers
@@ -867,7 +949,9 @@ public class OrganizationService : IOrganizationService
 
             // Update roles
             if (currentOwnerMember != null)
+            {
                 currentOwnerMember.Role = OrganizationRole.Admin; // Demote to admin
+            }
 
             newOwnerMember.Role = OrganizationRole.Owner;
 
@@ -923,26 +1007,30 @@ public class OrganizationService : IOrganizationService
     // Helper Methods
     // ============================================================
 
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
+
     private static string GenerateSlug(string name)
     {
         // Convert to lowercase
         var slug = name.ToLowerInvariant();
 
         // Replace spaces with hyphens
-        slug = Regex.Replace(slug, @"\s+", "-");
+        slug = Regex.Replace(slug, @"\s+", "-", RegexOptions.None, RegexTimeout);
 
         // Remove invalid characters
-        slug = Regex.Replace(slug, @"[^a-z0-9\-]", "");
+        slug = Regex.Replace(slug, @"[^a-z0-9\-]", "", RegexOptions.None, RegexTimeout);
 
         // Remove multiple consecutive hyphens
-        slug = Regex.Replace(slug, @"\-{2,}", "-");
+        slug = Regex.Replace(slug, @"\-{2,}", "-", RegexOptions.None, RegexTimeout);
 
         // Trim hyphens from start and end
         slug = slug.Trim('-');
 
         // Limit length
         if (slug.Length > 100)
+        {
             slug = slug[..100].TrimEnd('-');
+        }
 
         return slug;
     }
