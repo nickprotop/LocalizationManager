@@ -2,7 +2,6 @@ using LrmCloud.Api.Data;
 using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.DTOs.Usage;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace LrmCloud.Api.Services;
 
@@ -15,11 +14,11 @@ public class UsageService : IUsageService
     private readonly ILogger<UsageService> _logger;
     private readonly LimitsConfiguration _limits;
 
-    public UsageService(AppDbContext db, ILogger<UsageService> logger, IOptions<CloudConfiguration> config)
+    public UsageService(AppDbContext db, ILogger<UsageService> logger, CloudConfiguration config)
     {
         _db = db;
         _logger = logger;
-        _limits = config.Value.Limits;
+        _limits = config.Limits;
     }
 
     public async Task<UsageStatsDto> GetUserStatsAsync(int userId)
