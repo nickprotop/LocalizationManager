@@ -387,7 +387,8 @@ public class PushCommand : Command<PushCommandSettings>
         {
             Configuration = configChanged ? configJson : null,
             ModifiedFiles = modifiedFiles,
-            DeletedFiles = deletedFiles
+            DeletedFiles = deletedFiles,
+            Message = message
         };
 
         // Push to server

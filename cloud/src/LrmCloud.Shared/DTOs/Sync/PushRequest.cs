@@ -24,4 +24,10 @@ public class PushRequest
     /// Example: ["Resources.el.resx"] will delete all Greek translations.
     /// </summary>
     public List<string> DeletedFiles { get; set; } = new();
+
+    /// <summary>
+    /// Optional commit message describing the changes.
+    /// Will be stored in sync history and snapshots.
+    /// </summary>
+    public string? Message { get; set; }
 }

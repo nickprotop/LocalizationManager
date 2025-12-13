@@ -486,6 +486,7 @@ public class PushRequest
     public string? Configuration { get; set; }
     public List<FileDto> ModifiedFiles { get; set; } = new();
     public List<string> DeletedFiles { get; set; } = new();
+    public string? Message { get; set; }
 }
 
 /// <summary>
