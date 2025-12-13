@@ -57,4 +57,35 @@ public interface IStorageService
     /// <param name="projectId">Project ID</param>
     /// <param name="filePath">Path within project</param>
     Task<bool> FileExistsAsync(int projectId, string filePath);
+
+    /// <summary>
+    /// Lists files in a specific snapshot.
+    /// </summary>
+    /// <param name="projectId">Project ID</param>
+    /// <param name="snapshotId">Snapshot identifier</param>
+    /// <returns>List of file paths within the snapshot</returns>
+    Task<List<string>> ListSnapshotFilesAsync(int projectId, string snapshotId);
+
+    /// <summary>
+    /// Downloads a file from a specific snapshot.
+    /// </summary>
+    /// <param name="projectId">Project ID</param>
+    /// <param name="snapshotId">Snapshot identifier</param>
+    /// <param name="fileName">File name within snapshot</param>
+    /// <returns>File content stream, or null if not found</returns>
+    Task<Stream?> DownloadSnapshotFileAsync(int projectId, string snapshotId, string fileName);
+
+    /// <summary>
+    /// Restores files from a snapshot to current.
+    /// </summary>
+    /// <param name="projectId">Project ID</param>
+    /// <param name="snapshotId">Snapshot identifier to restore from</param>
+    Task RestoreFromSnapshotAsync(int projectId, string snapshotId);
+
+    /// <summary>
+    /// Deletes a snapshot from storage.
+    /// </summary>
+    /// <param name="projectId">Project ID</param>
+    /// <param name="snapshotId">Snapshot identifier</param>
+    Task DeleteSnapshotAsync(int projectId, string snapshotId);
 }

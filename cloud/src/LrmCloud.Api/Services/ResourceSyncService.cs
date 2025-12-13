@@ -31,6 +31,7 @@ public class ResourceSyncService
 
     /// <summary>
     /// Stores uploaded files to S3/Minio for historical archive.
+    /// Also maintains a "current/" folder with the latest version of all files for snapshots.
     /// </summary>
     public async Task StoreUploadedFilesAsync(int projectId, List<FileDto> files)
     {
@@ -42,14 +43,24 @@ public class ResourceSyncService
 
         foreach (var file in files)
         {
-            var s3FilePath = $"{uploadPath}/{file.Path}";
             var contentBytes = System.Text.Encoding.UTF8.GetBytes(file.Content);
 
-            using var stream = new MemoryStream(contentBytes);
-            await _storageService.UploadFileAsync(projectId, s3FilePath, stream, "text/plain");
+            // Store in timestamped upload folder (historical archive)
+            var s3FilePath = $"{uploadPath}/{file.Path}";
+            using (var stream = new MemoryStream(contentBytes))
+            {
+                await _storageService.UploadFileAsync(projectId, s3FilePath, stream, "text/plain");
+            }
+
+            // Also update the "current/" folder for snapshots
+            var currentFilePath = $"current/{file.Path}";
+            using (var stream = new MemoryStream(contentBytes))
+            {
+                await _storageService.UploadFileAsync(projectId, currentFilePath, stream, "text/plain");
+            }
         }
 
-        _logger.LogInformation("Stored {Count} files to {Path}", files.Count, uploadPath);
+        _logger.LogInformation("Stored {Count} files to {Path} and current/", files.Count, uploadPath);
     }
 
     /// <summary>

@@ -160,11 +160,11 @@ public class MinioStorageService : IStorageService
             // List all files in current/
             var currentFiles = await ListFilesAsync(projectId, "current/");
 
-            // Copy each file to history/{syncId}/
+            // Copy each file to snapshots/{syncId}/
             foreach (var file in currentFiles)
             {
                 var sourceObjectName = GetObjectName(projectId, file);
-                var destFileName = file.Replace("current/", $"history/{syncId}/");
+                var destFileName = file.Replace("current/", $"snapshots/{syncId}/");
                 var destObjectName = GetObjectName(projectId, destFileName);
 
                 var copyArgs = new CopyObjectArgs()
@@ -236,5 +236,76 @@ public class MinioStorageService : IStorageService
         }
 
         return $"projects/{projectId}/{filePath}";
+    }
+
+    public async Task<List<string>> ListSnapshotFilesAsync(int projectId, string snapshotId)
+    {
+        return await ListFilesAsync(projectId, $"snapshots/{snapshotId}/");
+    }
+
+    public async Task<Stream?> DownloadSnapshotFileAsync(int projectId, string snapshotId, string fileName)
+    {
+        return await DownloadFileAsync(projectId, $"snapshots/{snapshotId}/{fileName}");
+    }
+
+    public async Task RestoreFromSnapshotAsync(int projectId, string snapshotId)
+    {
+        try
+        {
+            // First, delete all current files
+            var currentFiles = await ListFilesAsync(projectId, "current/");
+            foreach (var file in currentFiles)
+            {
+                await DeleteFileAsync(projectId, file);
+            }
+
+            // Then copy all files from snapshot to current
+            var snapshotFiles = await ListSnapshotFilesAsync(projectId, snapshotId);
+            foreach (var file in snapshotFiles)
+            {
+                var sourceObjectName = GetObjectName(projectId, file);
+                var destFileName = file.Replace($"snapshots/{snapshotId}/", "current/");
+                var destObjectName = GetObjectName(projectId, destFileName);
+
+                var copyArgs = new CopyObjectArgs()
+                    .WithBucket(_config.Storage.Bucket)
+                    .WithObject(destObjectName)
+                    .WithCopyObjectSource(new CopySourceObjectArgs()
+                        .WithBucket(_config.Storage.Bucket)
+                        .WithObject(sourceObjectName));
+
+                await _minioClient.CopyObjectAsync(copyArgs);
+            }
+
+            _logger.LogInformation("Restored snapshot {SnapshotId} for project {ProjectId} with {FileCount} files",
+                snapshotId, projectId, snapshotFiles.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error restoring snapshot {SnapshotId} for project {ProjectId}",
+                snapshotId, projectId);
+            throw;
+        }
+    }
+
+    public async Task DeleteSnapshotAsync(int projectId, string snapshotId)
+    {
+        try
+        {
+            var snapshotFiles = await ListSnapshotFilesAsync(projectId, snapshotId);
+            foreach (var file in snapshotFiles)
+            {
+                await DeleteFileAsync(projectId, file);
+            }
+
+            _logger.LogInformation("Deleted snapshot {SnapshotId} for project {ProjectId} with {FileCount} files",
+                snapshotId, projectId, snapshotFiles.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting snapshot {SnapshotId} for project {ProjectId}",
+                snapshotId, projectId);
+            throw;
+        }
     }
 }

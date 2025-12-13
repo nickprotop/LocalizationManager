@@ -13,17 +13,20 @@ public class ResourceService : IResourceService
     private readonly AppDbContext _db;
     private readonly IProjectService _projectService;
     private readonly ResourceSyncService _syncService;
+    private readonly SnapshotService _snapshotService;
     private readonly ILogger<ResourceService> _logger;
 
     public ResourceService(
         AppDbContext db,
         IProjectService projectService,
         ResourceSyncService syncService,
+        SnapshotService snapshotService,
         ILogger<ResourceService> logger)
     {
         _db = db;
         _projectService = projectService;
         _syncService = syncService;
+        _snapshotService = snapshotService;
         _logger = logger;
     }
 
@@ -788,6 +791,9 @@ public class ResourceService : IResourceService
                 return (false, null, "Project not found");
             }
 
+            // Snapshot will be created after files are uploaded
+            Snapshot? snapshot = null;
+
             // Update configuration if provided
             if (request.Configuration != null)
             {
@@ -817,6 +823,20 @@ public class ResourceService : IResourceService
                 await _syncService.StoreUploadedFilesAsync(projectId, request.ModifiedFiles);
             }
 
+            // Create snapshot after files are uploaded to current/ folder
+            try
+            {
+                var description = request.Message ?? "Push from CLI";
+                snapshot = await _snapshotService.CreateSnapshotAsync(projectId, userId, "push", description);
+                _logger.LogInformation("Created snapshot {SnapshotId} after push for project {ProjectId}",
+                    snapshot.SnapshotId, projectId);
+            }
+            catch (Exception ex)
+            {
+                // Log but don't fail the push if snapshot creation fails
+                _logger.LogWarning(ex, "Failed to create snapshot after push for project {ProjectId}", projectId);
+            }
+
             // Parse modified files to database
             if (request.ModifiedFiles.Count > 0)
             {
@@ -834,6 +854,8 @@ public class ResourceService : IResourceService
                 SyncType = "push",
                 Direction = "to_cloud",
                 Status = "completed",
+                Message = request.Message,
+                SnapshotId = snapshot?.SnapshotId,
                 CreatedAt = DateTime.UtcNow
             });
             await _db.SaveChangesAsync();
