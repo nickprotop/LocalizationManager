@@ -32,9 +32,9 @@ public class ResourceServiceTests : IDisposable
         _mockProjectService = new Mock<IProjectService>();
         _mockLogger = new Mock<ILogger<ResourceService>>();
 
-        // Create ResourceSyncService mock (can't easily mock concrete class but we need the parameter)
-        // For now, pass null since our tests don't use sync functionality
-        _resourceService = new ResourceService(_db, _mockProjectService.Object, null!, _mockLogger.Object);
+        // Create ResourceSyncService and SnapshotService mocks (can't easily mock concrete classes but we need the parameters)
+        // For now, pass null since our tests don't use sync/snapshot functionality
+        _resourceService = new ResourceService(_db, _mockProjectService.Object, null!, null!, _mockLogger.Object);
     }
 
     public void Dispose()
