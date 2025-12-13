@@ -1,0 +1,767 @@
+@page "/projects/{ProjectId:int}/settings"
+@attribute [Authorize]
+@using LrmCloud.Shared.DTOs.Projects
+@using LrmCloud.Shared.DTOs.Resources
+@using LrmCloud.Shared.DTOs.Translation
+@inject ProjectService ProjectService
+@inject ResourceService ResourceService
+@inject TranslationService TranslationService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Settings - @(_project?.Name ?? "Project") - LRM Cloud</PageTitle>
+
+@if (_isLoading)
+{
+    <MudStack Spacing="4">
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" />
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" />
+    </MudStack>
+}
+else if (_project == null)
+{
+    <MudAlert Severity="Severity.Error">
+        Project not found or you don't have access to it.
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="">Go to Dashboard</MudButton>
+    </MudAlert>
+}
+else
+{
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                           OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))"
+                           Size="Size.Small" />
+            <MudText Typo="Typo.h4">Project Settings</MudText>
+            <MudText Typo="Typo.h6" Color="Color.Secondary">@_project.Name</MudText>
+        </MudStack>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Save"
+                   OnClick="@HandleSubmit"
+                   Disabled="_isSubmitting">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Saving...</MudText>
+            }
+            else
+            {
+                <MudText>Save Changes</MudText>
+            }
+        </MudButton>
+    </MudStack>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4" Variant="Variant.Filled">@_errorMessage</MudAlert>
+    }
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4" @bind-ActivePanelIndex="_activeTabIndex">
+        <MudTabPanel Text="General" Icon="@Icons.Material.Filled.Settings">
+            <EditForm Model="_model" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudStack Spacing="3">
+                            <MudTextField @bind-Value="_model.Name"
+                                          Label="Project Name"
+                                          Variant="Variant.Outlined"
+                                          For="@(() => _model.Name)"
+                                          Disabled="_isSubmitting"
+                                          Required="true" />
+
+                            <MudTextField @bind-Value="_model.Description"
+                                          Label="Description"
+                                          Variant="Variant.Outlined"
+                                          Lines="3"
+                                          For="@(() => _model.Description)"
+                                          Disabled="_isSubmitting" />
+
+                            <MudSelect @bind-Value="_model.Format"
+                                       Label="Format"
+                                       Variant="Variant.Outlined"
+                                       For="@(() => _model.Format)"
+                                       Disabled="_isSubmitting"
+                                       Required="true">
+                                <MudSelectItem Value="@("resx")">.resx (C#/.NET)</MudSelectItem>
+                                <MudSelectItem Value="@("json")">JSON Localization</MudSelectItem>
+                                <MudSelectItem Value="@("i18next")">i18next (JS/React)</MudSelectItem>
+                            </MudSelect>
+
+                            <MudTextField @bind-Value="_model.DefaultLanguage"
+                                          Label="Default Language"
+                                          Variant="Variant.Outlined"
+                                          For="@(() => _model.DefaultLanguage)"
+                                          Disabled="_isSubmitting"
+                                          HelperText="e.g., en, en-US" />
+
+                            <MudTextField @bind-Value="_model.LocalizationPath"
+                                          Label="Localization Path"
+                                          Variant="Variant.Outlined"
+                                          For="@(() => _model.LocalizationPath)"
+                                          Disabled="_isSubmitting"
+                                          HelperText="Relative path to localization files" />
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudPaper Class="pa-4" Elevation="0" Style="background: var(--mud-palette-background-gray);">
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Project Info</MudText>
+                            <MudStack Spacing="2">
+                                <div>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Created</MudText>
+                                    <MudText>@_project.CreatedAt.ToString("MMMM dd, yyyy")</MudText>
+                                </div>
+                                <div>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Last Updated</MudText>
+                                    <MudText>@_project.UpdatedAt.ToString("MMMM dd, yyyy HH:mm")</MudText>
+                                </div>
+                                <div>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Organization</MudText>
+                                    <MudText>@(_project.OrganizationName ?? "Personal")</MudText>
+                                </div>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </EditForm>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Languages" Icon="@Icons.Material.Filled.Language" OnClick="LoadLanguages">
+            @if (_loadingLanguages)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else
+            {
+                <MudStack Spacing="3">
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.subtitle1">Project Languages</MudText>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddLanguageDialog">
+                            Add Language
+                        </MudButton>
+                    </div>
+
+                    @if (_languages.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info">
+                            No languages in this project yet. Add resource keys first, then add languages.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudTable Items="@_languages" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Language</MudTh>
+                                <MudTh>Completion</MudTh>
+                                <MudTh>Last Updated</MudTh>
+                                <MudTh Style="width: 80px">Actions</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Language">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudText>@context.LanguageCode</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">(@context.DisplayName)</MudText>
+                                        @if (context.IsDefault)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">Default</MudChip>
+                                        }
+                                    </MudStack>
+                                </MudTd>
+                                <MudTd DataLabel="Completion">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudProgressLinear Value="@context.CompletionPercentage" Color="@GetCompletionColor(context.CompletionPercentage)"
+                                                           Style="width: 100px;" Size="Size.Small" Rounded="true" />
+                                        <MudText Typo="Typo.caption">@context.CompletionPercentage%</MudText>
+                                    </MudStack>
+                                </MudTd>
+                                <MudTd DataLabel="Last Updated">
+                                    @if (context.LastUpdated.HasValue)
+                                    {
+                                        @context.LastUpdated.Value.ToString("g")
+                                    }
+                                    else
+                                    {
+                                        <MudText Color="Color.Secondary">Never</MudText>
+                                    }
+                                </MudTd>
+                                <MudTd DataLabel="Actions">
+                                    @if (!context.IsDefault)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                                       OnClick="@(() => ConfirmRemoveLanguage(context))" />
+                                    }
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </MudStack>
+            }
+        </MudTabPanel>
+
+        <MudTabPanel Text="GitHub" Icon="@Icons.Custom.Brands.GitHub">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudStack Spacing="3">
+                        <MudTextField @bind-Value="_model.GitHubRepo"
+                                      Label="GitHub Repository"
+                                      Variant="Variant.Outlined"
+                                      For="@(() => _model.GitHubRepo)"
+                                      Disabled="_isSubmitting"
+                                      HelperText="e.g., owner/repo" />
+
+                        <MudTextField @bind-Value="_model.GitHubDefaultBranch"
+                                      Label="Default Branch"
+                                      Variant="Variant.Outlined"
+                                      For="@(() => _model.GitHubDefaultBranch)"
+                                      Disabled="_isSubmitting"
+                                      HelperText="e.g., main" />
+                    </MudStack>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudAlert Severity="Severity.Info">
+                        Link a GitHub repository to enable automatic sync with your source code.
+                    </MudAlert>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Translation" Icon="@Icons.Material.Filled.Translate" OnClick="LoadTranslationProviders">
+            @if (_loadingProviders)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else
+            {
+                <MudStack Spacing="3">
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                        <strong>Key Hierarchy:</strong> Project keys override Organization and User-level keys.
+                        @if (_project?.OrganizationId != null)
+                        {
+                            <span>Keys configured here will only be used for this project.</span>
+                        }
+                    </MudAlert>
+
+                    @if (!_translationProviders.Any())
+                    {
+                        <MudAlert Severity="Severity.Warning">
+                            No translation providers available. Configure your API keys in Settings.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudGrid>
+                            @foreach (var provider in _translationProviders)
+                            {
+                                <MudItem xs="12" md="6">
+                                    <MudPaper Elevation="1" Class="pa-3">
+                                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                <MudIcon Icon="@GetProviderIcon(provider.Name)" />
+                                                <MudStack Spacing="0">
+                                                    <MudText Typo="Typo.subtitle2">@provider.DisplayName</MudText>
+                                                    @if (provider.IsConfigured)
+                                                    {
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            Using: @GetKeySourceLabel(provider.ApiKeySource)
+                                                        </MudText>
+                                                    }
+                                                </MudStack>
+                                            </MudStack>
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                                @if (provider.IsConfigured)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Configured</MudChip>
+                                                }
+                                                @if (provider.ApiKeySource == "project")
+                                                {
+                                                    <MudButton Size="Size.Small" Color="Color.Primary"
+                                                               OnClick="@(() => OpenSetProviderKeyDialog(provider))">
+                                                        Update
+                                                    </MudButton>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                                                   OnClick="@(() => ConfirmRemoveProviderKey(provider))" />
+                                                }
+                                                else
+                                                {
+                                                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined"
+                                                               OnClick="@(() => OpenSetProviderKeyDialog(provider))">
+                                                        Override
+                                                    </MudButton>
+                                                }
+                                            </MudStack>
+                                        </MudStack>
+                                    </MudPaper>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    }
+                </MudStack>
+            }
+        </MudTabPanel>
+
+        <MudTabPanel Text="Danger Zone" Icon="@Icons.Material.Filled.Warning" BadgeColor="Color.Error">
+            <MudPaper Class="pa-4" Elevation="0" Style="border: 2px solid var(--mud-palette-error);">
+                <MudStack Spacing="3">
+                    <MudText Typo="Typo.h6" Color="Color.Error">Danger Zone</MudText>
+                    <MudAlert Severity="Severity.Warning">
+                        <MudText Typo="Typo.body2">
+                            Deleting this project will permanently remove all localization keys and translations.
+                            This action cannot be undone.
+                        </MudText>
+                    </MudAlert>
+
+                    @if (!_showDeleteConfirm)
+                    {
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Error"
+                                   StartIcon="@Icons.Material.Filled.Delete"
+                                   OnClick="@(() => _showDeleteConfirm = true)"
+                                   Disabled="_isSubmitting">
+                            Delete Project
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-error-lighten);">
+                            <MudStack Spacing="2">
+                                <MudText Typo="Typo.body2">
+                                    Type <strong>@_project.Name</strong> to confirm deletion:
+                                </MudText>
+                                <MudTextField @bind-Value="_deleteConfirmText"
+                                              Variant="Variant.Outlined"
+                                              Placeholder="@_project.Name"
+                                              Disabled="_isDeleting" />
+                                <MudStack Row="true" Spacing="2">
+                                    <MudButton Variant="Variant.Text"
+                                               OnClick="@(() => { _showDeleteConfirm = false; _deleteConfirmText = string.Empty; })"
+                                               Disabled="_isDeleting">
+                                        Cancel
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Error"
+                                               OnClick="HandleDelete"
+                                               Disabled="@(_deleteConfirmText != _project.Name || _isDeleting)">
+                                        @if (_isDeleting)
+                                        {
+                                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                                            <MudText Class="ms-2">Deleting...</MudText>
+                                        }
+                                        else
+                                        {
+                                            <MudText>Delete Forever</MudText>
+                                        }
+                                    </MudButton>
+                                </MudStack>
+                            </MudStack>
+                        </MudPaper>
+                    }
+                </MudStack>
+            </MudPaper>
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@* Add Language Dialog *@
+<MudDialog @bind-Visible="_addLanguageDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Add Language</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_newLanguageCode" Label="Language Code" Placeholder="e.g., fr, de, es"
+                      HelperText="Use ISO 639-1 codes (en, fr, de) or with region (en-US, pt-BR)"
+                      Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _addLanguageDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddLanguage" Disabled="_addingLanguage || string.IsNullOrWhiteSpace(_newLanguageCode)">
+            @if (_addingLanguage)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Add
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Remove Language Confirmation *@
+<MudDialog @bind-Visible="_removeLanguageDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Remove Language?</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText>
+            Are you sure you want to remove <strong>@_languageToRemove?.DisplayName</strong> (@_languageToRemove?.LanguageCode)?
+        </MudText>
+        <MudText Color="Color.Error" Class="mt-2">
+            This will permanently delete all translations for this language.
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _removeLanguageDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="RemoveLanguage" Disabled="_removingLanguage">
+            @if (_removingLanguage)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Remove
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Remove Provider Key Confirmation *@
+<MudDialog @bind-Visible="_removeProviderKeyDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Remove API Key?</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText>
+            Remove the <strong>@_selectedProvider?.DisplayName</strong> API key override for this project?
+        </MudText>
+        <MudText Color="Color.Secondary" Class="mt-2">
+            The project will fall back to organization, user, or platform-level keys.
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _removeProviderKeyDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="RemoveProviderKey" Disabled="_removingProviderKey">
+            @if (_removingProviderKey)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Remove
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    private ProjectDto? _project;
+    private bool _isLoading = true;
+    private bool _isSubmitting;
+    private bool _isDeleting;
+    private bool _showDeleteConfirm;
+    private string _deleteConfirmText = string.Empty;
+    private string? _errorMessage;
+    private UpdateProjectRequest _model = new();
+    private int _activeTabIndex;
+
+    // Languages
+    private List<ProjectLanguageDto> _languages = new();
+    private bool _loadingLanguages;
+    private bool _languagesLoaded;
+
+    // Add language
+    private bool _addLanguageDialogVisible;
+    private string _newLanguageCode = "";
+    private bool _addingLanguage;
+
+    // Remove language
+    private bool _removeLanguageDialogVisible;
+    private ProjectLanguageDto? _languageToRemove;
+    private bool _removingLanguage;
+
+    // Translation providers
+    private List<TranslationProviderDto> _translationProviders = new();
+    private bool _loadingProviders;
+    private bool _providersLoaded;
+
+    // Provider key management
+    private TranslationProviderDto? _selectedProvider;
+
+    // Remove provider key
+    private bool _removeProviderKeyDialogVisible;
+    private bool _removingProviderKey;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProjectAsync();
+    }
+
+    private async Task LoadProjectAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _project = await ProjectService.GetProjectAsync(ProjectId);
+            if (_project != null)
+            {
+                _model = new UpdateProjectRequest
+                {
+                    Name = _project.Name,
+                    Description = _project.Description,
+                    Format = _project.Format,
+                    DefaultLanguage = _project.DefaultLanguage,
+                    LocalizationPath = _project.LocalizationPath,
+                    GitHubRepo = _project.GitHubRepo,
+                    GitHubDefaultBranch = _project.GitHubDefaultBranch
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading project: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (_project == null) return;
+
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await ProjectService.UpdateProjectAsync(_project.Id, _model);
+
+            if (result.IsSuccess && result.Data != null)
+            {
+                _project = result.Data;
+                Snackbar.Add($"Project '{result.Data.Name}' updated successfully!", Severity.Success);
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private async Task HandleDelete()
+    {
+        if (_project == null || _deleteConfirmText != _project.Name) return;
+
+        _isDeleting = true;
+
+        try
+        {
+            var result = await ProjectService.DeleteProjectAsync(_project.Id);
+
+            if (result.IsSuccess)
+            {
+                Snackbar.Add($"Project '{_project.Name}' deleted.", Severity.Success);
+                Navigation.NavigateTo("");
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isDeleting = false;
+        }
+    }
+
+    private async Task LoadLanguages()
+    {
+        if (_project == null || _languagesLoaded) return;
+
+        _loadingLanguages = true;
+        try
+        {
+            _languages = await ResourceService.GetProjectLanguagesAsync(_project.Id);
+            _languagesLoaded = true;
+        }
+        finally
+        {
+            _loadingLanguages = false;
+        }
+    }
+
+    private void OpenAddLanguageDialog()
+    {
+        _newLanguageCode = "";
+        _addLanguageDialogVisible = true;
+    }
+
+    private async Task AddLanguage()
+    {
+        if (_project == null || string.IsNullOrWhiteSpace(_newLanguageCode)) return;
+
+        _addingLanguage = true;
+        try
+        {
+            var request = new AddLanguageRequest { LanguageCode = _newLanguageCode.Trim().ToLowerInvariant() };
+            var result = await ResourceService.AddLanguageAsync(_project.Id, request);
+
+            if (result.IsSuccess && result.Data != null)
+            {
+                _languages.Add(result.Data);
+                _languages = _languages.OrderBy(l => !l.IsDefault).ThenBy(l => l.LanguageCode).ToList();
+                Snackbar.Add($"Language '{result.Data.DisplayName}' added", Severity.Success);
+                _addLanguageDialogVisible = false;
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to add language", Severity.Error);
+            }
+        }
+        finally
+        {
+            _addingLanguage = false;
+        }
+    }
+
+    private void ConfirmRemoveLanguage(ProjectLanguageDto language)
+    {
+        _languageToRemove = language;
+        _removeLanguageDialogVisible = true;
+    }
+
+    private async Task RemoveLanguage()
+    {
+        if (_project == null || _languageToRemove == null) return;
+
+        _removingLanguage = true;
+        try
+        {
+            var result = await ResourceService.RemoveLanguageAsync(_project.Id, _languageToRemove.LanguageCode);
+
+            if (result.IsSuccess)
+            {
+                _languages.RemoveAll(l => l.LanguageCode == _languageToRemove.LanguageCode);
+                Snackbar.Add($"Language '{_languageToRemove.DisplayName}' removed", Severity.Success);
+                _removeLanguageDialogVisible = false;
+                _languageToRemove = null;
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to remove language", Severity.Error);
+            }
+        }
+        finally
+        {
+            _removingLanguage = false;
+        }
+    }
+
+    private static Color GetCompletionColor(double percentage) => percentage switch
+    {
+        >= 90 => Color.Success,
+        >= 50 => Color.Warning,
+        _ => Color.Error
+    };
+
+    // Translation provider methods
+    private async Task LoadTranslationProviders()
+    {
+        if (_project == null || _providersLoaded) return;
+
+        _loadingProviders = true;
+        try
+        {
+            _translationProviders = await TranslationService.GetProvidersAsync(projectId: _project.Id);
+            _providersLoaded = true;
+        }
+        finally
+        {
+            _loadingProviders = false;
+        }
+    }
+
+    private async Task OpenSetProviderKeyDialog(TranslationProviderDto provider)
+    {
+        if (_project == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { nameof(ConfigureProviderDialog.Provider), provider },
+            { nameof(ConfigureProviderDialog.Level), "project" },
+            { nameof(ConfigureProviderDialog.EntityId), _project.Id }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfigureProviderDialog>($"Configure {provider.DisplayName}", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            _providersLoaded = false;
+            await LoadTranslationProviders();
+        }
+    }
+
+    private void ConfirmRemoveProviderKey(TranslationProviderDto provider)
+    {
+        _selectedProvider = provider;
+        _removeProviderKeyDialogVisible = true;
+    }
+
+    private async Task RemoveProviderKey()
+    {
+        if (_project == null || _selectedProvider == null) return;
+
+        _removingProviderKey = true;
+        try
+        {
+            var result = await TranslationService.RemoveProjectApiKeyAsync(_project.Id, _selectedProvider.Name);
+
+            if (result.IsSuccess)
+            {
+                Snackbar.Add($"{_selectedProvider.DisplayName} API key removed", Severity.Success);
+                _removeProviderKeyDialogVisible = false;
+                _providersLoaded = false;
+                await LoadTranslationProviders();
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to remove API key", Severity.Error);
+            }
+        }
+        finally
+        {
+            _removingProviderKey = false;
+        }
+    }
+
+    private static string GetProviderIcon(string provider) => provider.ToLowerInvariant() switch
+    {
+        "google" => Icons.Material.Filled.Translate,
+        "deepl" => Icons.Material.Filled.Translate,
+        "openai" => Icons.Material.Filled.Psychology,
+        "claude" => Icons.Material.Filled.Psychology,
+        "azuretranslator" => Icons.Material.Filled.Cloud,
+        "azureopenai" => Icons.Material.Filled.Cloud,
+        "ollama" => Icons.Material.Filled.Computer,
+        "libretranslate" => Icons.Material.Filled.Public,
+        "mymemory" => Icons.Material.Filled.Memory,
+        _ => Icons.Material.Filled.Api
+    };
+
+    private static string GetKeySourceLabel(string? source) => source switch
+    {
+        "project" => "Project key",
+        "organization" => "Organization key",
+        "user" => "User key",
+        "platform" => "Platform key",
+        _ => "Unknown"
+    };
+}

@@ -36,7 +36,7 @@ else
             <MudButton Variant="Variant.Outlined"
                        Color="Color.Secondary"
                        StartIcon="@Icons.Material.Filled.Settings"
-                       OnClick="@OpenEditDialog">
+                       OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/settings"))">
                 Settings
             </MudButton>
             <MudButton Variant="Variant.Filled"
@@ -202,7 +202,6 @@ else
     </MudStack>
 }
 
-<EditProjectDialog @ref="_editDialog" OnProjectUpdated="OnProjectUpdated" OnProjectDeleted="OnProjectDeleted" />
 
 @code {
     [Parameter]
@@ -211,7 +210,6 @@ else
     private ProjectDto? _project;
     private ProjectStatsDto? _stats;
     private bool _isLoading = true;
-    private EditProjectDialog? _editDialog;
 
     protected override async Task OnInitializedAsync()
     {
@@ -237,23 +235,6 @@ else
         {
             _isLoading = false;
         }
-    }
-
-    private void OpenEditDialog()
-    {
-        if (_project != null)
-            _editDialog?.Open(_project);
-    }
-
-    private async Task OnProjectUpdated(ProjectDto project)
-    {
-        _project = project;
-        StateHasChanged();
-    }
-
-    private void OnProjectDeleted(int projectId)
-    {
-        Navigation.NavigateTo("");
     }
 
     private void TranslateAll()

@@ -3,6 +3,7 @@
 @inject TranslationService TranslationService
 @inject LimitsService LimitsService
 @inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
 
 <MudDialog>
     <TitleContent>
@@ -189,6 +190,8 @@
     private string? _usageWarning;
     private bool _usageBlocked;
 
+    private const string ProviderStorageKey = "lrm_translate_provider";
+
     private bool CanTranslate => !_isLoadingProviders &&
                                   !_isTranslating &&
                                   !string.IsNullOrEmpty(_selectedProvider) &&
@@ -224,9 +227,27 @@
         {
             _providers = await TranslationService.GetProvidersAsync(ProjectId);
 
-            // Select first configured provider
-            _selectedProvider = _providers
-                .FirstOrDefault(p => p.IsConfigured)?.Name;
+            // Try to restore previously selected provider from localStorage
+            string? savedProvider = null;
+            try
+            {
+                savedProvider = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", ProviderStorageKey);
+            }
+            catch
+            {
+                // localStorage may not be available (SSR prerender)
+            }
+
+            // Use saved provider if it's still configured, otherwise fall back to first configured
+            var configuredProviders = _providers.Where(p => p.IsConfigured).ToList();
+            if (!string.IsNullOrEmpty(savedProvider) && configuredProviders.Any(p => p.Name == savedProvider))
+            {
+                _selectedProvider = savedProvider;
+            }
+            else
+            {
+                _selectedProvider = configuredProviders.FirstOrDefault()?.Name;
+            }
         }
         catch (Exception ex)
         {
@@ -253,6 +274,19 @@
 
         try
         {
+            // Save selected provider to localStorage for next time
+            if (!string.IsNullOrEmpty(_selectedProvider))
+            {
+                try
+                {
+                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", ProviderStorageKey, _selectedProvider);
+                }
+                catch
+                {
+                    // Ignore localStorage errors
+                }
+            }
+
             var request = new TranslateRequestDto
             {
                 Keys = _keysToTranslate,
