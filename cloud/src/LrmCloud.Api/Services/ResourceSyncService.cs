@@ -54,11 +54,12 @@ public class ResourceSyncService
 
     /// <summary>
     /// Creates a resource backend from configuration.
+    /// Falls back to project format from database if not specified in config.
     /// </summary>
-    private IResourceBackend CreateBackendFromConfig(ConfigurationModel config)
+    private IResourceBackend CreateBackendFromConfig(ConfigurationModel config, string projectFormat)
     {
         var factory = new ResourceBackendFactory();
-        var backendName = config.ResourceFormat ?? "resx";  // Default to RESX if not specified
+        var backendName = config.ResourceFormat ?? projectFormat;  // Use project format as fallback
 
         return factory.GetBackend(backendName);
     }
@@ -66,12 +67,12 @@ public class ResourceSyncService
     /// <summary>
     /// Extracts language code from file path using configuration.
     /// </summary>
-    private string ExtractLanguageCodeFromPath(string filePath, ConfigurationModel config)
+    private string ExtractLanguageCodeFromPath(string filePath, ConfigurationModel config, string effectiveFormat)
     {
         var fileName = Path.GetFileNameWithoutExtension(filePath);
 
         // RESX format: Resources.el.resx → "el", Resources.resx → default language
-        if (config.ResourceFormat == "resx")
+        if (effectiveFormat == "resx")
         {
             var parts = fileName.Split('.');
             if (parts.Length > 1)
@@ -106,7 +107,8 @@ public class ResourceSyncService
     public async Task ParseFilesToDatabaseAsync(
         int projectId,
         List<FileDto> files,
-        string? configJson)
+        string? configJson,
+        string projectFormat)
     {
         if (files.Count == 0)
             return;
@@ -117,13 +119,16 @@ public class ResourceSyncService
             ? JsonSerializer.Deserialize<ConfigurationModel>(configJson, jsonOptions) ?? new ConfigurationModel()
             : new ConfigurationModel();
 
+        // Determine effective format: config takes priority, then project format from DB
+        var effectiveFormat = config.ResourceFormat ?? projectFormat;
+
         // Create resource backend
-        var backend = CreateBackendFromConfig(config);
+        var backend = CreateBackendFromConfig(config, projectFormat);
 
         foreach (var fileDto in files)
         {
             // Extract language code from filename
-            var langCode = ExtractLanguageCodeFromPath(fileDto.Path, config);
+            var langCode = ExtractLanguageCodeFromPath(fileDto.Path, config, effectiveFormat);
 
             // Create LanguageInfo metadata (no FilePath needed for stream-based reading)
             var langInfo = new LanguageInfo
@@ -232,7 +237,7 @@ public class ResourceSyncService
     /// <summary>
     /// Generates files from database using Core's backends.
     /// </summary>
-    public async Task<List<FileDto>> GenerateFilesFromDatabaseAsync(int projectId, string? configJson)
+    public async Task<List<FileDto>> GenerateFilesFromDatabaseAsync(int projectId, string? configJson, string projectFormat)
     {
         // Deserialize configuration or use defaults
         var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -240,8 +245,11 @@ public class ResourceSyncService
             ? JsonSerializer.Deserialize<ConfigurationModel>(configJson, jsonOptions) ?? new ConfigurationModel()
             : new ConfigurationModel();
 
+        // Determine effective format: config takes priority, then project format from DB
+        var effectiveFormat = config.ResourceFormat ?? projectFormat;
+
         // Create backend
-        var backend = CreateBackendFromConfig(config);
+        var backend = CreateBackendFromConfig(config, projectFormat);
 
         // Load all resource keys with translations
         var keys = await _db.ResourceKeys
@@ -327,7 +335,7 @@ public class ResourceSyncService
                 var content = await File.ReadAllTextAsync(tempFile);
 
                 // Get proper filename from backend
-                var filename = GetFileNameForLanguage(resourceFile.Language, config);
+                var filename = GetFileNameForLanguage(resourceFile.Language, config, effectiveFormat);
 
                 files.Add(new FileDto
                 {
@@ -350,9 +358,9 @@ public class ResourceSyncService
     /// <summary>
     /// Gets the filename for a language based on configuration.
     /// </summary>
-    private string GetFileNameForLanguage(LanguageInfo language, ConfigurationModel config)
+    private string GetFileNameForLanguage(LanguageInfo language, ConfigurationModel config, string effectiveFormat)
     {
-        if (config.ResourceFormat == "resx")
+        if (effectiveFormat == "resx")
         {
             // RESX: Resources.el.resx or Resources.resx (default)
             if (language.IsDefault)

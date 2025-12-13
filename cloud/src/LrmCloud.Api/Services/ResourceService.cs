@@ -820,7 +820,7 @@ public class ResourceService : IResourceService
             // Parse modified files to database
             if (request.ModifiedFiles.Count > 0)
             {
-                await _syncService.ParseFilesToDatabaseAsync(projectId, request.ModifiedFiles, project.ConfigJson);
+                await _syncService.ParseFilesToDatabaseAsync(projectId, request.ModifiedFiles, project.ConfigJson, project.Format);
             }
 
             // Update project last sync time
@@ -878,7 +878,7 @@ public class ResourceService : IResourceService
             }
 
             // Generate files from database using Core's backends
-            var files = await _syncService.GenerateFilesFromDatabaseAsync(projectId, project.ConfigJson);
+            var files = await _syncService.GenerateFilesFromDatabaseAsync(projectId, project.ConfigJson, project.Format);
 
             _logger.LogInformation("User {UserId} pulled {Count} files from project {ProjectId}",
                 userId, files.Count, projectId);
