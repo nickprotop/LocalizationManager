@@ -197,14 +197,10 @@
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
                        Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Save"
+                       StartIcon="@Icons.Material.Filled.Check"
                        OnClick="@HandleSave"
-                       Disabled="@(!HasChanges || IsSaving)">
-                @if (IsSaving)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                }
-                Save
+                       Disabled="@(!HasChanges)">
+                Apply
             </MudButton>
         </MudStack>
     </MudStack>
@@ -274,8 +270,6 @@
     [Parameter]
     public EventCallback<(TranslationGridRow Row, bool IsPlural)> OnTypeChanged { get; set; }
 
-    [Parameter]
-    public bool IsSaving { get; set; }
 
     [Inject]
     private ISnackbar Snackbar { get; set; } = default!;

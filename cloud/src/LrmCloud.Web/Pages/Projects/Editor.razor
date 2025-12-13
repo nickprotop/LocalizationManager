@@ -124,8 +124,7 @@ else
                                  OnSave="@SaveKeyDetails"
                                  OnTranslate="@TranslateKey"
                                  OnDelete="@DeleteKey"
-                                 OnTypeChanged="@OnKeyTypeChanged"
-                                 IsSaving="_isSavingKey" />
+                                 OnTypeChanged="@OnKeyTypeChanged" />
             }
         </MudDrawerContainer>
     </MudDrawer>
@@ -177,7 +176,6 @@ else
     private bool _isLoading = true;
     private bool _isRefreshing;
     private bool _isSaving;
-    private bool _isSavingKey;
     private bool _hasUnsavedChanges;
     private bool _drawerOpen;
     private TranslationGridRow? _selectedRow;
@@ -663,53 +661,98 @@ else
         await RefreshData();
     }
 
-    private async Task SaveKeyDetails(TranslationGridRow row)
+    private void SaveKeyDetails(TranslationGridRow row)
     {
-        _isSavingKey = true;
-        try
+        // Stage changes in the editor (don't save to DB yet)
+        // User must click the main Save button to persist with optional snapshot
+
+        // Ensure row is tracked in edited rows
+        if (!_editedRows.ContainsKey(row.KeyName))
         {
-            foreach (var (langCode, cell) in row.Translations.Where(t => t.Value.IsDirty))
-            {
-                var request = new UpdateTranslationRequest
-                {
-                    Value = cell.Value ?? "",
-                    PluralForm = cell.PluralForm,
-                    Status = "translated"
-                };
-
-                var result = await ResourceService.UpdateTranslationAsync(
-                    ProjectId, row.KeyName, langCode, request);
-
-                if (result.IsSuccess)
-                {
-                    cell.IsDirty = false;
-                    cell.OriginalValue = cell.Value;
-                }
-            }
-
-            // Remove from edited rows if no more dirty changes
-            if (!row.Translations.Values.Any(t => t.IsDirty))
-            {
-                _editedRows.Remove(row.KeyName);
-            }
-
-            Snackbar.Add("Translations saved", Severity.Success);
-            _hasUnsavedChanges = _editedRows.Any(kv => kv.Value.Translations.Values.Any(t => t.IsDirty));
-            _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
+            _editedRows[row.KeyName] = row;
         }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
-        }
-        finally
-        {
-            _isSavingKey = false;
-        }
+
+        // Mark that we have unsaved changes
+        _hasUnsavedChanges = true;
+
+        // Close the drawer
+        _drawerOpen = false;
+        _selectedRow = null;
+
+        Snackbar.Add("Changes staged. Click Save to persist.", Severity.Info);
     }
 
     private async Task TranslateKey(TranslationGridRow row)
     {
-        await OnTranslateSelected(new[] { row });
+        if (_project == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { nameof(TranslateDialog.ProjectId), ProjectId },
+            { nameof(TranslateDialog.SourceLanguage), _project.DefaultLanguage },
+            { nameof(TranslateDialog.AvailableLanguages), _languages },
+            { nameof(TranslateDialog.KeysToTranslate), new List<string> { row.KeyName } }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            BackdropClick = false
+        };
+
+        var dialog = await DialogService.ShowAsync<TranslateDialog>("Translate", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: TranslateResponseDto translationResult })
+        {
+            // Apply translations to the drawer row only (cells will update in place)
+            // User must click "Apply" to stage changes, then "Save" to persist
+            ApplyTranslationsToDrawerRow(row, translationResult);
+        }
+    }
+
+    /// <summary>
+    /// Applies translation results to the currently selected drawer row.
+    /// Unlike ApplyTranslationsToUI, this does NOT stage to _editedRows - the user must click Apply.
+    /// </summary>
+    private void ApplyTranslationsToDrawerRow(TranslationGridRow row, TranslateResponseDto translationResult)
+    {
+        var appliedCount = 0;
+
+        foreach (var translationRes in translationResult.Results.Where(r => r.Success && r.Key == row.KeyName))
+        {
+            // For non-plural keys, use language code directly
+            // For plural keys, the API currently doesn't return plural form, so default to "other"
+            var cellKey = row.IsPlural
+                ? TranslationGridRow.GetKey(translationRes.TargetLanguage, PluralForms.Other)
+                : translationRes.TargetLanguage;
+
+            if (!row.Translations.TryGetValue(cellKey, out var cell))
+            {
+                // Create new cell for this language
+                cell = new TranslationCell
+                {
+                    LanguageCode = translationRes.TargetLanguage,
+                    PluralForm = row.IsPlural ? PluralForms.Other : "",
+                    Value = null,
+                    OriginalValue = null
+                };
+                row.Translations[cellKey] = cell;
+            }
+
+            // Apply translated text and mark as dirty
+            cell.Value = translationRes.TranslatedText;
+            cell.IsDirty = true;
+            appliedCount++;
+        }
+
+        if (appliedCount > 0)
+        {
+            Snackbar.Add($"Applied {appliedCount} translations. Click Apply to stage changes.", Severity.Success);
+            StateHasChanged();
+        }
     }
 
     private async Task DeleteKey(TranslationGridRow row)
