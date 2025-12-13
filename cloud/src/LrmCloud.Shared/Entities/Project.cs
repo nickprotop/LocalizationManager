@@ -107,6 +107,19 @@ public class Project
     [ForeignKey(nameof(ConfigUpdatedBy))]
     public User? ConfigUpdater { get; set; }
 
+    // Snapshot settings
+    /// <summary>
+    /// Number of days to retain snapshots. Null means keep forever.
+    /// </summary>
+    [Column("snapshot_retention_days")]
+    public int? SnapshotRetentionDays { get; set; }
+
+    /// <summary>
+    /// Maximum number of snapshots to keep. Null means unlimited.
+    /// </summary>
+    [Column("max_snapshots")]
+    public int? MaxSnapshots { get; set; }
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -117,4 +130,5 @@ public class Project
     public ICollection<ResourceKey> ResourceKeys { get; set; } = new List<ResourceKey>();
     public ICollection<ProjectApiKey> ProjectApiKeys { get; set; } = new List<ProjectApiKey>();
     public ICollection<SyncHistory> SyncHistory { get; set; } = new List<SyncHistory>();
+    public ICollection<Snapshot> Snapshots { get; set; } = new List<Snapshot>();
 }

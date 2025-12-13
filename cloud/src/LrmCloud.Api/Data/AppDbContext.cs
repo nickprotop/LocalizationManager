@@ -35,6 +35,9 @@ public class AppDbContext : DbContext
     public DbSet<SyncConflict> SyncConflicts => Set<SyncConflict>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+    // Snapshots
+    public DbSet<Snapshot> Snapshots => Set<Snapshot>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -240,6 +243,27 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.ProjectId);
             entity.HasIndex(e => e.CreatedAt);
             entity.HasIndex(e => e.Action);
+        });
+
+        // =====================================================================
+        // Snapshots
+        // =====================================================================
+        modelBuilder.Entity<Snapshot>(entity =>
+        {
+            entity.HasIndex(e => new { e.ProjectId, e.SnapshotId }).IsUnique();
+            entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => e.SnapshotType);
+
+            entity.HasOne(e => e.Project)
+                .WithMany(p => p.Snapshots)
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.CreatedBy)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 

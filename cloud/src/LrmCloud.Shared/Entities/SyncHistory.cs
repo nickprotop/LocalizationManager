@@ -63,6 +63,20 @@ public class SyncHistory
     [Column("error_message")]
     public string? ErrorMessage { get; set; }
 
+    /// <summary>
+    /// User-provided commit message describing the changes.
+    /// </summary>
+    [MaxLength(500)]
+    [Column("message")]
+    public string? Message { get; set; }
+
+    /// <summary>
+    /// Reference to the snapshot created for this sync event.
+    /// </summary>
+    [MaxLength(8)]
+    [Column("snapshot_id")]
+    public string? SnapshotId { get; set; }
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
