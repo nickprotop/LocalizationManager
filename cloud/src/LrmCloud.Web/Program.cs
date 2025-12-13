@@ -42,6 +42,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ProjectService>();
 builder.Services.AddScoped<ResourceService>();
 builder.Services.AddScoped<TranslationService>();
+builder.Services.AddScoped<SnapshotService>();
 builder.Services.AddScoped<CliApiKeyService>();
 builder.Services.AddScoped<UsageService>();
 builder.Services.AddScoped<LimitsService>();

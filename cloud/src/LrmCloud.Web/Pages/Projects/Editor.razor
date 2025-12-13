@@ -6,6 +6,7 @@
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
 @inject IDialogService DialogService
+@inject SnapshotService SnapshotService
 @implements IAsyncDisposable
 @using LrmCloud.Web.Models
 @using LrmCloud.Web.Components
@@ -60,7 +61,7 @@ else
                        Color="Color.Primary"
                        Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.Save"
-                       OnClick="@SaveChanges"
+                       OnClick="@OpenSaveDialog"
                        Disabled="@(!_hasUnsavedChanges || _isSaving)">
                 @if (_isSaving)
                 {
@@ -133,6 +134,39 @@ else
 <AddKeyDialog @ref="_addKeyDialog" OnKeyAdded="@OnKeyAdded" ProjectId="@ProjectId" />
 <ConfirmDeleteDialog @ref="_deleteDialog" OnConfirmed="@OnDeleteConfirmed" />
 
+@* Save Changes Dialog *@
+<MudDialog @bind-Visible="_saveDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-2" />
+            Save Changes
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            @_pendingSaveCount translation(s) will be saved.
+        </MudText>
+        <MudTextField @bind-Value="_saveMessage"
+                      Label="Message (optional)"
+                      Placeholder="e.g., Updated French translations"
+                      HelperText="This message will be saved with the snapshot for history tracking"
+                      Lines="2" />
+        <MudCheckBox @bind-Value="_createSnapshotOnSave"
+                     Label="Create snapshot after saving"
+                     Class="mt-3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseSaveDialog">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveChangesWithMessage" Disabled="_isSaving">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Save Changes
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     [Parameter]
     public int ProjectId { get; set; }
@@ -153,6 +187,12 @@ else
     private TranslationGrid? _translationGrid;
     private string _searchText = string.Empty;
     private Dictionary<string, TranslationGridRow> _editedRows = new();
+
+    // Save dialog
+    private bool _saveDialogVisible;
+    private string _saveMessage = "";
+    private bool _createSnapshotOnSave = true;
+    private int _pendingSaveCount;
 
     /// <summary>
     /// Whether the current project format supports plural keys.
@@ -349,7 +389,53 @@ else
         }
     }
 
-    private async Task SaveChanges()
+    // ============================================================
+    // Save Dialog Methods
+    // ============================================================
+
+    private void OpenSaveDialog()
+    {
+        // Count pending changes
+        _pendingSaveCount = _editedRows.Values
+            .SelectMany(r => r.Translations.Values)
+            .Count(t => t.IsDirty);
+
+        // Generate default message
+        var languagesChanged = _editedRows.Values
+            .SelectMany(r => r.Translations.Where(t => t.Value.IsDirty))
+            .Select(t => t.Key)
+            .Distinct()
+            .ToList();
+
+        if (languagesChanged.Count == 1)
+        {
+            _saveMessage = $"Updated {_pendingSaveCount} translations in {languagesChanged[0]}";
+        }
+        else if (languagesChanged.Count > 1)
+        {
+            _saveMessage = $"Updated {_pendingSaveCount} translations in {languagesChanged.Count} languages";
+        }
+        else
+        {
+            _saveMessage = "Updated via web editor";
+        }
+
+        _saveDialogVisible = true;
+    }
+
+    private void CloseSaveDialog()
+    {
+        _saveDialogVisible = false;
+        _saveMessage = "";
+    }
+
+    private async Task SaveChangesWithMessage()
+    {
+        _saveDialogVisible = false;
+        await SaveChanges(_createSnapshotOnSave ? _saveMessage : null);
+    }
+
+    private async Task SaveChanges(string? snapshotMessage = null)
     {
         _isSaving = true;
         var savedCount = 0;
@@ -400,6 +486,24 @@ else
                 Snackbar.Add($"Saved {savedCount} translations, {errorCount} failed", Severity.Warning);
             else if (savedCount > 0)
                 Snackbar.Add($"Saved {savedCount} translations", Severity.Success);
+
+            // Create snapshot if message was provided and save was successful
+            if (!string.IsNullOrWhiteSpace(snapshotMessage) && savedCount > 0 && errorCount == 0)
+            {
+                try
+                {
+                    var snapshotResult = await SnapshotService.CreateSnapshotAsync(ProjectId, snapshotMessage);
+                    if (snapshotResult.IsSuccess)
+                    {
+                        Snackbar.Add($"Snapshot {snapshotResult.Data?.SnapshotId} created", Severity.Info);
+                    }
+                }
+                catch (Exception snapshotEx)
+                {
+                    // Log but don't fail the save operation
+                    Snackbar.Add($"Changes saved but snapshot creation failed: {snapshotEx.Message}", Severity.Warning);
+                }
+            }
 
             // Refresh stats
             _stats = await ResourceService.GetProjectStatsAsync(ProjectId);

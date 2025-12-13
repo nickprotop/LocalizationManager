@@ -180,6 +180,11 @@ else
             Open Editor
         </MudButton>
         <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.History"
+                   OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/snapshots"))">
+            View Snapshots
+        </MudButton>
+        <MudButton Variant="Variant.Outlined"
                    StartIcon="@Icons.Material.Filled.Translate"
                    OnClick="@TranslateAll">
             Translate All Missing
