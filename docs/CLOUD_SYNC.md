@@ -5,6 +5,7 @@ The LRM CLI tool supports bidirectional synchronization with LRM Cloud, allowing
 ## Table of Contents
 
 - [Overview](#overview)
+- [Quick Start: Clone](#quick-start-clone)
 - [Setup](#setup)
 - [Remote URL Configuration](#remote-url-configuration)
 - [Push Command](#push-command)
@@ -23,6 +24,39 @@ LRM Cloud sync provides:
 - **Conflict detection**: Automatically detect and resolve conflicts
 - **Backup system**: Automatic backups before pull operations
 - **Optimistic locking**: Version-based conflict detection for safe concurrent edits
+
+## Quick Start: Clone
+
+The easiest way to get started with an existing cloud project is to use the `clone` command (like `git clone`):
+
+```bash
+# Clone a cloud project into ./my-project/ directory
+lrm cloud clone https://lrm-cloud.com/@username/my-project
+
+# Clone into a specific directory
+lrm cloud clone https://lrm-cloud.com/org/project ./custom-dir
+
+# Clone with API key (for CI/CD)
+lrm cloud clone https://lrm-cloud.com/@username/project --api-key lrm_xxx
+```
+
+The `clone` command combines login, remote configuration, and pull into a single operation:
+
+1. Creates the target directory (default: `./{project-slug}`)
+2. Prompts for authentication (unless API key provided)
+3. Validates the project exists and is accessible
+4. Links the local directory to the remote project
+5. Pulls all resources and configuration
+
+### Clone Options
+
+| Option | Description |
+|--------|-------------|
+| `--email <email>` | Email for authentication |
+| `--password <pass>` | Password (not recommended - will prompt) |
+| `--api-key <key>` | API key for authentication |
+| `--no-pull` | Don't pull resources after cloning |
+| `--force` | Skip confirmation prompts |
 
 ## Setup
 
@@ -436,6 +470,7 @@ lrm cloud pull --no-backup
 
 ### Cloud Commands
 
+- `lrm cloud clone <url> [path]` - Clone existing project (login + link + pull)
 - `lrm cloud init [url]` - Connect to cloud project (interactive or direct URL)
 - `lrm cloud login [host]` - Authenticate via email/password
 - `lrm cloud logout` - Clear stored tokens

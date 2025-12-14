@@ -540,6 +540,7 @@ _lrm() {
                     local -a cloud_subcommands
                     cloud_subcommands=(
                         'init:Connect local project to cloud'
+                        'clone:Clone an existing cloud project (login + link + pull)'
                         'login:Authenticate with LRM Cloud'
                         'logout:Clear stored authentication tokens'
                         'status:Show cloud sync status or account info'
@@ -568,6 +569,17 @@ _lrm() {
                                         '--organization[Organization slug]:org' \
                                         '(-y --yes)'{-y,--yes}'[Skip confirmation prompts]' \
                                         $global_opts
+                                    ;;
+                                clone)
+                                    _arguments \
+                                        '1:remote URL' \
+                                        '2:target directory:_directories' \
+                                        '--email[Email for authentication]:email' \
+                                        '--password[Password (not recommended)]:password' \
+                                        '--api-key[API key for authentication]:key' \
+                                        '--no-pull[Do not pull resources after cloning]' \
+                                        '--force[Skip confirmation prompts]' \
+                                        '(-h --help)'{-h,--help}'[Show help information]'
                                     ;;
                                 login)
                                     _arguments \

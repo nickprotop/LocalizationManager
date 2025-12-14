@@ -422,6 +422,9 @@ Subcommands:
 .B init \fI[URL]\fR
 - Connect local project to cloud (interactive or direct URL)
 .IP \(bu 2
+.B clone \fIURL\fR \fI[PATH]\fR
+- Clone an existing cloud project (login + link + pull)
+.IP \(bu 2
 .B login \fI[HOST]\fR
 - Authenticate with LRM Cloud via email/password
 .IP \(bu 2
@@ -462,6 +465,49 @@ Project name (skip selection if matches existing project)
 .TP
 .BR \-\-organization " " \fIORG\fR
 Organization slug for new project
+.SS cloud clone
+Clone an existing cloud project. Combines login, link, and pull into a single command (like git clone).
+.PP
+.B lrm cloud clone
+\fIURL\fR
+[\fIPATH\fR]
+[\fB\-\-email\fR \fIEMAIL\fR]
+[\fB\-\-password\fR \fIPASSWORD\fR]
+[\fB\-\-api\-key\fR \fIKEY\fR]
+[\fB\-\-no\-pull\fR]
+[\fB\-\-force\fR]
+.TP
+.I URL
+Cloud project URL (e.g., https://lrm-cloud.com/@username/project or https://lrm-cloud.com/org/project)
+.TP
+.I PATH
+Target directory (default: ./{project-slug})
+.TP
+.BR \-\-email " " \fIEMAIL\fR
+Email for authentication
+.TP
+.BR \-\-password " " \fIPASSWORD\fR
+Password (not recommended - will prompt if not provided)
+.TP
+.BR \-\-api\-key " " \fIKEY\fR
+API key for authentication (alternative to email/password)
+.TP
+.BR \-\-no\-pull
+Don't pull resources after cloning (only link to remote)
+.TP
+.BR \-\-force
+Skip confirmation prompts when existing files are found
+.PP
+Examples:
+.TP
+Clone into default directory:
+.B lrm cloud clone https://lrm-cloud.com/@username/my-project
+.TP
+Clone into specific directory:
+.B lrm cloud clone https://lrm-cloud.com/org/project ./my-dir
+.TP
+Clone with API key (CI/CD):
+.B lrm cloud clone https://lrm-cloud.com/@username/project \-\-api\-key lrm_xxx
 .SS cloud login
 Authenticate with LRM Cloud.
 .PP

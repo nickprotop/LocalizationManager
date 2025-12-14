@@ -260,6 +260,13 @@ app.Configure(config =>
             .WithExample(new[] { "cloud", "init", "https://lrm-cloud.com/org/project" })
             .WithExample(new[] { "cloud", "init", "--name", "my-project" });
 
+        cfg.AddCommand<CloneCommand>("clone")
+            .WithDescription("Clone an existing cloud project (login + link + pull)")
+            .WithExample(new[] { "cloud", "clone", "https://lrm-cloud.com/@username/project" })
+            .WithExample(new[] { "cloud", "clone", "https://lrm-cloud.com/org/project", "./my-dir" })
+            .WithExample(new[] { "cloud", "clone", "https://lrm-cloud.com/@username/project", "--api-key", "lrm_xxx" })
+            .WithExample(new[] { "cloud", "clone", "https://lrm-cloud.com/@username/project", "--no-pull" });
+
         cfg.AddCommand<PushCommand>("push")
             .WithDescription("Push local changes (resources + lrm.json) to the cloud")
             .WithExample(new[] { "cloud", "push" })

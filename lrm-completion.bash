@@ -59,8 +59,9 @@ _lrm_completions() {
     local web_opts="--path -p --source-path --port --bind-address --no-open-browser --enable-https --cert-path --cert-password --help -h"
 
     # Cloud subcommands and options
-    local cloud_opts="init login logout status push pull set-token set-api-key remote --help -h"
+    local cloud_opts="init clone login logout status push pull set-token set-api-key remote --help -h"
     local cloud_init_opts="--path -p --name -n --organization --yes -y --help -h"
+    local cloud_clone_opts="--email --password --api-key --no-pull --force --help -h"
     local cloud_login_opts="--path -p --email --password --help -h"
     local cloud_logout_opts="--path -p --help -h"
     local cloud_status_opts="--path -p --format --account --help -h"
@@ -404,6 +405,14 @@ _lrm_completions() {
                         else
                             # URL argument
                             COMPREPLY=()
+                        fi
+                        ;;
+                    clone)
+                        if [[ "${cur}" == -* ]]; then
+                            COMPREPLY=( $(compgen -W "${cloud_clone_opts}" -- "${cur}") )
+                        else
+                            # URL argument or path argument
+                            COMPREPLY=( $(compgen -d -- "${cur}") )
                         fi
                         ;;
                     login)

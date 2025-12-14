@@ -31,6 +31,7 @@ This document provides detailed information about all LRM commands, their option
 - [config](#config) - Configuration management (documented below)
 - [chain](#chain) - Execute multiple commands sequentially
 - [web](#web) - Start web server with REST API and browser UI
+- [cloud](#cloud) - Cloud synchronization commands (see [CLOUD_SYNC.md](CLOUD_SYNC.md))
 
 ---
 
@@ -3114,4 +3115,5 @@ For more information:
 - [Web UI Guide](WEBUI.md)
 - [REST API Reference](API.md)
 - [CI/CD Integration](CICD.md)
+- [Cloud Sync Guide](CLOUD_SYNC.md) - Cloud synchronization commands (`lrm cloud clone`, `push`, `pull`, etc.)
 - [Contributing](../CONTRIBUTING.md)

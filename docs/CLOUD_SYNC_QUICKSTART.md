@@ -2,7 +2,26 @@
 
 Get started with LRM Cloud synchronization in 5 minutes.
 
-## Setup (One-time)
+## Option 1: Clone an Existing Project (Recommended)
+
+The easiest way to get started - one command does everything:
+
+```bash
+# Clone a project (like git clone)
+lrm cloud clone https://lrm-cloud.com/@username/my-project
+
+# You'll be prompted for email/password, then resources are pulled automatically
+```
+
+For CI/CD, use an API key:
+
+```bash
+lrm cloud clone https://lrm-cloud.com/@username/my-project --api-key lrm_xxx
+```
+
+## Option 2: Manual Setup
+
+If you have an existing local project:
 
 ```bash
 # 1. Set your remote URL
