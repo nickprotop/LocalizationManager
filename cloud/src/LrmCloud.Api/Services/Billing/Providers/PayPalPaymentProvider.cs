@@ -205,25 +205,127 @@ public class PayPalPaymentProvider : IPaymentProvider
     #region Custom Portal Support
 
     /// <inheritdoc />
-    public async Task<List<InvoiceInfo>> GetInvoicesAsync(string customerId, int limit = 10)
+    public async Task<List<InvoiceInfo>> GetInvoicesAsync(string subscriptionId, int limit = 10)
     {
-        // PayPal's invoicing API is separate from subscriptions
-        // For now, return an empty list - invoices are managed through PayPal's dashboard
-        return new List<InvoiceInfo>();
+        if (!IsEnabled || string.IsNullOrEmpty(subscriptionId))
+        {
+            return new List<InvoiceInfo>();
+        }
+
+        try
+        {
+            var accessToken = await GetAccessTokenAsync();
+
+            // PayPal Subscriptions API - list transactions for a subscription
+            // Time range: last year to now
+            var startTime = DateTime.UtcNow.AddYears(-1).ToString("yyyy-MM-ddTHH:mm:ssZ");
+            var endTime = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+            var request = new HttpRequestMessage(HttpMethod.Get,
+                $"{PayPalConfig!.ApiBaseUrl}/v1/billing/subscriptions/{subscriptionId}/transactions?start_time={startTime}&end_time={endTime}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await _httpClient.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("PayPal get transactions failed: {StatusCode} - {Body}",
+                    response.StatusCode, errorBody);
+                return new List<InvoiceInfo>();
+            }
+
+            var responseBody = await response.Content.ReadAsStringAsync();
+            var transactionsResponse = JsonSerializer.Deserialize<PayPalTransactionsResponse>(responseBody, JsonOptions);
+
+            if (transactionsResponse?.Transactions == null)
+            {
+                return new List<InvoiceInfo>();
+            }
+
+            return transactionsResponse.Transactions
+                .Take(limit)
+                .Select(t => new InvoiceInfo
+                {
+                    InvoiceId = t.Id ?? "",
+                    InvoiceNumber = t.Id,
+                    Status = MapTransactionStatus(t.Status),
+                    AmountTotal = ParsePayPalAmount(t.AmountWithBreakdown?.GrossAmount?.Value),
+                    AmountPaid = t.Status == "COMPLETED" ? ParsePayPalAmount(t.AmountWithBreakdown?.GrossAmount?.Value) : 0,
+                    Currency = t.AmountWithBreakdown?.GrossAmount?.CurrencyCode?.ToLowerInvariant() ?? "usd",
+                    CreatedAt = t.Time ?? DateTime.UtcNow,
+                    PaidAt = t.Status == "COMPLETED" ? t.Time : null,
+                    DueDate = null,
+                    PdfUrl = null, // PayPal doesn't provide PDF receipts via API
+                    HostedUrl = $"https://www.paypal.com/activity/payment/{t.Id}",
+                    Description = $"Subscription payment",
+                    PeriodStart = null,
+                    PeriodEnd = null
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get PayPal transactions for subscription {SubscriptionId}", subscriptionId);
+            return new List<InvoiceInfo>();
+        }
     }
 
     /// <inheritdoc />
-    public Task<PaymentMethodInfo?> GetPaymentMethodAsync(string customerId)
+    public async Task<PaymentMethodInfo?> GetPaymentMethodAsync(string subscriptionId)
     {
-        // PayPal doesn't expose payment method details in the same way
-        // Return a generic PayPal payment method
-        return Task.FromResult<PaymentMethodInfo?>(new PaymentMethodInfo
+        if (!IsEnabled || string.IsNullOrEmpty(subscriptionId))
         {
-            PaymentMethodId = "paypal",
-            Type = PaymentMethodType.PayPal,
-            PayPalEmail = null, // Would need to query subscription details
-            IsDefault = true
-        });
+            return null;
+        }
+
+        try
+        {
+            // Get subscription details to retrieve subscriber info including email
+            var accessToken = await GetAccessTokenAsync();
+
+            var request = new HttpRequestMessage(HttpMethod.Get,
+                $"{PayPalConfig!.ApiBaseUrl}/v1/billing/subscriptions/{subscriptionId}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await _httpClient.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("PayPal get subscription for payment method failed: {StatusCode}",
+                    response.StatusCode);
+                // Return generic PayPal info if we can't fetch details
+                return new PaymentMethodInfo
+                {
+                    PaymentMethodId = "paypal",
+                    Type = PaymentMethodType.PayPal,
+                    PayPalEmail = null,
+                    IsDefault = true
+                };
+            }
+
+            var responseBody = await response.Content.ReadAsStringAsync();
+            var subscription = JsonSerializer.Deserialize<PayPalSubscriptionResponse>(responseBody, JsonOptions);
+
+            return new PaymentMethodInfo
+            {
+                PaymentMethodId = subscription?.Subscriber?.PayerId ?? "paypal",
+                Type = PaymentMethodType.PayPal,
+                PayPalEmail = subscription?.Subscriber?.EmailAddress,
+                IsDefault = true
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get PayPal payment method for subscription {SubscriptionId}", subscriptionId);
+            return new PaymentMethodInfo
+            {
+                PaymentMethodId = "paypal",
+                Type = PaymentMethodType.PayPal,
+                PayPalEmail = null,
+                IsDefault = true
+            };
+        }
     }
 
     /// <inheritdoc />
@@ -231,6 +333,30 @@ public class PayPalPaymentProvider : IPaymentProvider
     {
         // PayPal manages payment methods through their own site
         return Task.FromResult("https://www.paypal.com/myaccount/autopay");
+    }
+
+    private static InvoiceStatus MapTransactionStatus(string? status)
+    {
+        return status?.ToUpperInvariant() switch
+        {
+            "COMPLETED" => InvoiceStatus.Paid,
+            "PENDING" => InvoiceStatus.Open,
+            "DECLINED" => InvoiceStatus.Uncollectible,
+            "REFUNDED" => InvoiceStatus.Void,
+            "PARTIALLY_REFUNDED" => InvoiceStatus.Paid,
+            _ => InvoiceStatus.Open
+        };
+    }
+
+    private static long ParsePayPalAmount(string? value)
+    {
+        if (string.IsNullOrEmpty(value) || !decimal.TryParse(value, out var amount))
+        {
+            return 0;
+        }
+        // PayPal returns amounts as decimal strings (e.g., "9.00")
+        // Convert to cents for consistency with Stripe
+        return (long)(amount * 100);
     }
 
     #endregion
@@ -562,6 +688,70 @@ public class PayPalPaymentProvider : IPaymentProvider
 
         [JsonPropertyName("billing_info")]
         public PayPalBillingInfo? BillingInfo { get; set; }
+    }
+
+    // Models for Transactions API response
+    private class PayPalTransactionsResponse
+    {
+        [JsonPropertyName("transactions")]
+        public List<PayPalTransaction>? Transactions { get; set; }
+
+        [JsonPropertyName("total_items")]
+        public int? TotalItems { get; set; }
+
+        [JsonPropertyName("total_pages")]
+        public int? TotalPages { get; set; }
+    }
+
+    private class PayPalTransaction
+    {
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
+
+        [JsonPropertyName("status")]
+        public string? Status { get; set; }
+
+        [JsonPropertyName("payer_email")]
+        public string? PayerEmail { get; set; }
+
+        [JsonPropertyName("payer_name")]
+        public PayPalPayerName? PayerName { get; set; }
+
+        [JsonPropertyName("amount_with_breakdown")]
+        public PayPalAmountWithBreakdown? AmountWithBreakdown { get; set; }
+
+        [JsonPropertyName("time")]
+        public DateTime? Time { get; set; }
+    }
+
+    private class PayPalPayerName
+    {
+        [JsonPropertyName("given_name")]
+        public string? GivenName { get; set; }
+
+        [JsonPropertyName("surname")]
+        public string? Surname { get; set; }
+    }
+
+    private class PayPalAmountWithBreakdown
+    {
+        [JsonPropertyName("gross_amount")]
+        public PayPalMoney? GrossAmount { get; set; }
+
+        [JsonPropertyName("fee_amount")]
+        public PayPalMoney? FeeAmount { get; set; }
+
+        [JsonPropertyName("net_amount")]
+        public PayPalMoney? NetAmount { get; set; }
+    }
+
+    private class PayPalMoney
+    {
+        [JsonPropertyName("currency_code")]
+        public string? CurrencyCode { get; set; }
+
+        [JsonPropertyName("value")]
+        public string? Value { get; set; }
     }
 
     #endregion

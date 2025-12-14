@@ -190,6 +190,100 @@ else
             </MudPaper>
         </MudItem>
 
+        @* Payment Method Card *@
+        @if (_paymentMethod != null)
+        {
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <div class="d-flex justify-space-between align-center mb-3">
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Payment" Class="mr-2" Style="vertical-align: middle;" />
+                            Payment Method
+                        </MudText>
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@UpdatePaymentMethod" Disabled="@_isProcessing">
+                            Update
+                        </MudButton>
+                    </div>
+
+                    <MudDivider Class="mb-3" />
+
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@GetPaymentMethodIcon(_paymentMethod.Type)" Size="Size.Large" Class="mr-3" />
+                        <div>
+                            <MudText Typo="Typo.body1">@_paymentMethod.DisplayString</MudText>
+                            @if (_paymentMethod.Type == "card" && _paymentMethod.CardExpMonth.HasValue)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Expires @_paymentMethod.CardExpMonth/@_paymentMethod.CardExpYear
+                                </MudText>
+                            }
+                        </div>
+                    </div>
+                </MudPaper>
+            </MudItem>
+        }
+
+        @* Invoice History Card *@
+        @if (_invoices.Count > 0)
+        {
+            <MudItem xs="12" md="@(_paymentMethod != null ? 6 : 12)">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" Style="vertical-align: middle;" />
+                        Recent Invoices
+                    </MudText>
+
+                    <MudDivider Class="mb-3" />
+
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Invoice</th>
+                                <th class="text-right">Amount</th>
+                                <th class="text-center">Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var invoice in _invoices)
+                            {
+                                <tr>
+                                    <td>@invoice.CreatedAt.ToString("MMM d, yyyy")</td>
+                                    <td>@(invoice.InvoiceNumber ?? invoice.InvoiceId[..Math.Min(8, invoice.InvoiceId.Length)])</td>
+                                    <td class="text-right">@FormatAmount(invoice.AmountTotal, invoice.Currency)</td>
+                                    <td class="text-center">
+                                        <MudChip T="string" Size="Size.Small" Color="@GetInvoiceStatusColor(invoice.Status)">
+                                            @(char.ToUpper(invoice.Status[0]) + invoice.Status[1..])
+                                        </MudChip>
+                                    </td>
+                                    <td>
+                                        <MudStack Row="true" Spacing="1">
+                                            @if (!string.IsNullOrEmpty(invoice.PdfUrl))
+                                            {
+                                                <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                                               Size="Size.Small"
+                                                               Href="@invoice.PdfUrl" Target="_blank"
+                                                               Title="Download PDF" />
+                                            }
+                                            @if (!string.IsNullOrEmpty(invoice.HostedUrl))
+                                            {
+                                                <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                                                               Size="Size.Small"
+                                                               Href="@invoice.HostedUrl" Target="_blank"
+                                                               Title="View Invoice" />
+                                            }
+                                        </MudStack>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                </MudPaper>
+            </MudItem>
+        }
+
         @* Plan Comparison *@
         <MudItem xs="12">
             <MudPaper Class="pa-4" Elevation="2">
@@ -380,6 +474,8 @@ else
 @code {
     private SubscriptionDto? _subscription;
     private UsageStatsDto? _stats;
+    private PaymentMethodDto? _paymentMethod;
+    private List<InvoiceDto> _invoices = new();
     private bool _isLoading = true;
     private bool _isProcessing;
     private bool _upgradeDialogVisible;
@@ -398,11 +494,15 @@ else
         {
             var subscriptionTask = BillingService.GetSubscriptionAsync();
             var statsTask = UsageService.GetStatsAsync();
+            var paymentMethodTask = BillingService.GetPaymentMethodAsync();
+            var invoicesTask = BillingService.GetInvoicesAsync(5);
 
-            await Task.WhenAll(subscriptionTask, statsTask);
+            await Task.WhenAll(subscriptionTask, statsTask, paymentMethodTask, invoicesTask);
 
             _subscription = await subscriptionTask;
             _stats = await statsTask;
+            _paymentMethod = await paymentMethodTask;
+            _invoices = await invoicesTask;
         }
         catch (Exception ex)
         {
@@ -550,6 +650,32 @@ else
         }
     }
 
+    private async Task UpdatePaymentMethod()
+    {
+        _isProcessing = true;
+        try
+        {
+            var returnUrl = Navigation.Uri;
+            var url = await BillingService.GetUpdatePaymentUrlAsync(returnUrl);
+            if (!string.IsNullOrEmpty(url))
+            {
+                await JS.InvokeVoidAsync("open", url, "_self");
+            }
+            else
+            {
+                Snackbar.Add("Failed to get payment update URL", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
     private static Color GetStatusColor(string? status) => status?.ToLower() switch
     {
         "active" => Color.Success,
@@ -576,5 +702,34 @@ else
         0 => "-",
         int.MaxValue => "Unlimited",
         _ => limit.ToString("N0")
+    };
+
+    private static string FormatAmount(long amountCents, string currency)
+    {
+        var amount = amountCents / 100.0m;
+        return currency.ToUpperInvariant() switch
+        {
+            "USD" => amount.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("en-US")),
+            "EUR" => amount.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("de-DE")),
+            "GBP" => amount.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("en-GB")),
+            _ => $"{amount:F2} {currency.ToUpperInvariant()}"
+        };
+    }
+
+    private static string GetPaymentMethodIcon(string? type) => type?.ToLowerInvariant() switch
+    {
+        "card" => Icons.Material.Filled.CreditCard,
+        "paypal" => Icons.Material.Filled.Payment,
+        "bank_account" => Icons.Material.Filled.AccountBalance,
+        _ => Icons.Material.Filled.Wallet
+    };
+
+    private static Color GetInvoiceStatusColor(string? status) => status?.ToLowerInvariant() switch
+    {
+        "paid" => Color.Success,
+        "open" => Color.Warning,
+        "void" => Color.Default,
+        "uncollectible" => Color.Error,
+        _ => Color.Info
     };
 }

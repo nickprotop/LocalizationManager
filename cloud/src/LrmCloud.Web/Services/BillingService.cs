@@ -119,4 +119,67 @@ public class BillingService
             return false;
         }
     }
+
+    /// <summary>
+    /// Get invoice history.
+    /// </summary>
+    public async Task<List<InvoiceDto>> GetInvoicesAsync(int limit = 10)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"billing/invoices?limit={limit}");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<List<InvoiceDto>>>();
+                return result?.Data ?? new List<InvoiceDto>();
+            }
+        }
+        catch
+        {
+            // Ignore errors
+        }
+        return new List<InvoiceDto>();
+    }
+
+    /// <summary>
+    /// Get current payment method.
+    /// </summary>
+    public async Task<PaymentMethodDto?> GetPaymentMethodAsync()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("billing/payment-method");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<PaymentMethodDto?>>();
+                return result?.Data;
+            }
+        }
+        catch
+        {
+            // Ignore errors
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Get URL to update payment method.
+    /// </summary>
+    public async Task<string?> GetUpdatePaymentUrlAsync(string returnUrl)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"billing/update-payment-url?returnUrl={Uri.EscapeDataString(returnUrl)}");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<string>>();
+                return result?.Data;
+            }
+        }
+        catch
+        {
+            // Ignore errors
+        }
+        return null;
+    }
 }

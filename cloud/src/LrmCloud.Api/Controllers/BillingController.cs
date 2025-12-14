@@ -173,4 +173,125 @@ public class BillingController : ApiControllerBase
             return BadRequest("reactivate-failed", "Failed to reactivate subscription");
         }
     }
+
+    /// <summary>
+    /// Get the user's invoice history.
+    /// </summary>
+    [HttpGet("invoices")]
+    public async Task<ActionResult<ApiResponse<List<InvoiceDto>>>> GetInvoices([FromQuery] int limit = 10)
+    {
+        if (!_billingService.IsEnabled)
+        {
+            return Success(new List<InvoiceDto>());
+        }
+
+        var userId = GetUserId();
+
+        try
+        {
+            var invoices = await _billingService.GetInvoicesAsync(userId, limit);
+            var invoiceDtos = invoices.Select(i => new InvoiceDto
+            {
+                InvoiceId = i.InvoiceId,
+                InvoiceNumber = i.InvoiceNumber,
+                Status = i.Status.ToString().ToLowerInvariant(),
+                AmountTotal = i.AmountTotal,
+                AmountPaid = i.AmountPaid,
+                Currency = i.Currency,
+                CreatedAt = i.CreatedAt,
+                PaidAt = i.PaidAt,
+                DueDate = i.DueDate,
+                PdfUrl = i.PdfUrl,
+                HostedUrl = i.HostedUrl,
+                Description = i.Description,
+                PeriodStart = i.PeriodStart,
+                PeriodEnd = i.PeriodEnd
+            }).ToList();
+
+            return Success(invoiceDtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get invoices for user {UserId}", userId);
+            return Success(new List<InvoiceDto>());
+        }
+    }
+
+    /// <summary>
+    /// Get the user's current payment method.
+    /// </summary>
+    [HttpGet("payment-method")]
+    public async Task<ActionResult<ApiResponse<PaymentMethodDto?>>> GetPaymentMethod()
+    {
+        if (!_billingService.IsEnabled)
+        {
+            return Success<PaymentMethodDto?>(null);
+        }
+
+        var userId = GetUserId();
+
+        try
+        {
+            var pm = await _billingService.GetPaymentMethodAsync(userId);
+            if (pm == null)
+            {
+                return Success<PaymentMethodDto?>(null);
+            }
+
+            return Success<PaymentMethodDto?>(new PaymentMethodDto
+            {
+                PaymentMethodId = pm.PaymentMethodId,
+                Type = pm.Type.ToString().ToLowerInvariant(),
+                CardBrand = pm.CardBrand,
+                CardLast4 = pm.CardLast4,
+                CardExpMonth = pm.CardExpMonth,
+                CardExpYear = pm.CardExpYear,
+                PayPalEmail = pm.PayPalEmail,
+                BankName = pm.BankName,
+                BankLast4 = pm.BankLast4,
+                IsDefault = pm.IsDefault,
+                DisplayString = pm.DisplayString
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get payment method for user {UserId}", userId);
+            return Success<PaymentMethodDto?>(null);
+        }
+    }
+
+    /// <summary>
+    /// Get URL to update payment method.
+    /// </summary>
+    [HttpGet("update-payment-url")]
+    public async Task<IActionResult> GetUpdatePaymentUrl([FromQuery] string returnUrl)
+    {
+        if (!_billingService.IsEnabled)
+        {
+            return BadRequest("billing-disabled", "Billing is not enabled");
+        }
+
+        if (string.IsNullOrEmpty(returnUrl))
+        {
+            return BadRequest("invalid-request", "Return URL is required");
+        }
+
+        var userId = GetUserId();
+
+        try
+        {
+            var url = await _billingService.GetUpdatePaymentMethodUrlAsync(userId, returnUrl);
+            return Ok(new ApiResponse<string> { Data = url });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Get update payment URL failed for user {UserId}", userId);
+            return BadRequest("update-payment-failed", ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get update payment URL for user {UserId}", userId);
+            return BadRequest("update-payment-failed", "Failed to get update payment URL");
+        }
+    }
 }
