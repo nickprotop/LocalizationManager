@@ -61,11 +61,9 @@ public class AuthService
 
             if (response.IsSuccessStatusCode)
             {
-                var result = await response.Content.ReadFromJsonAsync<ApiResponse<UserDto>>();
-                if (result?.Data != null)
-                {
-                    return AuthResult.Success(result.Data, "Registration successful. Please check your email to verify your account.");
-                }
+                // Registration returns a message, not user data (for security - prevents account enumeration)
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse>();
+                return AuthResult.Success(null, result?.Message ?? "Registration successful. Please check your email to verify your account.");
             }
 
             var error = await ReadErrorMessageAsync(response);
