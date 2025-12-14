@@ -487,6 +487,9 @@ public class ResourceSyncService
         // Determine effective default language: config takes priority, then project setting
         var effectiveDefaultLang = config.DefaultLanguageCode ?? defaultLanguage;
 
+        // Get the base name from stored files (important for RESX which has project-specific base names)
+        var baseName = await GetBaseNameFromStoredFilesAsync(projectId, effectiveFormat, config);
+
         // Create backend
         var backend = CreateBackendFromConfig(config, projectFormat);
 
@@ -558,7 +561,7 @@ public class ResourceSyncService
                 {
                     Language = new LanguageInfo
                     {
-                        BaseName = config.Json?.BaseName ?? "strings",
+                        BaseName = baseName,
                         Code = langCode,
                         Name = langCode,  // Use language code as display name
                         IsDefault = langCode == effectiveDefaultLang,
@@ -592,6 +595,70 @@ public class ResourceSyncService
         }
 
         return files;
+    }
+
+    /// <summary>
+    /// Gets the base name from config, stored files, or defaults.
+    /// Priority: 1) Config setting, 2) Stored files in current/, 3) Default value
+    /// For RESX: default is "SharedResource" per ASP.NET Core convention
+    /// For JSON: default is "strings"
+    /// </summary>
+    private async Task<string> GetBaseNameFromStoredFilesAsync(int projectId, string effectiveFormat, ConfigurationModel config)
+    {
+        // Config takes priority for both formats
+        if (effectiveFormat == "resx" && !string.IsNullOrEmpty(config.Resx?.BaseName))
+        {
+            return config.Resx.BaseName;
+        }
+        if (effectiveFormat != "resx" && !string.IsNullOrEmpty(config.Json?.BaseName))
+        {
+            return config.Json.BaseName;
+        }
+
+        try
+        {
+            // List files in current/ folder to get original filenames
+            var currentFiles = await _storageService.ListFilesAsync(projectId, "current/");
+
+            if (currentFiles.Count > 0)
+            {
+                // Get the first file and extract base name based on format
+                foreach (var filePath in currentFiles)
+                {
+                    var fileName = Path.GetFileName(filePath);
+
+                    if (effectiveFormat == "resx" && fileName.EndsWith(".resx", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // RESX: SharedResource.resx or SharedResource.el.resx → "SharedResource"
+                        return GetResxBaseName(fileName);
+                    }
+                    else if (effectiveFormat != "resx" && fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // JSON: Check if i18next (filename is culture code) or standard
+                        var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+
+                        // i18next mode: filename IS the culture code (en.json, fr.json)
+                        if (effectiveFormat == "i18next" || config.Json?.I18nextCompatible == true)
+                        {
+                            return "strings"; // i18next doesn't use base name in filename
+                        }
+
+                        // Standard JSON: strings.json or strings.fr.json → "strings"
+                        var parts = nameWithoutExt.Split('.');
+                        return parts[0];
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get base name from stored files for project {ProjectId}", projectId);
+        }
+
+        // Fallback to defaults per ASP.NET Core conventions
+        // RESX: "SharedResource" is the standard name for shared/global resources
+        // JSON: "strings" is a common convention
+        return effectiveFormat == "resx" ? "SharedResource" : "strings";
     }
 
     /// <summary>

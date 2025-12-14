@@ -45,6 +45,12 @@ public class ConfigurationModel
     /// Only applicable when ResourceFormat is "json".
     /// </summary>
     public JsonFormatConfiguration? Json { get; set; }
+
+    /// <summary>
+    /// RESX-specific configuration settings.
+    /// Only applicable when ResourceFormat is "resx".
+    /// </summary>
+    public ResxFormatConfiguration? Resx { get; set; }
 }
 
 /// <summary>
@@ -611,4 +617,18 @@ public class SyncConfiguration
     /// Default: true
     /// </summary>
     public bool CreatePr { get; set; } = true;
+}
+
+/// <summary>
+/// Configuration settings for RESX resource format.
+/// </summary>
+public class ResxFormatConfiguration
+{
+    /// <summary>
+    /// Base filename for resources (without extension or culture code).
+    /// Example: "SharedResource" produces "SharedResource.resx", "SharedResource.fr.resx", etc.
+    /// Per ASP.NET Core convention, "SharedResource" is the standard name for shared/global resources.
+    /// Default: "SharedResource"
+    /// </summary>
+    public string BaseName { get; set; } = "SharedResource";
 }
