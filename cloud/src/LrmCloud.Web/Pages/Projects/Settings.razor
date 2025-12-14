@@ -3,6 +3,7 @@
 @using LrmCloud.Shared.DTOs.Projects
 @using LrmCloud.Shared.DTOs.Resources
 @using LrmCloud.Shared.DTOs.Translation
+@using LrmCloud.Web.Helpers
 @inject ProjectService ProjectService
 @inject ResourceService ResourceService
 @inject TranslationService TranslationService
@@ -173,7 +174,7 @@ else
                                 </MudTd>
                                 <MudTd DataLabel="Completion">
                                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                        <MudProgressLinear Value="@context.CompletionPercentage" Color="@GetCompletionColor(context.CompletionPercentage)"
+                                        <MudProgressLinear Value="@context.CompletionPercentage" Color="@UiHelpers.GetCompletionColor(context.CompletionPercentage)"
                                                            Style="width: 100px;" Size="Size.Small" Rounded="true" />
                                         <MudText Typo="Typo.caption">@context.CompletionPercentage%</MudText>
                                     </MudStack>
@@ -656,13 +657,6 @@ else
             _removingLanguage = false;
         }
     }
-
-    private static Color GetCompletionColor(double percentage) => percentage switch
-    {
-        >= 90 => Color.Success,
-        >= 50 => Color.Warning,
-        _ => Color.Error
-    };
 
     // Translation provider methods
     private async Task LoadTranslationProviders()

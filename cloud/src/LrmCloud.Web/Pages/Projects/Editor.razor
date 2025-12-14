@@ -10,6 +10,7 @@
 @implements IAsyncDisposable
 @using LrmCloud.Web.Models
 @using LrmCloud.Web.Components
+@using LrmCloud.Web.Helpers
 @using LrmCloud.Shared.DTOs.Resources
 @using LrmCloud.Shared.DTOs.Translation
 @using MudBlazor
@@ -38,7 +39,7 @@ else
                            OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))"
                            Size="Size.Small" />
             <MudText Typo="Typo.h5">@_project.Name</MudText>
-            <MudChip T="string" Size="Size.Small" Color="@GetFormatColor(_project.Format)">@_project.Format</MudChip>
+            <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetFormatColor(_project.Format)">@_project.Format</MudChip>
         </MudStack>
 
         <MudStack Row="true" Spacing="2">
@@ -82,7 +83,7 @@ else
             {
                 <MudTooltip Text="@($"{lang.Value.TranslatedCount}/{_stats.TotalKeys} translated")">
                     <MudChip T="string" Size="Size.Small"
-                             Color="@GetCompletionColor(lang.Value.CompletionPercentage)"
+                             Color="@UiHelpers.GetCompletionColor(lang.Value.CompletionPercentage)"
                              Variant="Variant.Outlined">
                         @lang.Key: @lang.Value.CompletionPercentage.ToString("F0")%
                     </MudChip>
@@ -776,21 +777,6 @@ else
         // Force grid to re-render to update the plural indicator
         StateHasChanged();
     }
-
-    private static Color GetFormatColor(string format) => format.ToLower() switch
-    {
-        "resx" => Color.Primary,
-        "json" => Color.Info,
-        "i18next" => Color.Secondary,
-        _ => Color.Default
-    };
-
-    private static Color GetCompletionColor(double percentage) => percentage switch
-    {
-        >= 90 => Color.Success,
-        >= 50 => Color.Warning,
-        _ => Color.Error
-    };
 
     // ============================================================
     // Keyboard Shortcuts

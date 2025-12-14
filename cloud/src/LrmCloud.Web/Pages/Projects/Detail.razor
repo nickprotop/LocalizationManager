@@ -1,9 +1,14 @@
 @page "/projects/{ProjectId:int}"
 @attribute [Authorize]
+@using LrmCloud.Web.Helpers
+@using LrmCloud.Shared.DTOs.Translation
 @inject ProjectService ProjectService
 @inject ResourceService ResourceService
+@inject TranslationService TranslationService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JS
 
 <PageTitle>@(_project?.Name ?? "Project") - LRM Cloud</PageTitle>
 
@@ -29,7 +34,7 @@ else
                            OnClick="@(() => Navigation.NavigateTo(""))"
                            Size="Size.Small" />
             <MudText Typo="Typo.h4">@_project.Name</MudText>
-            <MudChip T="string" Size="Size.Small" Color="@GetFormatColor(_project.Format)">@_project.Format</MudChip>
+            <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetFormatColor(_project.Format)">@_project.Format</MudChip>
         </MudStack>
 
         <MudStack Row="true" Spacing="2">
@@ -83,7 +88,7 @@ else
                         <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Completion</MudText>
                         <MudText Typo="Typo.h4">@(_stats?.OverallCompletion.ToString("F0") ?? _project.CompletionPercentage.ToString("F0"))%</MudText>
                     </div>
-                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="@GetCompletionColor(_stats?.OverallCompletion ?? _project.CompletionPercentage)" Size="Size.Large" />
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="@UiHelpers.GetCompletionColor(_stats?.OverallCompletion ?? _project.CompletionPercentage)" Size="Size.Large" />
                 </MudStack>
             </MudPaper>
         </MudItem>
@@ -121,7 +126,7 @@ else
                             </MudText>
                         </MudStack>
                         <MudProgressLinear Value="@lang.Value.CompletionPercentage"
-                                           Color="@GetCompletionColor(lang.Value.CompletionPercentage)"
+                                           Color="@UiHelpers.GetCompletionColor(lang.Value.CompletionPercentage)"
                                            Class="mt-1" />
                     </div>
                 }
@@ -186,7 +191,12 @@ else
         </MudButton>
         <MudButton Variant="Variant.Outlined"
                    StartIcon="@Icons.Material.Filled.Translate"
-                   OnClick="@TranslateAll">
+                   OnClick="@OpenTranslateDialog"
+                   Disabled="@_isTranslating">
+            @if (_isTranslating)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
             Translate All Missing
         </MudButton>
         <MudButton Variant="Variant.Outlined"
@@ -202,6 +212,95 @@ else
     </MudStack>
 }
 
+@* Translate All Dialog *@
+<MudDialog @bind-Visible="_translateDialogVisible" Options="@(new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Translate" Class="mr-2" />
+            Translate All Missing
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                This will translate all missing translations from the default language (@_project?.DefaultLanguage) to the selected target languages.
+            </MudText>
+
+            <MudSelect T="string" Label="Translation Provider" @bind-Value="_selectedProvider"
+                       Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                @foreach (var provider in _availableProviders)
+                {
+                    <MudSelectItem Value="@provider.Name">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <span>@provider.DisplayName</span>
+                            @if (provider.IsConfigured)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Success" />
+                            }
+                        </MudStack>
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudText Typo="Typo.subtitle2">Target Languages</MudText>
+            @if (_stats?.Languages != null)
+            {
+                <MudStack Spacing="1">
+                    @foreach (var lang in _stats.Languages.Where(l => l.Key != _project?.DefaultLanguage))
+                    {
+                        <MudCheckBox T="bool" Label="@($"{lang.Key.ToUpperInvariant()} ({100 - lang.Value.CompletionPercentage:F0}% missing)")"
+                                     Checked="@_selectedLanguages.Contains(lang.Key)"
+                                     CheckedChanged="@((bool value) => ToggleLanguage(lang.Key, value))"
+                                     Color="Color.Primary" />
+                    }
+                </MudStack>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@CloseTranslateDialog" Variant="Variant.Text">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@ExecuteTranslateAll"
+                   Disabled="@(!_selectedLanguages.Any() || string.IsNullOrEmpty(_selectedProvider) || _isTranslating)">
+            @if (_isTranslating)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Translate
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Export Dialog *@
+<MudDialog @bind-Visible="_exportDialogVisible" Options="@(new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.FileDownload" Class="mr-2" />
+            Export Project
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Export your localization resources in various formats.
+            </MudText>
+
+            <MudRadioGroup T="string" @bind-Value="_exportFormat">
+                <MudRadio Value="@("json")" Color="Color.Primary">JSON (all languages in one file)</MudRadio>
+                <MudRadio Value="@("csv")" Color="Color.Primary">CSV (spreadsheet compatible)</MudRadio>
+                <MudRadio Value="@("native")" Color="Color.Primary">Native format (@_project?.Format files)</MudRadio>
+            </MudRadioGroup>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@CloseExportDialog" Variant="Variant.Text">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@ExecuteExport"
+                   Disabled="@(string.IsNullOrEmpty(_exportFormat))">
+            <MudIcon Icon="@Icons.Material.Filled.Download" Class="mr-1" />
+            Download
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 
 @code {
     [Parameter]
@@ -210,6 +309,17 @@ else
     private ProjectDto? _project;
     private ProjectStatsDto? _stats;
     private bool _isLoading = true;
+
+    // Translate dialog state
+    private bool _translateDialogVisible;
+    private bool _isTranslating;
+    private List<TranslationProviderDto> _availableProviders = new();
+    private string? _selectedProvider;
+    private HashSet<string> _selectedLanguages = new();
+
+    // Export dialog state
+    private bool _exportDialogVisible;
+    private string _exportFormat = "json";
 
     protected override async Task OnInitializedAsync()
     {
@@ -237,35 +347,122 @@ else
         }
     }
 
-    private void TranslateAll()
+    // =========================================================================
+    // Translate All
+    // =========================================================================
+
+    private async Task OpenTranslateDialog()
     {
-        Snackbar.Add("Translate all missing - coming soon!", Severity.Info);
+        // Load available providers
+        _availableProviders = await TranslationService.GetProvidersAsync(projectId: ProjectId);
+        _selectedProvider = _availableProviders.FirstOrDefault(p => p.IsConfigured)?.Name
+                          ?? _availableProviders.FirstOrDefault()?.Name;
+
+        // Pre-select languages with missing translations
+        _selectedLanguages = _stats?.Languages
+            .Where(l => l.Key != _project?.DefaultLanguage && l.Value.CompletionPercentage < 100)
+            .Select(l => l.Key)
+            .ToHashSet() ?? new HashSet<string>();
+
+        _translateDialogVisible = true;
     }
+
+    private void CloseTranslateDialog()
+    {
+        _translateDialogVisible = false;
+    }
+
+    private void ToggleLanguage(string langCode, bool selected)
+    {
+        if (selected)
+            _selectedLanguages.Add(langCode);
+        else
+            _selectedLanguages.Remove(langCode);
+    }
+
+    private async Task ExecuteTranslateAll()
+    {
+        if (_project == null || !_selectedLanguages.Any() || string.IsNullOrEmpty(_selectedProvider))
+            return;
+
+        _isTranslating = true;
+        try
+        {
+            var request = new TranslateRequestDto
+            {
+                TargetLanguages = _selectedLanguages.ToList(),
+                Provider = _selectedProvider,
+                OnlyMissing = true,
+                SaveToDatabase = true
+            };
+
+            var result = await TranslationService.TranslateKeysAsync(ProjectId, request);
+
+            if (result.Success)
+            {
+                Snackbar.Add($"Successfully translated {result.TranslatedCount} items!", Severity.Success);
+                _translateDialogVisible = false;
+
+                // Refresh stats
+                _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
+            }
+            else
+            {
+                var errorMsg = result.Errors?.FirstOrDefault() ?? "Translation failed";
+                Snackbar.Add(errorMsg, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Translation error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isTranslating = false;
+        }
+    }
+
+    // =========================================================================
+    // Export
+    // =========================================================================
 
     private void ExportProject()
     {
-        Snackbar.Add("Export - coming soon!", Severity.Info);
+        _exportFormat = "json";
+        _exportDialogVisible = true;
     }
+
+    private void CloseExportDialog()
+    {
+        _exportDialogVisible = false;
+    }
+
+    private async Task ExecuteExport()
+    {
+        if (_project == null)
+            return;
+
+        // For now, show a message about using CLI
+        // In the future, this could download files directly
+        Snackbar.Add($"Export to {_exportFormat.ToUpper()} format - Use CLI: lrm cloud sync --project {ProjectId} --export {_exportFormat}", Severity.Info);
+        _exportDialogVisible = false;
+    }
+
+    // =========================================================================
+    // CLI Command
+    // =========================================================================
 
     private async Task CopySyncCommand()
     {
         var command = $"lrm cloud sync --project {ProjectId}";
-        // This requires JS interop
-        Snackbar.Add($"CLI command: {command}", Severity.Info);
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", command);
+            Snackbar.Add("CLI command copied to clipboard!", Severity.Success);
+        }
+        catch
+        {
+            Snackbar.Add($"CLI command: {command}", Severity.Info);
+        }
     }
-
-    private static Color GetFormatColor(string format) => format.ToLower() switch
-    {
-        "resx" => Color.Primary,
-        "json" => Color.Info,
-        "i18next" => Color.Secondary,
-        _ => Color.Default
-    };
-
-    private static Color GetCompletionColor(double percentage) => percentage switch
-    {
-        >= 90 => Color.Success,
-        >= 50 => Color.Warning,
-        _ => Color.Error
-    };
 }

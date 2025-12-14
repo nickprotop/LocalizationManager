@@ -262,6 +262,18 @@ else
         </MudText>
     </TitleContent>
     <DialogContent>
+        @if (_hasUnsnapshotedChanges)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4" Icon="@Icons.Material.Filled.ErrorOutline">
+                <strong>Warning:</strong> There are unsaved changes since the last snapshot
+                @if (_lastChangeAt.HasValue)
+                {
+                    <span> (last change: @_lastChangeAt.Value.ToLocalTime().ToString("g"))</span>
+                }
+                that may be lost if you restore without creating a backup.
+            </MudAlert>
+        }
+
         <MudAlert Severity="Severity.Warning" Class="mb-4">
             This will replace your current project state with the snapshot from <strong>@_restoreSnapshot?.CreatedAt.ToLocalTime().ToString("g")</strong>.
         </MudAlert>
@@ -463,6 +475,8 @@ else
     private bool _restoreCreateBackup = true;
     private string _restoreMessage = "";
     private bool _isRestoring;
+    private bool _hasUnsnapshotedChanges;
+    private DateTime? _lastChangeAt;
 
     // Delete dialog
     private bool _deleteDialogVisible;
@@ -564,11 +578,22 @@ else
     }
 
     // Restore dialog methods
-    private void OpenRestoreDialog(SnapshotDto snapshot)
+    private async Task OpenRestoreDialog(SnapshotDto snapshot)
     {
         _restoreSnapshot = snapshot;
         _restoreCreateBackup = true;
         _restoreMessage = "";
+        _hasUnsnapshotedChanges = false;
+        _lastChangeAt = null;
+
+        // Check for unsnapshot-ed changes
+        var unsnapshotedChanges = await SnapshotService.CheckUnsnapshotedChangesAsync(ProjectId);
+        if (unsnapshotedChanges != null)
+        {
+            _hasUnsnapshotedChanges = unsnapshotedChanges.HasUnsnapshotedChanges;
+            _lastChangeAt = unsnapshotedChanges.LastChangeAt;
+        }
+
         _restoreDialogVisible = true;
     }
 
