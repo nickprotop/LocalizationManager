@@ -151,7 +151,8 @@ public class Program
             // =============================================================================
 
             builder.Services.AddDbContext<AppDbContext>(options =>
-                options.UseNpgsql(config.Database.ConnectionString));
+                options.UseNpgsql(config.Database.ConnectionString,
+                    npgsqlOptions => npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
             // =============================================================================
             // Redis (Caching & Sessions)

@@ -216,21 +216,21 @@ public class BillingService : IBillingService
             return;
         }
 
-        if (string.IsNullOrEmpty(result.CustomerId))
+        if (string.IsNullOrEmpty(result.CustomerId) && string.IsNullOrEmpty(result.SubscriptionId))
         {
-            _logger.LogDebug("Webhook event {EventType} has no customer ID, skipping", result.EventType);
+            _logger.LogDebug("Webhook event {EventType} has no customer or subscription ID, skipping", result.EventType);
             return;
         }
 
-        // Find user by payment customer ID
+        // Find user by payment customer ID or subscription ID
         var user = await _db.Users.FirstOrDefaultAsync(u =>
-            u.PaymentCustomerId == result.CustomerId &&
-            u.PaymentProvider == result.ProviderName);
+            u.PaymentProvider == result.ProviderName &&
+            (u.PaymentCustomerId == result.CustomerId || u.PaymentSubscriptionId == result.SubscriptionId));
 
         if (user == null)
         {
-            _logger.LogWarning("No user found for {Provider} customer {CustomerId}",
-                result.ProviderName, result.CustomerId);
+            _logger.LogWarning("No user found for {Provider} customer {CustomerId} / subscription {SubscriptionId}",
+                result.ProviderName, result.CustomerId, result.SubscriptionId);
             return;
         }
 
