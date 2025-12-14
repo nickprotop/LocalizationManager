@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using LrmCloud.Api.Services;
 using LrmCloud.Shared.Api;
+using LrmCloud.Shared.DTOs;
 using LrmCloud.Shared.DTOs.Projects;
+using LrmCloud.Shared.DTOs.Sync;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,13 +16,16 @@ namespace LrmCloud.Api.Controllers;
 public class ProjectsController : ApiControllerBase
 {
     private readonly IProjectService _projectService;
+    private readonly IResourceService _resourceService;
     private readonly ILogger<ProjectsController> _logger;
 
     public ProjectsController(
         IProjectService projectService,
+        IResourceService resourceService,
         ILogger<ProjectsController> logger)
     {
         _projectService = projectService;
+        _resourceService = resourceService;
         _logger = logger;
     }
 
@@ -35,6 +40,37 @@ public class ProjectsController : ApiControllerBase
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var projects = await _projectService.GetUserProjectsAsync(userId);
         return Success(projects);
+    }
+
+    /// <summary>
+    /// Gets projects with pagination support.
+    /// </summary>
+    /// <param name="page">Page number (1-indexed)</param>
+    /// <param name="pageSize">Number of items per page (max 100)</param>
+    /// <param name="search">Search term for project name or description</param>
+    /// <param name="organizationId">Filter by organization (0 for personal projects only)</param>
+    /// <param name="sortBy">Sort field: name, updatedAt, format, createdAt (default)</param>
+    /// <param name="sortDesc">Sort descending</param>
+    /// <returns>Paginated list of projects</returns>
+    [HttpGet("paged")]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<ProjectDto>>), 200)]
+    public async Task<ActionResult<ApiResponse<PagedResult<ProjectDto>>>> GetProjectsPaged(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
+        [FromQuery] int? organizationId = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] bool sortDesc = false)
+    {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+        // Validate page size
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var result = await _projectService.GetUserProjectsPagedAsync(
+            userId, page, pageSize, search, organizationId, sortBy, sortDesc);
+
+        return Success(result);
     }
 
     /// <summary>
@@ -246,5 +282,38 @@ public class ProjectsController : ApiControllerBase
             return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
 
         return Success(status);
+    }
+
+    /// <summary>
+    /// Import resource files into a project.
+    /// Used by the web UI to import files after project creation.
+    /// </summary>
+    /// <param name="id">Project ID</param>
+    /// <param name="request">Import request containing files to import</param>
+    /// <returns>Import result</returns>
+    [HttpPost("{id}/import")]
+    [ProducesResponseType(typeof(ApiResponse<PushResponse>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<PushResponse>>> ImportFiles(
+        int id, [FromBody] PushRequest request)
+    {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+        // Verify project exists and user has access
+        var project = await _projectService.GetProjectAsync(id, userId);
+        if (project == null)
+            return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
+
+        // Use the existing push functionality to import files
+        var (success, response, errorMessage) = await _resourceService.PushResourcesAsync(id, userId, request);
+
+        if (!success)
+            return BadRequest("PRJ_IMPORT_FAILED", errorMessage!);
+
+        _logger.LogInformation("User {UserId} imported {FileCount} files into project {ProjectId}",
+            userId, request.ModifiedFiles.Count, id);
+
+        return Success(response!);
     }
 }

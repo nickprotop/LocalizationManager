@@ -1,6 +1,7 @@
 using LrmCloud.Api.Data;
 using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.Constants;
+using LrmCloud.Shared.DTOs;
 using LrmCloud.Shared.DTOs.Projects;
 using LrmCloud.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -205,6 +206,92 @@ public class ProjectService : IProjectService
         }
 
         return dtos.OrderByDescending(p => p.CreatedAt).ToList();
+    }
+
+    public async Task<PagedResult<ProjectDto>> GetUserProjectsPagedAsync(
+        int userId,
+        int page = 1,
+        int pageSize = 20,
+        string? search = null,
+        int? organizationId = null,
+        string? sortBy = null,
+        bool sortDescending = false)
+    {
+        // Get organization IDs the user belongs to
+        var memberOrgIds = await _db.OrganizationMembers
+            .Where(m => m.UserId == userId)
+            .Select(m => m.OrganizationId)
+            .ToListAsync();
+
+        // Base query: personal projects + org projects
+        var query = _db.Projects
+            .Include(p => p.Organization)
+            .Include(p => p.ResourceKeys)
+                .ThenInclude(k => k.Translations)
+            .Where(p =>
+                p.UserId == userId ||
+                (p.OrganizationId != null && memberOrgIds.Contains(p.OrganizationId.Value)));
+
+        // Filter by organization if specified
+        if (organizationId.HasValue)
+        {
+            if (organizationId.Value == 0)
+            {
+                // Personal projects only
+                query = query.Where(p => p.OrganizationId == null);
+            }
+            else
+            {
+                // Specific organization
+                query = query.Where(p => p.OrganizationId == organizationId.Value);
+            }
+        }
+
+        // Search filter
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchLower = search.ToLower();
+            query = query.Where(p =>
+                p.Name.ToLower().Contains(searchLower) ||
+                (p.Description != null && p.Description.ToLower().Contains(searchLower)));
+        }
+
+        // Get total count before pagination
+        var totalCount = await query.CountAsync();
+
+        // Apply sorting
+        query = sortBy?.ToLower() switch
+        {
+            "name" => sortDescending
+                ? query.OrderByDescending(p => p.Name)
+                : query.OrderBy(p => p.Name),
+            "updatedat" => sortDescending
+                ? query.OrderByDescending(p => p.UpdatedAt)
+                : query.OrderBy(p => p.UpdatedAt),
+            "format" => sortDescending
+                ? query.OrderByDescending(p => p.Format)
+                : query.OrderBy(p => p.Format),
+            _ => sortDescending
+                ? query.OrderBy(p => p.CreatedAt)
+                : query.OrderByDescending(p => p.CreatedAt)
+        };
+
+        // Apply pagination
+        var projects = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        // Map to DTOs
+        var items = projects.Select(p => MapToProjectDto(p, userId)).ToList();
+
+        return new PagedResult<ProjectDto>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
     }
 
     public async Task<(bool Success, ProjectDto? Project, string? ErrorMessage)> UpdateProjectAsync(

@@ -1,6 +1,8 @@
 using System.Net.Http.Json;
 using LrmCloud.Shared.Api;
+using LrmCloud.Shared.DTOs;
 using LrmCloud.Shared.DTOs.Projects;
+using LrmCloud.Shared.DTOs.Sync;
 
 namespace LrmCloud.Web.Services;
 
@@ -27,6 +29,45 @@ public class ProjectService
 
         var result = await response.Content.ReadFromJsonAsync<ApiResponse<List<ProjectDto>>>();
         return result?.Data ?? new List<ProjectDto>();
+    }
+
+    /// <summary>
+    /// Gets projects with pagination support
+    /// </summary>
+    public async Task<PagedResult<ProjectDto>> GetProjectsPagedAsync(
+        int page = 1,
+        int pageSize = 20,
+        string? search = null,
+        int? organizationId = null,
+        string? sortBy = null,
+        bool sortDesc = false)
+    {
+        var queryParams = new List<string>
+        {
+            $"page={page}",
+            $"pageSize={pageSize}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(search))
+            queryParams.Add($"search={Uri.EscapeDataString(search)}");
+
+        if (organizationId.HasValue)
+            queryParams.Add($"organizationId={organizationId}");
+
+        if (!string.IsNullOrWhiteSpace(sortBy))
+            queryParams.Add($"sortBy={Uri.EscapeDataString(sortBy)}");
+
+        if (sortDesc)
+            queryParams.Add("sortDesc=true");
+
+        var queryString = string.Join("&", queryParams);
+        var response = await _httpClient.GetAsync($"projects/paged?{queryString}");
+
+        if (!response.IsSuccessStatusCode)
+            return new PagedResult<ProjectDto> { Page = page, PageSize = pageSize };
+
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResult<ProjectDto>>>();
+        return result?.Data ?? new PagedResult<ProjectDto> { Page = page, PageSize = pageSize };
     }
 
     public async Task<ProjectDto?> GetProjectAsync(int id)
@@ -128,6 +169,47 @@ public class ProjectService
         }
     }
 
+    /// <summary>
+    /// Imports resource files into a project
+    /// </summary>
+    public async Task<ServiceResult<ImportResult>> ImportFilesAsync(int projectId, List<FileDto> files)
+    {
+        try
+        {
+            var request = new PushRequest
+            {
+                ModifiedFiles = files,
+                Message = "Initial import from web UI"
+            };
+
+            var response = await _httpClient.PostAsJsonAsync($"projects/{projectId}/import", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<PushResponse>>();
+                if (result?.Data != null)
+                {
+                    // Fetch the updated project to get accurate key count
+                    var project = await GetProjectAsync(projectId);
+
+                    return ServiceResult<ImportResult>.Success(new ImportResult
+                    {
+                        KeyCount = project?.KeyCount ?? 0,
+                        LanguageCount = files.Count, // Number of files imported
+                        ModifiedCount = result.Data.ModifiedCount
+                    });
+                }
+            }
+
+            var error = await ReadErrorMessageAsync(response);
+            return ServiceResult<ImportResult>.Failure(error);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<ImportResult>.Failure($"Failed to import files: {ex.Message}");
+        }
+    }
+
     private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response)
     {
         try
@@ -213,4 +295,14 @@ public class DashboardStats
     // Legacy properties for backward compatibility
     public int CharsUsed => LrmCharsUsed;
     public int CharsLimit => LrmCharsLimit;
+}
+
+/// <summary>
+/// Result of file import operation
+/// </summary>
+public class ImportResult
+{
+    public int KeyCount { get; set; }
+    public int LanguageCount { get; set; }
+    public int ModifiedCount { get; set; }
 }

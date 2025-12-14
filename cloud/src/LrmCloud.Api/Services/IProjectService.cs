@@ -1,3 +1,4 @@
+using LrmCloud.Shared.DTOs;
 using LrmCloud.Shared.DTOs.Projects;
 
 namespace LrmCloud.Api.Services;
@@ -31,6 +32,18 @@ public interface IProjectService
     /// Gets all projects accessible by the user (personal + organization).
     /// </summary>
     Task<List<ProjectDto>> GetUserProjectsAsync(int userId);
+
+    /// <summary>
+    /// Gets projects accessible by the user with pagination.
+    /// </summary>
+    Task<PagedResult<ProjectDto>> GetUserProjectsPagedAsync(
+        int userId,
+        int page = 1,
+        int pageSize = 20,
+        string? search = null,
+        int? organizationId = null,
+        string? sortBy = null,
+        bool sortDescending = false);
 
     /// <summary>
     /// Updates a project (requires appropriate permissions).
