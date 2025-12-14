@@ -1,7 +1,9 @@
 @using LrmCloud.Shared.DTOs.Projects
+@using LrmCloud.Shared.DTOs.Sync
 @using LrmCloud.Web.Services
 @inject ProjectService ProjectService
 @inject ISnackbar Snackbar
+@inject NavigationManager Navigation
 
 <MudDialog @bind-Visible="_visible" Options="_dialogOptions">
     <TitleContent>
@@ -456,17 +458,55 @@
 
             _createdProject = createResult.Data;
 
-            // TODO: Upload and import files
-            // For now, we just create the project. Full file import would require:
-            // 1. Reading file contents via IBrowserFile.OpenReadStream()
-            // 2. Sending to backend import endpoint
-            // 3. Backend parsing and storing resources
+            // Read file contents and create FileDtos
+            var fileDtos = new List<FileDto>();
+            foreach (var file in _uploadedFiles)
+            {
+                try
+                {
+                    // Read file content (max 10MB per file)
+                    await using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                    using var reader = new StreamReader(stream);
+                    var content = await reader.ReadToEndAsync();
 
-            _importedKeyCount = 0; // Would come from import result
+                    fileDtos.Add(new FileDto
+                    {
+                        Path = file.Name,
+                        Content = content
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _parseErrors.Add($"Failed to read {file.Name}: {ex.Message}");
+                }
+            }
+
+            // Import files if we have any
+            if (fileDtos.Count > 0)
+            {
+                var importResult = await ProjectService.ImportFilesAsync(_createdProject.Id, fileDtos);
+                if (!importResult.IsSuccess)
+                {
+                    _parseErrors.Add($"Import warning: {importResult.ErrorMessage}");
+                }
+                else
+                {
+                    _importedKeyCount = importResult.Data?.KeyCount ?? 0;
+                }
+            }
+
+            // Refresh project data to get updated counts
+            var updatedProject = await ProjectService.GetProjectAsync(_createdProject.Id);
+            if (updatedProject != null)
+            {
+                _createdProject = updatedProject;
+                _importedKeyCount = updatedProject.KeyCount;
+            }
+
             _importComplete = true;
 
             await OnProjectImported.InvokeAsync(_createdProject);
-            Snackbar.Add($"Project '{_projectName}' created successfully!", Severity.Success);
+            Snackbar.Add($"Project '{_projectName}' created with {_importedKeyCount} keys!", Severity.Success);
         }
         catch (Exception ex)
         {
@@ -481,7 +521,7 @@
     private void GoToProject(int projectId)
     {
         Close();
-        // Navigation would be handled by parent
+        Navigation.NavigateTo($"projects/{projectId}");
     }
 
     private static string GetFileIcon(string fileName) =>
