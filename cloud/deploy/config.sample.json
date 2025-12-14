@@ -1,0 +1,98 @@
+{
+  "$schema": "./config.schema.json",
+  "server": {
+    "urls": "http://0.0.0.0:8080",
+    "environment": "Production",
+    "baseUrl": "https://your-domain.com"
+  },
+  "database": {
+    "connectionString": "Host=localhost;Port=5432;Database=lrmcloud;Username=lrm;Password=YOUR_DB_PASSWORD",
+    "autoMigrate": true
+  },
+  "redis": {
+    "connectionString": "localhost:6379,password=YOUR_REDIS_PASSWORD"
+  },
+  "storage": {
+    "endpoint": "localhost:9000",
+    "accessKey": "YOUR_MINIO_ACCESS_KEY",
+    "secretKey": "YOUR_MINIO_SECRET_KEY",
+    "bucket": "lrmcloud",
+    "useSSL": false
+  },
+  "encryption": {
+    "tokenKey": "YOUR_BASE64_ENCRYPTION_KEY_32_BYTES"
+  },
+  "apiKeyMasterSecret": "YOUR_API_KEY_MASTER_SECRET_32_PLUS_CHARS",
+  "auth": {
+    "jwtSecret": "YOUR_JWT_SECRET_64_PLUS_CHARS",
+    "jwtExpiryHours": 24
+  },
+  "mail": {
+    "host": "smtp.example.com",
+    "port": 587,
+    "username": "YOUR_SMTP_USERNAME",
+    "password": "YOUR_SMTP_PASSWORD",
+    "fromAddress": "noreply@your-domain.com",
+    "fromName": "LRM Cloud",
+    "useSsl": true
+  },
+  "features": {
+    "registration": true,
+    "githubSync": true,
+    "freeTranslations": true,
+    "teams": true
+  },
+  "limits": {
+    "freeTranslationChars": 5000,
+    "freeOtherChars": 25000,
+    "freeMaxProjects": 3,
+    "freeMaxApiKeys": 3,
+    "teamTranslationChars": 50000,
+    "teamOtherChars": 250000,
+    "teamMaxMembers": 10,
+    "teamMaxApiKeys": 10,
+    "enterpriseTranslationChars": 500000,
+    "enterpriseOtherChars": 2500000,
+    "maxKeysPerProject": 10000
+  },
+  "payment": {
+    "activeProvider": "stripe",
+    "stripe": {
+      "enabled": false,
+      "mode": "test",
+      "test": {
+        "secretKey": "sk_test_YOUR_TEST_SECRET_KEY",
+        "publishableKey": "pk_test_YOUR_TEST_PUBLISHABLE_KEY",
+        "webhookSecret": "whsec_YOUR_TEST_WEBHOOK_SECRET"
+      },
+      "live": {
+        "secretKey": "sk_live_YOUR_LIVE_SECRET_KEY",
+        "publishableKey": "pk_live_YOUR_LIVE_PUBLISHABLE_KEY",
+        "webhookSecret": "whsec_YOUR_LIVE_WEBHOOK_SECRET"
+      },
+      "teamPriceId": "price_YOUR_TEAM_PRICE_ID",
+      "enterprisePriceId": "price_YOUR_ENTERPRISE_PRICE_ID"
+    },
+    "paypal": {
+      "enabled": false,
+      "mode": "sandbox",
+      "sandbox": {
+        "clientId": "YOUR_PAYPAL_SANDBOX_CLIENT_ID",
+        "clientSecret": "YOUR_PAYPAL_SANDBOX_CLIENT_SECRET",
+        "webhookId": "YOUR_PAYPAL_SANDBOX_WEBHOOK_ID"
+      },
+      "live": {
+        "clientId": "YOUR_PAYPAL_LIVE_CLIENT_ID",
+        "clientSecret": "YOUR_PAYPAL_LIVE_CLIENT_SECRET",
+        "webhookId": "YOUR_PAYPAL_LIVE_WEBHOOK_ID"
+      },
+      "teamPlanId": "P-YOUR_PAYPAL_TEAM_PLAN_ID",
+      "enterprisePlanId": "P-YOUR_PAYPAL_ENTERPRISE_PLAN_ID"
+    }
+  },
+  "lrmProvider": {
+    "enabled": true,
+    "enabledBackends": ["mymemory", "lingva"],
+    "selectionStrategy": "priority"
+  }
+}

@@ -49,6 +49,19 @@ public sealed class CloudConfiguration
     /// LRM managed translation provider configuration.
     /// </summary>
     public LrmProviderConfiguration LrmProvider { get; init; } = new();
+
+    /// <summary>
+    /// Payment provider configuration.
+    /// Controls which payment providers are enabled and active.
+    /// </summary>
+    public PaymentConfiguration? Payment { get; init; }
+
+    /// <summary>
+    /// Legacy Stripe configuration property.
+    /// Use Payment.Stripe instead for new code.
+    /// </summary>
+    [Obsolete("Use Payment.Stripe instead")]
+    public StripeConfiguration? Stripe => Payment?.Stripe;
 }
 
 /// <summary>
@@ -403,24 +416,24 @@ public sealed class LimitsConfiguration
 
     /// <summary>
     /// Free tier: LRM translation character limit per month.
-    /// Default: 10,000 characters.
+    /// Default: 5,000 characters.
     /// </summary>
     [Range(0, int.MaxValue)]
-    public int FreeTranslationChars { get; init; } = 10_000;
+    public int FreeTranslationChars { get; init; } = 5_000;
 
     /// <summary>
     /// Free tier: Other providers (BYOK + community) character limit per month.
-    /// Default: 50,000 characters.
+    /// Default: 25,000 characters.
     /// </summary>
     [Range(0, long.MaxValue)]
-    public long FreeOtherChars { get; init; } = 50_000;
+    public long FreeOtherChars { get; init; } = 25_000;
 
     /// <summary>
     /// Free tier: Maximum projects.
-    /// Default: 5 projects.
+    /// Default: 3 projects.
     /// </summary>
     [Range(1, 1000)]
-    public int FreeMaxProjects { get; init; } = 5;
+    public int FreeMaxProjects { get; init; } = 3;
 
     /// <summary>
     /// Free tier: Maximum API keys (BYOK).
@@ -435,24 +448,24 @@ public sealed class LimitsConfiguration
 
     /// <summary>
     /// Team tier: LRM translation character limit per month.
-    /// Default: 100,000 characters.
+    /// Default: 50,000 characters.
     /// </summary>
     [Range(0, int.MaxValue)]
-    public int TeamTranslationChars { get; init; } = 100_000;
+    public int TeamTranslationChars { get; init; } = 50_000;
 
     /// <summary>
     /// Team tier: Other providers (BYOK + community) character limit per month.
-    /// Default: 500,000 characters.
+    /// Default: 250,000 characters.
     /// </summary>
     [Range(0, long.MaxValue)]
-    public long TeamOtherChars { get; init; } = 500_000;
+    public long TeamOtherChars { get; init; } = 250_000;
 
     /// <summary>
     /// Team tier: Maximum team members.
-    /// Default: 20 members.
+    /// Default: 10 members.
     /// </summary>
     [Range(1, 1000)]
-    public int TeamMaxMembers { get; init; } = 20;
+    public int TeamMaxMembers { get; init; } = 10;
 
     /// <summary>
     /// Team tier: Maximum API keys (BYOK).
@@ -467,17 +480,17 @@ public sealed class LimitsConfiguration
 
     /// <summary>
     /// Enterprise tier: LRM translation character limit per month.
-    /// Default: 10M/month.
+    /// Default: 500K/month.
     /// </summary>
     [Range(0, int.MaxValue)]
-    public int EnterpriseTranslationChars { get; init; } = 10_000_000; // 10M/month
+    public int EnterpriseTranslationChars { get; init; } = 500_000; // 500K/month
 
     /// <summary>
     /// Enterprise tier: Other providers character limit per month.
-    /// Default: 50M/month.
+    /// Default: 2.5M/month.
     /// </summary>
     [Range(0, long.MaxValue)]
-    public long EnterpriseOtherChars { get; init; } = 50_000_000; // 50M/month
+    public long EnterpriseOtherChars { get; init; } = 2_500_000; // 2.5M/month
 
     // ==========================================================================
     // General Limits (all tiers)
@@ -586,4 +599,267 @@ public sealed class LrmProviderConfiguration
     /// When disabled, users can only use BYOK.
     /// </summary>
     public bool Enabled { get; init; } = true;
+}
+
+/// <summary>
+/// Stripe billing configuration.
+/// Supports both test and live modes with separate key sets.
+/// </summary>
+public sealed class StripeConfiguration
+{
+    /// <summary>
+    /// Current mode: "test" or "live".
+    /// Determines which key set to use.
+    /// Default: "test" for safety.
+    /// </summary>
+    public string Mode { get; init; } = "test";
+
+    /// <summary>
+    /// Test mode keys (sk_test_*, pk_test_*).
+    /// Used when Mode = "test".
+    /// </summary>
+    public StripeKeySet Test { get; init; } = new();
+
+    /// <summary>
+    /// Live mode keys (sk_live_*, pk_live_*).
+    /// Used when Mode = "live".
+    /// </summary>
+    public StripeKeySet Live { get; init; } = new();
+
+    /// <summary>
+    /// Stripe Price ID for Team plan ($9/month).
+    /// Create in Stripe Dashboard under Products.
+    /// </summary>
+    public string TeamPriceId { get; init; } = "";
+
+    /// <summary>
+    /// Stripe Price ID for Enterprise plan ($29/month).
+    /// Create in Stripe Dashboard under Products.
+    /// </summary>
+    public string EnterprisePriceId { get; init; } = "";
+
+    /// <summary>
+    /// Whether Stripe billing is enabled.
+    /// When false, upgrade buttons are hidden.
+    /// </summary>
+    public bool Enabled { get; init; } = false;
+
+    // ==========================================================================
+    // Helper properties to get active keys based on mode
+    // ==========================================================================
+
+    /// <summary>
+    /// Get the active secret key based on current mode.
+    /// </summary>
+    [JsonIgnore]
+    public string SecretKey => Mode.ToLowerInvariant() == "live" ? Live.SecretKey : Test.SecretKey;
+
+    /// <summary>
+    /// Get the active publishable key based on current mode.
+    /// </summary>
+    [JsonIgnore]
+    public string PublishableKey => Mode.ToLowerInvariant() == "live" ? Live.PublishableKey : Test.PublishableKey;
+
+    /// <summary>
+    /// Get the active webhook secret based on current mode.
+    /// </summary>
+    [JsonIgnore]
+    public string WebhookSecret => Mode.ToLowerInvariant() == "live" ? Live.WebhookSecret : Test.WebhookSecret;
+
+    /// <summary>
+    /// Check if Stripe is properly configured (has required keys).
+    /// </summary>
+    [JsonIgnore]
+    public bool IsConfigured => Enabled && !string.IsNullOrEmpty(SecretKey) && !string.IsNullOrEmpty(TeamPriceId);
+
+    /// <summary>
+    /// Check if currently in live mode.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsLiveMode => Mode.ToLowerInvariant() == "live";
+}
+
+/// <summary>
+/// A set of Stripe API keys for a specific mode (test or live).
+/// </summary>
+public sealed class StripeKeySet
+{
+    /// <summary>
+    /// Stripe secret key (sk_test_* or sk_live_*).
+    /// Used for server-side API calls.
+    /// </summary>
+    public string SecretKey { get; init; } = "";
+
+    /// <summary>
+    /// Stripe publishable key (pk_test_* or pk_live_*).
+    /// Used for client-side (Checkout, Elements).
+    /// </summary>
+    public string PublishableKey { get; init; } = "";
+
+    /// <summary>
+    /// Stripe webhook signing secret (whsec_*).
+    /// Used to verify webhook payloads.
+    /// </summary>
+    public string WebhookSecret { get; init; } = "";
+}
+
+/// <summary>
+/// Payment provider configuration.
+/// Controls which payment providers are enabled and which one is active.
+/// </summary>
+public sealed class PaymentConfiguration
+{
+    /// <summary>
+    /// The active payment provider to use for new subscriptions.
+    /// Options: "stripe", "paypal", "none".
+    /// Default: "stripe".
+    /// </summary>
+    public string ActiveProvider { get; init; } = "stripe";
+
+    /// <summary>
+    /// Stripe configuration.
+    /// Optional - Stripe disabled if not configured.
+    /// </summary>
+    public StripeConfiguration? Stripe { get; init; }
+
+    /// <summary>
+    /// PayPal configuration.
+    /// Optional - PayPal disabled if not configured.
+    /// </summary>
+    public PayPalConfiguration? PayPal { get; init; }
+
+    /// <summary>
+    /// Check if a specific provider is enabled.
+    /// Uses the provider's own Enabled field.
+    /// </summary>
+    public bool IsProviderEnabled(string providerName)
+    {
+        return providerName?.ToLowerInvariant() switch
+        {
+            "stripe" => Stripe?.Enabled == true,
+            "paypal" => PayPal?.Enabled == true,
+            _ => false
+        };
+    }
+
+    /// <summary>
+    /// Check if any payment provider is enabled.
+    /// </summary>
+    [JsonIgnore]
+    public bool HasEnabledProvider => (Stripe?.Enabled == true) || (PayPal?.Enabled == true);
+
+    /// <summary>
+    /// Get the active provider if it's enabled, otherwise null.
+    /// </summary>
+    [JsonIgnore]
+    public string? ActiveEnabledProvider =>
+        IsProviderEnabled(ActiveProvider) ? ActiveProvider : null;
+}
+
+/// <summary>
+/// PayPal billing configuration.
+/// Supports both sandbox and live modes.
+/// </summary>
+public sealed class PayPalConfiguration
+{
+    /// <summary>
+    /// Current mode: "sandbox" or "live".
+    /// Default: "sandbox" for safety.
+    /// </summary>
+    public string Mode { get; init; } = "sandbox";
+
+    /// <summary>
+    /// Sandbox mode credentials.
+    /// Used when Mode = "sandbox".
+    /// </summary>
+    public PayPalKeySet Sandbox { get; init; } = new();
+
+    /// <summary>
+    /// Live mode credentials.
+    /// Used when Mode = "live".
+    /// </summary>
+    public PayPalKeySet Live { get; init; } = new();
+
+    /// <summary>
+    /// PayPal Plan ID for Team plan ($9/month).
+    /// Create in PayPal Dashboard under Subscriptions > Plans.
+    /// </summary>
+    public string TeamPlanId { get; init; } = "";
+
+    /// <summary>
+    /// PayPal Plan ID for Enterprise plan ($29/month).
+    /// Create in PayPal Dashboard under Subscriptions > Plans.
+    /// </summary>
+    public string EnterprisePlanId { get; init; } = "";
+
+    /// <summary>
+    /// Whether PayPal billing is enabled.
+    /// </summary>
+    public bool Enabled { get; init; } = false;
+
+    // ==========================================================================
+    // Helper properties to get active credentials based on mode
+    // ==========================================================================
+
+    /// <summary>
+    /// Get the active client ID based on current mode.
+    /// </summary>
+    [JsonIgnore]
+    public string ClientId => Mode.ToLowerInvariant() == "live" ? Live.ClientId : Sandbox.ClientId;
+
+    /// <summary>
+    /// Get the active client secret based on current mode.
+    /// </summary>
+    [JsonIgnore]
+    public string ClientSecret => Mode.ToLowerInvariant() == "live" ? Live.ClientSecret : Sandbox.ClientSecret;
+
+    /// <summary>
+    /// Get the active webhook ID based on current mode.
+    /// </summary>
+    [JsonIgnore]
+    public string WebhookId => Mode.ToLowerInvariant() == "live" ? Live.WebhookId : Sandbox.WebhookId;
+
+    /// <summary>
+    /// Check if PayPal is properly configured (has required credentials).
+    /// </summary>
+    [JsonIgnore]
+    public bool IsConfigured => Enabled && !string.IsNullOrEmpty(ClientId) && !string.IsNullOrEmpty(ClientSecret);
+
+    /// <summary>
+    /// Check if currently in live mode.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsLiveMode => Mode.ToLowerInvariant() == "live";
+
+    /// <summary>
+    /// Get the PayPal API base URL for the current mode.
+    /// </summary>
+    [JsonIgnore]
+    public string ApiBaseUrl => IsLiveMode
+        ? "https://api-m.paypal.com"
+        : "https://api-m.sandbox.paypal.com";
+}
+
+/// <summary>
+/// A set of PayPal API credentials for a specific mode (sandbox or live).
+/// </summary>
+public sealed class PayPalKeySet
+{
+    /// <summary>
+    /// PayPal Client ID.
+    /// Get from PayPal Developer Dashboard > My Apps.
+    /// </summary>
+    public string ClientId { get; init; } = "";
+
+    /// <summary>
+    /// PayPal Client Secret.
+    /// Get from PayPal Developer Dashboard > My Apps.
+    /// </summary>
+    public string ClientSecret { get; init; } = "";
+
+    /// <summary>
+    /// PayPal Webhook ID for signature verification.
+    /// Get from PayPal Developer Dashboard > Webhooks.
+    /// </summary>
+    public string WebhookId { get; init; } = "";
 }
