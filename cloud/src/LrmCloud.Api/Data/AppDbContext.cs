@@ -38,6 +38,9 @@ public class AppDbContext : DbContext
     // Snapshots
     public DbSet<Snapshot> Snapshots => Set<Snapshot>();
 
+    // Translation Usage History
+    public DbSet<TranslationUsageHistory> TranslationUsageHistory => Set<TranslationUsageHistory>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -264,6 +267,26 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.CreatedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // =====================================================================
+        // Translation Usage History
+        // =====================================================================
+        modelBuilder.Entity<TranslationUsageHistory>(entity =>
+        {
+            // Unique constraint: one record per user+provider+period
+            entity.HasIndex(e => new { e.UserId, e.ProviderName, e.PeriodStart }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.ProviderName);
+            entity.HasIndex(e => e.PeriodStart);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Match parent's soft-delete filter
+            entity.HasQueryFilter(e => e.User!.DeletedAt == null);
         });
     }
 

@@ -287,6 +287,12 @@ public class CloudTranslationService : ICloudTranslationService
                 await TrackOtherUsageAsync(userId, response.CharactersTranslated);
             }
 
+            // Track per-provider usage for analytics
+            if (response.CharactersTranslated > 0)
+            {
+                await TrackProviderUsageAsync(userId, request.Provider ?? "auto", response.CharactersTranslated, response.TranslatedCount);
+            }
+
             response.Success = response.FailedCount == 0;
         }
         catch (Exception ex)
@@ -427,10 +433,24 @@ public class CloudTranslationService : ICloudTranslationService
         };
     }
 
-    public Task<List<ProviderUsageDto>> GetUsageByProviderAsync(int userId)
+    public async Task<List<ProviderUsageDto>> GetUsageByProviderAsync(int userId)
     {
-        // TODO: Implement per-provider usage tracking
-        return Task.FromResult(new List<ProviderUsageDto>());
+        // Get current month period
+        var now = DateTime.UtcNow;
+        var periodStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var usageRecords = await _db.TranslationUsageHistory
+            .Where(h => h.UserId == userId && h.PeriodStart == periodStart)
+            .OrderByDescending(h => h.CharsUsed)
+            .ToListAsync();
+
+        return usageRecords.Select(r => new ProviderUsageDto
+        {
+            ProviderName = r.ProviderName,
+            CharactersUsed = r.CharsUsed,
+            ApiCalls = r.ApiCalls,
+            LastUsedAt = r.LastUsedAt
+        }).ToList();
     }
 
     private async Task<string?> GetBestAvailableProviderAsync(
@@ -498,6 +518,53 @@ public class CloudTranslationService : ICloudTranslationService
         await _db.SaveChangesAsync();
 
         _logger.LogDebug("Other providers usage tracked: {Chars} chars for user {UserId}", charsUsed, userId);
+    }
+
+    private async Task TrackProviderUsageAsync(int userId, string providerName, long charsUsed, int apiCalls)
+    {
+        try
+        {
+            // Get current month period
+            var now = DateTime.UtcNow;
+            var periodStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var periodEnd = periodStart.AddMonths(1).AddTicks(-1);
+
+            // Find or create usage record for this user+provider+period
+            var usage = await _db.TranslationUsageHistory
+                .FirstOrDefaultAsync(h =>
+                    h.UserId == userId &&
+                    h.ProviderName == providerName &&
+                    h.PeriodStart == periodStart);
+
+            if (usage == null)
+            {
+                usage = new Shared.Entities.TranslationUsageHistory
+                {
+                    UserId = userId,
+                    ProviderName = providerName,
+                    PeriodStart = periodStart,
+                    PeriodEnd = periodEnd,
+                    CharsUsed = 0,
+                    ApiCalls = 0
+                };
+                _db.TranslationUsageHistory.Add(usage);
+            }
+
+            usage.CharsUsed += charsUsed;
+            usage.ApiCalls += apiCalls;
+            usage.LastUsedAt = now;
+
+            await _db.SaveChangesAsync();
+
+            _logger.LogDebug(
+                "Provider usage tracked: {Provider} - {Chars} chars, {Calls} calls for user {UserId}",
+                providerName, charsUsed, apiCalls, userId);
+        }
+        catch (Exception ex)
+        {
+            // Don't fail the translation if usage tracking fails
+            _logger.LogWarning(ex, "Failed to track provider usage for {Provider}, user {UserId}", providerName, userId);
+        }
     }
 
     private async Task<(bool allowed, string? reason)> CheckOtherLimitAsync(int userId, long charsToUse)
