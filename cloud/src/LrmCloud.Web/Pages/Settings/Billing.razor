@@ -1,0 +1,569 @@
+@page "/settings/billing"
+@using LrmCloud.Shared.DTOs.Billing
+@using LrmCloud.Shared.DTOs.Usage
+@using LrmCloud.Web.Services
+@using LrmCloud.Web.Helpers
+@inject BillingService BillingService
+@inject UsageService UsageService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@attribute [Authorize]
+
+<PageTitle>Billing - LRM Cloud</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">
+    <MudIcon Icon="@Icons.Material.Filled.CreditCard" Class="mr-2" Style="vertical-align: middle;" />
+    Billing & Subscription
+</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    Manage your subscription, view usage, and upgrade your plan.
+</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudGrid>
+        @* Current Subscription Card *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.CardMembership" Class="mr-2" Style="vertical-align: middle;" />
+                        Current Plan
+                    </MudText>
+                    <MudChip T="string" Size="Size.Medium" Color="@UiHelpers.GetPlanColor(_subscription?.Plan ?? "free")">
+                        @((_subscription?.Plan ?? "Free").ToUpperInvariant())
+                    </MudChip>
+                </div>
+
+                <MudDivider Class="mb-3" />
+
+                @if (_subscription?.BillingEnabled == true)
+                {
+                    <MudList T="string" Dense="true">
+                        <MudListItem>
+                            <div class="d-flex justify-space-between w-100">
+                                <MudText>Status</MudText>
+                                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_subscription.Status)">
+                                    @GetStatusText(_subscription.Status)
+                                </MudChip>
+                            </div>
+                        </MudListItem>
+                        @if (_subscription.CurrentPeriodEnd.HasValue)
+                        {
+                            <MudListItem>
+                                <div class="d-flex justify-space-between w-100">
+                                    <MudText>@(_subscription.CancelAtPeriodEnd ? "Access Until" : "Next Billing")</MudText>
+                                    <MudText Color="Color.Secondary">@_subscription.CurrentPeriodEnd.Value.ToString("MMM d, yyyy")</MudText>
+                                </div>
+                            </MudListItem>
+                        }
+                        @if (_subscription.CancelAtPeriodEnd)
+                        {
+                            <MudListItem>
+                                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                                    Your subscription will cancel at the end of the billing period.
+                                </MudAlert>
+                            </MudListItem>
+                        }
+                    </MudList>
+
+                    <MudStack Row="true" Class="mt-4" Spacing="2">
+                        @if (_subscription.Plan.ToLower() == "free")
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Upgrade"
+                                       OnClick="@(() => ShowUpgradeDialog("team"))">
+                                Upgrade to Team
+                            </MudButton>
+                        }
+                        else if (_subscription.Plan.ToLower() == "team")
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Upgrade"
+                                       OnClick="@(() => ShowUpgradeDialog("enterprise"))">
+                                Upgrade to Enterprise
+                            </MudButton>
+                        }
+
+                        @if (!string.IsNullOrEmpty(_subscription.PaymentSubscriptionId))
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Settings"
+                                       OnClick="@OpenPortal">
+                                Manage Subscription
+                            </MudButton>
+                        }
+                    </MudStack>
+
+                    @if (_subscription.CancelAtPeriodEnd && !string.IsNullOrEmpty(_subscription.PaymentSubscriptionId))
+                    {
+                        <MudButton Variant="Variant.Text" Color="Color.Success" Class="mt-2"
+                                   StartIcon="@Icons.Material.Filled.Refresh"
+                                   OnClick="@ReactivateSubscription">
+                            Reactivate Subscription
+                        </MudButton>
+                    }
+                    else if (!_subscription.CancelAtPeriodEnd && !string.IsNullOrEmpty(_subscription.PaymentSubscriptionId))
+                    {
+                        <MudButton Variant="Variant.Text" Color="Color.Error" Class="mt-2"
+                                   StartIcon="@Icons.Material.Filled.Cancel"
+                                   OnClick="@ShowCancelDialog">
+                            Cancel Subscription
+                        </MudButton>
+                    }
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info" Class="mb-3">
+                        Billing is not yet enabled for this instance.
+                    </MudAlert>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        You're currently on the Free plan. Contact your administrator to enable billing.
+                    </MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        @* Usage Summary Card *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.BarChart" Class="mr-2" Style="vertical-align: middle;" />
+                    This Month's Usage
+                </MudText>
+
+                <MudDivider Class="mb-3" />
+
+                @if (_stats != null)
+                {
+                    <MudStack Spacing="3">
+                        <div>
+                            <div class="d-flex justify-space-between mb-1">
+                                <MudText Typo="Typo.body2">LRM Translation</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    @_stats.TranslationCharsUsed.ToString("N0") / @_stats.TranslationCharsLimit.ToString("N0")
+                                </MudText>
+                            </div>
+                            <MudProgressLinear Value="@_stats.TranslationUsagePercent"
+                                               Color="@UiHelpers.GetUsageColor(_stats.TranslationUsagePercent)"
+                                               Rounded="true" />
+                        </div>
+
+                        <div>
+                            <div class="d-flex justify-space-between mb-1">
+                                <MudText Typo="Typo.body2">BYOK Providers</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    @_stats.OtherCharsUsed.ToString("N0") / @_stats.OtherCharsLimit.ToString("N0")
+                                </MudText>
+                            </div>
+                            <MudProgressLinear Value="@_stats.OtherUsagePercent"
+                                               Color="@UiHelpers.GetUsageColor(_stats.OtherUsagePercent)"
+                                               Rounded="true" />
+                        </div>
+                    </MudStack>
+
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Class="mt-3"
+                               Href="/settings/usage" FullWidth="true">
+                        View Full Usage Dashboard
+                    </MudButton>
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">Unable to load usage statistics.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        @* Plan Comparison *@
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Compare" Class="mr-2" Style="vertical-align: middle;" />
+                    Compare Plans
+                </MudText>
+
+                <MudDivider Class="mb-3" />
+
+                <MudSimpleTable Hover="true" Dense="true">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th class="text-center">
+                                <MudStack AlignItems="AlignItems.Center">
+                                    <MudText>Free</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">$@((_subscription?.PlanLimits?.Free.Price ?? 0).ToString("0"))/mo</MudText>
+                                    @if (_subscription?.Plan?.ToLower() == "free")
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">Current</MudChip>
+                                    }
+                                </MudStack>
+                            </th>
+                            <th class="text-center">
+                                <MudStack AlignItems="AlignItems.Center">
+                                    <MudText>Team</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">$@((_subscription?.PlanLimits?.Team.Price ?? 9).ToString("0"))/mo</MudText>
+                                    @if (_subscription?.Plan?.ToLower() == "team")
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary">Current</MudChip>
+                                    }
+                                </MudStack>
+                            </th>
+                            <th class="text-center">
+                                <MudStack AlignItems="AlignItems.Center">
+                                    <MudText>Enterprise</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">$@((_subscription?.PlanLimits?.Enterprise.Price ?? 29).ToString("0"))/mo</MudText>
+                                    @if (_subscription?.Plan?.ToLower() == "enterprise")
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Tertiary">Current</MudChip>
+                                    }
+                                </MudStack>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>LRM Translation</td>
+                            <td class="text-center">@FormatChars(_subscription?.PlanLimits?.Free.TranslationChars ?? 5000)/mo</td>
+                            <td class="text-center">@FormatChars(_subscription?.PlanLimits?.Team.TranslationChars ?? 50000)/mo</td>
+                            <td class="text-center">@FormatChars(_subscription?.PlanLimits?.Enterprise.TranslationChars ?? 500000)/mo</td>
+                        </tr>
+                        <tr>
+                            <td>BYOK Providers</td>
+                            <td class="text-center">@FormatChars(_subscription?.PlanLimits?.Free.OtherChars ?? 25000)/mo</td>
+                            <td class="text-center">@FormatChars(_subscription?.PlanLimits?.Team.OtherChars ?? 250000)/mo</td>
+                            <td class="text-center">@FormatChars(_subscription?.PlanLimits?.Enterprise.OtherChars ?? 2500000)/mo</td>
+                        </tr>
+                        <tr>
+                            <td>Projects</td>
+                            <td class="text-center">@FormatLimit(_subscription?.PlanLimits?.Free.MaxProjects ?? 3)</td>
+                            <td class="text-center">@FormatLimit(_subscription?.PlanLimits?.Team.MaxProjects ?? int.MaxValue)</td>
+                            <td class="text-center">@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxProjects ?? int.MaxValue)</td>
+                        </tr>
+                        <tr>
+                            <td>Team Members</td>
+                            <td class="text-center">@FormatLimit(_subscription?.PlanLimits?.Free.MaxTeamMembers ?? 0)</td>
+                            <td class="text-center">@FormatLimit(_subscription?.PlanLimits?.Team.MaxTeamMembers ?? 10)</td>
+                            <td class="text-center">@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxTeamMembers ?? int.MaxValue)</td>
+                        </tr>
+                        <tr>
+                            <td>Translation Providers</td>
+                            <td class="text-center">All</td>
+                            <td class="text-center">All</td>
+                            <td class="text-center">All</td>
+                        </tr>
+                        <tr>
+                            <td>API Access</td>
+                            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
+                            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
+                            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
+                        </tr>
+                        <tr>
+                            <td>Priority Support</td>
+                            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Close" Color="Color.Default" Size="Size.Small" /></td>
+                            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
+                            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
+                        </tr>
+                    </tbody>
+                </MudSimpleTable>
+
+                @if (_subscription?.BillingEnabled == true && _subscription.Plan?.ToLower() != "enterprise")
+                {
+                    <MudStack Row="true" Justify="Justify.Center" Class="mt-4" Spacing="2">
+                        @if (_subscription.Plan?.ToLower() == "free")
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       OnClick="@(() => ShowUpgradeDialog("team"))">
+                                Upgrade to Team - $@((_subscription?.PlanLimits?.Team.Price ?? 9).ToString("0"))/mo
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                       OnClick="@(() => ShowUpgradeDialog("enterprise"))">
+                                Upgrade to Enterprise - $@((_subscription?.PlanLimits?.Enterprise.Price ?? 29).ToString("0"))/mo
+                            </MudButton>
+                        }
+                        else if (_subscription.Plan?.ToLower() == "team")
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       OnClick="@(() => ShowUpgradeDialog("enterprise"))">
+                                Upgrade to Enterprise - $@((_subscription?.PlanLimits?.Enterprise.Price ?? 29).ToString("0"))/mo
+                            </MudButton>
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@* Upgrade Dialog *@
+<MudDialog @bind-Visible="_upgradeDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Upgrade" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Upgrade to @(_selectedPlan?.ToUpperInvariant())</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body1" Class="mb-3">
+            You'll be redirected to our secure payment page to complete your subscription.
+        </MudText>
+        <MudAlert Severity="Severity.Info" Class="mb-3">
+            @if (_selectedPlan == "team")
+            {
+                var team = _subscription?.PlanLimits?.Team;
+                <MudText>Team plan: $@((team?.Price ?? 9).ToString("0"))/month with @FormatChars(team?.TranslationChars ?? 50000) LRM translation characters and @FormatLimit(team?.MaxTeamMembers ?? 10) team members.</MudText>
+            }
+            else if (_selectedPlan == "enterprise")
+            {
+                var enterprise = _subscription?.PlanLimits?.Enterprise;
+                <MudText>Enterprise plan: $@((enterprise?.Price ?? 29).ToString("0"))/month with @FormatChars(enterprise?.TranslationChars ?? 500000) LRM translation characters and unlimited team members.</MudText>
+            }
+        </MudAlert>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@CloseUpgradeDialog">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="@StartCheckout" Disabled="@_isProcessing">
+            @if (_isProcessing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Proceed to Payment
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Cancel Dialog *@
+<MudDialog @bind-Visible="_cancelDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" />
+            <MudText Typo="Typo.h6">Cancel Subscription?</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Warning" Class="mb-3">
+            Your subscription will remain active until the end of your current billing period.
+        </MudAlert>
+        <MudText Typo="Typo.body1">
+            After cancellation, you'll be downgraded to the Free plan with reduced limits.
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@CloseCancelDialog">Keep Subscription</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error"
+                   OnClick="@CancelSubscription" Disabled="@_isProcessing">
+            @if (_isProcessing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Cancel Subscription
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private SubscriptionDto? _subscription;
+    private UsageStatsDto? _stats;
+    private bool _isLoading = true;
+    private bool _isProcessing;
+    private bool _upgradeDialogVisible;
+    private bool _cancelDialogVisible;
+    private string? _selectedPlan;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var subscriptionTask = BillingService.GetSubscriptionAsync();
+            var statsTask = UsageService.GetStatsAsync();
+
+            await Task.WhenAll(subscriptionTask, statsTask);
+
+            _subscription = await subscriptionTask;
+            _stats = await statsTask;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load billing data: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ShowUpgradeDialog(string plan)
+    {
+        _selectedPlan = plan;
+        _upgradeDialogVisible = true;
+    }
+
+    private void CloseUpgradeDialog()
+    {
+        _upgradeDialogVisible = false;
+        _selectedPlan = null;
+    }
+
+    private void ShowCancelDialog()
+    {
+        _cancelDialogVisible = true;
+    }
+
+    private void CloseCancelDialog()
+    {
+        _cancelDialogVisible = false;
+    }
+
+    private async Task StartCheckout()
+    {
+        if (string.IsNullOrEmpty(_selectedPlan)) return;
+
+        _isProcessing = true;
+        try
+        {
+            var baseUrl = Navigation.BaseUri.TrimEnd('/');
+            var result = await BillingService.CreateCheckoutAsync(
+                _selectedPlan,
+                $"{baseUrl}/settings/billing?success=true",
+                $"{baseUrl}/settings/billing?canceled=true"
+            );
+
+            if (result?.SessionUrl != null)
+            {
+                await JS.InvokeVoidAsync("open", result.SessionUrl, "_self");
+            }
+            else
+            {
+                Snackbar.Add("Failed to create checkout session", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+            CloseUpgradeDialog();
+        }
+    }
+
+    private async Task OpenPortal()
+    {
+        _isProcessing = true;
+        try
+        {
+            var baseUrl = Navigation.BaseUri.TrimEnd('/');
+            var result = await BillingService.CreatePortalAsync($"{baseUrl}/settings/billing");
+
+            if (result?.PortalUrl != null)
+            {
+                await JS.InvokeVoidAsync("open", result.PortalUrl, "_self");
+            }
+            else
+            {
+                Snackbar.Add("Failed to open billing portal", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task CancelSubscription()
+    {
+        _isProcessing = true;
+        try
+        {
+            var success = await BillingService.CancelSubscriptionAsync();
+            if (success)
+            {
+                Snackbar.Add("Subscription will be canceled at the end of your billing period", Severity.Success);
+                await LoadDataAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to cancel subscription", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+            CloseCancelDialog();
+        }
+    }
+
+    private async Task ReactivateSubscription()
+    {
+        _isProcessing = true;
+        try
+        {
+            var success = await BillingService.ReactivateSubscriptionAsync();
+            if (success)
+            {
+                Snackbar.Add("Subscription reactivated successfully", Severity.Success);
+                await LoadDataAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to reactivate subscription", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private static Color GetStatusColor(string? status) => status?.ToLower() switch
+    {
+        "active" => Color.Success,
+        "past_due" => Color.Warning,
+        "canceled" => Color.Error,
+        "incomplete" => Color.Warning,
+        _ => Color.Default
+    };
+
+    private static string GetStatusText(string? status) => status?.ToLower() switch
+    {
+        "active" => "Active",
+        "past_due" => "Past Due",
+        "canceled" => "Canceled",
+        "incomplete" => "Incomplete",
+        "none" => "No Subscription",
+        _ => status ?? "Unknown"
+    };
+
+    private static string FormatChars(long chars) => chars.ToString("N0");
+
+    private static string FormatLimit(int limit) => limit switch
+    {
+        0 => "-",
+        int.MaxValue => "Unlimited",
+        _ => limit.ToString("N0")
+    };
+}
