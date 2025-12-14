@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using LrmCloud.Shared.DTOs.Translation
 @using LrmCloud.Web.Services
+@using LrmCloud.Web.Helpers
 @inject TranslationService TranslationService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -210,7 +211,7 @@
                         @if (_usage.CharacterLimit.HasValue)
                         {
                             <MudProgressLinear Value="@_usage.UsagePercentage"
-                                               Color="@GetUsageColor(_usage.UsagePercentage)"
+                                               Color="@UiHelpers.GetUsageColor(_usage.UsagePercentage)"
                                                Rounded="true"
                                                Size="Size.Medium" />
                             <MudText Typo="Typo.caption" Color="Color.Secondary">
@@ -245,7 +246,7 @@
                         @if (_usage.OtherCharacterLimit.HasValue)
                         {
                             <MudProgressLinear Value="@_usage.OtherUsagePercentage"
-                                               Color="@GetUsageColor(_usage.OtherUsagePercentage)"
+                                               Color="@UiHelpers.GetUsageColor(_usage.OtherUsagePercentage)"
                                                Rounded="true"
                                                Size="Size.Medium" />
                         }
@@ -374,11 +375,4 @@
             }
         }
     }
-
-    private static Color GetUsageColor(double percentage) => percentage switch
-    {
-        >= 90 => Color.Error,
-        >= 70 => Color.Warning,
-        _ => Color.Primary
-    };
 }
