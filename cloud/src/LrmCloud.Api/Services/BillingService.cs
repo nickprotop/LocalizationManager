@@ -279,7 +279,9 @@ public class BillingService : IBillingService
         }
 
         var provider = GetProviderForUser(user);
-        return await provider.GetInvoicesAsync(user.PaymentCustomerId, limit);
+        // PayPal uses subscription ID for invoices/transactions, Stripe uses customer ID
+        var identifier = GetProviderIdentifier(user, provider);
+        return await provider.GetInvoicesAsync(identifier, limit);
     }
 
     /// <inheritdoc />
@@ -295,7 +297,9 @@ public class BillingService : IBillingService
         }
 
         var provider = GetProviderForUser(user);
-        return await provider.GetPaymentMethodAsync(user.PaymentCustomerId);
+        // PayPal uses subscription ID for payment method lookup, Stripe uses customer ID
+        var identifier = GetProviderIdentifier(user, provider);
+        return await provider.GetPaymentMethodAsync(identifier);
     }
 
     /// <inheritdoc />
@@ -451,6 +455,23 @@ public class BillingService : IBillingService
 
         // Otherwise use the active provider
         return _providerFactory.GetActiveProvider();
+    }
+
+    /// <summary>
+    /// Gets the appropriate identifier for provider-specific operations.
+    /// Stripe uses customer ID for invoice/payment lookups.
+    /// PayPal uses subscription ID since it doesn't have a separate customer concept.
+    /// </summary>
+    private static string GetProviderIdentifier(User user, IPaymentProvider provider)
+    {
+        // PayPal needs subscription ID for invoices and payment method lookups
+        if (provider.ProviderName == "paypal" && !string.IsNullOrEmpty(user.PaymentSubscriptionId))
+        {
+            return user.PaymentSubscriptionId;
+        }
+
+        // Stripe and others use customer ID
+        return user.PaymentCustomerId ?? "";
     }
 
     private static string MapSubscriptionStatus(SubscriptionStatus? status)
