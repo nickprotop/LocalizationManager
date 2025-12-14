@@ -915,16 +915,24 @@ public class ResourceService : IResourceService
                 return (false, null, "Project not found");
             }
 
+            // Ensure ConfigJson is not empty - generate default if needed
+            var configJson = project.ConfigJson;
+            if (string.IsNullOrWhiteSpace(configJson))
+            {
+                configJson = ProjectService.GenerateDefaultConfig(project.Format, project.DefaultLanguage);
+                _logger.LogInformation("Generated default config for project {ProjectId} on pull", projectId);
+            }
+
             // Generate files from database using Core's backends
             var files = await _syncService.GenerateFilesFromDatabaseAsync(
-                projectId, project.ConfigJson, project.Format, project.DefaultLanguage);
+                projectId, configJson, project.Format, project.DefaultLanguage);
 
             _logger.LogInformation("User {UserId} pulled {Count} files from project {ProjectId}",
                 userId, files.Count, projectId);
 
             return (true, new PullResponse
             {
-                Configuration = project.ConfigJson,
+                Configuration = configJson,
                 Files = files
             }, null);
         }

@@ -756,7 +756,7 @@ public class ProjectService : IProjectService
     /// <summary>
     /// Generates a default lrm.json configuration based on project format.
     /// </summary>
-    private static string GenerateDefaultConfig(string format, string defaultLanguage)
+    internal static string GenerateDefaultConfig(string format, string defaultLanguage)
     {
         var config = new Dictionary<string, object?>
         {
@@ -764,12 +764,20 @@ public class ProjectService : IProjectService
             ["ResourceFormat"] = format == "i18next" ? "json" : format
         };
 
-        // Add JSON-specific configuration for json and i18next formats
+        // Add format-specific configuration
         if (format == "json" || format == "i18next")
         {
             config["Json"] = new Dictionary<string, object>
             {
                 ["I18nextCompatible"] = format == "i18next"
+            };
+        }
+        else if (format == "resx")
+        {
+            // RESX: Use SharedResource as default per ASP.NET Core convention
+            config["Resx"] = new Dictionary<string, object>
+            {
+                ["BaseName"] = "SharedResource"
             };
         }
 
