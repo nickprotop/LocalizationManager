@@ -207,4 +207,21 @@ public class SnapshotsController : ApiControllerBase
 
         return NoContent();
     }
+
+    /// <summary>
+    /// Checks if there are unsnapshot-ed changes since the last snapshot.
+    /// </summary>
+    [HttpGet("unsnapshoted-changes")]
+    [ProducesResponseType(typeof(ApiResponse<UnsnapshotedChangesDto>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    public async Task<ActionResult<ApiResponse<UnsnapshotedChangesDto>>> CheckUnsnapshotedChanges(int projectId)
+    {
+        var userId = GetUserId();
+
+        if (!await _projectService.CanViewProjectAsync(projectId, userId))
+            return Forbidden("PRJ_ACCESS_DENIED", "You don't have access to this project");
+
+        var result = await _snapshotService.CheckUnsnapshotedChangesAsync(projectId);
+        return Success(result);
+    }
 }

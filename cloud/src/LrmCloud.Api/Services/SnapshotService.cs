@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using LrmCloud.Api.Data;
 using LrmCloud.Shared.DTOs;
 using LrmCloud.Shared.DTOs.Snapshots;
@@ -35,6 +37,7 @@ public class SnapshotService
 
     /// <summary>
     /// Creates a new snapshot of the current project state.
+    /// Includes both file storage and database state.
     /// </summary>
     public async Task<Snapshot> CreateSnapshotAsync(
         int projectId,
@@ -45,16 +48,15 @@ public class SnapshotService
         var snapshotId = GenerateSnapshotId();
         var storagePath = $"snapshots/{snapshotId}/";
 
-        // Create snapshot in MinIO storage
+        // Create snapshot in MinIO storage (files)
         await _storageService.CreateSnapshotAsync(projectId, snapshotId);
 
         // Get file count from storage
         var files = await _storageService.ListSnapshotFilesAsync(projectId, snapshotId);
 
-        // Get counts from database
-        var keyCount = await _db.ResourceKeys.CountAsync(k => k.ProjectId == projectId);
-        var translationCount = await _db.Translations
-            .CountAsync(t => t.ResourceKey != null && t.ResourceKey.ProjectId == projectId);
+        // Get database state and save as JSON in snapshot
+        var dbState = await CreateDbStateAsync(projectId, snapshotId);
+        await SaveDbStateToSnapshotAsync(projectId, snapshotId, dbState);
 
         // Create snapshot record
         var snapshot = new Snapshot
@@ -65,8 +67,8 @@ public class SnapshotService
             Description = description,
             StoragePath = storagePath,
             FileCount = files.Count,
-            KeyCount = keyCount,
-            TranslationCount = translationCount,
+            KeyCount = dbState.Keys.Count,
+            TranslationCount = dbState.Keys.Sum(k => k.Translations.Count),
             SnapshotType = snapshotType,
             CreatedAt = DateTime.UtcNow
         };
@@ -81,10 +83,74 @@ public class SnapshotService
             await ApplyRetentionPolicyAsync(projectId, project.SnapshotRetentionDays, project.MaxSnapshots);
         }
 
-        _logger.LogInformation("Created snapshot {SnapshotId} for project {ProjectId} by user {UserId}",
-            snapshotId, projectId, userId);
+        _logger.LogInformation("Created snapshot {SnapshotId} for project {ProjectId} with {Keys} keys by user {UserId}",
+            snapshotId, projectId, dbState.Keys.Count, userId);
 
         return snapshot;
+    }
+
+    /// <summary>
+    /// Creates a database state object for the current project state.
+    /// </summary>
+    private async Task<SnapshotDbState> CreateDbStateAsync(int projectId, string snapshotId)
+    {
+        var keys = await _db.ResourceKeys
+            .Where(k => k.ProjectId == projectId)
+            .Include(k => k.Translations)
+            .OrderBy(k => k.KeyName)
+            .ToListAsync();
+
+        return new SnapshotDbState
+        {
+            Version = 1,
+            ProjectId = projectId,
+            SnapshotId = snapshotId,
+            CreatedAt = DateTime.UtcNow,
+            Keys = keys.Select(k => new SnapshotKeyState
+            {
+                KeyName = k.KeyName,
+                KeyPath = k.KeyPath,
+                IsPlural = k.IsPlural,
+                Comment = k.Comment,
+                Translations = k.Translations.Select(t => new SnapshotTranslationState
+                {
+                    LanguageCode = t.LanguageCode,
+                    Value = t.Value,
+                    Comment = t.Comment,
+                    PluralForm = t.PluralForm,
+                    Status = t.Status,
+                    TranslatedBy = t.TranslatedBy
+                }).ToList()
+            }).ToList()
+        };
+    }
+
+    /// <summary>
+    /// Saves database state as JSON to the snapshot in storage.
+    /// </summary>
+    private async Task SaveDbStateToSnapshotAsync(int projectId, string snapshotId, SnapshotDbState dbState)
+    {
+        var json = JsonSerializer.Serialize(dbState, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+        var bytes = Encoding.UTF8.GetBytes(json);
+        using var stream = new MemoryStream(bytes);
+        await _storageService.UploadFileAsync(projectId, $"snapshots/{snapshotId}/dbstate.json", stream, "application/json");
+    }
+
+    /// <summary>
+    /// Loads database state from a snapshot.
+    /// </summary>
+    private async Task<SnapshotDbState?> LoadDbStateFromSnapshotAsync(int projectId, string snapshotId)
+    {
+        var stream = await _storageService.DownloadSnapshotFileAsync(projectId, snapshotId, "dbstate.json");
+        if (stream == null)
+            return null;
+
+        using var reader = new StreamReader(stream);
+        var json = await reader.ReadToEndAsync();
+        return JsonSerializer.Deserialize<SnapshotDbState>(json);
     }
 
     /// <summary>
@@ -173,6 +239,7 @@ public class SnapshotService
 
     /// <summary>
     /// Restores a project from a snapshot.
+    /// Restores both files and database state.
     /// </summary>
     public async Task<Snapshot?> RestoreSnapshotAsync(
         int projectId,
@@ -190,16 +257,25 @@ public class SnapshotService
         // Create backup before restore if requested
         if (createBackup)
         {
-            await CreateSnapshotAsync(projectId, userId, "restore",
+            await CreateSnapshotAsync(projectId, userId, "pre-restore",
                 $"Backup before restore to {snapshotId}");
         }
 
         // Restore files from snapshot
         await _storageService.RestoreFromSnapshotAsync(projectId, snapshotId);
 
-        // TODO: Also restore database state from snapshot
-        // This would require storing database state in the snapshot as well
-        // For now, we only restore files
+        // Restore database state from snapshot
+        var dbState = await LoadDbStateFromSnapshotAsync(projectId, snapshotId);
+        if (dbState != null)
+        {
+            await RestoreDbStateAsync(projectId, dbState);
+            _logger.LogInformation("Restored database state with {Keys} keys from snapshot {SnapshotId}",
+                dbState.Keys.Count, snapshotId);
+        }
+        else
+        {
+            _logger.LogWarning("No database state found in snapshot {SnapshotId} - only files were restored", snapshotId);
+        }
 
         _logger.LogInformation("Restored snapshot {SnapshotId} for project {ProjectId} by user {UserId}",
             snapshotId, projectId, userId);
@@ -209,6 +285,78 @@ public class SnapshotService
             message ?? $"Restored from snapshot {snapshotId}");
 
         return restoreSnapshot;
+    }
+
+    /// <summary>
+    /// Restores database state from a snapshot.
+    /// Replaces all keys and translations with the state from the snapshot.
+    /// </summary>
+    private async Task RestoreDbStateAsync(int projectId, SnapshotDbState dbState)
+    {
+        // Use a transaction to ensure consistency
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+
+        try
+        {
+            // Delete existing translations for this project
+            var existingTranslations = await _db.Translations
+                .Where(t => t.ResourceKey != null && t.ResourceKey.ProjectId == projectId)
+                .ToListAsync();
+            _db.Translations.RemoveRange(existingTranslations);
+            await _db.SaveChangesAsync();
+
+            // Delete existing keys for this project
+            var existingKeys = await _db.ResourceKeys
+                .Where(k => k.ProjectId == projectId)
+                .ToListAsync();
+            _db.ResourceKeys.RemoveRange(existingKeys);
+            await _db.SaveChangesAsync();
+
+            // Restore keys and translations from snapshot
+            foreach (var keyState in dbState.Keys)
+            {
+                var key = new ResourceKey
+                {
+                    ProjectId = projectId,
+                    KeyName = keyState.KeyName,
+                    KeyPath = keyState.KeyPath,
+                    IsPlural = keyState.IsPlural,
+                    Comment = keyState.Comment,
+                    Version = 1,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                _db.ResourceKeys.Add(key);
+                await _db.SaveChangesAsync();
+
+                // Add translations for this key
+                foreach (var translationState in keyState.Translations)
+                {
+                    var translation = new LrmCloud.Shared.Entities.Translation
+                    {
+                        ResourceKeyId = key.Id,
+                        LanguageCode = translationState.LanguageCode,
+                        Value = translationState.Value,
+                        Comment = translationState.Comment,
+                        PluralForm = translationState.PluralForm,
+                        Status = translationState.Status,
+                        TranslatedBy = translationState.TranslatedBy,
+                        Version = 1,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    _db.Translations.Add(translation);
+                }
+            }
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     /// <summary>
@@ -354,6 +502,43 @@ public class SnapshotService
                     excessSnapshots.Count, projectId, maxSnapshots.Value);
             }
         }
+    }
+
+    /// <summary>
+    /// Checks if there are changes since the last snapshot.
+    /// </summary>
+    public async Task<UnsnapshotedChangesDto> CheckUnsnapshotedChangesAsync(int projectId)
+    {
+        // Get the latest snapshot date for this project
+        var latestSnapshotDate = await _db.Set<Snapshot>()
+            .Where(s => s.ProjectId == projectId)
+            .MaxAsync(s => (DateTime?)s.CreatedAt);
+
+        // Get the latest translation update date
+        var latestTranslationDate = await _db.Translations
+            .Where(t => t.ResourceKey != null && t.ResourceKey.ProjectId == projectId)
+            .MaxAsync(t => (DateTime?)t.UpdatedAt);
+
+        // Get the latest resource key update date
+        var latestKeyDate = await _db.ResourceKeys
+            .Where(k => k.ProjectId == projectId)
+            .MaxAsync(k => (DateTime?)k.UpdatedAt);
+
+        // Use the most recent change date
+        var latestChangeDate = new[] { latestTranslationDate, latestKeyDate }
+            .Where(d => d.HasValue)
+            .DefaultIfEmpty(null)
+            .Max();
+
+        var hasChanges = latestChangeDate.HasValue &&
+            (!latestSnapshotDate.HasValue || latestChangeDate > latestSnapshotDate);
+
+        return new UnsnapshotedChangesDto
+        {
+            HasUnsnapshotedChanges = hasChanges,
+            LastSnapshotAt = latestSnapshotDate,
+            LastChangeAt = latestChangeDate
+        };
     }
 
     /// <summary>

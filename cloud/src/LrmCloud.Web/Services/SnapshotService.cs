@@ -119,6 +119,23 @@ public class SnapshotService
         }
     }
 
+    public async Task<UnsnapshotedChangesDto?> CheckUnsnapshotedChangesAsync(int projectId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"projects/{projectId}/snapshots/unsnapshoted-changes");
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<UnsnapshotedChangesDto>>();
+            return result?.Data;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response)
     {
         try
