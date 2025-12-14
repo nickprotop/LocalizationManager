@@ -36,9 +36,19 @@ public class Organization
     [Column("plan")]
     public string Plan { get; set; } = "team";
 
+    /// <summary>
+    /// Payment provider customer ID.
+    /// </summary>
     [MaxLength(255)]
-    [Column("stripe_customer_id")]
-    public string? StripeCustomerId { get; set; }
+    [Column("payment_customer_id")]
+    public string? PaymentCustomerId { get; set; }
+
+    /// <summary>
+    /// Active payment provider: "stripe", "paypal", etc.
+    /// </summary>
+    [MaxLength(50)]
+    [Column("payment_provider")]
+    public string? PaymentProvider { get; set; }
 
     [Column("translation_chars_used")]
     public int TranslationCharsUsed { get; set; }

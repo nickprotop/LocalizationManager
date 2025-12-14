@@ -19,7 +19,8 @@ public class UserProfileDto
 
     // Subscription
     public string Plan { get; set; } = "free";
-    public string? StripeCustomerId { get; set; }
+    public string? PaymentCustomerId { get; set; }
+    public string? PaymentProvider { get; set; }
 
     // LRM Translation Usage & Limits (counts against plan)
     public int TranslationCharsUsed { get; set; }

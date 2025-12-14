@@ -58,9 +58,45 @@ public class User
     [Column("plan")]
     public string Plan { get; set; } = "free";
 
+    /// <summary>
+    /// Payment provider customer ID (e.g., Stripe cus_xxx, PayPal payer ID).
+    /// </summary>
     [MaxLength(255)]
-    [Column("stripe_customer_id")]
-    public string? StripeCustomerId { get; set; }
+    [Column("payment_customer_id")]
+    public string? PaymentCustomerId { get; set; }
+
+    /// <summary>
+    /// Payment provider subscription ID.
+    /// </summary>
+    [MaxLength(255)]
+    [Column("payment_subscription_id")]
+    public string? PaymentSubscriptionId { get; set; }
+
+    /// <summary>
+    /// Active payment provider: "stripe", "paypal", etc.
+    /// </summary>
+    [MaxLength(50)]
+    [Column("payment_provider")]
+    public string? PaymentProvider { get; set; }
+
+    /// <summary>
+    /// Subscription status: "none", "active", "past_due", "canceled", "incomplete".
+    /// </summary>
+    [MaxLength(50)]
+    [Column("subscription_status")]
+    public string SubscriptionStatus { get; set; } = "none";
+
+    /// <summary>
+    /// End of current billing period.
+    /// </summary>
+    [Column("subscription_current_period_end")]
+    public DateTime? SubscriptionCurrentPeriodEnd { get; set; }
+
+    /// <summary>
+    /// Whether subscription will cancel at period end.
+    /// </summary>
+    [Column("cancel_at_period_end")]
+    public bool CancelAtPeriodEnd { get; set; }
 
     [Column("translation_chars_used")]
     public int TranslationCharsUsed { get; set; }
