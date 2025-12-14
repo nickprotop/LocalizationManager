@@ -6,6 +6,8 @@ using LrmCloud.Api.BackgroundJobs;
 using LrmCloud.Api.Data;
 using LrmCloud.Api.Middleware;
 using LrmCloud.Api.Services;
+using LrmCloud.Api.Services.Billing;
+using LrmCloud.Api.Services.Billing.Providers;
 using LrmCloud.Api.Services.Translation;
 using LrmCloud.Shared.Configuration;
 using Microsoft.EntityFrameworkCore;
@@ -128,6 +130,15 @@ public class Program
 
             // Usage Statistics Service
             builder.Services.AddScoped<IUsageService, UsageService>();
+
+            // Payment Provider Factory & Providers
+            builder.Services.AddSingleton<PaymentProviderFactory>();
+            builder.Services.AddSingleton<StripePaymentProvider>();
+            builder.Services.AddSingleton<PayPalPaymentProvider>();
+            builder.Services.AddHttpClient("PayPal"); // Required for PayPal REST API
+
+            // Billing Service
+            builder.Services.AddScoped<IBillingService, BillingService>();
 
             // Authorization Service
             builder.Services.AddScoped<ILrmAuthorizationService, LrmAuthorizationService>();
@@ -437,6 +448,16 @@ public class Program
 
             // Map controllers (when added)
             app.MapControllers();
+
+            // =============================================================================
+            // Register Payment Providers
+            // =============================================================================
+
+            var providerFactory = app.Services.GetRequiredService<PaymentProviderFactory>();
+            var stripeProvider = app.Services.GetRequiredService<StripePaymentProvider>();
+            var paypalProvider = app.Services.GetRequiredService<PayPalPaymentProvider>();
+            providerFactory.RegisterProvider(stripeProvider);
+            providerFactory.RegisterProvider(paypalProvider);
 
             // =============================================================================
             // Run
