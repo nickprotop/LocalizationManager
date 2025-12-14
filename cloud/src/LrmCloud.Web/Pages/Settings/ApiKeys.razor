@@ -1,7 +1,9 @@
 @page "/settings/api-keys"
 @using LrmCloud.Shared.DTOs.Auth
+@using LrmCloud.Shared.DTOs.Projects
 @using LrmCloud.Web.Services
 @inject CliApiKeyService ApiKeyService
+@inject ProjectService ProjectService
 @inject LimitsService LimitsService
 @inject ISnackbar Snackbar
 @attribute [Authorize]
@@ -24,7 +26,7 @@
             </MudTooltip>
         </div>
 
-        @if (_loading)
+        @if (_isLoading)
         {
             <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
         }
@@ -141,7 +143,10 @@
             <MudSelect @bind-Value="_newKeyProjectId" Label="Project (Optional)"
                        HelperText="Limit key to a specific project" Class="mb-3" Clearable="true">
                 <MudSelectItem T="int?" Value="@((int?)null)">All Projects</MudSelectItem>
-                @* TODO: Load projects when available *@
+                @foreach (var project in _projects)
+                {
+                    <MudSelectItem T="int?" Value="@project.Id">@project.Name</MudSelectItem>
+                }
             </MudSelect>
 
             <MudSelect @bind-Value="_newKeyExpiresInDays" Label="Expiration" Class="mb-3">
@@ -218,7 +223,8 @@
 
 @code {
     private List<CliApiKeyDto> _keys = new();
-    private bool _loading = true;
+    private List<ProjectDto> _projects = new();
+    private bool _isLoading = true;
     private bool _canCreateKey = true;
     private string? _limitMessage;
 
@@ -242,7 +248,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(LoadKeys(), CheckLimitsAsync());
+        await Task.WhenAll(LoadKeys(), LoadProjects(), CheckLimitsAsync());
     }
 
     private async Task CheckLimitsAsync()
@@ -254,14 +260,27 @@
 
     private async Task LoadKeys()
     {
-        _loading = true;
+        _isLoading = true;
         try
         {
             _keys = await ApiKeyService.GetKeysAsync();
         }
         finally
         {
-            _loading = false;
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadProjects()
+    {
+        try
+        {
+            _projects = await ProjectService.GetProjectsAsync();
+        }
+        catch
+        {
+            // Projects are optional for API key creation
+            _projects = new List<ProjectDto>();
         }
     }
 

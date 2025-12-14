@@ -1,6 +1,7 @@
 @page "/settings/usage"
 @using LrmCloud.Shared.DTOs.Usage
 @using LrmCloud.Web.Services
+@using LrmCloud.Web.Helpers
 @inject UsageService UsageService
 @attribute [Authorize]
 
@@ -14,7 +15,7 @@
         Track your translation usage, resource limits, and account activity.
     </MudText>
 
-    @if (_loading)
+    @if (_isLoading)
     {
         <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
     }
@@ -33,7 +34,7 @@
                             <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Warning" Class="mr-2" Style="vertical-align: middle;" />
                             LRM Translation
                         </MudText>
-                        <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(_stats.Plan)">@_stats.Plan.ToUpper()</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetPlanColor(_stats.Plan)">@_stats.Plan.ToUpper()</MudChip>
                     </div>
 
                     <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
@@ -41,7 +42,7 @@
                     </MudText>
 
                     <div class="mb-2">
-                        <MudProgressLinear Value="@_stats.TranslationUsagePercent" Color="@GetUsageColor(_stats.TranslationUsagePercent)"
+                        <MudProgressLinear Value="@_stats.TranslationUsagePercent" Color="@UiHelpers.GetUsageColor(_stats.TranslationUsagePercent)"
                                           Size="Size.Large" Rounded="true" />
                     </div>
 
@@ -49,7 +50,7 @@
                         <MudText Typo="Typo.body2">
                             <strong>@_stats.TranslationCharsUsed.ToString("N0")</strong> / @_stats.TranslationCharsLimit.ToString("N0") characters
                         </MudText>
-                        <MudText Typo="Typo.body2" Color="@GetUsageTextColor(_stats.TranslationUsagePercent)">
+                        <MudText Typo="Typo.body2" Color="@UiHelpers.GetUsageColor(_stats.TranslationUsagePercent)">
                             @_stats.TranslationUsagePercent%
                         </MudText>
                     </div>
@@ -72,7 +73,7 @@
                             <MudIcon Icon="@Icons.Material.Filled.CloudQueue" Color="Color.Secondary" Class="mr-2" Style="vertical-align: middle;" />
                             Other Providers
                         </MudText>
-                        <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(_stats.Plan)">@_stats.Plan.ToUpper()</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetPlanColor(_stats.Plan)">@_stats.Plan.ToUpper()</MudChip>
                     </div>
 
                     <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
@@ -80,7 +81,7 @@
                     </MudText>
 
                     <div class="mb-2">
-                        <MudProgressLinear Value="@_stats.OtherUsagePercent" Color="@GetUsageColor(_stats.OtherUsagePercent)"
+                        <MudProgressLinear Value="@_stats.OtherUsagePercent" Color="@UiHelpers.GetUsageColor(_stats.OtherUsagePercent)"
                                           Size="Size.Large" Rounded="true" />
                     </div>
 
@@ -88,7 +89,7 @@
                         <MudText Typo="Typo.body2">
                             <strong>@_stats.OtherCharsUsed.ToString("N0")</strong> / @_stats.OtherCharsLimit.ToString("N0") characters
                         </MudText>
-                        <MudText Typo="Typo.body2" Color="@GetUsageTextColor(_stats.OtherUsagePercent)">
+                        <MudText Typo="Typo.body2" Color="@UiHelpers.GetUsageColor(_stats.OtherUsagePercent)">
                             @_stats.OtherUsagePercent%
                         </MudText>
                     </div>
@@ -115,7 +116,7 @@
                         <MudListItem>
                             <div class="d-flex justify-space-between w-100">
                                 <MudText>Plan</MudText>
-                                <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(_stats.Plan)">@_stats.Plan.ToUpper()</MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetPlanColor(_stats.Plan)">@_stats.Plan.ToUpper()</MudChip>
                             </div>
                         </MudListItem>
                         <MudListItem>
@@ -202,7 +203,7 @@
 
 @code {
     private UsageStatsDto? _stats;
-    private bool _loading = true;
+    private bool _isLoading = true;
     private List<PlanLimitInfo> _planLimits = new();
 
     protected override async Task OnInitializedAsync()
@@ -212,7 +213,7 @@
 
     private async Task LoadStats()
     {
-        _loading = true;
+        _isLoading = true;
         try
         {
             _stats = await UsageService.GetStatsAsync();
@@ -223,7 +224,7 @@
         }
         finally
         {
-            _loading = false;
+            _isLoading = false;
         }
     }
 
@@ -239,7 +240,7 @@
                 CurrentUsage = _stats.TranslationCharsUsed.ToString("N0"),
                 Limit = _stats.TranslationCharsLimit.ToString("N0") + " / month",
                 Status = GetLimitStatus(_stats.TranslationUsagePercent),
-                StatusColor = GetUsageColor(_stats.TranslationUsagePercent)
+                StatusColor = UiHelpers.GetUsageColor(_stats.TranslationUsagePercent)
             },
             new()
             {
@@ -247,7 +248,7 @@
                 CurrentUsage = _stats.OtherCharsUsed.ToString("N0"),
                 Limit = _stats.OtherCharsLimit.ToString("N0") + " / month",
                 Status = GetLimitStatus(_stats.OtherUsagePercent),
-                StatusColor = GetUsageColor(_stats.OtherUsagePercent)
+                StatusColor = UiHelpers.GetUsageColor(_stats.OtherUsagePercent)
             },
             new()
             {
@@ -277,38 +278,6 @@
             >= 100 => "Limit Reached",
             >= 80 => "Approaching Limit",
             _ => "OK"
-        };
-    }
-
-    private static Color GetUsageColor(double usagePercent)
-    {
-        return usagePercent switch
-        {
-            >= 100 => Color.Error,
-            >= 80 => Color.Warning,
-            >= 50 => Color.Info,
-            _ => Color.Success
-        };
-    }
-
-    private static Color GetUsageTextColor(double usagePercent)
-    {
-        return usagePercent switch
-        {
-            >= 100 => Color.Error,
-            >= 80 => Color.Warning,
-            _ => Color.Default
-        };
-    }
-
-    private static Color GetPlanColor(string plan)
-    {
-        return plan.ToLower() switch
-        {
-            "pro" => Color.Primary,
-            "team" => Color.Secondary,
-            "enterprise" => Color.Tertiary,
-            _ => Color.Default
         };
     }
 
