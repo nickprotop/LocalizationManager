@@ -75,11 +75,19 @@
 
             <MudTabPanel Text="2. Configure" Disabled="@(_currentStep < 1)">
                 <MudStack Spacing="3">
-                    <MudTextField @bind-Value="_projectName"
-                                  Label="Project Name"
+                    <MudTextField @bind-Value="_projectSlug"
+                                  Label="Project ID"
                                   Variant="Variant.Outlined"
                                   Required="true"
-                                  RequiredError="Project name is required" />
+                                  RequiredError="Project ID is required"
+                                  HelperText="URL-friendly ID (lowercase, no spaces, e.g., my-project)" />
+
+                    <MudTextField @bind-Value="_projectName"
+                                  Label="Display Name"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="Display name is required"
+                                  HelperText="Human-readable name for display" />
 
                     <MudTextField @bind-Value="_projectDescription"
                                   Label="Description (optional)"
@@ -257,6 +265,7 @@
     private List<IBrowserFile> _uploadedFiles = new();
 
     // Step 2: Configuration
+    private string _projectSlug = "";
     private string _projectName = "";
     private string _projectDescription = "";
     private string _detectedFormat = "resx";
@@ -289,6 +298,7 @@
     {
         _currentStep = 0;
         _uploadedFiles = new();
+        _projectSlug = "";
         _projectName = "";
         _projectDescription = "";
         _detectedFormat = "resx";
@@ -442,6 +452,7 @@
             // Create the project first
             var createRequest = new CreateProjectRequest
             {
+                Slug = _projectSlug.Trim().ToLowerInvariant(),
                 Name = _projectName.Trim(),
                 Description = _projectDescription?.Trim(),
                 Format = _detectedFormat,

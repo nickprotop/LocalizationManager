@@ -26,6 +26,18 @@ public class Project
     [ForeignKey(nameof(OrganizationId))]
     public Organization? Organization { get; set; }
 
+    /// <summary>
+    /// URL-friendly identifier (no spaces, lowercase, used in remote URLs).
+    /// Example: "my-project" for URL like /@username/my-project
+    /// </summary>
+    [Required]
+    [MaxLength(100)]
+    [Column("slug")]
+    public required string Slug { get; set; }
+
+    /// <summary>
+    /// Display name for the project (can contain spaces and special characters).
+    /// </summary>
     [Required]
     [MaxLength(255)]
     [Column("name")]

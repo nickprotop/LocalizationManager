@@ -125,6 +125,7 @@ public class ProjectServiceTests : IDisposable
         var user = await CreateTestUserAsync();
         var request = new CreateProjectRequest
         {
+            Slug = "my-project",
             Name = "My Project",
             Description = "Test project",
             Format = ProjectFormat.Json,
@@ -157,6 +158,7 @@ public class ProjectServiceTests : IDisposable
 
         var request = new CreateProjectRequest
         {
+            Slug = "org-project",
             Name = "Org Project",
             OrganizationId = org.Id,
             Format = ProjectFormat.Resx
@@ -186,6 +188,7 @@ public class ProjectServiceTests : IDisposable
 
         var request = new CreateProjectRequest
         {
+            Slug = "org-project",
             Name = "Org Project",
             OrganizationId = org.Id,
             Format = ProjectFormat.Json
@@ -207,6 +210,7 @@ public class ProjectServiceTests : IDisposable
         var user = await CreateTestUserAsync();
         var request = new CreateProjectRequest
         {
+            Slug = "my-project",
             Name = "My Project",
             Format = "invalid-format"
         };
@@ -227,6 +231,7 @@ public class ProjectServiceTests : IDisposable
         var user = await CreateTestUserAsync();
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
             Format = ProjectFormat.Json,
@@ -253,6 +258,7 @@ public class ProjectServiceTests : IDisposable
         var otherUser = await CreateTestUserAsync("other@example.com");
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = owner.Id,
             Format = ProjectFormat.Json,
@@ -280,6 +286,7 @@ public class ProjectServiceTests : IDisposable
         // Personal project
         var personalProject = new Project
         {
+            Slug = "test-project",
             Name = "Personal Project",
             UserId = user.Id,
             Format = ProjectFormat.Json,
@@ -291,6 +298,7 @@ public class ProjectServiceTests : IDisposable
         // Organization project
         var orgProject = new Project
         {
+            Slug = "test-project",
             Name = "Org Project",
             OrganizationId = org.Id,
             Format = ProjectFormat.Resx,
@@ -316,6 +324,7 @@ public class ProjectServiceTests : IDisposable
         var user = await CreateTestUserAsync();
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
             Format = ProjectFormat.Json,
@@ -351,6 +360,7 @@ public class ProjectServiceTests : IDisposable
         var otherUser = await CreateTestUserAsync("other@example.com");
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = owner.Id,
             Format = ProjectFormat.Json,
@@ -379,6 +389,7 @@ public class ProjectServiceTests : IDisposable
         var user = await CreateTestUserAsync();
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
             Format = ProjectFormat.Json,
@@ -408,6 +419,7 @@ public class ProjectServiceTests : IDisposable
         var otherUser = await CreateTestUserAsync("other@example.com");
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = owner.Id,
             Format = ProjectFormat.Json,
@@ -436,6 +448,7 @@ public class ProjectServiceTests : IDisposable
         var user = await CreateTestUserAsync();
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
             Format = ProjectFormat.Json,
@@ -460,6 +473,7 @@ public class ProjectServiceTests : IDisposable
         var otherUser = await CreateTestUserAsync("other@example.com");
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = owner.Id,
             Format = ProjectFormat.Json,
@@ -485,6 +499,7 @@ public class ProjectServiceTests : IDisposable
         var org = await CreateTestOrganizationAsync(owner.Id);
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Org Project",
             OrganizationId = org.Id,
             Format = ProjectFormat.Json,
@@ -511,6 +526,7 @@ public class ProjectServiceTests : IDisposable
         var user = await CreateTestUserAsync();
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
             Format = ProjectFormat.Json,
@@ -536,6 +552,7 @@ public class ProjectServiceTests : IDisposable
         var org = await CreateTestOrganizationAsync(owner.Id);
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Org Project",
             OrganizationId = org.Id,
             Format = ProjectFormat.Json,
@@ -564,6 +581,7 @@ public class ProjectServiceTests : IDisposable
         var org = await CreateTestOrganizationAsync(owner.Id);
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Org Project",
             OrganizationId = org.Id,
             Format = ProjectFormat.Json,
@@ -592,6 +610,7 @@ public class ProjectServiceTests : IDisposable
         var org = await CreateTestOrganizationAsync(owner.Id);
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Org Project",
             OrganizationId = org.Id,
             Format = ProjectFormat.Json,
@@ -620,6 +639,7 @@ public class ProjectServiceTests : IDisposable
         var org = await CreateTestOrganizationAsync(owner.Id);
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Org Project",
             OrganizationId = org.Id,
             Format = ProjectFormat.Json,
@@ -650,6 +670,7 @@ public class ProjectServiceTests : IDisposable
         var user = await CreateTestUserAsync();
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
             Format = ProjectFormat.Json,
@@ -702,6 +723,7 @@ public class ProjectServiceTests : IDisposable
         var user = await CreateTestUserAsync();
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
             Format = ProjectFormat.Json,
@@ -727,6 +749,7 @@ public class ProjectServiceTests : IDisposable
         var user = await CreateTestUserAsync();
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
             Format = ProjectFormat.Json,

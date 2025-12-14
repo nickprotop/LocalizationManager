@@ -7,6 +7,18 @@ namespace LrmCloud.Shared.DTOs.Projects;
 /// </summary>
 public class UpdateProjectRequest
 {
+    /// <summary>
+    /// URL-friendly identifier (no spaces, lowercase, used in remote URLs).
+    /// Must contain only lowercase letters, numbers, and hyphens.
+    /// </summary>
+    [MaxLength(100, ErrorMessage = "Project slug must not exceed 100 characters")]
+    [RegularExpression(@"^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$",
+        ErrorMessage = "Slug must contain only lowercase letters, numbers, and hyphens, and cannot start or end with a hyphen")]
+    public string? Slug { get; set; }
+
+    /// <summary>
+    /// Display name for the project.
+    /// </summary>
     [MaxLength(255, ErrorMessage = "Project name must not exceed 255 characters")]
     public string? Name { get; set; }
 

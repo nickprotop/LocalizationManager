@@ -119,6 +119,7 @@ public class TranslationControllerTests : IDisposable
     {
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = userId,
             OrganizationId = orgId,

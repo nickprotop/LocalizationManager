@@ -23,12 +23,18 @@
                     <EditForm Model="_model" OnValidSubmit="HandleSubmit">
                         <DataAnnotationsValidator />
                         <MudStack Spacing="3">
+                            <MudTextField @bind-Value="_model.Slug"
+                                          Label="Project ID"
+                                          Variant="Variant.Outlined"
+                                          ReadOnly="true"
+                                          HelperText="Cannot be changed (used in CLI sync commands)" />
+
                             <MudTextField @bind-Value="_model.Name"
-                                          Label="Project Name"
+                                          Label="Display Name"
                                           Variant="Variant.Outlined"
                                           For="@(() => _model.Name)"
                                           Disabled="_isSubmitting"
-                                          Required="true" />
+                                          HelperText="Human-readable name for display" />
 
                             <MudTextField @bind-Value="_model.Description"
                                           Label="Description"
@@ -37,16 +43,11 @@
                                           For="@(() => _model.Description)"
                                           Disabled="_isSubmitting" />
 
-                            <MudSelect @bind-Value="_model.Format"
-                                       Label="Format"
-                                       Variant="Variant.Outlined"
-                                       For="@(() => _model.Format)"
-                                       Disabled="_isSubmitting"
-                                       Required="true">
-                                <MudSelectItem Value="@("resx")">.resx (C#/.NET)</MudSelectItem>
-                                <MudSelectItem Value="@("json")">JSON Localization</MudSelectItem>
-                                <MudSelectItem Value="@("i18next")">i18next (JS/React)</MudSelectItem>
-                            </MudSelect>
+                            <MudTextField @bind-Value="_model.Format"
+                                          Label="Format"
+                                          Variant="Variant.Outlined"
+                                          ReadOnly="true"
+                                          HelperText="Cannot be changed after creation" />
 
                             <MudTextField @bind-Value="_model.DefaultLanguage"
                                           Label="Default Language"
@@ -437,6 +438,7 @@
         _project = project;
         _model = new UpdateProjectRequest
         {
+            Slug = project.Slug,
             Name = project.Name,
             Description = project.Description,
             Format = project.Format,

@@ -12,12 +12,21 @@
         <EditForm Model="_model" OnValidSubmit="HandleSubmit">
             <DataAnnotationsValidator />
             <MudStack Spacing="3">
+                <MudTextField @bind-Value="_model.Slug"
+                              Label="Project ID"
+                              Variant="Variant.Outlined"
+                              For="@(() => _model.Slug)"
+                              Disabled="_isSubmitting"
+                              Required="true"
+                              HelperText="URL-friendly ID (lowercase, no spaces, e.g., my-project)" />
+
                 <MudTextField @bind-Value="_model.Name"
-                              Label="Project Name"
+                              Label="Display Name"
                               Variant="Variant.Outlined"
                               For="@(() => _model.Name)"
                               Disabled="_isSubmitting"
-                              Required="true" />
+                              Required="true"
+                              HelperText="Human-readable name for display" />
 
                 <MudTextField @bind-Value="_model.Description"
                               Label="Description"
@@ -101,7 +110,7 @@
     private bool _visible;
     private bool _isSubmitting;
     private string? _errorMessage;
-    private CreateProjectRequest _model = new() { Name = "", Format = "resx" };
+    private CreateProjectRequest _model = new() { Slug = "", Name = "", Format = "resx" };
 
     private readonly DialogOptions _dialogOptions = new()
     {
@@ -112,7 +121,7 @@
 
     public void Open()
     {
-        _model = new CreateProjectRequest { Name = "", Format = "resx", DefaultLanguage = "en", LocalizationPath = "." };
+        _model = new CreateProjectRequest { Slug = "", Name = "", Format = "resx", DefaultLanguage = "en", LocalizationPath = "." };
         _errorMessage = null;
         _visible = true;
         StateHasChanged();

@@ -82,21 +82,47 @@ public class ProjectService : IProjectService
                 projectUserId = userId;
             }
 
-            // Create project
+            // Validate slug uniqueness within the owner's scope
+            var slugLower = request.Slug.ToLowerInvariant();
+            bool slugExists;
+            if (projectOrganizationId.HasValue)
+            {
+                slugExists = await _db.Projects.AnyAsync(p =>
+                    p.OrganizationId == projectOrganizationId && p.Slug == slugLower);
+            }
+            else
+            {
+                slugExists = await _db.Projects.AnyAsync(p =>
+                    p.UserId == projectUserId && p.Slug == slugLower);
+            }
+
+            if (slugExists)
+            {
+                return (false, null, "A project with this slug already exists");
+            }
+
+            // Create project with auto-generated config
+            var format = request.Format.ToLowerInvariant();
             var project = new Project
             {
+                Slug = slugLower,
                 Name = request.Name,
                 Description = request.Description,
                 UserId = projectUserId,
                 OrganizationId = projectOrganizationId,
-                Format = request.Format.ToLowerInvariant(),
+                Format = format,
                 DefaultLanguage = request.DefaultLanguage,
                 LocalizationPath = request.LocalizationPath,
                 GitHubRepo = request.GitHubRepo,
                 GitHubDefaultBranch = request.GitHubDefaultBranch ?? "main",
                 SyncStatus = SyncStatus.Pending,
                 CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                UpdatedAt = DateTime.UtcNow,
+                // Auto-generate default config based on format
+                ConfigJson = GenerateDefaultConfig(format, request.DefaultLanguage),
+                ConfigVersion = Guid.NewGuid().ToString(),
+                ConfigUpdatedAt = DateTime.UtcNow,
+                ConfigUpdatedBy = userId
             };
 
             _db.Projects.Add(project);
@@ -137,7 +163,7 @@ public class ProjectService : IProjectService
         return MapToProjectDto(project, userId);
     }
 
-    public async Task<ProjectDto?> GetProjectByNameAsync(string username, string projectName, int userId)
+    public async Task<ProjectDto?> GetProjectByNameAsync(string username, string projectSlug, int userId)
     {
         try
         {
@@ -148,12 +174,13 @@ public class ProjectService : IProjectService
                 return null;
             }
 
-            // Look up project by name for that user (personal projects only)
+            // Look up project by slug for that user (personal projects only)
+            var slugLower = projectSlug.ToLowerInvariant();
             var project = await _db.Projects
                 .Include(p => p.Organization)
                 .Include(p => p.ResourceKeys)
                     .ThenInclude(k => k.Translations)
-                .FirstOrDefaultAsync(p => p.Name == projectName && p.UserId == user.Id);
+                .FirstOrDefaultAsync(p => p.Slug == slugLower && p.UserId == user.Id);
 
             if (project == null)
             {
@@ -170,7 +197,7 @@ public class ProjectService : IProjectService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting project by name {Username}/{ProjectName}", username, projectName);
+            _logger.LogError(ex, "Error getting project by slug {Username}/{ProjectSlug}", username, projectSlug);
             return null;
         }
     }
@@ -316,7 +343,7 @@ public class ProjectService : IProjectService
                 return (false, null, "Project not found");
             }
 
-            // Update fields
+            // Update fields (Slug and Format are immutable after creation)
             if (!string.IsNullOrWhiteSpace(request.Name))
             {
                 project.Name = request.Name;
@@ -327,14 +354,7 @@ public class ProjectService : IProjectService
                 project.Description = request.Description;
             }
 
-            if (!string.IsNullOrWhiteSpace(request.Format))
-            {
-                if (!ProjectFormat.IsValid(request.Format))
-                {
-                    return (false, null, $"Invalid format. Must be one of: {string.Join(", ", ProjectFormat.All)}");
-                }
-                project.Format = request.Format.ToLowerInvariant();
-            }
+            // Format is immutable after creation (removed format update logic)
 
             if (!string.IsNullOrWhiteSpace(request.DefaultLanguage))
             {
@@ -555,6 +575,7 @@ public class ProjectService : IProjectService
         return new ProjectDto
         {
             Id = project.Id,
+            Slug = project.Slug,
             Name = project.Name,
             Description = project.Description,
             UserId = project.UserId,
@@ -730,5 +751,32 @@ public class ProjectService : IProjectService
             LocalChanges = localChanges,
             RemoteChanges = remoteChanges
         };
+    }
+
+    /// <summary>
+    /// Generates a default lrm.json configuration based on project format.
+    /// </summary>
+    private static string GenerateDefaultConfig(string format, string defaultLanguage)
+    {
+        var config = new Dictionary<string, object?>
+        {
+            ["DefaultLanguageCode"] = defaultLanguage,
+            ["ResourceFormat"] = format == "i18next" ? "json" : format
+        };
+
+        // Add JSON-specific configuration for json and i18next formats
+        if (format == "json" || format == "i18next")
+        {
+            config["Json"] = new Dictionary<string, object>
+            {
+                ["I18nextCompatible"] = format == "i18next"
+            };
+        }
+
+        return System.Text.Json.JsonSerializer.Serialize(config, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        });
     }
 }

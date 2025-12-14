@@ -67,6 +67,7 @@ public class ResourceServiceTests : IDisposable
     {
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = userId,
             Format = ProjectFormat.Json,

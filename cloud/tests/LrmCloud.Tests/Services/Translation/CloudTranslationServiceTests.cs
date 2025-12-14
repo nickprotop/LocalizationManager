@@ -112,6 +112,7 @@ public class CloudTranslationServiceTests : IDisposable
     {
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = userId,
             OrganizationId = orgId,
@@ -354,6 +355,7 @@ public class CloudTranslationServiceTests : IDisposable
 
         var project = new Project
         {
+            Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
             Format = "json",

@@ -151,6 +151,16 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.GitHubRepo);
             entity.HasIndex(e => e.ConfigUpdatedBy);
 
+            // Unique slug per user (for personal projects)
+            entity.HasIndex(e => new { e.UserId, e.Slug })
+                .HasFilter("user_id IS NOT NULL")
+                .IsUnique();
+
+            // Unique slug per organization (for org projects)
+            entity.HasIndex(e => new { e.OrganizationId, e.Slug })
+                .HasFilter("organization_id IS NOT NULL")
+                .IsUnique();
+
             // Configure ConfigUpdater relationship (who last updated config)
             // Note: User relationship is already configured via [ForeignKey] attribute
             entity.HasOne(e => e.ConfigUpdater)

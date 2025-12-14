@@ -791,6 +791,22 @@ public class ResourceService : IResourceService
                 return (false, null, "Project not found");
             }
 
+            // Validate file naming consistency with project format
+            if (request.ModifiedFiles.Count > 0)
+            {
+                var config = project.ConfigJson != null
+                    ? System.Text.Json.JsonSerializer.Deserialize<LocalizationManager.Core.Configuration.ConfigurationModel>(project.ConfigJson)
+                    : null;
+
+                var (isValid, errorMessage) = _syncService.ValidateFileNamingConsistency(
+                    request.ModifiedFiles, project.Format, config);
+
+                if (!isValid)
+                {
+                    return (false, null, errorMessage);
+                }
+            }
+
             // Snapshot will be created after files are uploaded
             Snapshot? snapshot = null;
 
@@ -900,7 +916,8 @@ public class ResourceService : IResourceService
             }
 
             // Generate files from database using Core's backends
-            var files = await _syncService.GenerateFilesFromDatabaseAsync(projectId, project.ConfigJson, project.Format);
+            var files = await _syncService.GenerateFilesFromDatabaseAsync(
+                projectId, project.ConfigJson, project.Format, project.DefaultLanguage);
 
             _logger.LogInformation("User {UserId} pulled {Count} files from project {ProjectId}",
                 userId, files.Count, projectId);

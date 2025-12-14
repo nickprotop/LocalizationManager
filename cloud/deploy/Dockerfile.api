@@ -39,8 +39,12 @@ RUN dotnet publish \
 # ============================================
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
 
-# Install curl for health checks, su-exec for dropping privileges
-RUN apk add --no-cache curl su-exec
+# Install ICU for globalization support, curl for health checks, su-exec for dropping privileges
+# ICU is required for CultureInfo.GetCultureInfo() to work correctly
+RUN apk add --no-cache curl su-exec icu-libs
+
+# Disable invariant globalization mode (enable ICU)
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 # Create non-root user (no fixed UID - entrypoint handles permissions)
 RUN addgroup -S lrmcloud && adduser -S lrmcloud -G lrmcloud

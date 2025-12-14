@@ -6,7 +6,17 @@ namespace LrmCloud.Shared.DTOs.Projects;
 public class ProjectDto
 {
     public int Id { get; set; }
+
+    /// <summary>
+    /// URL-friendly identifier (no spaces, lowercase, used in remote URLs).
+    /// </summary>
+    public required string Slug { get; set; }
+
+    /// <summary>
+    /// Display name for the project.
+    /// </summary>
     public required string Name { get; set; }
+
     public string? Description { get; set; }
 
     public int? UserId { get; set; }
