@@ -315,6 +315,16 @@ public class Program
                             Window = TimeSpan.FromMinutes(1)
                         }));
 
+                // Translation rate limit: 30 requests/minute per user (expensive API calls)
+                options.AddPolicy("translation", context =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: context.User?.Identity?.Name ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 30,
+                            Window = TimeSpan.FromMinutes(1)
+                        }));
+
                 // Rate limit exceeded response
                 options.OnRejected = async (context, cancellationToken) =>
                 {

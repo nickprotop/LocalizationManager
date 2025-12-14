@@ -1,8 +1,10 @@
 using LrmCloud.Api.Authorization;
 using LrmCloud.Api.Services.Translation;
+using LrmCloud.Shared.Api;
 using LrmCloud.Shared.DTOs.Translation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace LrmCloud.Api.Controllers;
@@ -10,10 +12,10 @@ namespace LrmCloud.Api.Controllers;
 /// <summary>
 /// API endpoints for machine translation operations.
 /// </summary>
-[ApiController]
-[Route("api/[controller]")]
 [Authorize]
-public class TranslationController : ControllerBase
+[Route("api/[controller]")]
+[EnableRateLimiting("translation")]
+public class TranslationController : ApiControllerBase
 {
     private readonly ICloudTranslationService _translationService;
     private readonly IApiKeyHierarchyService _keyHierarchy;
@@ -41,79 +43,78 @@ public class TranslationController : ControllerBase
     /// Get available translation providers for a project.
     /// </summary>
     [HttpGet("providers")]
-    public async Task<ActionResult<List<TranslationProviderDto>>> GetProviders(
+    [ProducesResponseType(typeof(ApiResponse<List<TranslationProviderDto>>), 200)]
+    public async Task<ActionResult<ApiResponse<List<TranslationProviderDto>>>> GetProviders(
         [FromQuery] int? projectId = null,
         [FromQuery] int? organizationId = null)
     {
         var userId = GetUserId();
         var providers = await _translationService.GetAvailableProvidersAsync(projectId, userId, organizationId);
-        return Ok(providers);
+        return Success(providers);
     }
 
     /// <summary>
     /// Get translation usage statistics.
     /// </summary>
     [HttpGet("usage")]
-    public async Task<ActionResult<TranslationUsageDto>> GetUsage()
+    [ProducesResponseType(typeof(ApiResponse<TranslationUsageDto>), 200)]
+    public async Task<ActionResult<ApiResponse<TranslationUsageDto>>> GetUsage()
     {
         var userId = GetUserId();
         var usage = await _translationService.GetUsageAsync(userId);
-        return Ok(usage);
+        return Success(usage);
     }
 
     /// <summary>
     /// Get usage breakdown by provider.
     /// </summary>
     [HttpGet("usage/providers")]
-    public async Task<ActionResult<List<ProviderUsageDto>>> GetUsageByProvider()
+    [ProducesResponseType(typeof(ApiResponse<List<ProviderUsageDto>>), 200)]
+    public async Task<ActionResult<ApiResponse<List<ProviderUsageDto>>>> GetUsageByProvider()
     {
         var userId = GetUserId();
         var usage = await _translationService.GetUsageByProviderAsync(userId);
-        return Ok(usage);
+        return Success(usage);
     }
 
     /// <summary>
     /// Translate resource keys for a project.
     /// </summary>
     [HttpPost("projects/{projectId}/translate")]
-    public async Task<ActionResult<TranslateResponseDto>> TranslateKeys(
+    [ProducesResponseType(typeof(ApiResponse<TranslateResponseDto>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    public async Task<ActionResult<ApiResponse<TranslateResponseDto>>> TranslateKeys(
         int projectId,
         [FromBody] TranslateRequestDto request)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, "Invalid translation request");
 
         var userId = GetUserId();
         var result = await _translationService.TranslateKeysAsync(projectId, userId, request);
 
-        if (result.Errors.Any())
-        {
-            return result.Success
-                ? Ok(result)  // Partial success
-                : BadRequest(result);
-        }
-
-        return Ok(result);
+        // Always return Success wrapper - the result itself contains Success/Errors
+        return Success(result);
     }
 
     /// <summary>
     /// Translate a single text (for preview/testing).
     /// </summary>
     [HttpPost("translate-single")]
-    public async Task<ActionResult<TranslateSingleResponseDto>> TranslateSingle(
+    [ProducesResponseType(typeof(ApiResponse<TranslateSingleResponseDto>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    public async Task<ActionResult<ApiResponse<TranslateSingleResponseDto>>> TranslateSingle(
         [FromBody] TranslateSingleRequestDto request,
         [FromQuery] int? projectId = null)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, "Invalid translation request");
 
         var userId = GetUserId();
         var result = await _translationService.TranslateSingleAsync(userId, request, projectId);
 
-        if (!result.Success)
-            return BadRequest(result);
-
-        return Ok(result);
+        // Always return Success wrapper - the result itself contains Success/Error
+        return Success(result);
     }
 
     // =========================================================================
@@ -124,22 +125,24 @@ public class TranslationController : ControllerBase
     /// Set an API key for a translation provider at user level.
     /// </summary>
     [HttpPost("keys/user")]
-    public async Task<IActionResult> SetUserApiKey([FromBody] SetApiKeyRequest request)
+    [ProducesResponseType(typeof(ApiResponse), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    public async Task<ActionResult<ApiResponse>> SetUserApiKey([FromBody] SetApiKeyRequest request)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, "Invalid request");
 
         var userId = GetUserId();
 
         try
         {
             await _keyHierarchy.SetApiKeyAsync(request.ProviderName, request.ApiKey, "user", userId);
-            return Ok(new { message = "API key saved successfully" });
+            return Success("API key saved successfully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to set user API key for {Provider}", request.ProviderName);
-            return BadRequest(new { error = "Failed to save API key" });
+            return BadRequest(ErrorCodes.TRN_SAVE_FAILED, "Failed to save API key");
         }
     }
 
@@ -147,39 +150,44 @@ public class TranslationController : ControllerBase
     /// Remove an API key at user level.
     /// </summary>
     [HttpDelete("keys/user/{provider}")]
-    public async Task<IActionResult> RemoveUserApiKey(string provider)
+    [ProducesResponseType(typeof(ApiResponse), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse>> RemoveUserApiKey(string provider)
     {
         var userId = GetUserId();
         var removed = await _keyHierarchy.RemoveApiKeyAsync(provider, "user", userId);
 
         if (!removed)
-            return NotFound(new { error = "API key not found" });
+            return NotFound(ErrorCodes.TRN_KEY_NOT_FOUND, "API key not found");
 
-        return Ok(new { message = "API key removed" });
+        return Success("API key removed");
     }
 
     /// <summary>
     /// Set an API key for a translation provider at project level.
     /// </summary>
     [HttpPost("keys/projects/{projectId}")]
-    public async Task<IActionResult> SetProjectApiKey(int projectId, [FromBody] SetApiKeyRequest request)
+    [ProducesResponseType(typeof(ApiResponse), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    public async Task<ActionResult<ApiResponse>> SetProjectApiKey(int projectId, [FromBody] SetApiKeyRequest request)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, "Invalid request");
 
         var userId = GetUserId();
         if (!await _authService.CanEditProjectAsync(userId, projectId))
-            return Forbid();
+            return Forbidden(ErrorCodes.AUTH_FORBIDDEN, "You don't have permission to edit this project");
 
         try
         {
             await _keyHierarchy.SetApiKeyAsync(request.ProviderName, request.ApiKey, "project", projectId);
-            return Ok(new { message = "API key saved successfully" });
+            return Success("API key saved successfully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to set project API key for {Provider}", request.ProviderName);
-            return BadRequest(new { error = "Failed to save API key" });
+            return BadRequest(ErrorCodes.TRN_SAVE_FAILED, "Failed to save API key");
         }
     }
 
@@ -187,42 +195,48 @@ public class TranslationController : ControllerBase
     /// Remove an API key at project level.
     /// </summary>
     [HttpDelete("keys/projects/{projectId}/{provider}")]
-    public async Task<IActionResult> RemoveProjectApiKey(int projectId, string provider)
+    [ProducesResponseType(typeof(ApiResponse), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse>> RemoveProjectApiKey(int projectId, string provider)
     {
         var userId = GetUserId();
         if (!await _authService.CanEditProjectAsync(userId, projectId))
-            return Forbid();
+            return Forbidden(ErrorCodes.AUTH_FORBIDDEN, "You don't have permission to edit this project");
 
         var removed = await _keyHierarchy.RemoveApiKeyAsync(provider, "project", projectId);
 
         if (!removed)
-            return NotFound(new { error = "API key not found" });
+            return NotFound(ErrorCodes.TRN_KEY_NOT_FOUND, "API key not found");
 
-        return Ok(new { message = "API key removed" });
+        return Success("API key removed");
     }
 
     /// <summary>
     /// Set an API key for a translation provider at organization level.
     /// </summary>
     [HttpPost("keys/organizations/{organizationId}")]
-    public async Task<IActionResult> SetOrganizationApiKey(int organizationId, [FromBody] SetApiKeyRequest request)
+    [ProducesResponseType(typeof(ApiResponse), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    public async Task<ActionResult<ApiResponse>> SetOrganizationApiKey(int organizationId, [FromBody] SetApiKeyRequest request)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, "Invalid request");
 
         var userId = GetUserId();
         if (!await _authService.IsOrganizationAdminAsync(userId, organizationId))
-            return Forbid();
+            return Forbidden(ErrorCodes.AUTH_FORBIDDEN, "You must be an organization admin to manage API keys");
 
         try
         {
             await _keyHierarchy.SetApiKeyAsync(request.ProviderName, request.ApiKey, "organization", organizationId);
-            return Ok(new { message = "API key saved successfully" });
+            return Success("API key saved successfully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to set organization API key for {Provider}", request.ProviderName);
-            return BadRequest(new { error = "Failed to save API key" });
+            return BadRequest(ErrorCodes.TRN_SAVE_FAILED, "Failed to save API key");
         }
     }
 
@@ -230,21 +244,24 @@ public class TranslationController : ControllerBase
     /// Remove an API key at organization level.
     /// </summary>
     [HttpDelete("keys/organizations/{organizationId}/{provider}")]
-    public async Task<IActionResult> RemoveOrganizationApiKey(int organizationId, string provider)
+    [ProducesResponseType(typeof(ApiResponse), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse>> RemoveOrganizationApiKey(int organizationId, string provider)
     {
         var userId = GetUserId();
         if (!await _authService.IsOrganizationAdminAsync(userId, organizationId))
-            return Forbid();
+            return Forbidden(ErrorCodes.AUTH_FORBIDDEN, "You must be an organization admin to manage API keys");
 
         var removed = await _keyHierarchy.RemoveApiKeyAsync(provider, "organization", organizationId);
 
         if (!removed)
-            return NotFound(new { error = "API key not found" });
+            return NotFound(ErrorCodes.TRN_KEY_NOT_FOUND, "API key not found");
 
-        return Ok(new { message = "API key removed" });
+        return Success("API key removed");
     }
 
-// =========================================================================
+    // =========================================================================
     // Provider Configuration Management (API Keys + Config)
     // =========================================================================
 
@@ -252,34 +269,38 @@ public class TranslationController : ControllerBase
     /// Get provider configuration at user level.
     /// </summary>
     [HttpGet("config/user/{provider}")]
-    public async Task<ActionResult<ProviderConfigDto>> GetUserProviderConfig(string provider)
+    [ProducesResponseType(typeof(ApiResponse<ProviderConfigDto>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<ProviderConfigDto>>> GetUserProviderConfig(string provider)
     {
         var userId = GetUserId();
         var config = await _keyHierarchy.GetProviderConfigAsync(provider, "user", userId);
 
         if (config == null)
-            return NotFound(new { error = "Provider configuration not found" });
+            return NotFound(ErrorCodes.TRN_CONFIG_NOT_FOUND, "Provider configuration not found");
 
-        return Ok(config);
+        return Success(config);
     }
 
     /// <summary>
     /// Set provider configuration at user level (API key and/or config).
     /// </summary>
     [HttpPut("config/user/{provider}")]
-    public async Task<IActionResult> SetUserProviderConfig(string provider, [FromBody] SetProviderConfigRequest request)
+    [ProducesResponseType(typeof(ApiResponse), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    public async Task<ActionResult<ApiResponse>> SetUserProviderConfig(string provider, [FromBody] SetProviderConfigRequest request)
     {
         var userId = GetUserId();
 
         try
         {
             await _keyHierarchy.SetProviderConfigAsync(provider, "user", userId, request.ApiKey, request.Config);
-            return Ok(new { message = "Provider configuration saved successfully" });
+            return Success("Provider configuration saved successfully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to set user provider config for {Provider}", provider);
-            return BadRequest(new { error = "Failed to save provider configuration" });
+            return BadRequest(ErrorCodes.TRN_SAVE_FAILED, "Failed to save provider configuration");
         }
     }
 
@@ -287,54 +308,62 @@ public class TranslationController : ControllerBase
     /// Remove provider configuration at user level.
     /// </summary>
     [HttpDelete("config/user/{provider}")]
-    public async Task<IActionResult> RemoveUserProviderConfig(string provider)
+    [ProducesResponseType(typeof(ApiResponse), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse>> RemoveUserProviderConfig(string provider)
     {
         var userId = GetUserId();
         var removed = await _keyHierarchy.RemoveProviderConfigAsync(provider, "user", userId);
 
         if (!removed)
-            return NotFound(new { error = "Provider configuration not found" });
+            return NotFound(ErrorCodes.TRN_CONFIG_NOT_FOUND, "Provider configuration not found");
 
-        return Ok(new { message = "Provider configuration removed" });
+        return Success("Provider configuration removed");
     }
 
     /// <summary>
     /// Get provider configuration at organization level.
     /// </summary>
     [HttpGet("config/organizations/{organizationId}/{provider}")]
-    public async Task<ActionResult<ProviderConfigDto>> GetOrganizationProviderConfig(int organizationId, string provider)
+    [ProducesResponseType(typeof(ApiResponse<ProviderConfigDto>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<ProviderConfigDto>>> GetOrganizationProviderConfig(int organizationId, string provider)
     {
         var userId = GetUserId();
         if (!await _authService.IsOrganizationMemberAsync(userId, organizationId))
-            return Forbid();
+            return Forbidden(ErrorCodes.AUTH_FORBIDDEN, "You must be a member of this organization");
 
         var config = await _keyHierarchy.GetProviderConfigAsync(provider, "organization", organizationId);
 
         if (config == null)
-            return NotFound(new { error = "Provider configuration not found" });
+            return NotFound(ErrorCodes.TRN_CONFIG_NOT_FOUND, "Provider configuration not found");
 
-        return Ok(config);
+        return Success(config);
     }
 
     /// <summary>
     /// Set provider configuration at organization level.
     /// </summary>
     [HttpPut("config/organizations/{organizationId}/{provider}")]
-    public async Task<IActionResult> SetOrganizationProviderConfig(int organizationId, string provider, [FromBody] SetProviderConfigRequest request)
+    [ProducesResponseType(typeof(ApiResponse), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    public async Task<ActionResult<ApiResponse>> SetOrganizationProviderConfig(int organizationId, string provider, [FromBody] SetProviderConfigRequest request)
     {
         var userId = GetUserId();
         if (!await _authService.IsOrganizationAdminAsync(userId, organizationId))
-            return Forbid();
+            return Forbidden(ErrorCodes.AUTH_FORBIDDEN, "You must be an organization admin to manage provider configuration");
 
         try
         {
             await _keyHierarchy.SetProviderConfigAsync(provider, "organization", organizationId, request.ApiKey, request.Config);
-            return Ok(new { message = "Provider configuration saved successfully" });
+            return Success("Provider configuration saved successfully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to set organization provider config for {Provider}", provider);
-            return BadRequest(new { error = "Failed to save provider configuration" });
+            return BadRequest(ErrorCodes.TRN_SAVE_FAILED, "Failed to save provider configuration");
         }
     }
 
@@ -342,57 +371,66 @@ public class TranslationController : ControllerBase
     /// Remove provider configuration at organization level.
     /// </summary>
     [HttpDelete("config/organizations/{organizationId}/{provider}")]
-    public async Task<IActionResult> RemoveOrganizationProviderConfig(int organizationId, string provider)
+    [ProducesResponseType(typeof(ApiResponse), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse>> RemoveOrganizationProviderConfig(int organizationId, string provider)
     {
         var userId = GetUserId();
         if (!await _authService.IsOrganizationAdminAsync(userId, organizationId))
-            return Forbid();
+            return Forbidden(ErrorCodes.AUTH_FORBIDDEN, "You must be an organization admin to manage provider configuration");
 
         var removed = await _keyHierarchy.RemoveProviderConfigAsync(provider, "organization", organizationId);
 
         if (!removed)
-            return NotFound(new { error = "Provider configuration not found" });
+            return NotFound(ErrorCodes.TRN_CONFIG_NOT_FOUND, "Provider configuration not found");
 
-        return Ok(new { message = "Provider configuration removed" });
+        return Success("Provider configuration removed");
     }
 
     /// <summary>
     /// Get provider configuration at project level.
     /// </summary>
     [HttpGet("config/projects/{projectId}/{provider}")]
-    public async Task<ActionResult<ProviderConfigDto>> GetProjectProviderConfig(int projectId, string provider)
+    [ProducesResponseType(typeof(ApiResponse<ProviderConfigDto>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<ProviderConfigDto>>> GetProjectProviderConfig(int projectId, string provider)
     {
         var userId = GetUserId();
         if (!await _authService.HasProjectAccessAsync(userId, projectId))
-            return Forbid();
+            return Forbidden(ErrorCodes.AUTH_FORBIDDEN, "You don't have access to this project");
 
         var config = await _keyHierarchy.GetProviderConfigAsync(provider, "project", projectId);
 
         if (config == null)
-            return NotFound(new { error = "Provider configuration not found" });
+            return NotFound(ErrorCodes.TRN_CONFIG_NOT_FOUND, "Provider configuration not found");
 
-        return Ok(config);
+        return Success(config);
     }
 
     /// <summary>
     /// Set provider configuration at project level.
     /// </summary>
     [HttpPut("config/projects/{projectId}/{provider}")]
-    public async Task<IActionResult> SetProjectProviderConfig(int projectId, string provider, [FromBody] SetProviderConfigRequest request)
+    [ProducesResponseType(typeof(ApiResponse), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    public async Task<ActionResult<ApiResponse>> SetProjectProviderConfig(int projectId, string provider, [FromBody] SetProviderConfigRequest request)
     {
         var userId = GetUserId();
         if (!await _authService.CanEditProjectAsync(userId, projectId))
-            return Forbid();
+            return Forbidden(ErrorCodes.AUTH_FORBIDDEN, "You don't have permission to edit this project");
 
         try
         {
             await _keyHierarchy.SetProviderConfigAsync(provider, "project", projectId, request.ApiKey, request.Config);
-            return Ok(new { message = "Provider configuration saved successfully" });
+            return Success("Provider configuration saved successfully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to set project provider config for {Provider}", provider);
-            return BadRequest(new { error = "Failed to save provider configuration" });
+            return BadRequest(ErrorCodes.TRN_SAVE_FAILED, "Failed to save provider configuration");
         }
     }
 
@@ -400,39 +438,45 @@ public class TranslationController : ControllerBase
     /// Remove provider configuration at project level.
     /// </summary>
     [HttpDelete("config/projects/{projectId}/{provider}")]
-    public async Task<IActionResult> RemoveProjectProviderConfig(int projectId, string provider)
+    [ProducesResponseType(typeof(ApiResponse), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse>> RemoveProjectProviderConfig(int projectId, string provider)
     {
         var userId = GetUserId();
         if (!await _authService.CanEditProjectAsync(userId, projectId))
-            return Forbid();
+            return Forbidden(ErrorCodes.AUTH_FORBIDDEN, "You don't have permission to edit this project");
 
         var removed = await _keyHierarchy.RemoveProviderConfigAsync(provider, "project", projectId);
 
         if (!removed)
-            return NotFound(new { error = "Provider configuration not found" });
+            return NotFound(ErrorCodes.TRN_CONFIG_NOT_FOUND, "Provider configuration not found");
 
-        return Ok(new { message = "Provider configuration removed" });
+        return Success("Provider configuration removed");
     }
 
     /// <summary>
     /// Get resolved (merged) configuration for a provider in a given context.
     /// </summary>
     [HttpGet("config/resolved/{provider}")]
-    public async Task<ActionResult<ResolvedProviderConfigDto>> GetResolvedProviderConfig(
+    [ProducesResponseType(typeof(ApiResponse<ResolvedProviderConfigDto>), 200)]
+    public async Task<ActionResult<ApiResponse<ResolvedProviderConfigDto>>> GetResolvedProviderConfig(
         string provider,
         [FromQuery] int? projectId = null,
         [FromQuery] int? organizationId = null)
     {
         var userId = GetUserId();
         var resolved = await _keyHierarchy.ResolveProviderConfigAsync(provider, projectId, userId, organizationId);
-        return Ok(resolved);
+        return Success(resolved);
     }
 
     /// <summary>
     /// Get summary of all providers at a specific level.
     /// </summary>
     [HttpGet("config/summary/{level}/{entityId}")]
-    public async Task<ActionResult<List<ProviderConfigSummaryDto>>> GetProviderSummaries(
+    [ProducesResponseType(typeof(ApiResponse<List<ProviderConfigSummaryDto>>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    public async Task<ActionResult<ApiResponse<List<ProviderConfigSummaryDto>>>> GetProviderSummaries(
         string level,
         int entityId,
         [FromQuery] int? projectId = null,
@@ -443,11 +487,11 @@ public class TranslationController : ControllerBase
         // For user level, entityId should match the authenticated user
         if (level.Equals("user", StringComparison.OrdinalIgnoreCase) && entityId != userId)
         {
-            return Forbid();
+            return Forbidden(ErrorCodes.AUTH_FORBIDDEN, "You can only view your own provider configuration");
         }
 
         var summaries = await _keyHierarchy.GetProviderSummariesAsync(level, entityId, projectId, userId, organizationId);
-        return Ok(summaries);
+        return Success(summaries);
     }
 
     // =========================================================================
@@ -458,10 +502,12 @@ public class TranslationController : ControllerBase
     /// Test an API key without saving it.
     /// </summary>
     [HttpPost("keys/test")]
-    public async Task<ActionResult<TestApiKeyResponse>> TestApiKey([FromBody] TestApiKeyRequest request)
+    [ProducesResponseType(typeof(ApiResponse<TestApiKeyResponse>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    public async Task<ActionResult<ApiResponse<TestApiKeyResponse>>> TestApiKey([FromBody] TestApiKeyRequest request)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, "Invalid request");
 
         try
         {
@@ -499,7 +545,7 @@ public class TranslationController : ControllerBase
                     break;
                 default:
                     // For providers that don't require API keys or need special handling
-                    return Ok(new TestApiKeyResponse
+                    return Success(new TestApiKeyResponse
                     {
                         IsValid = true,
                         ProviderMessage = "Provider configuration accepted"
@@ -519,7 +565,7 @@ public class TranslationController : ControllerBase
 
             var result = await provider.TranslateAsync(testRequest);
 
-            return Ok(new TestApiKeyResponse
+            return Success(new TestApiKeyResponse
             {
                 IsValid = true,
                 ProviderMessage = $"Test successful: 'Hello' → '{result.TranslatedText}'"
@@ -528,7 +574,7 @@ public class TranslationController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "API key test failed for {Provider}", request.ProviderName);
-            return Ok(new TestApiKeyResponse
+            return Success(new TestApiKeyResponse
             {
                 IsValid = false,
                 Error = ex.Message
