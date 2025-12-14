@@ -127,8 +127,11 @@ public class ResourceFileParser
         try
         {
             // Load existing file to preserve structure
-            var xdoc = File.Exists(resourceFile.Language.FilePath)
-                ? XDocument.Load(resourceFile.Language.FilePath)
+            // Only load if file exists AND has content (not empty)
+            var filePath = resourceFile.Language.FilePath;
+            var fileInfo = new FileInfo(filePath);
+            var xdoc = fileInfo.Exists && fileInfo.Length > 0
+                ? XDocument.Load(filePath)
                 : CreateNewResxDocument();
 
             var root = xdoc.Root;
