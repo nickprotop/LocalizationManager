@@ -5,6 +5,7 @@
 @using LrmCloud.Web.Services
 @using LrmCloud.Web.Components
 @using LrmCloud.Web.Models
+@using LrmCloud.Web.Helpers
 @inject OrganizationService OrganizationService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -116,7 +117,7 @@ else
                         <tr>
                             <td><MudText Typo="Typo.body2" Color="Color.Secondary">Plan</MudText></td>
                             <td>
-                                <MudChip T="string" Color="@GetPlanColor(_organization.Plan)" Size="Size.Small">
+                                <MudChip T="string" Color="@UiHelpers.GetPlanColor(_organization.Plan)" Size="Size.Small">
                                     @_organization.Plan.ToUpperInvariant()
                                 </MudChip>
                             </td>
@@ -138,7 +139,7 @@ else
                         <tr>
                             <td><MudText Typo="Typo.body2" Color="Color.Secondary">Your Role</MudText></td>
                             <td>
-                                <MudChip T="string" Color="@GetRoleColor(_organization.UserRole)" Size="Size.Small">
+                                <MudChip T="string" Color="@UiHelpers.GetRoleColor(_organization.UserRole)" Size="Size.Small">
                                     @_organization.UserRole
                                 </MudChip>
                             </td>
@@ -475,19 +476,4 @@ else
         }
     }
 
-    private static Color GetPlanColor(string plan) => plan.ToLowerInvariant() switch
-    {
-        "team" => Color.Secondary,
-        "enterprise" => Color.Primary,
-        _ => Color.Default
-    };
-
-    private static Color GetRoleColor(string role) => role switch
-    {
-        OrganizationRole.Owner => Color.Error,
-        OrganizationRole.Admin => Color.Warning,
-        OrganizationRole.Member => Color.Primary,
-        OrganizationRole.Viewer => Color.Default,
-        _ => Color.Default
-    };
 }

@@ -5,6 +5,7 @@
 @using LrmCloud.Web.Services
 @using LrmCloud.Web.Components
 @using LrmCloud.Web.Models
+@using LrmCloud.Web.Helpers
 @inject OrganizationService OrganizationService
 @inject LimitsService LimitsService
 @inject NavigationManager Navigation
@@ -36,12 +37,12 @@
                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
                         <MudAvatar Color="Color.Primary" Size="Size.Medium">
-                            @GetOrgInitials(invitation.OrganizationName)
+                            @UiHelpers.GetInitials(invitation.OrganizationName)
                         </MudAvatar>
                         <div>
                             <MudText Typo="Typo.subtitle1">
                                 <strong>@invitation.OrganizationName</strong> invited you as
-                                <MudChip T="string" Size="Size.Small" Color="@GetRoleColor(invitation.Role)" Class="mx-1">@invitation.Role</MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetRoleColor(invitation.Role)" Class="mx-1">@invitation.Role</MudChip>
                             </MudText>
                             <MudText Typo="Typo.body2" Color="Color.Secondary">
                                 @if (!string.IsNullOrEmpty(invitation.InvitedByName))
@@ -111,8 +112,8 @@ else
                 <MudCard Elevation="2" Class="cursor-pointer" @onclick="@(() => NavigateToOrg(org.Id))">
                     <MudCardHeader>
                         <CardHeaderAvatar>
-                            <MudAvatar Color="@GetOrgColor(org.Name)" Size="Size.Large">
-                                @GetOrgInitials(org.Name)
+                            <MudAvatar Color="@UiHelpers.GetHashColor(org.Name)" Size="Size.Large">
+                                @UiHelpers.GetInitials(org.Name)
                             </MudAvatar>
                         </CardHeaderAvatar>
                         <CardHeaderContent>
@@ -120,7 +121,7 @@ else
                             <MudText Typo="Typo.body2" Color="Color.Secondary">@org.Slug</MudText>
                         </CardHeaderContent>
                         <CardHeaderActions>
-                            <MudChip T="string" Size="Size.Small" Color="@GetRoleColor(org.UserRole)">
+                            <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetRoleColor(org.UserRole)">
                                 @org.UserRole
                             </MudChip>
                         </CardHeaderActions>
@@ -137,7 +138,7 @@ else
                                 <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Color="Color.Secondary" />
                                 <MudText Typo="Typo.body2" Color="Color.Secondary">@org.MemberCount members</MudText>
                             </MudStack>
-                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@GetPlanColor(org.Plan)">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@UiHelpers.GetPlanColor(org.Plan)">
                                 @org.Plan
                             </MudChip>
                         </MudStack>
@@ -397,35 +398,4 @@ else
                 yield return "Slug must contain only lowercase letters, numbers, and hyphens";
         }
     }
-
-    private static string GetOrgInitials(string name)
-    {
-        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length >= 2)
-            return $"{words[0][0]}{words[1][0]}".ToUpper();
-        return name.Length >= 2 ? name[..2].ToUpper() : name.ToUpper();
-    }
-
-    private static Color GetOrgColor(string name)
-    {
-        var hash = name.GetHashCode();
-        var colors = new[] { Color.Primary, Color.Secondary, Color.Info, Color.Success, Color.Warning };
-        return colors[Math.Abs(hash) % colors.Length];
-    }
-
-    private static Color GetRoleColor(string role) => role switch
-    {
-        OrganizationRole.Owner => Color.Error,
-        OrganizationRole.Admin => Color.Warning,
-        OrganizationRole.Member => Color.Primary,
-        OrganizationRole.Viewer => Color.Default,
-        _ => Color.Default
-    };
-
-    private static Color GetPlanColor(string plan) => plan.ToLowerInvariant() switch
-    {
-        "team" => Color.Secondary,
-        "enterprise" => Color.Primary,
-        _ => Color.Default
-    };
 }

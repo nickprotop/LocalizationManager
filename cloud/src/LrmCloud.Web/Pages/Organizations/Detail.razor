@@ -5,6 +5,7 @@
 @using LrmCloud.Web.Services
 @using LrmCloud.Web.Components
 @using LrmCloud.Web.Models
+@using LrmCloud.Web.Helpers
 @inject OrganizationService OrganizationService
 @inject ProjectService ProjectService
 @inject NavigationManager Navigation
@@ -46,13 +47,13 @@ else
     <MudPaper Elevation="2" Class="pa-4 mb-4">
         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
-                <MudAvatar Color="@GetOrgColor(_organization.Name)" Size="Size.Large" Style="font-size: 1.5rem;">
-                    @GetOrgInitials(_organization.Name)
+                <MudAvatar Color="@UiHelpers.GetHashColor(_organization.Name)" Size="Size.Large" Style="font-size: 1.5rem;">
+                    @UiHelpers.GetInitials(_organization.Name)
                 </MudAvatar>
                 <MudStack Spacing="0">
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                         <MudText Typo="Typo.h5">@_organization.Name</MudText>
-                        <MudChip T="string" Size="Size.Small" Color="@GetRoleColor(_organization.UserRole)">
+                        <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetRoleColor(_organization.UserRole)">
                             @_organization.UserRole
                         </MudChip>
                     </MudStack>
@@ -185,7 +186,7 @@ else
                                 <MudText Typo="Typo.subtitle1">@project.Name</MudText>
                             </CardHeaderContent>
                             <CardHeaderActions>
-                                <MudChip T="string" Size="Size.Small" Color="@GetFormatColor(project.Format)">@project.Format</MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetFormatColor(project.Format)">@project.Format</MudChip>
                             </CardHeaderActions>
                         </MudCardHeader>
                         <MudCardContent>
@@ -194,7 +195,7 @@ else
                                 <MudText Typo="Typo.caption">@project.CompletionPercentage.ToString("F0")% complete</MudText>
                             </MudStack>
                             <MudProgressLinear Value="@project.CompletionPercentage"
-                                               Color="@GetCompletionColor(project.CompletionPercentage)"
+                                               Color="@UiHelpers.GetCompletionColor(project.CompletionPercentage)"
                                                Class="mt-2" />
                         </MudCardContent>
                     </MudCard>
@@ -288,45 +289,6 @@ else
             _isLoading = false;
         }
     }
-
-    private static string GetOrgInitials(string name)
-    {
-        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length >= 2)
-            return $"{words[0][0]}{words[1][0]}".ToUpper();
-        return name.Length >= 2 ? name[..2].ToUpper() : name.ToUpper();
-    }
-
-    private static Color GetOrgColor(string name)
-    {
-        var hash = name.GetHashCode();
-        var colors = new[] { Color.Primary, Color.Secondary, Color.Info, Color.Success, Color.Warning };
-        return colors[Math.Abs(hash) % colors.Length];
-    }
-
-    private static Color GetRoleColor(string role) => role switch
-    {
-        OrganizationRole.Owner => Color.Error,
-        OrganizationRole.Admin => Color.Warning,
-        OrganizationRole.Member => Color.Primary,
-        OrganizationRole.Viewer => Color.Default,
-        _ => Color.Default
-    };
-
-    private static Color GetFormatColor(string format) => format.ToLower() switch
-    {
-        "resx" => Color.Primary,
-        "json" => Color.Info,
-        "i18next" => Color.Secondary,
-        _ => Color.Default
-    };
-
-    private static Color GetCompletionColor(double percentage) => percentage switch
-    {
-        >= 90 => Color.Success,
-        >= 50 => Color.Warning,
-        _ => Color.Error
-    };
 
     private void ShowLeaveConfirmation()
     {

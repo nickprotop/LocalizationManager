@@ -5,6 +5,7 @@
 @using LrmCloud.Web.Services
 @using LrmCloud.Web.Components
 @using LrmCloud.Web.Models
+@using LrmCloud.Web.Helpers
 @inject OrganizationService OrganizationService
 @inject LimitsService LimitsService
 @inject NavigationManager Navigation
@@ -84,7 +85,7 @@ else
 
                 <PropertyColumn Property="x => x.Role" Title="Role">
                     <CellTemplate>
-                        <MudChip T="string" Size="Size.Small" Color="@GetRoleColor(context.Item.Role)">
+                        <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetRoleColor(context.Item.Role)">
                             @context.Item.Role
                         </MudChip>
                     </CellTemplate>
@@ -490,15 +491,6 @@ else
 
         return name.Length >= 2 ? name[..2].ToUpper() : name.ToUpper();
     }
-
-    private static Color GetRoleColor(string role) => role switch
-    {
-        OrganizationRole.Owner => Color.Error,
-        OrganizationRole.Admin => Color.Warning,
-        OrganizationRole.Member => Color.Primary,
-        OrganizationRole.Viewer => Color.Default,
-        _ => Color.Default
-    };
 
     private static string GetRoleDescription(string role) => role switch
     {

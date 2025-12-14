@@ -4,6 +4,7 @@
 @using LrmCloud.Shared.DTOs.Organizations
 @using LrmCloud.Web.Services
 @using LrmCloud.Web.Components
+@using LrmCloud.Web.Helpers
 @inject OrganizationService OrganizationService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -59,7 +60,7 @@ else
                     </MudStack>
                 </CardHeaderContent>
                 <CardHeaderActions>
-                    <MudChip T="string" Color="@GetPlanColor(_organization.Plan)" Size="Size.Medium">
+                    <MudChip T="string" Color="@UiHelpers.GetPlanColor(_organization.Plan)" Size="Size.Medium">
                         @_organization.Plan.ToUpperInvariant()
                     </MudChip>
                 </CardHeaderActions>
@@ -116,12 +117,12 @@ else
                         <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">LRM TRANSLATION</MudText>
-                                <MudText Typo="Typo.h5">@FormatNumber(_usageStats.LrmCharsUsed)</MudText>
-                                <MudProgressLinear Value="@GetUsagePercentage(_usageStats.LrmCharsUsed, _usageStats.LrmCharsLimit)"
-                                                   Color="@GetUsageColor(_usageStats.LrmCharsUsed, _usageStats.LrmCharsLimit)"
+                                <MudText Typo="Typo.h5">@UiHelpers.FormatNumber(_usageStats.LrmCharsUsed)</MudText>
+                                <MudProgressLinear Value="@UiHelpers.GetUsagePercentage(_usageStats.LrmCharsUsed, _usageStats.LrmCharsLimit)"
+                                                   Color="@UiHelpers.GetUsageColor(_usageStats.LrmCharsUsed, _usageStats.LrmCharsLimit)"
                                                    Class="mt-2" />
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    of @FormatNumber(_usageStats.LrmCharsLimit) limit
+                                    of @UiHelpers.FormatNumber(_usageStats.LrmCharsLimit) limit
                                 </MudText>
                             </MudStack>
                         </MudPaper>
@@ -130,7 +131,7 @@ else
                         <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">OTHER PROVIDERS</MudText>
-                                <MudText Typo="Typo.h5">@FormatNumber(_usageStats.OtherCharsUsed)</MudText>
+                                <MudText Typo="Typo.h5">@UiHelpers.FormatNumber(_usageStats.OtherCharsUsed)</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
                                     BYOK + free (tracked)
                                 </MudText>
@@ -141,7 +142,7 @@ else
                         <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">API CALLS</MudText>
-                                <MudText Typo="Typo.h5">@FormatNumber(_usageStats.ApiCalls)</MudText>
+                                <MudText Typo="Typo.h5">@UiHelpers.FormatNumber(_usageStats.ApiCalls)</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
                                     This billing period
                                 </MudText>
@@ -152,7 +153,7 @@ else
                         <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">STORAGE</MudText>
-                                <MudText Typo="Typo.h5">@FormatBytes(_usageStats.StorageBytes)</MudText>
+                                <MudText Typo="Typo.h5">@UiHelpers.FormatBytes(_usageStats.StorageBytes)</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
                                     Resource files
                                 </MudText>
@@ -400,47 +401,6 @@ else
         _ => 10000
     };
 
-    private static Color GetPlanColor(string plan) => plan.ToLower() switch
-    {
-        "free" => Color.Default,
-        "team" => Color.Secondary,
-        "enterprise" => Color.Primary,
-        _ => Color.Default
-    };
-
-    private static double GetUsagePercentage(long used, long limit) =>
-        limit > 0 ? Math.Min(100, (double)used / limit * 100) : 0;
-
-    private static Color GetUsageColor(long used, long limit)
-    {
-        var percentage = GetUsagePercentage(used, limit);
-        return percentage switch
-        {
-            >= 90 => Color.Error,
-            >= 70 => Color.Warning,
-            _ => Color.Success
-        };
-    }
-
-    private static string FormatNumber(long number)
-    {
-        if (number >= 1_000_000)
-            return $"{number / 1_000_000.0:F1}M";
-        if (number >= 1_000)
-            return $"{number / 1_000.0:F1}K";
-        return number.ToString("N0");
-    }
-
-    private static string FormatBytes(long bytes)
-    {
-        if (bytes >= 1_073_741_824)
-            return $"{bytes / 1_073_741_824.0:F1} GB";
-        if (bytes >= 1_048_576)
-            return $"{bytes / 1_048_576.0:F1} MB";
-        if (bytes >= 1_024)
-            return $"{bytes / 1_024.0:F1} KB";
-        return $"{bytes} B";
-    }
 
     private class UsageStats
     {
