@@ -96,52 +96,63 @@ public class LrmTranslationProvider : ILrmTranslationProvider
             return result;
         }
 
-        // Select backend provider
-        var backend = SelectBackend();
-        if (string.IsNullOrEmpty(backend))
+        // Get backends to try (in order based on strategy)
+        var backends = GetBackendsForFailover();
+        if (!backends.Any())
         {
             result.Error = "No LRM backend providers configured";
             return result;
         }
 
-        try
+        var request = new TranslationRequest
         {
-            // Create and call the actual backend provider
-            var provider = CreateBackendProvider(backend);
-            if (provider == null)
+            SourceText = sourceText,
+            SourceLanguage = sourceLanguage,
+            TargetLanguage = targetLanguage,
+            Context = context
+        };
+
+        var errors = new List<string>();
+
+        // Try each backend in order until one succeeds
+        foreach (var backend in backends)
+        {
+            try
             {
-                result.Error = $"Failed to initialize LRM backend: {backend}";
-                return result;
+                // Create and call the actual backend provider
+                var provider = CreateBackendProvider(backend);
+                if (provider == null)
+                {
+                    errors.Add($"{backend}: Failed to initialize");
+                    continue;
+                }
+
+                var response = await provider.TranslateAsync(request);
+
+                result.Success = true;
+                result.TranslatedText = response.TranslatedText;
+                result.FromCache = response.FromCache;
+
+                // Track usage (decrement user's char balance)
+                await TrackLrmUsageAsync(userId, sourceText.Length);
+
+                _logger.LogDebug(
+                    "LRM translation via {Backend}: {Chars} chars for user {UserId}",
+                    backend, sourceText.Length, userId);
+
+                return result; // Success - return immediately
             }
-
-            var request = new TranslationRequest
+            catch (Exception ex)
             {
-                SourceText = sourceText,
-                SourceLanguage = sourceLanguage,
-                TargetLanguage = targetLanguage,
-                Context = context
-            };
-
-            var response = await provider.TranslateAsync(request);
-
-            result.Success = true;
-            result.TranslatedText = response.TranslatedText;
-            result.FromCache = response.FromCache;
-
-            // Track usage (decrement user's char balance)
-            await TrackLrmUsageAsync(userId, sourceText.Length);
-
-            _logger.LogDebug(
-                "LRM translation via {Backend}: {Chars} chars for user {UserId}",
-                backend, sourceText.Length, userId);
+                _logger.LogWarning(ex, "LRM backend {Backend} failed, user {UserId}, trying next", backend, userId);
+                errors.Add($"{backend}: {ex.Message}");
+                // Continue to next backend
+            }
         }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "LRM backend {Backend} failed, user {UserId}", backend, userId);
-            result.Error = $"Translation failed: {ex.Message}";
 
-            // TODO: Try next backend on failure (failover)
-        }
+        // All backends failed
+        result.Error = $"All LRM backends failed: {string.Join("; ", errors)}";
+        _logger.LogError("All LRM backends failed for user {UserId}: {Errors}", userId, result.Error);
 
         return result;
     }
@@ -186,24 +197,42 @@ public class LrmTranslationProvider : ILrmTranslationProvider
         return Math.Max(0, user.TranslationCharsLimit - user.TranslationCharsUsed);
     }
 
-    private string? SelectBackend()
+    /// <summary>
+    /// Get backends ordered for failover attempts.
+    /// Uses round-robin for initial selection, then continues with remaining backends.
+    /// </summary>
+    private List<string> GetBackendsForFailover()
     {
         var backends = _config.LrmProvider.EnabledBackends;
         if (!backends.Any())
-            return null;
+            return new List<string>();
 
         if (_config.LrmProvider.SelectionStrategy == "roundrobin")
         {
+            // Round-robin: start with next backend, then cycle through all
             lock (_roundRobinLock)
             {
-                var index = _roundRobinIndex % backends.Count;
+                var startIndex = _roundRobinIndex % backends.Count;
                 _roundRobinIndex++;
-                return backends[index];
+
+                // Create ordered list starting from round-robin index
+                var ordered = new List<string>(backends.Count);
+                for (int i = 0; i < backends.Count; i++)
+                {
+                    ordered.Add(backends[(startIndex + i) % backends.Count]);
+                }
+                return ordered;
             }
         }
 
-        // Default: priority (first available)
-        return backends.First();
+        // Default: priority order (as configured)
+        return backends.ToList();
+    }
+
+    private string? SelectBackend()
+    {
+        var backends = GetBackendsForFailover();
+        return backends.FirstOrDefault();
     }
 
     private ITranslationProvider? CreateBackendProvider(string backend)
