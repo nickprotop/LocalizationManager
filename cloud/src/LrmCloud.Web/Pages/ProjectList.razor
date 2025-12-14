@@ -1,8 +1,10 @@
 @page "/projects"
 @attribute [Authorize]
+@using LrmCloud.Web.Helpers
 @inject ProjectService ProjectService
 @inject LimitsService LimitsService
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
 
 <PageTitle>Projects - LRM Cloud</PageTitle>
 
@@ -86,7 +88,7 @@ else
                             </MudText>
                         </CardHeaderContent>
                         <CardHeaderActions>
-                            <MudChip T="string" Size="Size.Small" Color="@GetFormatColor(project.Format)">@project.Format</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetFormatColor(project.Format)">@project.Format</MudChip>
                         </CardHeaderActions>
                     </MudCardHeader>
                     <MudCardContent>
@@ -100,7 +102,7 @@ else
                             <MudText Typo="Typo.caption">@project.KeyCount keys</MudText>
                             <MudText Typo="Typo.caption">@project.CompletionPercentage.ToString("F0")% complete</MudText>
                         </MudStack>
-                        <MudProgressLinear Value="@project.CompletionPercentage" Color="@GetCompletionColor(project.CompletionPercentage)" Class="mt-2" />
+                        <MudProgressLinear Value="@project.CompletionPercentage" Color="@UiHelpers.GetCompletionColor(project.CompletionPercentage)" Class="mt-2" />
                     </MudCardContent>
                     <MudCardActions>
                         <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => NavigateToEditor(project.Id))" ClickPropagation="false">
@@ -155,9 +157,9 @@ else
         {
             _projects = await ProjectService.GetProjectsAsync();
         }
-        catch
+        catch (Exception ex)
         {
-            // Handle error - could show snackbar
+            Snackbar.Add($"Error loading projects: {ex.Message}", Severity.Error);
         }
         finally
         {
@@ -216,19 +218,4 @@ else
     {
         Navigation.NavigateTo($"projects/{projectId}/editor");
     }
-
-    private static Color GetFormatColor(string format) => format.ToLower() switch
-    {
-        "resx" => Color.Primary,
-        "json" => Color.Info,
-        "i18next" => Color.Secondary,
-        _ => Color.Default
-    };
-
-    private static Color GetCompletionColor(double percentage) => percentage switch
-    {
-        >= 90 => Color.Success,
-        >= 50 => Color.Warning,
-        _ => Color.Error
-    };
 }

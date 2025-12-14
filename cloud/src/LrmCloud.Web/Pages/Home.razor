@@ -1,10 +1,12 @@
 @page "/"
 @attribute [Authorize]
 @using LrmCloud.Shared.DTOs.Usage
+@using LrmCloud.Web.Helpers
 @inject ProjectService ProjectService
 @inject UsageService UsageService
 @inject OrganizationContextService OrgContext
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
 @implements IDisposable
 
 <PageTitle>Dashboard - LRM Cloud</PageTitle>
@@ -67,7 +69,7 @@ else
                         @if (_usageStats?.ByokCharsUsed > 0)
                         {
                             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                + @FormatChars(_usageStats.ByokCharsUsed) other
+                                + @UiHelpers.FormatCharacters(_usageStats.ByokCharsUsed) other
                             </MudText>
                         }
                     </div>
@@ -128,7 +130,7 @@ else
                             </MudText>
                         </CardHeaderContent>
                         <CardHeaderActions>
-                            <MudChip T="string" Size="Size.Small" Color="@GetFormatColor(project.Format)">@project.Format</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetFormatColor(project.Format)">@project.Format</MudChip>
                         </CardHeaderActions>
                     </MudCardHeader>
                     <MudCardContent>
@@ -142,7 +144,7 @@ else
                             <MudText Typo="Typo.caption">@project.KeyCount keys</MudText>
                             <MudText Typo="Typo.caption">@project.CompletionPercentage.ToString("F0")% complete</MudText>
                         </MudStack>
-                        <MudProgressLinear Value="@project.CompletionPercentage" Color="@GetCompletionColor(project.CompletionPercentage)" Class="mt-2" />
+                        <MudProgressLinear Value="@project.CompletionPercentage" Color="@UiHelpers.GetCompletionColor(project.CompletionPercentage)" Class="mt-2" />
                     </MudCardContent>
                     <MudCardActions>
                         <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => NavigateToEditor(project.Id))" ClickPropagation="false">
@@ -204,9 +206,9 @@ else
             _stats = await ProjectService.GetDashboardStatsAsync();
             _usageStats = await UsageService.GetStatsAsync();
         }
-        catch
+        catch (Exception ex)
         {
-            // Handle error - show snackbar
+            Snackbar.Add($"Error loading dashboard: {ex.Message}", Severity.Error);
         }
         finally
         {
@@ -297,27 +299,4 @@ else
         return $"{used} / {limit / 1000}K";
     }
 
-    private static string FormatChars(long chars)
-    {
-        if (chars >= 1_000_000)
-            return $"{chars / 1_000_000.0:F1}M";
-        if (chars >= 1000)
-            return $"{chars / 1000}K";
-        return chars.ToString();
-    }
-
-    private static Color GetFormatColor(string format) => format.ToLower() switch
-    {
-        "resx" => Color.Primary,
-        "json" => Color.Info,
-        "i18next" => Color.Secondary,
-        _ => Color.Default
-    };
-
-    private static Color GetCompletionColor(double percentage) => percentage switch
-    {
-        >= 90 => Color.Success,
-        >= 50 => Color.Warning,
-        _ => Color.Error
-    };
 }
