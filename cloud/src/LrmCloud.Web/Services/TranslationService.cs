@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using LrmCloud.Shared.Api;
 using LrmCloud.Shared.DTOs.Translation;
 
 namespace LrmCloud.Web.Services;
@@ -31,8 +32,11 @@ public class TranslationService
         if (queryParams.Any())
             url += "?" + string.Join("&", queryParams);
 
-        return await _httpClient.GetFromJsonAsync<List<TranslationProviderDto>>(url)
-            ?? new List<TranslationProviderDto>();
+        var response = await _httpClient.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<List<TranslationProviderDto>>>();
+        return result?.Data ?? new List<TranslationProviderDto>();
     }
 
     /// <summary>
@@ -40,7 +44,12 @@ public class TranslationService
     /// </summary>
     public async Task<TranslationUsageDto?> GetUsageAsync()
     {
-        return await _httpClient.GetFromJsonAsync<TranslationUsageDto>("translation/usage");
+        var response = await _httpClient.GetAsync("translation/usage");
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<TranslationUsageDto>>();
+        return result?.Data;
     }
 
     /// <summary>
@@ -48,8 +57,12 @@ public class TranslationService
     /// </summary>
     public async Task<List<ProviderUsageDto>> GetUsageByProviderAsync()
     {
-        return await _httpClient.GetFromJsonAsync<List<ProviderUsageDto>>("translation/usage/providers")
-            ?? new List<ProviderUsageDto>();
+        var response = await _httpClient.GetAsync("translation/usage/providers");
+        if (!response.IsSuccessStatusCode)
+            return new List<ProviderUsageDto>();
+
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<List<ProviderUsageDto>>>();
+        return result?.Data ?? new List<ProviderUsageDto>();
     }
 
     /// <summary>
@@ -61,15 +74,16 @@ public class TranslationService
 
         if (response.IsSuccessStatusCode)
         {
-            return await response.Content.ReadFromJsonAsync<TranslateResponseDto>()
-                ?? new TranslateResponseDto { Success = false, Errors = ["Failed to parse response"] };
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<TranslateResponseDto>>();
+            return result?.Data ?? new TranslateResponseDto { Success = false, Errors = ["Failed to parse response"] };
         }
 
-        var errorResult = await response.Content.ReadFromJsonAsync<TranslateResponseDto>();
-        return errorResult ?? new TranslateResponseDto
+        // Try to parse error response
+        var error = await ReadErrorMessageAsync(response);
+        return new TranslateResponseDto
         {
             Success = false,
-            Errors = [$"Translation failed: {response.StatusCode}"]
+            Errors = [error]
         };
     }
 
@@ -86,15 +100,15 @@ public class TranslationService
 
         if (response.IsSuccessStatusCode)
         {
-            return await response.Content.ReadFromJsonAsync<TranslateSingleResponseDto>()
-                ?? new TranslateSingleResponseDto { Success = false, Error = "Failed to parse response" };
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<TranslateSingleResponseDto>>();
+            return result?.Data ?? new TranslateSingleResponseDto { Success = false, Error = "Failed to parse response" };
         }
 
-        var errorResult = await response.Content.ReadFromJsonAsync<TranslateSingleResponseDto>();
-        return errorResult ?? new TranslateSingleResponseDto
+        var error = await ReadErrorMessageAsync(response);
+        return new TranslateSingleResponseDto
         {
             Success = false,
-            Error = $"Translation failed: {response.StatusCode}"
+            Error = error
         };
     }
 
@@ -165,8 +179,8 @@ public class TranslationService
 
         if (response.IsSuccessStatusCode)
         {
-            return await response.Content.ReadFromJsonAsync<TestApiKeyResponse>()
-                ?? new TestApiKeyResponse { IsValid = false, Error = "Failed to parse response" };
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<TestApiKeyResponse>>();
+            return result?.Data ?? new TestApiKeyResponse { IsValid = false, Error = "Failed to parse response" };
         }
 
         return new TestApiKeyResponse
@@ -185,14 +199,12 @@ public class TranslationService
     /// </summary>
     public async Task<ProviderConfigDto?> GetUserProviderConfigAsync(string provider)
     {
-        try
-        {
-            return await _httpClient.GetFromJsonAsync<ProviderConfigDto>($"translation/config/user/{provider}");
-        }
-        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
+        var response = await _httpClient.GetAsync($"translation/config/user/{provider}");
+        if (!response.IsSuccessStatusCode)
             return null;
-        }
+
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<ProviderConfigDto>>();
+        return result?.Data;
     }
 
     /// <summary>
@@ -218,15 +230,12 @@ public class TranslationService
     /// </summary>
     public async Task<ProviderConfigDto?> GetOrganizationProviderConfigAsync(int organizationId, string provider)
     {
-        try
-        {
-            return await _httpClient.GetFromJsonAsync<ProviderConfigDto>(
-                $"translation/config/organizations/{organizationId}/{provider}");
-        }
-        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
+        var response = await _httpClient.GetAsync($"translation/config/organizations/{organizationId}/{provider}");
+        if (!response.IsSuccessStatusCode)
             return null;
-        }
+
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<ProviderConfigDto>>();
+        return result?.Data;
     }
 
     /// <summary>
@@ -255,15 +264,12 @@ public class TranslationService
     /// </summary>
     public async Task<ProviderConfigDto?> GetProjectProviderConfigAsync(int projectId, string provider)
     {
-        try
-        {
-            return await _httpClient.GetFromJsonAsync<ProviderConfigDto>(
-                $"translation/config/projects/{projectId}/{provider}");
-        }
-        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
+        var response = await _httpClient.GetAsync($"translation/config/projects/{projectId}/{provider}");
+        if (!response.IsSuccessStatusCode)
             return null;
-        }
+
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<ProviderConfigDto>>();
+        return result?.Data;
     }
 
     /// <summary>
@@ -304,29 +310,50 @@ public class TranslationService
         if (queryParams.Any())
             url += "?" + string.Join("&", queryParams);
 
-        return await _httpClient.GetFromJsonAsync<ResolvedProviderConfigDto>(url);
+        var response = await _httpClient.GetAsync(url);
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<ResolvedProviderConfigDto>>();
+        return result?.Data;
     }
 
+    /// <summary>
+    /// Parses API response into ServiceResult.
+    /// </summary>
     private static async Task<ServiceResult> ParseServiceResultAsync(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode)
         {
-            return ServiceResult.Success();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>();
+            return ServiceResult.Success(result?.Message);
         }
 
+        var error = await ReadErrorMessageAsync(response);
+        return ServiceResult.Failure(error);
+    }
+
+    /// <summary>
+    /// Reads error message from ProblemDetails or other error response formats.
+    /// </summary>
+    private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response)
+    {
         try
         {
-            var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
-            return ServiceResult.Failure(error?.Error ?? $"Request failed: {response.StatusCode}");
+            var content = await response.Content.ReadAsStringAsync();
+            if (content.Contains("\"detail\""))
+            {
+                var problem = System.Text.Json.JsonDocument.Parse(content);
+                if (problem.RootElement.TryGetProperty("detail", out var detail))
+                {
+                    return detail.GetString() ?? "An error occurred";
+                }
+            }
+            return content.Length < 200 ? content : "An error occurred";
         }
         catch
         {
-            return ServiceResult.Failure($"Request failed: {response.StatusCode}");
+            return $"Request failed with status {response.StatusCode}";
         }
-    }
-
-    private class ErrorResponse
-    {
-        public string? Error { get; set; }
     }
 }
