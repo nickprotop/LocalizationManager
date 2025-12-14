@@ -53,4 +53,13 @@ public static class ErrorCodes
     public const string EXT_GITHUB_ERROR = "EXT_GITHUB_ERROR";
     public const string EXT_TRANSLATION_ERROR = "EXT_TRANSLATION_ERROR";
     public const string EXT_MAIL_ERROR = "EXT_MAIL_ERROR";
+
+    // ==========================================================================
+    // Translation (TRN_*)
+    // ==========================================================================
+    public const string TRN_KEY_NOT_FOUND = "TRN_KEY_NOT_FOUND";
+    public const string TRN_CONFIG_NOT_FOUND = "TRN_CONFIG_NOT_FOUND";
+    public const string TRN_PROVIDER_ERROR = "TRN_PROVIDER_ERROR";
+    public const string TRN_SAVE_FAILED = "TRN_SAVE_FAILED";
+    public const string TRN_INVALID_PROVIDER = "TRN_INVALID_PROVIDER";
 }
