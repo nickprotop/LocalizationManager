@@ -389,6 +389,9 @@ public class AuthService : IAuthService
         user.LastLoginAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;
 
+        // Sync plan limits with current config (in case limits changed)
+        SyncUserLimitsWithConfig(user);
+
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("User logged in successfully: {Email}", user.Email);
@@ -504,6 +507,9 @@ public class AuthService : IAuthService
 
         // Track last used timestamp (for session management)
         validToken.LastUsedAt = DateTime.UtcNow;
+
+        // Sync plan limits with current config (in case limits changed)
+        SyncUserLimitsWithConfig(user);
 
         // Revoke old refresh token (token rotation)
         validToken.RevokedAt = DateTime.UtcNow;
@@ -1283,5 +1289,28 @@ public class AuthService : IAuthService
         var newOrder = planOrder.GetValueOrDefault(newPlan?.ToLowerInvariant() ?? "free", 0);
 
         return newOrder > oldOrder;
+    }
+
+    /// <summary>
+    /// Syncs user plan limits with current config values.
+    /// This ensures users get updated limits if config changes.
+    /// </summary>
+    private void SyncUserLimitsWithConfig(User user)
+    {
+        var expectedTranslationLimit = _config.Limits.GetTranslationCharsLimit(user.Plan);
+        var expectedOtherLimit = _config.Limits.GetOtherCharsLimit(user.Plan);
+
+        if (user.TranslationCharsLimit != expectedTranslationLimit ||
+            user.OtherCharsLimit != expectedOtherLimit)
+        {
+            _logger.LogInformation(
+                "Syncing limits for user {UserId} ({Plan}): Translation {Old}->{New}, Other {OldOther}->{NewOther}",
+                user.Id, user.Plan,
+                user.TranslationCharsLimit, expectedTranslationLimit,
+                user.OtherCharsLimit, expectedOtherLimit);
+
+            user.TranslationCharsLimit = expectedTranslationLimit;
+            user.OtherCharsLimit = expectedOtherLimit;
+        }
     }
 }

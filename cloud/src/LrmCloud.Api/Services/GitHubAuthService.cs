@@ -86,8 +86,9 @@ public class GitHubAuthService : IGitHubAuthService
 
             var (refreshToken, refreshTokenExpiresAt) = await GenerateRefreshTokenAsync(user.Id, ipAddress);
 
-            // Update last login
+            // Update last login and sync limits
             user.LastLoginAt = DateTime.UtcNow;
+            SyncUserLimitsWithConfig(user);
             await _db.SaveChangesAsync();
 
             var response = new LoginResponse
@@ -334,5 +335,28 @@ public class GitHubAuthService : IGitHubAuthService
         await _db.SaveChangesAsync();
 
         return (refreshToken, expiresAt);
+    }
+
+    /// <summary>
+    /// Syncs user plan limits with current config values.
+    /// This ensures users get updated limits if config changes.
+    /// </summary>
+    private void SyncUserLimitsWithConfig(User user)
+    {
+        var expectedTranslationLimit = _config.Limits.GetTranslationCharsLimit(user.Plan);
+        var expectedOtherLimit = _config.Limits.GetOtherCharsLimit(user.Plan);
+
+        if (user.TranslationCharsLimit != expectedTranslationLimit ||
+            user.OtherCharsLimit != expectedOtherLimit)
+        {
+            _logger.LogInformation(
+                "Syncing limits for user {UserId} ({Plan}): Translation {Old}->{New}, Other {OldOther}->{NewOther}",
+                user.Id, user.Plan,
+                user.TranslationCharsLimit, expectedTranslationLimit,
+                user.OtherCharsLimit, expectedOtherLimit);
+
+            user.TranslationCharsLimit = expectedTranslationLimit;
+            user.OtherCharsLimit = expectedOtherLimit;
+        }
     }
 }
