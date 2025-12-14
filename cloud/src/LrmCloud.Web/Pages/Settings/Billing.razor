@@ -92,11 +92,22 @@ else
 
                         @if (!string.IsNullOrEmpty(_subscription.PaymentSubscriptionId))
                         {
-                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Filled.Settings"
-                                       OnClick="@OpenPortal">
-                                Manage Subscription
-                            </MudButton>
+                            @if (_subscription.PaymentProvider == "paypal")
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.OpenInNew"
+                                           Href="https://www.paypal.com/myaccount/autopay" Target="_blank">
+                                    Manage on PayPal
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.Settings"
+                                           OnClick="@OpenPortal">
+                                    Manage Subscription
+                                </MudButton>
+                            }
                         }
                     </MudStack>
 
@@ -168,7 +179,7 @@ else
                     </MudStack>
 
                     <MudButton Variant="Variant.Text" Color="Color.Primary" Class="mt-3"
-                               Href="/settings/usage" FullWidth="true">
+                               Href="/app/settings/usage" FullWidth="true">
                         View Full Usage Dashboard
                     </MudButton>
                 }
