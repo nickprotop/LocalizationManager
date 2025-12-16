@@ -532,7 +532,7 @@
     private void GoToProject(int projectId)
     {
         Close();
-        Navigation.NavigateTo($"projects/{projectId}");
+        Navigation.NavigateTo($"/app/projects/{projectId}");
     }
 
     private static string GetFileIcon(string fileName) =>

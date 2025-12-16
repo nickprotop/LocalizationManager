@@ -23,21 +23,21 @@ else if (_organization == null)
 {
     <MudAlert Severity="Severity.Error">
         Organization not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="organizations">Back to Organizations</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/app/organizations">Back to Organizations</MudButton>
     </MudAlert>
 }
 else if (!OrganizationRole.IsAdminOrOwner(_organization.UserRole))
 {
     <MudAlert Severity="Severity.Warning">
         You don't have permission to access organization settings.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"/organizations/{OrganizationId}")">Back to Organization</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"/app/organizations/{OrganizationId}")">Back to Organization</MudButton>
     </MudAlert>
 }
 else
 {
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
         <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                       OnClick="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}"))"
+                       OnClick="@(() => Navigation.NavigateTo($"/app/organizations/{OrganizationId}"))"
                        Size="Size.Small" />
         <MudBreadcrumbs Items="_breadcrumbs" />
     </MudStack>
@@ -130,7 +130,7 @@ else
                                     <MudButton Variant="Variant.Text"
                                                Color="Color.Primary"
                                                Size="Size.Small"
-                                               Href="@($"/organizations/{OrganizationId}/members")">
+                                               Href="@($"/app/organizations/{OrganizationId}/members")">
                                         Manage
                                     </MudButton>
                                 </MudStack>
@@ -407,7 +407,7 @@ else
             if (success)
             {
                 Snackbar.Add("Organization deleted successfully", Severity.Success);
-                Navigation.NavigateTo("organizations");
+                Navigation.NavigateTo("/app/organizations");
             }
             else
             {

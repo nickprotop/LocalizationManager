@@ -211,11 +211,11 @@ else
 
     private void NavigateToProject(int projectId)
     {
-        Navigation.NavigateTo($"projects/{projectId}");
+        Navigation.NavigateTo($"/app/projects/{projectId}");
     }
 
     private void NavigateToEditor(int projectId)
     {
-        Navigation.NavigateTo($"projects/{projectId}/editor");
+        Navigation.NavigateTo($"/app/projects/{projectId}/editor");
     }
 }

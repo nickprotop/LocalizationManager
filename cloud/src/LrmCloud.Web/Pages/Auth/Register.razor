@@ -18,7 +18,7 @@
             <MudAlert Severity="Severity.Success" Dense="true">
                 @_successMessage
                 <br />
-                <MudLink Href="login">Go to login</MudLink>
+                <MudLink Href="/app/login">Go to login</MudLink>
             </MudAlert>
         }
         else
@@ -102,7 +102,7 @@
             </MudButton>
 
             <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-4">
-                Already have an account? <MudLink Href="login">Sign in</MudLink>
+                Already have an account? <MudLink Href="/app/login">Sign in</MudLink>
             </MudText>
         }
     </MudStack>
@@ -121,7 +121,7 @@
         // If user is already authenticated, redirect to home
         if (await AuthService.IsAuthenticatedAsync())
         {
-            Navigation.NavigateTo("", forceLoad: false);
+            Navigation.NavigateTo("/app", forceLoad: false);
         }
     }
 

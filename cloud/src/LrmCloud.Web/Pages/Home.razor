@@ -162,7 +162,7 @@ else
     @if (_filteredProjects.Count > 6)
     {
         <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
-            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="projects">
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/app/projects">
                 View All Projects (@_filteredProjects.Count)
             </MudButton>
         </MudStack>
@@ -278,12 +278,12 @@ else
 
     private void NavigateToProject(int projectId)
     {
-        Navigation.NavigateTo($"projects/{projectId}");
+        Navigation.NavigateTo($"/app/projects/{projectId}");
     }
 
     private void NavigateToEditor(int projectId)
     {
-        Navigation.NavigateTo($"projects/{projectId}/editor");
+        Navigation.NavigateTo($"/app/projects/{projectId}/editor");
     }
 
     private string FormatLrmUsage()
