@@ -35,4 +35,21 @@ public class UsageController : ApiControllerBase
         var stats = await _usageService.GetUserStatsAsync(userId);
         return Success(stats);
     }
+
+    /// <summary>
+    /// Get usage statistics for an organization.
+    /// </summary>
+    [HttpGet("organizations/{organizationId:int}")]
+    public async Task<ActionResult<ApiResponse<OrganizationUsageDto>>> GetOrganizationStats(int organizationId)
+    {
+        var userId = GetUserId();
+        var stats = await _usageService.GetOrganizationStatsAsync(organizationId, userId);
+
+        if (stats == null)
+        {
+            return NotFound("Organization not found or you don't have access to it.");
+        }
+
+        return Success(stats);
+    }
 }

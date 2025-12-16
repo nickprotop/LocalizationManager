@@ -86,4 +86,49 @@ public class UsageService : IUsageService
             MaxTeamMembers = _limits.GetMaxTeamMembers(user.Plan)
         };
     }
+
+    public async Task<OrganizationUsageDto?> GetOrganizationStatsAsync(int organizationId, int userId)
+    {
+        // Verify user is a member of the organization
+        var membership = await _db.OrganizationMembers
+            .FirstOrDefaultAsync(m => m.OrganizationId == organizationId && m.UserId == userId);
+
+        if (membership == null)
+        {
+            return null;
+        }
+
+        var org = await _db.Organizations
+            .Include(o => o.Members)
+            .Include(o => o.Projects)
+            .FirstOrDefaultAsync(o => o.Id == organizationId);
+
+        if (org == null)
+        {
+            return null;
+        }
+
+        // Storage tracking not implemented yet - return 0
+        var storageBytes = 0L;
+
+        // Calculate days remaining in billing cycle (reset on 1st of month)
+        var now = DateTime.UtcNow;
+        var nextMonth = now.AddMonths(1);
+        var resetDate = new DateTime(nextMonth.Year, nextMonth.Month, 1);
+        var daysRemaining = (int)(resetDate - now).TotalDays;
+
+        return new OrganizationUsageDto
+        {
+            LrmCharsUsed = org.TranslationCharsUsed,
+            LrmCharsLimit = org.TranslationCharsLimit,
+            OtherCharsUsed = 0, // TODO: Track organization-level BYOK usage
+            ApiCalls = 0, // TODO: Track organization-level API calls
+            StorageBytes = storageBytes,
+            DaysRemaining = daysRemaining,
+            Plan = org.Plan,
+            MemberCount = org.Members.Count,
+            MaxMembers = _limits.GetMaxTeamMembers(org.Plan),
+            ProjectCount = org.Projects.Count
+        };
+    }
 }

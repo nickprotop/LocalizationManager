@@ -33,4 +33,22 @@ public class UsageService
         }
         return null;
     }
+
+    public async Task<OrganizationUsageDto?> GetOrganizationStatsAsync(int organizationId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"usage/organizations/{organizationId}");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<OrganizationUsageDto>>();
+                return result?.Data;
+            }
+        }
+        catch
+        {
+            // Ignore errors
+        }
+        return null;
+    }
 }
