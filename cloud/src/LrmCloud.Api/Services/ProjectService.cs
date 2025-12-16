@@ -386,6 +386,55 @@ public class ProjectService : IProjectService
                 project.AutoCreatePr = request.AutoCreatePr.Value;
             }
 
+            // Handle organization assignment/transfer
+            if (request.UpdateOrganization)
+            {
+                if (request.OrganizationId.HasValue)
+                {
+                    // Verify user has admin/owner access to the target organization
+                    if (!await _organizationService.IsAdminOrOwnerAsync(request.OrganizationId.Value, userId))
+                    {
+                        return (false, null, "You don't have permission to assign projects to this organization");
+                    }
+
+                    // Check if slug would conflict in the target organization
+                    var slugExists = await _db.Projects.AnyAsync(p =>
+                        p.OrganizationId == request.OrganizationId.Value &&
+                        p.Slug == project.Slug &&
+                        p.Id != projectId);
+
+                    if (slugExists)
+                    {
+                        return (false, null, "A project with this slug already exists in the target organization");
+                    }
+
+                    project.OrganizationId = request.OrganizationId.Value;
+                    project.UserId = null; // Remove personal ownership
+
+                    _logger.LogInformation("Project {ProjectId} transferred to organization {OrgId} by user {UserId}",
+                        projectId, request.OrganizationId.Value, userId);
+                }
+                else
+                {
+                    // Converting to personal project - verify user owns the project or is org admin
+                    // Only the original creator can convert back to personal, or we make it personal for the requester
+                    var slugExists = await _db.Projects.AnyAsync(p =>
+                        p.UserId == userId &&
+                        p.Slug == project.Slug &&
+                        p.Id != projectId);
+
+                    if (slugExists)
+                    {
+                        return (false, null, "You already have a personal project with this slug");
+                    }
+
+                    project.OrganizationId = null;
+                    project.UserId = userId;
+
+                    _logger.LogInformation("Project {ProjectId} converted to personal project for user {UserId}", projectId, userId);
+                }
+            }
+
             project.UpdatedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();

@@ -43,4 +43,17 @@ public class UpdateProjectRequest
     public bool? AutoTranslate { get; set; }
 
     public bool? AutoCreatePr { get; set; }
+
+    /// <summary>
+    /// Organization ID to transfer/assign this project to.
+    /// Set to null to make it a personal project.
+    /// Set to a valid organization ID to transfer it to that organization.
+    /// </summary>
+    public int? OrganizationId { get; set; }
+
+    /// <summary>
+    /// Flag to indicate we want to explicitly set the OrganizationId (even to null).
+    /// Required because OrganizationId being null could mean "don't change" or "remove from org".
+    /// </summary>
+    public bool UpdateOrganization { get; set; }
 }
