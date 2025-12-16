@@ -1,12 +1,14 @@
-@page "/projects/{ProjectId:int}/settings"
+@page "/app/projects/{ProjectId:int}/settings"
 @attribute [Authorize]
 @using LrmCloud.Shared.DTOs.Projects
 @using LrmCloud.Shared.DTOs.Resources
 @using LrmCloud.Shared.DTOs.Translation
+@using LrmCloud.Shared.DTOs.Organizations
 @using LrmCloud.Web.Helpers
 @inject ProjectService ProjectService
 @inject ResourceService ResourceService
 @inject TranslationService TranslationService
+@inject OrganizationService OrganizationService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -105,6 +107,21 @@ else
                                           For="@(() => _model.LocalizationPath)"
                                           Disabled="_isSubmitting"
                                           HelperText="Relative path to localization files" />
+
+                            <MudDivider Class="my-2" />
+
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Project Ownership</MudText>
+                            <MudSelect @bind-Value="_selectedOrganizationId"
+                                       Label="Organization"
+                                       Variant="Variant.Outlined"
+                                       Disabled="_isSubmitting || _loadingOrganizations"
+                                       HelperText="Assign this project to an organization or keep as personal">
+                                <MudSelectItem Value="@((int?)null)">Personal Project</MudSelectItem>
+                                @foreach (var org in _organizations.Where(o => o.UserRole is "Owner" or "Admin"))
+                                {
+                                    <MudSelectItem Value="@((int?)org.Id)">@org.Name</MudSelectItem>
+                                }
+                            </MudSelect>
                         </MudStack>
                     </MudItem>
                     <MudItem xs="12" md="6">
@@ -120,7 +137,7 @@ else
                                     <MudText>@_project.UpdatedAt.ToString("MMMM dd, yyyy HH:mm")</MudText>
                                 </div>
                                 <div>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Organization</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Current Organization</MudText>
                                     <MudText>@(_project.OrganizationName ?? "Personal")</MudText>
                                 </div>
                             </MudStack>
@@ -452,6 +469,12 @@ else
     private UpdateProjectRequest _model = new();
     private int _activeTabIndex;
 
+    // Organization assignment
+    private List<OrganizationDto> _organizations = new();
+    private bool _loadingOrganizations;
+    private int? _selectedOrganizationId;
+    private int? _originalOrganizationId;
+
     // Languages
     private List<ProjectLanguageDto> _languages = new();
     private bool _loadingLanguages;
@@ -481,7 +504,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadProjectAsync();
+        await Task.WhenAll(LoadProjectAsync(), LoadOrganizationsAsync());
     }
 
     private async Task LoadProjectAsync()
@@ -502,6 +525,8 @@ else
                     GitHubRepo = _project.GitHubRepo,
                     GitHubDefaultBranch = _project.GitHubDefaultBranch
                 };
+                _selectedOrganizationId = _project.OrganizationId;
+                _originalOrganizationId = _project.OrganizationId;
             }
         }
         catch (Exception ex)
@@ -514,6 +539,23 @@ else
         }
     }
 
+    private async Task LoadOrganizationsAsync()
+    {
+        _loadingOrganizations = true;
+        try
+        {
+            _organizations = await OrganizationService.GetOrganizationsAsync();
+        }
+        catch
+        {
+            // Ignore errors - user may not have organizations
+        }
+        finally
+        {
+            _loadingOrganizations = false;
+        }
+    }
+
     private async Task HandleSubmit()
     {
         if (_project == null) return;
@@ -523,11 +565,20 @@ else
 
         try
         {
+            // Check if organization assignment changed
+            if (_selectedOrganizationId != _originalOrganizationId)
+            {
+                _model.OrganizationId = _selectedOrganizationId;
+                _model.UpdateOrganization = true;
+            }
+
             var result = await ProjectService.UpdateProjectAsync(_project.Id, _model);
 
             if (result.IsSuccess && result.Data != null)
             {
                 _project = result.Data;
+                _originalOrganizationId = _selectedOrganizationId; // Update the original to reflect saved state
+                _model.UpdateOrganization = false; // Reset flag
                 Snackbar.Add($"Project '{result.Data.Name}' updated successfully!", Severity.Success);
             }
             else
