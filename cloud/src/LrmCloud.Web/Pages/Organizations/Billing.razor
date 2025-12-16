@@ -1,13 +1,15 @@
-@page "/organizations/{OrganizationId:int}/billing"
+@page "/app/organizations/{OrganizationId:int}/billing"
 @attribute [Authorize]
 @using LrmCloud.Shared.Constants
 @using LrmCloud.Shared.DTOs.Organizations
 @using LrmCloud.Shared.DTOs.Billing
+@using LrmCloud.Shared.DTOs.Usage
 @using LrmCloud.Web.Services
 @using LrmCloud.Web.Components
 @using LrmCloud.Web.Helpers
 @inject OrganizationService OrganizationService
 @inject BillingService BillingService
+@inject UsageService UsageService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
@@ -120,12 +122,12 @@ else
                         <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">LRM TRANSLATION</MudText>
-                                <MudText Typo="Typo.h5">@UiHelpers.FormatNumber(_usageStats.LrmCharsUsed)</MudText>
-                                <MudProgressLinear Value="@UiHelpers.GetUsagePercentage(_usageStats.LrmCharsUsed, _usageStats.LrmCharsLimit)"
-                                                   Color="@UiHelpers.GetUsageColor(_usageStats.LrmCharsUsed, _usageStats.LrmCharsLimit)"
+                                <MudText Typo="Typo.h5">@UiHelpers.FormatNumber(_usageStats?.LrmCharsUsed ?? 0)</MudText>
+                                <MudProgressLinear Value="@UiHelpers.GetUsagePercentage(_usageStats?.LrmCharsUsed ?? 0, _usageStats?.LrmCharsLimit ?? 1)"
+                                                   Color="@UiHelpers.GetUsageColor(_usageStats?.LrmCharsUsed ?? 0, _usageStats?.LrmCharsLimit ?? 1)"
                                                    Class="mt-2" />
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    of @UiHelpers.FormatNumber(_usageStats.LrmCharsLimit) limit
+                                    of @UiHelpers.FormatNumber(_usageStats?.LrmCharsLimit ?? 0) limit
                                 </MudText>
                             </MudStack>
                         </MudPaper>
@@ -134,7 +136,7 @@ else
                         <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">OTHER PROVIDERS</MudText>
-                                <MudText Typo="Typo.h5">@UiHelpers.FormatNumber(_usageStats.OtherCharsUsed)</MudText>
+                                <MudText Typo="Typo.h5">@UiHelpers.FormatNumber(_usageStats?.OtherCharsUsed ?? 0)</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
                                     BYOK + free (tracked)
                                 </MudText>
@@ -145,7 +147,7 @@ else
                         <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">API CALLS</MudText>
-                                <MudText Typo="Typo.h5">@UiHelpers.FormatNumber(_usageStats.ApiCalls)</MudText>
+                                <MudText Typo="Typo.h5">@UiHelpers.FormatNumber(_usageStats?.ApiCalls ?? 0)</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
                                     This billing period
                                 </MudText>
@@ -156,7 +158,7 @@ else
                         <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">STORAGE</MudText>
-                                <MudText Typo="Typo.h5">@UiHelpers.FormatBytes(_usageStats.StorageBytes)</MudText>
+                                <MudText Typo="Typo.h5">@UiHelpers.FormatBytes(_usageStats?.StorageBytes ?? 0)</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
                                     Resource files
                                 </MudText>
@@ -167,7 +169,7 @@ else
                         <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">BILLING CYCLE</MudText>
-                                <MudText Typo="Typo.h5">@_usageStats.DaysRemaining days</MudText>
+                                <MudText Typo="Typo.h5">@(_usageStats?.DaysRemaining ?? 0) days</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
                                     Until reset
                                 </MudText>
@@ -349,7 +351,7 @@ else
 
     private OrganizationDto? _organization;
     private SubscriptionDto? _subscription;
-    private UsageStats _usageStats = new();
+    private OrganizationUsageDto? _usageStats;
     private bool _isLoading = true;
     private bool _isProcessing;
     private bool _upgradeDialogVisible;
@@ -368,30 +370,21 @@ else
         {
             var orgTask = OrganizationService.GetOrganizationAsync(OrganizationId);
             var subscriptionTask = BillingService.GetSubscriptionAsync();
+            var usageTask = UsageService.GetOrganizationStatsAsync(OrganizationId);
 
-            await Task.WhenAll(orgTask, subscriptionTask);
+            await Task.WhenAll(orgTask, subscriptionTask, usageTask);
 
             _organization = await orgTask;
             _subscription = await subscriptionTask;
+            _usageStats = await usageTask;
 
             if (_organization != null)
             {
                 _breadcrumbs = new List<BreadcrumbItem>
                 {
-                    new("Organizations", "/organizations"),
-                    new(_organization.Name, $"/organizations/{OrganizationId}"),
+                    new("Organizations", "/app/organizations"),
+                    new(_organization.Name, $"/app/organizations/{OrganizationId}"),
                     new("Billing", null, disabled: true)
-                };
-
-                // TODO: Load actual usage stats from API
-                _usageStats = new UsageStats
-                {
-                    LrmCharsUsed = 5432,
-                    LrmCharsLimit = GetCharacterLimitNumber(_organization.Plan),
-                    OtherCharsUsed = 12500,
-                    ApiCalls = 127,
-                    StorageBytes = 1024 * 1024 * 2, // 2 MB
-                    DaysRemaining = 15
                 };
             }
         }
@@ -427,8 +420,8 @@ else
             var baseUrl = Navigation.BaseUri.TrimEnd('/');
             var result = await BillingService.CreateCheckoutAsync(
                 _selectedPlan,
-                $"{baseUrl}/organizations/{OrganizationId}/billing?success=true",
-                $"{baseUrl}/organizations/{OrganizationId}/billing?canceled=true"
+                $"{baseUrl}/app/organizations/{OrganizationId}/billing?success=true",
+                $"{baseUrl}/app/organizations/{OrganizationId}/billing?canceled=true"
             );
 
             if (result?.SessionUrl != null)
@@ -482,19 +475,4 @@ else
         "enterprise" => int.MaxValue,
         _ => 10000
     };
-
-
-    private class UsageStats
-    {
-        // LRM Translation (managed service)
-        public long LrmCharsUsed { get; set; }
-        public long LrmCharsLimit { get; set; }
-
-        // Other providers (BYOK + free)
-        public long OtherCharsUsed { get; set; }
-
-        public int ApiCalls { get; set; }
-        public long StorageBytes { get; set; }
-        public int DaysRemaining { get; set; }
-    }
 }

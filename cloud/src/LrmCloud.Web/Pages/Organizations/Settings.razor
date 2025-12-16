@@ -1,4 +1,4 @@
-@page "/organizations/{OrganizationId:int}/settings"
+@page "/app/organizations/{OrganizationId:int}/settings"
 @attribute [Authorize]
 @using LrmCloud.Shared.Constants
 @using LrmCloud.Shared.DTOs.Organizations
@@ -340,8 +340,8 @@ else
 
                 _breadcrumbs = new List<BreadcrumbItem>
                 {
-                    new("Organizations", "/organizations"),
-                    new(_organization.Name, $"/organizations/{OrganizationId}"),
+                    new("Organizations", "/app/organizations"),
+                    new(_organization.Name, $"/app/organizations/{OrganizationId}"),
                     new("Settings", null, disabled: true)
                 };
             }

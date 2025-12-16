@@ -1,4 +1,4 @@
-@page "/organizations/{OrganizationId:int}/api-keys"
+@page "/app/organizations/{OrganizationId:int}/api-keys"
 @using LrmCloud.Shared.DTOs.Organizations
 @using LrmCloud.Shared.DTOs.Translation
 @using LrmCloud.Web.Services
@@ -305,8 +305,8 @@
 
                 _breadcrumbs = new List<BreadcrumbItem>
                 {
-                    new("Organizations", "/organizations", icon: Icons.Material.Filled.Business),
-                    new(_organization.Name, $"/organizations/{OrganizationId}"),
+                    new("Organizations", "/app/organizations", icon: Icons.Material.Filled.Business),
+                    new(_organization.Name, $"/app/organizations/{OrganizationId}"),
                     new("API Keys", null, disabled: true)
                 };
             }
