@@ -177,6 +177,13 @@
     [Parameter]
     public List<string> KeysToTranslate { get; set; } = new();
 
+    /// <summary>
+    /// Optional source texts for each key. When provided, these are used instead of database values.
+    /// This allows translating unsaved edits from the UI.
+    /// </summary>
+    [Parameter]
+    public Dictionary<string, string>? SourceTexts { get; set; }
+
     private List<TranslationProviderDto> _providers = new();
     private string? _selectedProvider;
     private HashSet<string> _selectedLanguages = new();
@@ -296,7 +303,8 @@
                 OnlyMissing = _onlyMissing,
                 Overwrite = _overwrite,
                 Context = _context,
-                SaveToDatabase = false  // Return translations for UI preview, don't save yet
+                SaveToDatabase = false,  // Return translations for UI preview, don't save yet
+                SourceTexts = SourceTexts  // Pass current UI values if provided
             };
 
             _translationResult = await TranslationService.TranslateKeysAsync(ProjectId, request);

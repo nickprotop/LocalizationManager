@@ -130,6 +130,81 @@ public class TranslationGridRow
             };
         }
     }
+
+    /// <summary>
+    /// Creates a deep clone of this row for isolated editing.
+    /// </summary>
+    public TranslationGridRow Clone()
+    {
+        var clone = new TranslationGridRow
+        {
+            KeyId = KeyId,
+            KeyName = KeyName,
+            KeyPath = KeyPath,
+            IsPlural = IsPlural,
+            Comment = Comment,
+            Version = Version,
+            UpdatedAt = UpdatedAt,
+            Translations = new Dictionary<string, TranslationCell>()
+        };
+
+        foreach (var kvp in Translations)
+        {
+            clone.Translations[kvp.Key] = new TranslationCell
+            {
+                TranslationId = kvp.Value.TranslationId,
+                LanguageCode = kvp.Value.LanguageCode,
+                Value = kvp.Value.Value,
+                OriginalValue = kvp.Value.OriginalValue,
+                PluralForm = kvp.Value.PluralForm,
+                Status = kvp.Value.Status,
+                Version = kvp.Value.Version,
+                IsDirty = kvp.Value.IsDirty
+            };
+        }
+
+        return clone;
+    }
+
+    /// <summary>
+    /// Copies values from another row into this row (for applying edits from a clone).
+    /// </summary>
+    public void ApplyFrom(TranslationGridRow source)
+    {
+        Comment = source.Comment;
+        IsPlural = source.IsPlural;
+
+        // Copy translations
+        foreach (var kvp in source.Translations)
+        {
+            if (Translations.TryGetValue(kvp.Key, out var existingCell))
+            {
+                existingCell.Value = kvp.Value.Value;
+                existingCell.IsDirty = kvp.Value.IsDirty;
+            }
+            else
+            {
+                Translations[kvp.Key] = new TranslationCell
+                {
+                    TranslationId = kvp.Value.TranslationId,
+                    LanguageCode = kvp.Value.LanguageCode,
+                    Value = kvp.Value.Value,
+                    OriginalValue = kvp.Value.OriginalValue,
+                    PluralForm = kvp.Value.PluralForm,
+                    Status = kvp.Value.Status,
+                    Version = kvp.Value.Version,
+                    IsDirty = kvp.Value.IsDirty
+                };
+            }
+        }
+
+        // Remove translations that were removed in source
+        var keysToRemove = Translations.Keys.Where(k => !source.Translations.ContainsKey(k)).ToList();
+        foreach (var key in keysToRemove)
+        {
+            Translations.Remove(key);
+        }
+    }
 }
 
 /// <summary>

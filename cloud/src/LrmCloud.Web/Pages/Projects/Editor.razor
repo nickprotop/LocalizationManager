@@ -179,7 +179,8 @@ else
     private bool _isSaving;
     private bool _hasUnsavedChanges;
     private bool _drawerOpen;
-    private TranslationGridRow? _selectedRow;
+    private TranslationGridRow? _selectedRow;        // Clone for drawer editing (isolated)
+    private TranslationGridRow? _originalSelectedRow; // Original row reference (in grid)
     private AddKeyDialog? _addKeyDialog;
     private ConfirmDeleteDialog? _deleteDialog;
     private IEnumerable<TranslationGridRow>? _pendingDeleteRows;
@@ -519,7 +520,8 @@ else
 
     private void OnRowSelected(TranslationGridRow row)
     {
-        _selectedRow = row;
+        _originalSelectedRow = row;
+        _selectedRow = row.Clone(); // Drawer works on a clone to isolate changes
         _drawerOpen = true;
     }
 
@@ -527,6 +529,7 @@ else
     {
         _drawerOpen = false;
         _selectedRow = null;
+        _originalSelectedRow = null;
     }
 
     private void OnCellChanged((TranslationGridRow Row, string LanguageCode, string Value) args)
@@ -554,12 +557,17 @@ else
         if (_project == null) return;
 
         var rowList = rows.ToList();
+
+        // Build source texts from current UI state (may include unsaved edits)
+        var sourceTexts = BuildSourceTextsFromRows(rowList, _project.DefaultLanguage);
+
         var parameters = new DialogParameters
         {
             { nameof(TranslateDialog.ProjectId), ProjectId },
             { nameof(TranslateDialog.SourceLanguage), _project.DefaultLanguage },
             { nameof(TranslateDialog.AvailableLanguages), _languages },
-            { nameof(TranslateDialog.KeysToTranslate), rowList.Select(r => r.KeyName).ToList() }
+            { nameof(TranslateDialog.KeysToTranslate), rowList.Select(r => r.KeyName).ToList() },
+            { nameof(TranslateDialog.SourceTexts), sourceTexts }
         };
 
         var options = new DialogOptions
@@ -582,6 +590,7 @@ else
 
     /// <summary>
     /// Applies translation results to the UI state, marking cells as dirty so Save button enables.
+    /// Handles both non-plural and plural keys.
     /// </summary>
     private void ApplyTranslationsToUI(List<TranslationGridRow> rows, TranslateResponseDto translationResult)
     {
@@ -595,16 +604,22 @@ else
                 continue;
             }
 
-            if (!row.Translations.TryGetValue(translationRes.TargetLanguage, out var cell))
+            // Build the cell key: "lang" for non-plural, "lang:pluralForm" for plural
+            var cellKey = string.IsNullOrEmpty(translationRes.PluralForm)
+                ? translationRes.TargetLanguage
+                : TranslationGridRow.GetKey(translationRes.TargetLanguage, translationRes.PluralForm);
+
+            if (!row.Translations.TryGetValue(cellKey, out var cell))
             {
-                // Create new cell for this language
+                // Create new cell for this language/plural form
                 cell = new TranslationCell
                 {
                     LanguageCode = translationRes.TargetLanguage,
+                    PluralForm = translationRes.PluralForm,
                     Value = null,
                     OriginalValue = null
                 };
-                row.Translations[translationRes.TargetLanguage] = cell;
+                row.Translations[cellKey] = cell;
             }
 
             // Apply translated text and mark as dirty
@@ -667,10 +682,16 @@ else
         // Stage changes in the editor (don't save to DB yet)
         // User must click the main Save button to persist with optional snapshot
 
-        // Ensure row is tracked in edited rows
-        if (!_editedRows.ContainsKey(row.KeyName))
+        // Apply changes from the drawer's clone to the original row in the grid
+        if (_originalSelectedRow != null)
         {
-            _editedRows[row.KeyName] = row;
+            _originalSelectedRow.ApplyFrom(row);
+
+            // Track the original row (not the clone) in edited rows
+            if (!_editedRows.ContainsKey(_originalSelectedRow.KeyName))
+            {
+                _editedRows[_originalSelectedRow.KeyName] = _originalSelectedRow;
+            }
         }
 
         // Mark that we have unsaved changes
@@ -679,6 +700,7 @@ else
         // Close the drawer
         _drawerOpen = false;
         _selectedRow = null;
+        _originalSelectedRow = null;
 
         Snackbar.Add("Changes staged. Click Save to persist.", Severity.Info);
     }
@@ -687,12 +709,16 @@ else
     {
         if (_project == null) return;
 
+        // Build source texts from current UI state (may include unsaved edits)
+        var sourceTexts = BuildSourceTextsFromRows(new List<TranslationGridRow> { row }, _project.DefaultLanguage);
+
         var parameters = new DialogParameters
         {
             { nameof(TranslateDialog.ProjectId), ProjectId },
             { nameof(TranslateDialog.SourceLanguage), _project.DefaultLanguage },
             { nameof(TranslateDialog.AvailableLanguages), _languages },
-            { nameof(TranslateDialog.KeysToTranslate), new List<string> { row.KeyName } }
+            { nameof(TranslateDialog.KeysToTranslate), new List<string> { row.KeyName } },
+            { nameof(TranslateDialog.SourceTexts), sourceTexts }
         };
 
         var options = new DialogOptions
@@ -717,6 +743,7 @@ else
     /// <summary>
     /// Applies translation results to the currently selected drawer row.
     /// Unlike ApplyTranslationsToUI, this does NOT stage to _editedRows - the user must click Apply.
+    /// Handles both non-plural and plural keys.
     /// </summary>
     private void ApplyTranslationsToDrawerRow(TranslationGridRow row, TranslateResponseDto translationResult)
     {
@@ -724,19 +751,18 @@ else
 
         foreach (var translationRes in translationResult.Results.Where(r => r.Success && r.Key == row.KeyName))
         {
-            // For non-plural keys, use language code directly
-            // For plural keys, the API currently doesn't return plural form, so default to "other"
-            var cellKey = row.IsPlural
-                ? TranslationGridRow.GetKey(translationRes.TargetLanguage, PluralForms.Other)
-                : translationRes.TargetLanguage;
+            // Build the cell key: "lang" for non-plural, "lang:pluralForm" for plural
+            var cellKey = string.IsNullOrEmpty(translationRes.PluralForm)
+                ? translationRes.TargetLanguage
+                : TranslationGridRow.GetKey(translationRes.TargetLanguage, translationRes.PluralForm);
 
             if (!row.Translations.TryGetValue(cellKey, out var cell))
             {
-                // Create new cell for this language
+                // Create new cell for this language/plural form
                 cell = new TranslationCell
                 {
                     LanguageCode = translationRes.TargetLanguage,
-                    PluralForm = row.IsPlural ? PluralForms.Other : "",
+                    PluralForm = translationRes.PluralForm,
                     Value = null,
                     OriginalValue = null
                 };
@@ -756,6 +782,44 @@ else
         }
     }
 
+    /// <summary>
+    /// Builds a dictionary of source texts from the current UI state.
+    /// This allows translating unsaved edits (what the user sees in the editor).
+    /// For plural keys, includes all plural forms with "keyName:pluralForm" keys.
+    /// </summary>
+    private Dictionary<string, string> BuildSourceTextsFromRows(List<TranslationGridRow> rows, string defaultLanguage)
+    {
+        var sourceTexts = new Dictionary<string, string>();
+
+        foreach (var row in rows)
+        {
+            if (row.IsPlural)
+            {
+                // For plural keys, include all plural forms
+                foreach (var pluralForm in PluralForms.All)
+                {
+                    var cell = row.GetCell(defaultLanguage, pluralForm);
+                    if (cell != null && !string.IsNullOrEmpty(cell.Value))
+                    {
+                        // Use "keyName:pluralForm" format for plural keys
+                        sourceTexts[$"{row.KeyName}:{pluralForm}"] = cell.Value;
+                    }
+                }
+            }
+            else
+            {
+                // For non-plural keys, just use the key name
+                var cell = row.Translations.GetValueOrDefault(defaultLanguage);
+                if (cell != null && !string.IsNullOrEmpty(cell.Value))
+                {
+                    sourceTexts[row.KeyName] = cell.Value;
+                }
+            }
+        }
+
+        return sourceTexts;
+    }
+
     private async Task DeleteKey(TranslationGridRow row)
     {
         _pendingDeleteRows = new[] { row };
@@ -767,14 +831,9 @@ else
 
     private void OnKeyTypeChanged((TranslationGridRow Row, bool IsPlural) args)
     {
-        // Track the edited row for the type change
-        if (!_editedRows.ContainsKey(args.Row.KeyName))
-        {
-            _editedRows[args.Row.KeyName] = args.Row;
-        }
-        _hasUnsavedChanges = true;
-
-        // Force grid to re-render to update the plural indicator
+        // Type change is on the clone - just update UI to show changes in the drawer.
+        // The actual change will be applied when the user clicks "Apply" via SaveKeyDetails.
+        // Don't track or mark as dirty here - that happens in SaveKeyDetails.
         StateHasChanged();
     }
 
