@@ -62,14 +62,16 @@ public class OrganizationService : IOrganizationService
                 }
             }
 
-            // Create organization
+            // Create organization - organizations always start on team plan
+            // (free tier doesn't support team features)
             var organization = new Organization
             {
                 Name = request.Name,
                 Slug = slug,
                 Description = request.Description,
                 OwnerId = userId,
-                Plan = "free",
+                Plan = "team",
+                TranslationCharsLimit = _config.Limits.TeamTranslationChars,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };

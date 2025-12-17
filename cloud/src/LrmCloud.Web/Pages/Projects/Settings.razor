@@ -1,4 +1,4 @@
-@page "/app/projects/{ProjectId:int}/settings"
+@page "/projects/{ProjectId:int}/settings"
 @attribute [Authorize]
 @using LrmCloud.Shared.DTOs.Projects
 @using LrmCloud.Shared.DTOs.Resources
@@ -117,7 +117,7 @@ else
                                        Disabled="_isSubmitting || _loadingOrganizations"
                                        HelperText="Assign this project to an organization or keep as personal">
                                 <MudSelectItem Value="@((int?)null)">Personal Project</MudSelectItem>
-                                @foreach (var org in _organizations.Where(o => o.UserRole is "Owner" or "Admin"))
+                                @foreach (var org in _organizations.Where(o => o.UserRole is "owner" or "admin"))
                                 {
                                     <MudSelectItem Value="@((int?)org.Id)">@org.Name</MudSelectItem>
                                 }

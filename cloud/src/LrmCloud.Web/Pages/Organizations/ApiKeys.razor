@@ -1,4 +1,4 @@
-@page "/app/organizations/{OrganizationId:int}/api-keys"
+@page "/organizations/{OrganizationId:int}/api-keys"
 @using LrmCloud.Shared.DTOs.Organizations
 @using LrmCloud.Shared.DTOs.Translation
 @using LrmCloud.Web.Services
@@ -301,7 +301,7 @@
 
             if (_organization != null)
             {
-                _canManageKeys = _organization.UserRole is "Owner" or "Admin";
+                _canManageKeys = _organization.UserRole is "owner" or "admin";
 
                 _breadcrumbs = new List<BreadcrumbItem>
                 {
