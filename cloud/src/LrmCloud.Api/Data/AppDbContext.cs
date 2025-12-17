@@ -41,6 +41,9 @@ public class AppDbContext : DbContext
     // Translation Usage History
     public DbSet<TranslationUsageHistory> TranslationUsageHistory => Set<TranslationUsageHistory>();
 
+    // Usage Events (detailed per-translation tracking)
+    public DbSet<UsageEvent> UsageEvents => Set<UsageEvent>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -297,6 +300,40 @@ public class AppDbContext : DbContext
 
             // Match parent's soft-delete filter
             entity.HasQueryFilter(e => e.User!.DeletedAt == null);
+        });
+
+        // =====================================================================
+        // Usage Events (detailed per-translation tracking)
+        // =====================================================================
+        modelBuilder.Entity<UsageEvent>(entity =>
+        {
+            entity.HasIndex(e => e.ActingUserId);
+            entity.HasIndex(e => e.BilledUserId);
+            entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => e.OrganizationId);
+            entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => new { e.OrganizationId, e.CreatedAt });
+            entity.HasIndex(e => new { e.ProjectId, e.CreatedAt });
+
+            entity.HasOne(e => e.ActingUser)
+                .WithMany()
+                .HasForeignKey(e => e.ActingUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.BilledUser)
+                .WithMany()
+                .HasForeignKey(e => e.BilledUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Project)
+                .WithMany()
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 

@@ -28,6 +28,18 @@ public class OrganizationUsageDto
     public long OtherCharsUsed { get; set; }
 
     /// <summary>
+    /// Other providers character limit per month (BYOK + free community).
+    /// </summary>
+    public long OtherCharsLimit { get; set; }
+
+    /// <summary>
+    /// Percentage of BYOK limit used (0-100).
+    /// </summary>
+    public double OtherUsagePercent => OtherCharsLimit > 0
+        ? Math.Round((double)OtherCharsUsed / OtherCharsLimit * 100, 1)
+        : 0;
+
+    /// <summary>
     /// Number of API calls made this period.
     /// </summary>
     public int ApiCalls { get; set; }

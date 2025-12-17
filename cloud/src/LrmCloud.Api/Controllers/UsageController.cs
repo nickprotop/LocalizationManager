@@ -52,4 +52,43 @@ public class UsageController : ApiControllerBase
 
         return Success(stats);
     }
+
+    /// <summary>
+    /// Get user's usage breakdown by personal vs organization contributions.
+    /// </summary>
+    [HttpGet("breakdown")]
+    public async Task<ActionResult<ApiResponse<UserUsageBreakdownDto>>> GetUserBreakdown()
+    {
+        var userId = GetUserId();
+        var breakdown = await _usageService.GetUserUsageBreakdownAsync(userId);
+        return Success(breakdown);
+    }
+
+    /// <summary>
+    /// Get organization usage breakdown by member (admins/owners only).
+    /// </summary>
+    [HttpGet("organizations/{organizationId:int}/members")]
+    public async Task<ActionResult<ApiResponse<List<OrgMemberUsageDto>>>> GetOrgMemberUsage(int organizationId)
+    {
+        var userId = GetUserId();
+        var usage = await _usageService.GetOrgMemberUsageAsync(organizationId, userId);
+        return Success(usage);
+    }
+
+    /// <summary>
+    /// Get project usage breakdown by contributor.
+    /// </summary>
+    [HttpGet("projects/{projectId:int}")]
+    public async Task<ActionResult<ApiResponse<ProjectUsageDto>>> GetProjectUsage(int projectId)
+    {
+        var userId = GetUserId();
+        var usage = await _usageService.GetProjectUsageAsync(projectId, userId);
+
+        if (usage == null)
+        {
+            return NotFound("Project not found or you don't have access to it.");
+        }
+
+        return Success(usage);
+    }
 }
