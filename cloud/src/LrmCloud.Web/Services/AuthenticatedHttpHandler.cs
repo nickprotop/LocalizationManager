@@ -10,7 +10,6 @@ public class AuthenticatedHttpHandler : DelegatingHandler
 {
     private readonly TokenStorageService _tokenStorage;
     private readonly IServiceProvider _serviceProvider;
-    private bool _isRefreshing;
 
     public AuthenticatedHttpHandler(TokenStorageService tokenStorage, IServiceProvider serviceProvider)
     {
@@ -34,7 +33,7 @@ public class AuthenticatedHttpHandler : DelegatingHandler
         var response = await base.SendAsync(request, cancellationToken);
 
         // Handle 401 Unauthorized - try to refresh token
-        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized && !isAuthEndpoint && !_isRefreshing)
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized && !isAuthEndpoint)
         {
             if (await TryRefreshTokenAsync())
             {
@@ -59,26 +58,16 @@ public class AuthenticatedHttpHandler : DelegatingHandler
 
     private async Task<bool> TryRefreshTokenAsync()
     {
-        if (_isRefreshing)
+        if (!await _tokenStorage.CanRefreshAsync())
             return false;
 
-        _isRefreshing = true;
-        try
-        {
-            if (!await _tokenStorage.CanRefreshAsync())
-                return false;
+        // Get AuthService from service provider (avoiding circular dependency)
+        // AuthService now uses TokenRefreshCoordinator internally for synchronization
+        var authService = _serviceProvider.GetService<AuthService>();
+        if (authService == null)
+            return false;
 
-            // Get AuthService from service provider (avoiding circular dependency)
-            var authService = _serviceProvider.GetService<AuthService>();
-            if (authService == null)
-                return false;
-
-            return await authService.RefreshTokenAsync();
-        }
-        finally
-        {
-            _isRefreshing = false;
-        }
+        return await authService.RefreshTokenAsync();
     }
 
     private static async Task<HttpRequestMessage> CloneRequestAsync(HttpRequestMessage request)

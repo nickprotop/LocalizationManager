@@ -283,6 +283,15 @@
 
     protected override void OnParametersSet()
     {
+        RefreshActivePluralForms();
+    }
+
+    /// <summary>
+    /// Refreshes the active plural forms from the current Row state.
+    /// Call this after externally modifying Row.Translations (e.g., after translation).
+    /// </summary>
+    public void RefreshActivePluralForms()
+    {
         // Initialize active plural forms from existing translations
         _activePluralForms = GetExistingPluralForms();
 
@@ -297,6 +306,8 @@
         {
             _activePluralForms.Add(PluralForms.One);
         }
+
+        StateHasChanged();
     }
 
     private bool HasChanges => Row.Translations.Values.Any(t => t.IsDirty);

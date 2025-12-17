@@ -14,12 +14,14 @@ public class AuthService
     private readonly HttpClient _httpClient;
     private readonly TokenStorageService _tokenStorage;
     private readonly LrmAuthStateProvider _authStateProvider;
+    private readonly TokenRefreshCoordinator _refreshCoordinator;
 
-    public AuthService(HttpClient httpClient, TokenStorageService tokenStorage, LrmAuthStateProvider authStateProvider)
+    public AuthService(HttpClient httpClient, TokenStorageService tokenStorage, LrmAuthStateProvider authStateProvider, TokenRefreshCoordinator refreshCoordinator)
     {
         _httpClient = httpClient;
         _tokenStorage = tokenStorage;
         _authStateProvider = authStateProvider;
+        _refreshCoordinator = refreshCoordinator;
     }
 
     public async Task<AuthResult> LoginAsync(LoginRequest request)
@@ -138,6 +140,18 @@ public class AuthService
 
     public async Task<bool> RefreshTokenAsync()
     {
+        // Use coordinator to prevent concurrent refresh attempts
+        if (!await _refreshCoordinator.TryAcquireRefreshLockAsync())
+        {
+            // Another refresh is in progress or was recently attempted
+            // Wait for it to complete and check if tokens are now valid
+            await _refreshCoordinator.WaitForRefreshAsync(TimeSpan.FromSeconds(5));
+
+            // Check if we now have valid tokens (from the other refresh)
+            var token = await _tokenStorage.GetAccessTokenAsync();
+            return !string.IsNullOrEmpty(token) && !await _tokenStorage.IsTokenExpiredAsync();
+        }
+
         try
         {
             var refreshToken = await _tokenStorage.GetRefreshTokenAsync();
@@ -179,6 +193,10 @@ public class AuthService
             // Network error - don't clear tokens, just return false
             // The user may still be able to retry later
             return false;
+        }
+        finally
+        {
+            _refreshCoordinator.ReleaseRefreshLock();
         }
     }
 

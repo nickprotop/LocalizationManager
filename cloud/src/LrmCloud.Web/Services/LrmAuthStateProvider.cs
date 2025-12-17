@@ -15,7 +15,6 @@ public class LrmAuthStateProvider : AuthenticationStateProvider
     private readonly IServiceProvider _serviceProvider;
     private UserDto? _cachedUser;
     private bool _isInitialized;
-    private bool _isRefreshing;
 
     public LrmAuthStateProvider(TokenStorageService tokenStorage, HttpClient httpClient, IServiceProvider serviceProvider)
     {
@@ -37,12 +36,12 @@ public class LrmAuthStateProvider : AuthenticationStateProvider
         if (await _tokenStorage.IsTokenExpiredAsync())
         {
             // Token expired, try to refresh if possible
-            if (await _tokenStorage.CanRefreshAsync() && !_isRefreshing)
+            if (await _tokenStorage.CanRefreshAsync())
             {
-                _isRefreshing = true;
                 try
                 {
                     // Attempt to refresh the token using AuthService
+                    // AuthService uses TokenRefreshCoordinator internally to prevent concurrent refreshes
                     var authService = _serviceProvider.GetService<AuthService>();
                     if (authService != null && await authService.RefreshTokenAsync())
                     {
@@ -61,17 +60,12 @@ public class LrmAuthStateProvider : AuthenticationStateProvider
                     // Error during refresh - return unauthenticated
                     return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
                 }
-                finally
-                {
-                    _isRefreshing = false;
-                }
             }
-            else if (!_isRefreshing)
+            else
             {
-                // Can't refresh and not currently refreshing - return unauthenticated
+                // Can't refresh - return unauthenticated
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
-            // If _isRefreshing is true, we're in a refresh cycle, proceed with current token
         }
 
         // Try to get user info from cache or fetch from API

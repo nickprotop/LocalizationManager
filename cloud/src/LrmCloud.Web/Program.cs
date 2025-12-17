@@ -35,6 +35,9 @@ builder.Services.AddScoped(sp =>
     return new HttpClient(handler) { BaseAddress = apiBaseUrl };
 });
 
+// Token refresh coordinator (singleton to coordinate across all service instances)
+builder.Services.AddSingleton<TokenRefreshCoordinator>();
+
 // Auth service (depends on HttpClient, so register after)
 builder.Services.AddScoped<AuthService>();
 

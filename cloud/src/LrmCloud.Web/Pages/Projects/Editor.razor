@@ -117,7 +117,8 @@ else
         <MudDrawerContainer Class="pa-4">
             @if (_selectedRow != null)
             {
-                <KeyDetailDrawer Row="@_selectedRow"
+                <KeyDetailDrawer @ref="_keyDetailDrawer"
+                                 Row="@_selectedRow"
                                  Languages="@_languages"
                                  DefaultLanguage="@_project.DefaultLanguage"
                                  ProjectFormat="@_project.Format"
@@ -181,6 +182,7 @@ else
     private bool _drawerOpen;
     private TranslationGridRow? _selectedRow;        // Clone for drawer editing (isolated)
     private TranslationGridRow? _originalSelectedRow; // Original row reference (in grid)
+    private KeyDetailDrawer? _keyDetailDrawer;
     private AddKeyDialog? _addKeyDialog;
     private ConfirmDeleteDialog? _deleteDialog;
     private IEnumerable<TranslationGridRow>? _pendingDeleteRows;
@@ -777,6 +779,8 @@ else
 
         if (appliedCount > 0)
         {
+            // Refresh the drawer's plural form display to show new cells
+            _keyDetailDrawer?.RefreshActivePluralForms();
             Snackbar.Add($"Applied {appliedCount} translations. Click Apply to stage changes.", Severity.Success);
             StateHasChanged();
         }
