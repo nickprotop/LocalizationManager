@@ -21,7 +21,7 @@ print_info() { echo -e "${BLUE}ℹ${NC} $1"; }
 DO_PULL=false
 RESTART_ONLY=false
 FORCE=false
-BUILD_TARGET="both"  # api, web, or both
+BUILD_TARGET="all"  # api, web, www, or all
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -31,11 +31,11 @@ while [[ $# -gt 0 ]]; do
         --build)
             if [[ -n "$2" && ! "$2" =~ ^-- ]]; then
                 case $2 in
-                    api|web|both) BUILD_TARGET="$2"; shift 2 ;;
-                    *) print_error "Invalid --build option: $2 (use: api, web, or both)"; exit 1 ;;
+                    api|web|www|all) BUILD_TARGET="$2"; shift 2 ;;
+                    *) print_error "Invalid --build option: $2 (use: api, web, www, or all)"; exit 1 ;;
                 esac
             else
-                BUILD_TARGET="both"; shift
+                BUILD_TARGET="all"; shift
             fi
             ;;
         --help|-h)
@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --pull              Pull latest from git (production deployment)"
             echo "  --restart-only      Skip build, just restart containers"
-            echo "  --build [TARGET]    Build target: api, web, or both (default: both)"
+            echo "  --build [TARGET]    Build target: api, web, www, or all (default: all)"
             echo "  --force, -f         Don't ask for confirmation"
             echo "  --help, -h          Show this help"
             exit 0
@@ -182,13 +182,17 @@ docker compose pull postgres redis minio
 
 # Step 3: Build images (unless --restart-only)
 if [ "$RESTART_ONLY" = false ]; then
-    if [ "$BUILD_TARGET" = "api" ] || [ "$BUILD_TARGET" = "both" ]; then
+    if [ "$BUILD_TARGET" = "api" ] || [ "$BUILD_TARGET" = "all" ]; then
         print_step "Building API image..."
         docker compose build --no-cache api
     fi
-    if [ "$BUILD_TARGET" = "web" ] || [ "$BUILD_TARGET" = "both" ]; then
+    if [ "$BUILD_TARGET" = "web" ] || [ "$BUILD_TARGET" = "all" ]; then
         print_step "Building Web (Blazor WASM) image..."
         docker compose build --no-cache web
+    fi
+    if [ "$BUILD_TARGET" = "www" ] || [ "$BUILD_TARGET" = "all" ]; then
+        print_step "Building WWW (landing page) image..."
+        docker compose build --no-cache www
     fi
     print_success "Build complete ($BUILD_TARGET)"
 else
@@ -197,7 +201,7 @@ fi
 
 # Step 4: Stop old containers
 print_step "Stopping containers..."
-docker compose stop api web nginx
+docker compose stop api web www nginx
 
 # Step 5: Start new containers
 print_step "Starting containers..."

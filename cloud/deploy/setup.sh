@@ -629,6 +629,17 @@ if docker images lrmcloud-web --format '{{.ID}}' | grep -q .; then
     fi
 fi
 
+# Check if WWW (landing page) image needs rebuild
+REBUILD_WWW=false
+if docker images lrmcloud-www --format '{{.ID}}' | grep -q .; then
+    echo ""
+    echo -e "${BLUE}WWW (landing page) image already exists.${NC}"
+    read -p "Rebuild WWW image? [y/N]: " REBUILD_RESPONSE
+    if [ "$REBUILD_RESPONSE" = "y" ] || [ "$REBUILD_RESPONSE" = "Y" ]; then
+        REBUILD_WWW=true
+    fi
+fi
+
 # Pull latest images
 print_step "Pulling latest Docker images..."
 docker compose pull
@@ -649,6 +660,15 @@ if [ "$REBUILD_WEB" = true ]; then
 elif ! docker images lrmcloud-web --format '{{.ID}}' | grep -q .; then
     print_step "Building Web (Blazor) image..."
     docker compose build web
+fi
+
+# Build WWW if needed (first time or rebuild requested)
+if [ "$REBUILD_WWW" = true ]; then
+    print_step "Rebuilding WWW (landing page) image..."
+    docker compose build www --no-cache
+elif ! docker images lrmcloud-www --format '{{.ID}}' | grep -q .; then
+    print_step "Building WWW (landing page) image..."
+    docker compose build www
 fi
 
 # Check if Redis or MinIO passwords changed - need force-recreate
