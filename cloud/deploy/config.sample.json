@@ -93,6 +93,55 @@
   "lrmProvider": {
     "enabled": true,
     "enabledBackends": ["mymemory", "lingva"],
-    "selectionStrategy": "priority"
+    "selectionStrategy": "priority",
+    "backends": {
+      "myMemory": {
+        "rateLimitPerMinute": 20
+      },
+      "lingva": {
+        "instanceUrl": "https://lingva.ml",
+        "rateLimitPerMinute": 30
+      },
+      "deepL": {
+        "apiKey": "YOUR_DEEPL_API_KEY",
+        "useFreeApi": false,
+        "rateLimitPerMinute": 100
+      },
+      "google": {
+        "apiKey": "YOUR_GOOGLE_CLOUD_API_KEY",
+        "rateLimitPerMinute": 100
+      },
+      "openAI": {
+        "apiKey": "YOUR_OPENAI_API_KEY",
+        "model": "gpt-4o-mini",
+        "rateLimitPerMinute": 60
+      },
+      "claude": {
+        "apiKey": "YOUR_CLAUDE_API_KEY",
+        "model": "claude-3-5-sonnet-20241022",
+        "rateLimitPerMinute": 50
+      },
+      "azureOpenAI": {
+        "apiKey": "YOUR_AZURE_OPENAI_API_KEY",
+        "endpoint": "https://your-resource.openai.azure.com",
+        "deploymentName": "gpt-4",
+        "rateLimitPerMinute": 60
+      },
+      "azureTranslator": {
+        "apiKey": "YOUR_AZURE_TRANSLATOR_API_KEY",
+        "region": "westus",
+        "rateLimitPerMinute": 100
+      },
+      "libreTranslate": {
+        "apiKey": "",
+        "instanceUrl": "https://libretranslate.com",
+        "rateLimitPerMinute": 30
+      },
+      "ollama": {
+        "apiUrl": "http://localhost:11434",
+        "model": "llama3.2",
+        "rateLimitPerMinute": 10
+      }
+    }
   }
 }

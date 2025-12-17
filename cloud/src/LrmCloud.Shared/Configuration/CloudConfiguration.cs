@@ -599,6 +599,130 @@ public sealed class LrmProviderConfiguration
     /// When disabled, users can only use BYOK.
     /// </summary>
     public bool Enabled { get; init; } = true;
+
+    /// <summary>
+    /// Backend-specific configuration (API keys, endpoints, models).
+    /// </summary>
+    public LrmBackendsConfiguration Backends { get; init; } = new();
+}
+
+/// <summary>
+/// Configuration for all LRM backend providers.
+/// </summary>
+public sealed class LrmBackendsConfiguration
+{
+    public LrmMyMemoryConfig? MyMemory { get; init; }
+    public LrmLingvaConfig? Lingva { get; init; }
+    public LrmDeepLConfig? DeepL { get; init; }
+    public LrmGoogleConfig? Google { get; init; }
+    public LrmOpenAIConfig? OpenAI { get; init; }
+    public LrmClaudeConfig? Claude { get; init; }
+    public LrmAzureOpenAIConfig? AzureOpenAI { get; init; }
+    public LrmAzureTranslatorConfig? AzureTranslator { get; init; }
+    public LrmLibreTranslateConfig? LibreTranslate { get; init; }
+    public LrmOllamaConfig? Ollama { get; init; }
+}
+
+/// <summary>
+/// MyMemory backend configuration (free, no API key needed).
+/// </summary>
+public sealed class LrmMyMemoryConfig
+{
+    public int RateLimitPerMinute { get; init; } = 20;
+}
+
+/// <summary>
+/// Lingva backend configuration (free Google Translate proxy).
+/// </summary>
+public sealed class LrmLingvaConfig
+{
+    public string InstanceUrl { get; init; } = "https://lingva.ml";
+    public int RateLimitPerMinute { get; init; } = 30;
+}
+
+/// <summary>
+/// DeepL backend configuration (requires API key).
+/// </summary>
+public sealed class LrmDeepLConfig
+{
+    public string? ApiKey { get; init; }
+    public bool UseFreeApi { get; init; } = false;
+    public int RateLimitPerMinute { get; init; } = 100;
+}
+
+/// <summary>
+/// Google Cloud Translation backend configuration (requires API key).
+/// </summary>
+public sealed class LrmGoogleConfig
+{
+    public string? ApiKey { get; init; }
+    public int RateLimitPerMinute { get; init; } = 100;
+}
+
+/// <summary>
+/// OpenAI backend configuration (requires API key).
+/// </summary>
+public sealed class LrmOpenAIConfig
+{
+    public string? ApiKey { get; init; }
+    public string Model { get; init; } = "gpt-4o-mini";
+    public string? CustomSystemPrompt { get; init; }
+    public int RateLimitPerMinute { get; init; } = 60;
+}
+
+/// <summary>
+/// Claude (Anthropic) backend configuration (requires API key).
+/// </summary>
+public sealed class LrmClaudeConfig
+{
+    public string? ApiKey { get; init; }
+    public string Model { get; init; } = "claude-3-5-sonnet-20241022";
+    public string? CustomSystemPrompt { get; init; }
+    public int RateLimitPerMinute { get; init; } = 50;
+}
+
+/// <summary>
+/// Azure OpenAI backend configuration (requires API key and endpoint).
+/// </summary>
+public sealed class LrmAzureOpenAIConfig
+{
+    public string? ApiKey { get; init; }
+    public string? Endpoint { get; init; }
+    public string? DeploymentName { get; init; }
+    public string? CustomSystemPrompt { get; init; }
+    public int RateLimitPerMinute { get; init; } = 60;
+}
+
+/// <summary>
+/// Azure Translator backend configuration (requires API key).
+/// </summary>
+public sealed class LrmAzureTranslatorConfig
+{
+    public string? ApiKey { get; init; }
+    public string? Region { get; init; }
+    public string? Endpoint { get; init; }
+    public int RateLimitPerMinute { get; init; } = 100;
+}
+
+/// <summary>
+/// LibreTranslate backend configuration (API key optional for public instances).
+/// </summary>
+public sealed class LrmLibreTranslateConfig
+{
+    public string? ApiKey { get; init; }
+    public string InstanceUrl { get; init; } = "https://libretranslate.com";
+    public int RateLimitPerMinute { get; init; } = 30;
+}
+
+/// <summary>
+/// Ollama backend configuration (local LLM, no API key needed).
+/// </summary>
+public sealed class LrmOllamaConfig
+{
+    public string ApiUrl { get; init; } = "http://localhost:11434";
+    public string Model { get; init; } = "llama3.2";
+    public string? CustomSystemPrompt { get; init; }
+    public int RateLimitPerMinute { get; init; } = 10;
 }
 
 /// <summary>
