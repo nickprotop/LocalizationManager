@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="LRM .NET Libraries documentation - JsonLocalization and Source Generator for type-safe, CLDR-compliant localization in .NET apps.">
+    <meta name="theme-color" content="#6366f1">
+    <title>.NET Libraries - LRM Documentation</title>
+
+    <link rel="icon" type="image/png" href="../favicon.png">
+    <link rel="apple-touch-icon" href="../icon-192.png">
+
+    <style>
+        /* CSS Reset & Base */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #8b5cf6;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --bg-card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --text-light: #94a3b8;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f172a;
+                --bg-alt: #1e293b;
+                --bg-card: #1e293b;
+                --text: #f1f5f9;
+                --text-muted: #94a3b8;
+                --text-light: #64748b;
+                --border: #334155;
+                --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+            }
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        a:hover {
+            color: var(--primary-dark);
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            header {
+                background: rgba(15, 23, 42, 0.9);
+            }
+        }
+
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--text);
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        nav a {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.9375rem;
+            transition: color 0.2s;
+        }
+
+        nav a:hover {
+            color: var(--text);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.9375rem;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px 0 rgba(99, 102, 241, 0.5);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--bg-alt);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            padding: 80px 0 16px;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .breadcrumb a {
+            color: var(--text-muted);
+        }
+
+        .breadcrumb a:hover {
+            color: var(--primary);
+        }
+
+        .breadcrumb span {
+            margin: 0 8px;
+        }
+
+        /* Docs Layout */
+        .docs-layout {
+            display: flex;
+            gap: 48px;
+            padding-bottom: 80px;
+        }
+
+        /* Sidebar */
+        .docs-sidebar {
+            width: 250px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 80px;
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            margin-bottom: 24px;
+        }
+
+        .sidebar-title {
+            font-weight: 600;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+            padding-left: 12px;
+        }
+
+        .sidebar-link {
+            display: block;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+            font-size: 0.9375rem;
+            transition: all 0.2s;
+        }
+
+        .sidebar-link:hover {
+            background: var(--bg-alt);
+            color: var(--text);
+        }
+
+        .sidebar-link.active {
+            background: var(--bg-alt);
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .sidebar-external {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .sidebar-external::after {
+            content: '\2197';
+            font-size: 0.75rem;
+        }
+
+        /* Content */
+        .docs-content {
+            flex: 1;
+            min-width: 0;
+            max-width: 800px;
+        }
+
+        .docs-content h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .docs-content .lead {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+        }
+
+        .docs-content h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 48px;
+            margin-bottom: 16px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .docs-content h2:first-of-type {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+        }
+
+        .docs-content h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 32px;
+            margin-bottom: 12px;
+        }
+
+        .docs-content p {
+            margin-bottom: 16px;
+        }
+
+        .docs-content ul, .docs-content ol {
+            margin-bottom: 16px;
+            padding-left: 24px;
+        }
+
+        .docs-content li {
+            margin-bottom: 8px;
+        }
+
+        .docs-content pre {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+
+        .docs-content code {
+            background: var(--bg-alt);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.875em;
+        }
+
+        .docs-content pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .docs-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+        }
+
+        .docs-content th, .docs-content td {
+            border: 1px solid var(--border);
+            padding: 12px;
+            text-align: left;
+        }
+
+        .docs-content th {
+            background: var(--bg-alt);
+            font-weight: 600;
+        }
+
+        .info-box {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .info-box-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        /* Footer */
+        footer {
+            padding: 48px 0;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .footer-links a:hover {
+            color: var(--text);
+        }
+
+        .footer-copy {
+            color: var(--text-light);
+            font-size: 0.875rem;
+        }
+
+        /* Mobile Menu */
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        .sidebar-toggle {
+            display: none;
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            margin-bottom: 24px;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            font-size: 0.9375rem;
+            color: var(--text);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .docs-sidebar {
+                display: none;
+            }
+
+            .docs-sidebar.open {
+                display: block;
+                position: fixed;
+                top: 64px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                width: 100%;
+                height: auto;
+                background: var(--bg);
+                z-index: 50;
+                padding: 24px;
+                overflow-y: auto;
+            }
+
+            .sidebar-toggle {
+                display: block;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .docs-content h1 {
+                font-size: 1.5rem;
+            }
+
+            .docs-content h2 {
+                font-size: 1.25rem;
+            }
+
+            .footer-inner {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .footer-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="header-inner">
+                <a href="/" class="logo">
+                    <div class="logo-icon">LR</div>
+                    LRM Cloud
+                </a>
+
+                <nav>
+                    <div class="nav-links">
+                        <a href="/#features">Features</a>
+                        <a href="/#pricing">Pricing</a>
+                        <a href="https://github.com/nickprotop/LocalizationManager" target="_blank">GitHub</a>
+                        <a href="/docs/" style="color: var(--primary);">Docs</a>
+                    </div>
+
+                    <div class="nav-buttons" id="nav-buttons">
+                        <a href="/app/login" class="btn btn-secondary" id="nav-login">Log In</a>
+                        <a href="/app/register" class="btn btn-primary" id="nav-register">Get Started</a>
+                    </div>
+
+                    <button class="mobile-menu-btn" aria-label="Menu">☰</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Breadcrumb -->
+        <div class="breadcrumb">
+            <a href="/docs/">Docs</a>
+            <span>/</span>
+            <span>.NET Libraries</span>
+        </div>
+
+        <!-- Mobile sidebar toggle -->
+        <button class="sidebar-toggle" onclick="toggleSidebar()">
+            ☰ Navigation
+        </button>
+
+        <!-- Docs Layout -->
+        <div class="docs-layout">
+            <!-- Sidebar -->
+            <aside class="docs-sidebar" id="sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-title">.NET Libraries</div>
+                    <a href="#overview" class="sidebar-link active">Overview</a>
+                    <a href="#installation" class="sidebar-link">Installation</a>
+                    <a href="#standalone" class="sidebar-link">Standalone Usage</a>
+                    <a href="#aspnetcore" class="sidebar-link">ASP.NET Core</a>
+                    <a href="#pluralization" class="sidebar-link">Pluralization</a>
+                    <a href="#source-generator" class="sidebar-link">Source Generator</a>
+                    <a href="#samples" class="sidebar-link">Sample Projects</a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-title">Other Docs</div>
+                    <a href="cloud.html" class="sidebar-link">Cloud Platform</a>
+                    <a href="vscode.html" class="sidebar-link">VS Code Extension</a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-title">GitHub</div>
+                    <a href="https://github.com/nickprotop/LocalizationManager/tree/main/samples" target="_blank" class="sidebar-link sidebar-external">Sample Projects</a>
+                    <a href="https://www.nuget.org/packages/LocalizationManager.JsonLocalization" target="_blank" class="sidebar-link sidebar-external">NuGet Package</a>
+                </div>
+            </aside>
+
+            <!-- Content -->
+            <main class="docs-content">
+                <h1 id="overview">.NET Localization Libraries</h1>
+                <p class="lead">JSON-based localization for .NET with CLDR pluralization, strong typing via source generation, and full ASP.NET Core integration.</p>
+
+                <h3>Available Packages</h3>
+                <table>
+                    <tr>
+                        <th>Package</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code>LocalizationManager.JsonLocalization</code></td>
+                        <td>JSON-based localization with IStringLocalizer support</td>
+                    </tr>
+                    <tr>
+                        <td><code>LocalizationManager.JsonLocalization.Generator</code></td>
+                        <td>Source generator for compile-time type safety</td>
+                    </tr>
+                </table>
+
+                <h3>Key Features</h3>
+                <ul>
+                    <li><strong>JSON resources</strong> - Simple JSON files instead of .resx</li>
+                    <li><strong>CLDR pluralization</strong> - Proper plural forms for 30+ languages</li>
+                    <li><strong>Nested keys</strong> - Support for dot notation (e.g., <code>Navigation.Home</code>)</li>
+                    <li><strong>Culture fallback</strong> - Automatic fallback chain (fr-CA → fr → default)</li>
+                    <li><strong>ASP.NET Core integration</strong> - Drop-in IStringLocalizer replacement</li>
+                    <li><strong>Source generator</strong> - Compile-time type safety</li>
+                </ul>
+
+                <h2 id="installation">Installation</h2>
+
+                <h3>NuGet Packages</h3>
+                <pre><code># Main localization library
+dotnet add package LocalizationManager.JsonLocalization
+
+# Optional: Source generator for strong typing
+dotnet add package LocalizationManager.JsonLocalization.Generator</code></pre>
+
+                <h3>Supported Frameworks</h3>
+                <ul>
+                    <li>.NET 7.0</li>
+                    <li>.NET 8.0</li>
+                    <li>.NET 9.0</li>
+                </ul>
+
+                <h2 id="standalone">Standalone Usage</h2>
+                <p>Use the library without dependency injection for console apps or simple scenarios.</p>
+
+                <h3>Resource File Structure</h3>
+                <p>Create JSON files with culture suffixes:</p>
+                <pre><code>Resources/
+├── strings.json          # Default language (English)
+├── strings.fr.json       # French
+├── strings.de.json       # German
+└── strings.es.json       # Spanish</code></pre>
+
+                <h3>Resource File Format</h3>
+                <pre><code>// strings.json
+{
+  "Welcome": "Welcome to our app!",
+  "Navigation": {
+    "Home": "Home",
+    "Settings": "Settings",
+    "Profile": "Profile"
+  },
+  "Greeting": "Hello, {0}!",
+  "ItemCount": {
+    "one": "{0} item",
+    "other": "{0} items"
+  }
+}</code></pre>
+
+                <h3>Creating the Localizer</h3>
+                <pre><code>using LocalizationManager.JsonLocalization;
+
+// Create localizer with file system resources
+var localizer = new JsonLocalizer(
+    resourcePath: "./Resources",
+    resourceName: "strings",
+    defaultCulture: "en"
+);
+
+// Get translations
+string welcome = localizer["Welcome"];
+string home = localizer["Navigation.Home"];
+
+// With format arguments
+string greeting = localizer["Greeting", "John"];
+
+// Change culture
+localizer.SetCulture("fr");
+string welcomeFr = localizer["Welcome"]; // "Bienvenue!"</code></pre>
+
+                <h3>Embedded Resources</h3>
+                <p>Load resources embedded in your assembly:</p>
+                <pre><code>var localizer = new JsonLocalizer(
+    assembly: typeof(Program).Assembly,
+    resourceNamespace: "MyApp.Resources",
+    resourceName: "strings",
+    defaultCulture: "en"
+);</code></pre>
+
+                <div class="info-box">
+                    <div class="info-box-title">Embedded Resources</div>
+                    <p>Set the JSON files' Build Action to "Embedded Resource" in your .csproj or project properties.</p>
+                </div>
+
+                <h2 id="aspnetcore">ASP.NET Core Integration</h2>
+                <p>Full integration with ASP.NET Core's localization infrastructure.</p>
+
+                <h3>Service Registration</h3>
+                <pre><code>// Program.cs
+builder.Services.AddJsonLocalization(options =>
+{
+    options.ResourcesPath = "Resources";
+    options.DefaultCulture = "en";
+});</code></pre>
+
+                <h3>Using IStringLocalizer</h3>
+                <pre><code>public class HomeController : Controller
+{
+    private readonly IStringLocalizer&lt;HomeController&gt; _localizer;
+
+    public HomeController(IStringLocalizer&lt;HomeController&gt; localizer)
+    {
+        _localizer = localizer;
+    }
+
+    public IActionResult Index()
+    {
+        ViewData["Title"] = _localizer["Welcome"];
+        return View();
+    }
+}</code></pre>
+
+                <h3>In Razor Views</h3>
+                <pre><code>@inject IStringLocalizer&lt;SharedResource&gt; Localizer
+
+&lt;h1&gt;@Localizer["Welcome"]&lt;/h1&gt;
+&lt;p&gt;@Localizer["Greeting", User.Identity.Name]&lt;/p&gt;</code></pre>
+
+                <h3>Configuration Options</h3>
+                <pre><code>builder.Services.AddJsonLocalization(options =>
+{
+    // Path to JSON resource files
+    options.ResourcesPath = "Resources";
+
+    // Default culture when no match found
+    options.DefaultCulture = "en";
+
+    // Supported cultures
+    options.SupportedCultures = new[] { "en", "fr", "de", "es" };
+
+    // Use embedded resources instead of file system
+    options.UseEmbeddedResources = false;
+
+    // Assembly for embedded resources
+    options.ResourceAssembly = typeof(Program).Assembly;
+});</code></pre>
+
+                <h2 id="pluralization">Pluralization</h2>
+                <p>The library supports CLDR plural rules for 30+ languages with the following categories:</p>
+
+                <table>
+                    <tr>
+                        <th>Category</th>
+                        <th>Example (English)</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code>zero</code></td>
+                        <td>0 items</td>
+                        <td>Zero quantity (some languages)</td>
+                    </tr>
+                    <tr>
+                        <td><code>one</code></td>
+                        <td>1 item</td>
+                        <td>Singular</td>
+                    </tr>
+                    <tr>
+                        <td><code>two</code></td>
+                        <td>2 items</td>
+                        <td>Dual (Arabic, Welsh, etc.)</td>
+                    </tr>
+                    <tr>
+                        <td><code>few</code></td>
+                        <td>2-4 items</td>
+                        <td>Few (Slavic languages)</td>
+                    </tr>
+                    <tr>
+                        <td><code>many</code></td>
+                        <td>5+ items</td>
+                        <td>Many (Slavic, Arabic)</td>
+                    </tr>
+                    <tr>
+                        <td><code>other</code></td>
+                        <td>N items</td>
+                        <td>Default/plural (required)</td>
+                    </tr>
+                </table>
+
+                <h3>Plural Resource Format</h3>
+                <pre><code>// strings.json (English - needs one/other)
+{
+  "ItemCount": {
+    "one": "{0} item",
+    "other": "{0} items"
+  }
+}
+
+// strings.ru.json (Russian - needs one/few/many/other)
+{
+  "ItemCount": {
+    "one": "{0} элемент",
+    "few": "{0} элемента",
+    "many": "{0} элементов",
+    "other": "{0} элемента"
+  }
+}
+
+// strings.ar.json (Arabic - needs zero/one/two/few/many/other)
+{
+  "ItemCount": {
+    "zero": "لا عناصر",
+    "one": "عنصر واحد",
+    "two": "عنصران",
+    "few": "{0} عناصر",
+    "many": "{0} عنصرًا",
+    "other": "{0} عنصر"
+  }
+}</code></pre>
+
+                <h3>Using Pluralization</h3>
+                <pre><code>// The library automatically selects the correct plural form
+string text1 = localizer.GetPlural("ItemCount", 1);  // "1 item"
+string text5 = localizer.GetPlural("ItemCount", 5);  // "5 items"
+
+// With IStringLocalizer (uses first argument as count)
+string text = _localizer["ItemCount", count];</code></pre>
+
+                <h2 id="source-generator">Source Generator</h2>
+                <p>Generate strongly-typed accessors at compile time for type safety and IntelliSense support.</p>
+
+                <h3>Installation</h3>
+                <pre><code>dotnet add package LocalizationManager.JsonLocalization.Generator</code></pre>
+
+                <h3>Setup</h3>
+                <p>Mark your JSON resource file as an AdditionalFile:</p>
+                <pre><code>&lt;!-- In your .csproj --&gt;
+&lt;ItemGroup&gt;
+  &lt;AdditionalFiles Include="Resources/strings.json" /&gt;
+&lt;/ItemGroup&gt;</code></pre>
+
+                <h3>Generated Code</h3>
+                <p>The generator creates a static class with properties for each key:</p>
+                <pre><code>// Generated code (auto-generated, do not edit)
+public static partial class Strings
+{
+    public static string Welcome =&gt; _localizer["Welcome"];
+
+    public static class Navigation
+    {
+        public static string Home =&gt; _localizer["Navigation.Home"];
+        public static string Settings =&gt; _localizer["Navigation.Settings"];
+        public static string Profile =&gt; _localizer["Navigation.Profile"];
+    }
+
+    public static string Greeting(object arg0) =&gt;
+        _localizer["Greeting", arg0];
+
+    public static string ItemCount(int count) =&gt;
+        _localizer.GetPlural("ItemCount", count);
+}</code></pre>
+
+                <h3>Usage</h3>
+                <pre><code>// Strong typing with IntelliSense
+string welcome = Strings.Welcome;
+string home = Strings.Navigation.Home;
+string greeting = Strings.Greeting("John");
+string items = Strings.ItemCount(5);
+
+// Compile-time error if key doesn't exist
+// string invalid = Strings.NonExistent; // Error!</code></pre>
+
+                <div class="info-box">
+                    <div class="info-box-title">Benefits</div>
+                    <ul style="margin-bottom: 0;">
+                        <li><strong>Type safety</strong> - Compile-time errors for missing keys</li>
+                        <li><strong>IntelliSense</strong> - Full autocomplete support</li>
+                        <li><strong>Refactoring</strong> - Rename keys safely across your codebase</li>
+                        <li><strong>No runtime reflection</strong> - Better performance</li>
+                    </ul>
+                </div>
+
+                <h2 id="samples">Sample Projects</h2>
+                <p>Explore working examples on GitHub:</p>
+
+                <table>
+                    <tr>
+                        <th>Sample</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><a href="https://github.com/nickprotop/LocalizationManager/tree/main/samples/ConsoleApp.Standalone" target="_blank">ConsoleApp.Standalone</a></td>
+                        <td>Console app with file system resources</td>
+                    </tr>
+                    <tr>
+                        <td><a href="https://github.com/nickprotop/LocalizationManager/tree/main/samples/ConsoleApp.Embedded" target="_blank">ConsoleApp.Embedded</a></td>
+                        <td>Console app with embedded resources</td>
+                    </tr>
+                    <tr>
+                        <td><a href="https://github.com/nickprotop/LocalizationManager/tree/main/samples/ConsoleApp.SourceGenerator" target="_blank">ConsoleApp.SourceGenerator</a></td>
+                        <td>Console app with source generator</td>
+                    </tr>
+                    <tr>
+                        <td><a href="https://github.com/nickprotop/LocalizationManager/tree/main/samples/WebApp.AspNetCore" target="_blank">WebApp.AspNetCore</a></td>
+                        <td>ASP.NET Core web app with full integration</td>
+                    </tr>
+                </table>
+
+                <h3>Running Samples</h3>
+                <pre><code># Clone the repository
+git clone https://github.com/nickprotop/LocalizationManager.git
+cd LocalizationManager
+
+# Run a sample
+cd samples/ConsoleApp.Standalone
+dotnet run</code></pre>
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-links">
+                    <a href="/docs/">Documentation</a>
+                    <a href="https://github.com/nickprotop/LocalizationManager" target="_blank">GitHub</a>
+                    <a href="/privacy.html">Privacy</a>
+                    <a href="/terms.html">Terms</a>
+                </div>
+                <div class="footer-copy">
+                    &copy; 2025 LRM Cloud. All rights reserved.
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Check authentication state
+        (function() {
+            let token = localStorage.getItem('lrm_access_token');
+            let expiry = localStorage.getItem('lrm_token_expiry');
+
+            try {
+                if (token && token.startsWith('"')) token = JSON.parse(token);
+                if (expiry && expiry.startsWith('"')) expiry = JSON.parse(expiry);
+            } catch (e) {}
+
+            let expiryDate = null;
+            if (expiry) {
+                const normalizedExpiry = expiry.replace(/\.(\d{3})\d*Z$/, '.$1Z');
+                expiryDate = new Date(normalizedExpiry);
+            }
+
+            const isLoggedIn = token && expiryDate && !isNaN(expiryDate.getTime()) && expiryDate > new Date();
+
+            if (isLoggedIn) {
+                const navButtons = document.getElementById('nav-buttons');
+                if (navButtons) {
+                    navButtons.innerHTML = '<a href="/app/" class="btn btn-primary">Dashboard</a>';
+                }
+            }
+        })();
+
+        // Toggle sidebar on mobile
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        // Highlight active sidebar link on scroll
+        document.addEventListener('scroll', function() {
+            const sections = document.querySelectorAll('h1[id], h2[id]');
+            const links = document.querySelectorAll('.sidebar-link');
+
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 100;
+                if (scrollY >= sectionTop) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            links.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

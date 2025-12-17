@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="LRM VS Code Extension documentation - Real-time diagnostics, IntelliSense, CodeLens, and translation for .NET localization.">
+    <meta name="theme-color" content="#6366f1">
+    <title>VS Code Extension - LRM Documentation</title>
+
+    <link rel="icon" type="image/png" href="../favicon.png">
+    <link rel="apple-touch-icon" href="../icon-192.png">
+
+    <style>
+        /* CSS Reset & Base */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #8b5cf6;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --bg-card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --text-light: #94a3b8;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f172a;
+                --bg-alt: #1e293b;
+                --bg-card: #1e293b;
+                --text: #f1f5f9;
+                --text-muted: #94a3b8;
+                --text-light: #64748b;
+                --border: #334155;
+                --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+            }
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        a:hover {
+            color: var(--primary-dark);
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            header {
+                background: rgba(15, 23, 42, 0.9);
+            }
+        }
+
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--text);
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        nav a {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.9375rem;
+            transition: color 0.2s;
+        }
+
+        nav a:hover {
+            color: var(--text);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.9375rem;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px 0 rgba(99, 102, 241, 0.5);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--bg-alt);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            padding: 80px 0 16px;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .breadcrumb a {
+            color: var(--text-muted);
+        }
+
+        .breadcrumb a:hover {
+            color: var(--primary);
+        }
+
+        .breadcrumb span {
+            margin: 0 8px;
+        }
+
+        /* Docs Layout */
+        .docs-layout {
+            display: flex;
+            gap: 48px;
+            padding-bottom: 80px;
+        }
+
+        /* Sidebar */
+        .docs-sidebar {
+            width: 250px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 80px;
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            margin-bottom: 24px;
+        }
+
+        .sidebar-title {
+            font-weight: 600;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+            padding-left: 12px;
+        }
+
+        .sidebar-link {
+            display: block;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+            font-size: 0.9375rem;
+            transition: all 0.2s;
+        }
+
+        .sidebar-link:hover {
+            background: var(--bg-alt);
+            color: var(--text);
+        }
+
+        .sidebar-link.active {
+            background: var(--bg-alt);
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .sidebar-external {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .sidebar-external::after {
+            content: '\2197';
+            font-size: 0.75rem;
+        }
+
+        /* Content */
+        .docs-content {
+            flex: 1;
+            min-width: 0;
+            max-width: 800px;
+        }
+
+        .docs-content h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .docs-content .lead {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+        }
+
+        .docs-content h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 48px;
+            margin-bottom: 16px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .docs-content h2:first-of-type {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+        }
+
+        .docs-content h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 32px;
+            margin-bottom: 12px;
+        }
+
+        .docs-content p {
+            margin-bottom: 16px;
+        }
+
+        .docs-content ul, .docs-content ol {
+            margin-bottom: 16px;
+            padding-left: 24px;
+        }
+
+        .docs-content li {
+            margin-bottom: 8px;
+        }
+
+        .docs-content pre {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+
+        .docs-content code {
+            background: var(--bg-alt);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.875em;
+        }
+
+        .docs-content pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .docs-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+        }
+
+        .docs-content th, .docs-content td {
+            border: 1px solid var(--border);
+            padding: 12px;
+            text-align: left;
+        }
+
+        .docs-content th {
+            background: var(--bg-alt);
+            font-weight: 600;
+        }
+
+        .info-box {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .info-box-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        kbd {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.85em;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        /* Footer */
+        footer {
+            padding: 48px 0;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .footer-links a:hover {
+            color: var(--text);
+        }
+
+        .footer-copy {
+            color: var(--text-light);
+            font-size: 0.875rem;
+        }
+
+        /* Mobile Menu */
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        .sidebar-toggle {
+            display: none;
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            margin-bottom: 24px;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            font-size: 0.9375rem;
+            color: var(--text);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .docs-sidebar {
+                display: none;
+            }
+
+            .docs-sidebar.open {
+                display: block;
+                position: fixed;
+                top: 64px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                width: 100%;
+                height: auto;
+                background: var(--bg);
+                z-index: 50;
+                padding: 24px;
+                overflow-y: auto;
+            }
+
+            .sidebar-toggle {
+                display: block;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .docs-content h1 {
+                font-size: 1.5rem;
+            }
+
+            .docs-content h2 {
+                font-size: 1.25rem;
+            }
+
+            .footer-inner {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .footer-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="header-inner">
+                <a href="/" class="logo">
+                    <div class="logo-icon">LR</div>
+                    LRM Cloud
+                </a>
+
+                <nav>
+                    <div class="nav-links">
+                        <a href="/#features">Features</a>
+                        <a href="/#pricing">Pricing</a>
+                        <a href="https://github.com/nickprotop/LocalizationManager" target="_blank">GitHub</a>
+                        <a href="/docs/" style="color: var(--primary);">Docs</a>
+                    </div>
+
+                    <div class="nav-buttons" id="nav-buttons">
+                        <a href="/app/login" class="btn btn-secondary" id="nav-login">Log In</a>
+                        <a href="/app/register" class="btn btn-primary" id="nav-register">Get Started</a>
+                    </div>
+
+                    <button class="mobile-menu-btn" aria-label="Menu">☰</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Breadcrumb -->
+        <div class="breadcrumb">
+            <a href="/docs/">Docs</a>
+            <span>/</span>
+            <span>VS Code Extension</span>
+        </div>
+
+        <!-- Mobile sidebar toggle -->
+        <button class="sidebar-toggle" onclick="toggleSidebar()">
+            ☰ Navigation
+        </button>
+
+        <!-- Docs Layout -->
+        <div class="docs-layout">
+            <!-- Sidebar -->
+            <aside class="docs-sidebar" id="sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-title">VS Code Extension</div>
+                    <a href="#installation" class="sidebar-link active">Installation</a>
+                    <a href="#quick-start" class="sidebar-link">Quick Start</a>
+                    <a href="#features" class="sidebar-link">Features</a>
+                    <a href="#resource-editor" class="sidebar-link">Resource Editor</a>
+                    <a href="#translation" class="sidebar-link">Translation</a>
+                    <a href="#settings" class="sidebar-link">Settings</a>
+                    <a href="#keyboard-shortcuts" class="sidebar-link">Keyboard Shortcuts</a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-title">Other Docs</div>
+                    <a href="cloud.html" class="sidebar-link">Cloud Platform</a>
+                    <a href="dotnet.html" class="sidebar-link">.NET Libraries</a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-title">GitHub</div>
+                    <a href="https://github.com/nickprotop/LocalizationManager/blob/main/docs/COMMANDS.md" target="_blank" class="sidebar-link sidebar-external">CLI Reference</a>
+                    <a href="https://github.com/nickprotop/LocalizationManager/blob/main/docs/TUI.md" target="_blank" class="sidebar-link sidebar-external">TUI Guide</a>
+                </div>
+            </aside>
+
+            <!-- Content -->
+            <main class="docs-content">
+                <h1 id="installation">VS Code Extension</h1>
+                <p class="lead">The LRM VS Code extension brings powerful localization tools directly into your IDE with real-time diagnostics, IntelliSense, and translation capabilities.</p>
+
+                <h3>Installation</h3>
+                <p>Install from the VS Code Marketplace:</p>
+                <ol>
+                    <li>Open VS Code</li>
+                    <li>Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> to open Extensions</li>
+                    <li>Search for <strong>"LRM - .NET Localization"</strong></li>
+                    <li>Click <strong>Install</strong></li>
+                </ol>
+
+                <p>Or install via command:</p>
+                <pre><code>code --install-extension nickprotop.lrm</code></pre>
+
+                <div class="info-box">
+                    <div class="info-box-title">Supported Formats</div>
+                    <p>The extension supports .resx files, JSON resources, and i18next format. It auto-detects the format based on file naming patterns.</p>
+                </div>
+
+                <h2 id="quick-start">Quick Start</h2>
+                <ol>
+                    <li>Open a folder containing resource files (.resx or JSON)</li>
+                    <li>The extension automatically detects your resources</li>
+                    <li>Look for the <strong>LRM</strong> icon in the sidebar</li>
+                    <li>Click to open the Resource Tree View</li>
+                </ol>
+
+                <h3>Auto-Detection</h3>
+                <p>The extension finds resources by looking for:</p>
+                <ul>
+                    <li><strong>.resx files:</strong> <code>Resources.resx</code>, <code>Resources.fr.resx</code></li>
+                    <li><strong>JSON (standard):</strong> <code>strings.json</code>, <code>strings.fr.json</code></li>
+                    <li><strong>i18next:</strong> <code>en.json</code>, <code>fr.json</code> in <code>locales/</code> folder</li>
+                </ul>
+
+                <h2 id="features">Features</h2>
+
+                <h3>Real-time Diagnostics</h3>
+                <p>As you code, the extension scans for localization issues:</p>
+                <ul>
+                    <li><strong>Missing keys</strong> - Keys used in code but not in resources</li>
+                    <li><strong>Unused keys</strong> - Keys in resources but not used in code</li>
+                    <li><strong>Empty translations</strong> - Keys without values</li>
+                    <li><strong>Duplicate keys</strong> - Same key defined multiple times</li>
+                </ul>
+
+                <h3>IntelliSense Autocomplete</h3>
+                <p>Get autocomplete suggestions as you type localization keys:</p>
+                <pre><code>// Type "Resources." to see suggestions
+var text = Resources.Welcome_Title;
+
+// Also works with indexers
+var text = Resources["Welcome_Title"];
+
+// And IStringLocalizer
+_localizer["Welcome_Title"]</code></pre>
+
+                <h3>CodeLens</h3>
+                <p>See key metadata directly in your resource files:</p>
+                <ul>
+                    <li><strong>Reference count</strong> - "12 references" shows how many times a key is used</li>
+                    <li><strong>Language coverage</strong> - "3/5 languages" shows translation status</li>
+                    <li><strong>Quick translate</strong> - Click to translate missing languages</li>
+                    <li><strong>Warnings</strong> - Unused or duplicate key indicators</li>
+                </ul>
+
+                <h3>Go to Definition</h3>
+                <p>Press <kbd>F12</kbd> on a localization key to jump to its definition in the resource file.</p>
+
+                <h3>Find References</h3>
+                <p>Press <kbd>Shift</kbd>+<kbd>F12</kbd> to find all usages of a key across your codebase.</p>
+
+                <h3>Quick Fix Actions</h3>
+                <p>When the extension detects issues, it offers quick fixes:</p>
+                <ul>
+                    <li><strong>Add missing key</strong> - Create the key in your resources</li>
+                    <li><strong>Translate key</strong> - Translate to missing languages</li>
+                    <li><strong>Remove unused key</strong> - Delete keys not used in code</li>
+                </ul>
+
+                <h2 id="resource-editor">Resource Editor</h2>
+                <p>The built-in resource editor provides a visual interface for editing translations.</p>
+
+                <h3>Opening the Editor</h3>
+                <ul>
+                    <li>Click the <strong>LRM</strong> icon in the sidebar</li>
+                    <li>Right-click a resource file → <strong>"Open in LRM Editor"</strong></li>
+                    <li>Use Command Palette: <strong>"LRM: Open Resource Editor"</strong></li>
+                </ul>
+
+                <h3>Editor Features</h3>
+                <ul>
+                    <li><strong>Multi-language view</strong> - See all translations side by side</li>
+                    <li><strong>Inline editing</strong> - Click any cell to edit</li>
+                    <li><strong>Search</strong> - Filter by key name or value</li>
+                    <li><strong>Status filters</strong> - Show only missing, empty, or all keys</li>
+                    <li><strong>Bulk operations</strong> - Translate or delete multiple keys</li>
+                </ul>
+
+                <h2 id="translation">Translation</h2>
+
+                <h3>Translation Providers</h3>
+                <p>The extension supports multiple translation providers:</p>
+
+                <table>
+                    <tr>
+                        <th>Provider</th>
+                        <th>API Key Required</th>
+                        <th>Notes</th>
+                    </tr>
+                    <tr>
+                        <td>MyMemory</td>
+                        <td>No (default)</td>
+                        <td>Free, good for small projects</td>
+                    </tr>
+                    <tr>
+                        <td>Lingva</td>
+                        <td>No</td>
+                        <td>Free Google Translate frontend</td>
+                    </tr>
+                    <tr>
+                        <td>Google Translate</td>
+                        <td>Yes</td>
+                        <td>High quality, fast</td>
+                    </tr>
+                    <tr>
+                        <td>DeepL</td>
+                        <td>Yes</td>
+                        <td>Excellent for European languages</td>
+                    </tr>
+                    <tr>
+                        <td>Azure Translator</td>
+                        <td>Yes</td>
+                        <td>Enterprise-grade</td>
+                    </tr>
+                    <tr>
+                        <td>OpenAI</td>
+                        <td>Yes</td>
+                        <td>Context-aware AI translation</td>
+                    </tr>
+                    <tr>
+                        <td>Claude</td>
+                        <td>Yes</td>
+                        <td>High quality AI translation</td>
+                    </tr>
+                    <tr>
+                        <td>Ollama</td>
+                        <td>No (local)</td>
+                        <td>Private, runs locally</td>
+                    </tr>
+                </table>
+
+                <h3>Configuring API Keys</h3>
+                <ol>
+                    <li>Open VS Code Settings (<kbd>Ctrl</kbd>+<kbd>,</kbd>)</li>
+                    <li>Search for <strong>"LRM"</strong></li>
+                    <li>Find <strong>"Translation Provider"</strong> and select your provider</li>
+                    <li>Enter your API key in the corresponding setting</li>
+                </ol>
+
+                <p>Or use environment variables:</p>
+                <pre><code>export LRM_GOOGLE_API_KEY="your-key"
+export LRM_DEEPL_API_KEY="your-key"
+export LRM_OPENAI_API_KEY="your-key"</code></pre>
+
+                <h3>Translating Keys</h3>
+                <ol>
+                    <li>Open a resource file or the Resource Editor</li>
+                    <li>Select one or more keys</li>
+                    <li>Right-click → <strong>"Translate"</strong> (or use CodeLens)</li>
+                    <li>Choose target languages</li>
+                    <li>Click <strong>"Translate"</strong></li>
+                </ol>
+
+                <h2 id="settings">Settings</h2>
+
+                <h3>Extension Settings</h3>
+                <table>
+                    <tr>
+                        <th>Setting</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code>lrm.resourcePath</code></td>
+                        <td>Auto-detect</td>
+                        <td>Path to resource files</td>
+                    </tr>
+                    <tr>
+                        <td><code>lrm.enableRealtimeScan</code></td>
+                        <td>true</td>
+                        <td>Enable live diagnostics</td>
+                    </tr>
+                    <tr>
+                        <td><code>lrm.scanOnSave</code></td>
+                        <td>true</td>
+                        <td>Scan files when saved</td>
+                    </tr>
+                    <tr>
+                        <td><code>lrm.translationProvider</code></td>
+                        <td>mymemory</td>
+                        <td>Default translation provider</td>
+                    </tr>
+                    <tr>
+                        <td><code>lrm.enableCodeLens</code></td>
+                        <td>true</td>
+                        <td>Show CodeLens in resource files</td>
+                    </tr>
+                    <tr>
+                        <td><code>lrm.scanCSharp</code></td>
+                        <td>true</td>
+                        <td>Scan .cs files</td>
+                    </tr>
+                    <tr>
+                        <td><code>lrm.scanRazor</code></td>
+                        <td>true</td>
+                        <td>Scan .cshtml/.razor files</td>
+                    </tr>
+                    <tr>
+                        <td><code>lrm.scanXaml</code></td>
+                        <td>true</td>
+                        <td>Scan .xaml files</td>
+                    </tr>
+                </table>
+
+                <h3>Project Configuration</h3>
+                <p>Create an <code>lrm.json</code> file in your project root:</p>
+                <pre><code>{
+  "resourcePath": "./Resources",
+  "defaultLanguage": "en",
+  "translation": {
+    "provider": "deepl",
+    "preservePlaceholders": true
+  },
+  "scanning": {
+    "include": ["**/*.cs", "**/*.cshtml"],
+    "exclude": ["**/bin/**", "**/obj/**"]
+  }
+}</code></pre>
+
+                <h2 id="keyboard-shortcuts">Keyboard Shortcuts</h2>
+
+                <table>
+                    <tr>
+                        <th>Shortcut</th>
+                        <th>Action</th>
+                    </tr>
+                    <tr>
+                        <td><kbd>F12</kbd></td>
+                        <td>Go to Definition</td>
+                    </tr>
+                    <tr>
+                        <td><kbd>Shift</kbd>+<kbd>F12</kbd></td>
+                        <td>Find All References</td>
+                    </tr>
+                    <tr>
+                        <td><kbd>Ctrl</kbd>+<kbd>.</kbd></td>
+                        <td>Quick Fix (add key, translate, etc.)</td>
+                    </tr>
+                    <tr>
+                        <td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td>
+                        <td>Command Palette (search "LRM")</td>
+                    </tr>
+                </table>
+
+                <h3>Commands</h3>
+                <p>Available commands (via Command Palette):</p>
+                <ul>
+                    <li><code>LRM: Open Resource Editor</code></li>
+                    <li><code>LRM: Open Dashboard</code></li>
+                    <li><code>LRM: Open Settings</code></li>
+                    <li><code>LRM: Validate Resources</code></li>
+                    <li><code>LRM: Scan Code</code></li>
+                    <li><code>LRM: Translate Selected Keys</code></li>
+                    <li><code>LRM: Add Language</code></li>
+                    <li><code>LRM: Export to CSV</code></li>
+                    <li><code>LRM: Import from CSV</code></li>
+                </ul>
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-links">
+                    <a href="/docs/">Documentation</a>
+                    <a href="https://github.com/nickprotop/LocalizationManager" target="_blank">GitHub</a>
+                    <a href="/privacy.html">Privacy</a>
+                    <a href="/terms.html">Terms</a>
+                </div>
+                <div class="footer-copy">
+                    &copy; 2025 LRM Cloud. All rights reserved.
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Check authentication state
+        (function() {
+            let token = localStorage.getItem('lrm_access_token');
+            let expiry = localStorage.getItem('lrm_token_expiry');
+
+            try {
+                if (token && token.startsWith('"')) token = JSON.parse(token);
+                if (expiry && expiry.startsWith('"')) expiry = JSON.parse(expiry);
+            } catch (e) {}
+
+            let expiryDate = null;
+            if (expiry) {
+                const normalizedExpiry = expiry.replace(/\.(\d{3})\d*Z$/, '.$1Z');
+                expiryDate = new Date(normalizedExpiry);
+            }
+
+            const isLoggedIn = token && expiryDate && !isNaN(expiryDate.getTime()) && expiryDate > new Date();
+
+            if (isLoggedIn) {
+                const navButtons = document.getElementById('nav-buttons');
+                if (navButtons) {
+                    navButtons.innerHTML = '<a href="/app/" class="btn btn-primary">Dashboard</a>';
+                }
+            }
+        })();
+
+        // Toggle sidebar on mobile
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        // Highlight active sidebar link on scroll
+        document.addEventListener('scroll', function() {
+            const sections = document.querySelectorAll('h1[id], h2[id]');
+            const links = document.querySelectorAll('.sidebar-link');
+
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 100;
+                if (scrollY >= sectionTop) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            links.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

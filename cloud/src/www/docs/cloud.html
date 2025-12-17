@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="LRM Cloud documentation - Learn how to use the cloud platform for team collaboration, project management, and translation.">
+    <meta name="theme-color" content="#6366f1">
+    <title>Cloud Platform - LRM Documentation</title>
+
+    <link rel="icon" type="image/png" href="../favicon.png">
+    <link rel="apple-touch-icon" href="../icon-192.png">
+
+    <style>
+        /* CSS Reset & Base */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #8b5cf6;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --bg-card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --text-light: #94a3b8;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f172a;
+                --bg-alt: #1e293b;
+                --bg-card: #1e293b;
+                --text: #f1f5f9;
+                --text-muted: #94a3b8;
+                --text-light: #64748b;
+                --border: #334155;
+                --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+            }
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        a:hover {
+            color: var(--primary-dark);
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            header {
+                background: rgba(15, 23, 42, 0.9);
+            }
+        }
+
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--text);
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        nav a {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.9375rem;
+            transition: color 0.2s;
+        }
+
+        nav a:hover {
+            color: var(--text);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.9375rem;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px 0 rgba(99, 102, 241, 0.5);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--bg-alt);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            padding: 80px 0 16px;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .breadcrumb a {
+            color: var(--text-muted);
+        }
+
+        .breadcrumb a:hover {
+            color: var(--primary);
+        }
+
+        .breadcrumb span {
+            margin: 0 8px;
+        }
+
+        /* Docs Layout */
+        .docs-layout {
+            display: flex;
+            gap: 48px;
+            padding-bottom: 80px;
+        }
+
+        /* Sidebar */
+        .docs-sidebar {
+            width: 250px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 80px;
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            margin-bottom: 24px;
+        }
+
+        .sidebar-title {
+            font-weight: 600;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+            padding-left: 12px;
+        }
+
+        .sidebar-link {
+            display: block;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+            font-size: 0.9375rem;
+            transition: all 0.2s;
+        }
+
+        .sidebar-link:hover {
+            background: var(--bg-alt);
+            color: var(--text);
+        }
+
+        .sidebar-link.active {
+            background: var(--bg-alt);
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .sidebar-external {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .sidebar-external::after {
+            content: '\2197';
+            font-size: 0.75rem;
+        }
+
+        /* Content */
+        .docs-content {
+            flex: 1;
+            min-width: 0;
+            max-width: 800px;
+        }
+
+        .docs-content h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .docs-content .lead {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+        }
+
+        .docs-content h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 48px;
+            margin-bottom: 16px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .docs-content h2:first-of-type {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+        }
+
+        .docs-content h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 32px;
+            margin-bottom: 12px;
+        }
+
+        .docs-content p {
+            margin-bottom: 16px;
+        }
+
+        .docs-content ul, .docs-content ol {
+            margin-bottom: 16px;
+            padding-left: 24px;
+        }
+
+        .docs-content li {
+            margin-bottom: 8px;
+        }
+
+        .docs-content pre {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+
+        .docs-content code {
+            background: var(--bg-alt);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.875em;
+        }
+
+        .docs-content pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .docs-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+        }
+
+        .docs-content th, .docs-content td {
+            border: 1px solid var(--border);
+            padding: 12px;
+            text-align: left;
+        }
+
+        .docs-content th {
+            background: var(--bg-alt);
+            font-weight: 600;
+        }
+
+        .info-box {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .info-box-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        /* Footer */
+        footer {
+            padding: 48px 0;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .footer-links a:hover {
+            color: var(--text);
+        }
+
+        .footer-copy {
+            color: var(--text-light);
+            font-size: 0.875rem;
+        }
+
+        /* Mobile Menu */
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        .sidebar-toggle {
+            display: none;
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            margin-bottom: 24px;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            font-size: 0.9375rem;
+            color: var(--text);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .docs-sidebar {
+                display: none;
+            }
+
+            .docs-sidebar.open {
+                display: block;
+                position: fixed;
+                top: 64px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                width: 100%;
+                height: auto;
+                background: var(--bg);
+                z-index: 50;
+                padding: 24px;
+                overflow-y: auto;
+            }
+
+            .sidebar-toggle {
+                display: block;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .docs-content h1 {
+                font-size: 1.5rem;
+            }
+
+            .docs-content h2 {
+                font-size: 1.25rem;
+            }
+
+            .footer-inner {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .footer-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="header-inner">
+                <a href="/" class="logo">
+                    <div class="logo-icon">LR</div>
+                    LRM Cloud
+                </a>
+
+                <nav>
+                    <div class="nav-links">
+                        <a href="/#features">Features</a>
+                        <a href="/#pricing">Pricing</a>
+                        <a href="https://github.com/nickprotop/LocalizationManager" target="_blank">GitHub</a>
+                        <a href="/docs/" style="color: var(--primary);">Docs</a>
+                    </div>
+
+                    <div class="nav-buttons" id="nav-buttons">
+                        <a href="/app/login" class="btn btn-secondary" id="nav-login">Log In</a>
+                        <a href="/app/register" class="btn btn-primary" id="nav-register">Get Started</a>
+                    </div>
+
+                    <button class="mobile-menu-btn" aria-label="Menu">☰</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Breadcrumb -->
+        <div class="breadcrumb">
+            <a href="/docs/">Docs</a>
+            <span>/</span>
+            <span>Cloud Platform</span>
+        </div>
+
+        <!-- Mobile sidebar toggle -->
+        <button class="sidebar-toggle" onclick="toggleSidebar()">
+            ☰ Navigation
+        </button>
+
+        <!-- Docs Layout -->
+        <div class="docs-layout">
+            <!-- Sidebar -->
+            <aside class="docs-sidebar" id="sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-title">Cloud Platform</div>
+                    <a href="#getting-started" class="sidebar-link active">Getting Started</a>
+                    <a href="#projects" class="sidebar-link">Projects</a>
+                    <a href="#resource-editor" class="sidebar-link">Resource Editor</a>
+                    <a href="#translation" class="sidebar-link">Translation</a>
+                    <a href="#cli-sync" class="sidebar-link">CLI Sync</a>
+                    <a href="#teams" class="sidebar-link">Teams & Organizations</a>
+                    <a href="#billing" class="sidebar-link">Billing & Plans</a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-title">Other Docs</div>
+                    <a href="vscode.html" class="sidebar-link">VS Code Extension</a>
+                    <a href="dotnet.html" class="sidebar-link">.NET Libraries</a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-title">GitHub</div>
+                    <a href="https://github.com/nickprotop/LocalizationManager/blob/main/docs/COMMANDS.md" target="_blank" class="sidebar-link sidebar-external">CLI Reference</a>
+                    <a href="https://github.com/nickprotop/LocalizationManager/blob/main/docs/API.md" target="_blank" class="sidebar-link sidebar-external">REST API</a>
+                </div>
+            </aside>
+
+            <!-- Content -->
+            <main class="docs-content">
+                <h1 id="getting-started">Getting Started with LRM Cloud</h1>
+                <p class="lead">LRM Cloud is a web-based platform for managing localization resources with team collaboration features.</p>
+
+                <h3>Creating an Account</h3>
+                <p>To get started with LRM Cloud:</p>
+                <ol>
+                    <li>Visit <a href="/app/register">/app/register</a> to create a free account</li>
+                    <li>Verify your email address</li>
+                    <li>Log in to access your dashboard</li>
+                </ol>
+
+                <h3>Dashboard Overview</h3>
+                <p>After logging in, you'll see your dashboard with:</p>
+                <ul>
+                    <li><strong>Projects</strong> - Your localization projects</li>
+                    <li><strong>Usage</strong> - Translation character usage and limits</li>
+                    <li><strong>Quick Actions</strong> - Create project, sync, translate</li>
+                </ul>
+
+                <h2 id="projects">Projects</h2>
+                <p>Projects are the core organizational unit in LRM Cloud. Each project contains your localization resources in a specific format.</p>
+
+                <h3>Creating a Project</h3>
+                <ol>
+                    <li>Click <strong>"New Project"</strong> on your dashboard</li>
+                    <li>Enter a project name</li>
+                    <li>Select the resource format:
+                        <ul>
+                            <li><strong>RESX</strong> - .NET resource files</li>
+                            <li><strong>JSON</strong> - Standard JSON with culture suffixes</li>
+                            <li><strong>i18next</strong> - i18next format with nested keys</li>
+                        </ul>
+                    </li>
+                    <li>Set the default language (e.g., "en" for English)</li>
+                    <li>Click <strong>"Create"</strong></li>
+                </ol>
+
+                <h3>Project Settings</h3>
+                <p>Each project has configurable settings:</p>
+                <ul>
+                    <li><strong>Default Language</strong> - The source language for translations</li>
+                    <li><strong>Languages</strong> - Target languages to support</li>
+                    <li><strong>Format</strong> - Resource file format (cannot be changed after creation)</li>
+                </ul>
+
+                <h2 id="resource-editor">Resource Editor</h2>
+                <p>The web-based resource editor provides a spreadsheet-like interface for managing translations.</p>
+
+                <h3>Features</h3>
+                <ul>
+                    <li><strong>Multi-language view</strong> - See all languages side by side</li>
+                    <li><strong>Inline editing</strong> - Click any cell to edit</li>
+                    <li><strong>Search & filter</strong> - Find keys quickly</li>
+                    <li><strong>Validation</strong> - See missing or empty translations highlighted</li>
+                    <li><strong>Comments</strong> - Add notes for translators</li>
+                </ul>
+
+                <h3>Adding Keys</h3>
+                <ol>
+                    <li>Click <strong>"Add Key"</strong> in the toolbar</li>
+                    <li>Enter the key name (e.g., "Welcome.Title")</li>
+                    <li>Enter the value for the default language</li>
+                    <li>Optionally add a comment</li>
+                    <li>Click <strong>"Save"</strong></li>
+                </ol>
+
+                <h2 id="translation">Translation</h2>
+                <p>LRM Cloud offers multiple translation options to fit your workflow and budget.</p>
+
+                <h3>Translation Options</h3>
+                <table>
+                    <tr>
+                        <th>Option</th>
+                        <th>Description</th>
+                        <th>Usage</th>
+                    </tr>
+                    <tr>
+                        <td><strong>LRM Managed</strong></td>
+                        <td>We handle the translation APIs</td>
+                        <td>Included characters per plan</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Your Own Keys (BYOK)</strong></td>
+                        <td>Use your own API keys</td>
+                        <td>Separate character limit</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Free Providers</strong></td>
+                        <td>MyMemory, Lingva (no API key)</td>
+                        <td>Counts toward BYOK limit</td>
+                    </tr>
+                </table>
+
+                <h3>Configuring Translation Providers</h3>
+                <p>To use your own API keys:</p>
+                <ol>
+                    <li>Go to <strong>Settings</strong> → <strong>Translation</strong></li>
+                    <li>Select a provider (Google, DeepL, Azure, OpenAI, etc.)</li>
+                    <li>Enter your API key</li>
+                    <li>Click <strong>"Save & Test"</strong> to verify</li>
+                </ol>
+
+                <div class="info-box">
+                    <div class="info-box-title">Supported Providers</div>
+                    <p>Google Translate, DeepL, Azure Translator, AWS Translate, OpenAI, Anthropic Claude, Ollama (local), MyMemory, and Lingva.</p>
+                </div>
+
+                <h3>Translating Keys</h3>
+                <ol>
+                    <li>Select one or more keys in the editor</li>
+                    <li>Click <strong>"Translate"</strong> in the toolbar</li>
+                    <li>Choose target languages</li>
+                    <li>Select translation provider</li>
+                    <li>Click <strong>"Translate"</strong></li>
+                </ol>
+
+                <h2 id="cli-sync">CLI Sync</h2>
+                <p>Sync your local resource files with LRM Cloud using the CLI.</p>
+
+                <h3>Installation</h3>
+                <p>Download the CLI from <a href="https://github.com/nickprotop/LocalizationManager/releases" target="_blank">GitHub Releases</a> or install via package manager.</p>
+
+                <h3>Authentication</h3>
+                <pre><code># Log in to LRM Cloud
+lrm cloud login
+
+# This will open your browser for authentication</code></pre>
+
+                <h3>Push & Pull</h3>
+                <pre><code># Push local changes to cloud
+lrm cloud push --project my-project
+
+# Pull cloud changes to local
+lrm cloud pull --project my-project
+
+# Two-way sync (merge changes)
+lrm cloud sync --project my-project</code></pre>
+
+                <h3>Project Configuration</h3>
+                <p>Add to your <code>lrm.json</code>:</p>
+                <pre><code>{
+  "cloud": {
+    "project": "my-project",
+    "autoSync": false
+  }
+}</code></pre>
+
+                <h2 id="teams">Teams & Organizations</h2>
+                <p>Organizations allow team collaboration on localization projects (Team and Enterprise plans).</p>
+
+                <h3>Creating an Organization</h3>
+                <ol>
+                    <li>Go to <strong>Settings</strong> → <strong>Organizations</strong></li>
+                    <li>Click <strong>"Create Organization"</strong></li>
+                    <li>Enter organization name</li>
+                    <li>Click <strong>"Create"</strong></li>
+                </ol>
+
+                <h3>Inviting Members</h3>
+                <ol>
+                    <li>Open your organization</li>
+                    <li>Go to <strong>"Members"</strong> tab</li>
+                    <li>Click <strong>"Invite"</strong></li>
+                    <li>Enter email address</li>
+                    <li>Select role (Admin, Member, or Viewer)</li>
+                    <li>Click <strong>"Send Invite"</strong></li>
+                </ol>
+
+                <h3>Roles</h3>
+                <table>
+                    <tr>
+                        <th>Role</th>
+                        <th>Permissions</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Owner</strong></td>
+                        <td>Full access, billing, delete organization</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Admin</strong></td>
+                        <td>Manage projects, members, settings</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Member</strong></td>
+                        <td>Edit resources, translate, sync</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Viewer</strong></td>
+                        <td>View only, export</td>
+                    </tr>
+                </table>
+
+                <h2 id="billing">Billing & Plans</h2>
+
+                <h3>Plan Comparison</h3>
+                <table>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Free</th>
+                        <th>Team ($9/mo)</th>
+                        <th>Enterprise ($29/mo)</th>
+                    </tr>
+                    <tr>
+                        <td>LRM Translation Chars</td>
+                        <td>5,000/month</td>
+                        <td>50,000/month</td>
+                        <td>500,000/month</td>
+                    </tr>
+                    <tr>
+                        <td>BYOK Chars</td>
+                        <td>25,000/month</td>
+                        <td>250,000/month</td>
+                        <td>2,500,000/month</td>
+                    </tr>
+                    <tr>
+                        <td>Projects</td>
+                        <td>3</td>
+                        <td>Unlimited</td>
+                        <td>Unlimited</td>
+                    </tr>
+                    <tr>
+                        <td>API Keys</td>
+                        <td>3</td>
+                        <td>10</td>
+                        <td>Unlimited</td>
+                    </tr>
+                    <tr>
+                        <td>Team Members</td>
+                        <td>-</td>
+                        <td>10</td>
+                        <td>Unlimited</td>
+                    </tr>
+                    <tr>
+                        <td>Organizations</td>
+                        <td>-</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                </table>
+
+                <h3>Managing Your Subscription</h3>
+                <ol>
+                    <li>Go to <strong>Settings</strong> → <strong>Billing</strong></li>
+                    <li>View current plan and usage</li>
+                    <li>Click <strong>"Upgrade"</strong> or <strong>"Manage Subscription"</strong></li>
+                </ol>
+
+                <h3>Usage Monitoring</h3>
+                <p>Your dashboard shows real-time usage statistics:</p>
+                <ul>
+                    <li>LRM translation characters used vs. limit</li>
+                    <li>BYOK characters used vs. limit</li>
+                    <li>Reset date for monthly limits</li>
+                </ul>
+
+                <div class="info-box">
+                    <div class="info-box-title">Usage Warnings</div>
+                    <p>You'll receive warnings at 75% and 90% usage. Translation will be blocked at 100% until limits reset or you upgrade.</p>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-links">
+                    <a href="/docs/">Documentation</a>
+                    <a href="https://github.com/nickprotop/LocalizationManager" target="_blank">GitHub</a>
+                    <a href="/privacy.html">Privacy</a>
+                    <a href="/terms.html">Terms</a>
+                </div>
+                <div class="footer-copy">
+                    &copy; 2025 LRM Cloud. All rights reserved.
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Check authentication state
+        (function() {
+            let token = localStorage.getItem('lrm_access_token');
+            let expiry = localStorage.getItem('lrm_token_expiry');
+
+            try {
+                if (token && token.startsWith('"')) token = JSON.parse(token);
+                if (expiry && expiry.startsWith('"')) expiry = JSON.parse(expiry);
+            } catch (e) {}
+
+            let expiryDate = null;
+            if (expiry) {
+                const normalizedExpiry = expiry.replace(/\.(\d{3})\d*Z$/, '.$1Z');
+                expiryDate = new Date(normalizedExpiry);
+            }
+
+            const isLoggedIn = token && expiryDate && !isNaN(expiryDate.getTime()) && expiryDate > new Date();
+
+            if (isLoggedIn) {
+                const navButtons = document.getElementById('nav-buttons');
+                if (navButtons) {
+                    navButtons.innerHTML = '<a href="/app/" class="btn btn-primary">Dashboard</a>';
+                }
+            }
+        })();
+
+        // Toggle sidebar on mobile
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        // Highlight active sidebar link on scroll
+        document.addEventListener('scroll', function() {
+            const sections = document.querySelectorAll('h1[id], h2[id]');
+            const links = document.querySelectorAll('.sidebar-link');
+
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 100;
+                if (scrollY >= sectionTop) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            links.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
