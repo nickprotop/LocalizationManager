@@ -422,16 +422,31 @@
             // Initialize active forms
             _activePluralForms = new HashSet<string> { PluralForms.One, PluralForms.Other };
 
-            // Create empty "one" forms
+            // Create empty cells for both "one" and "other" forms for ALL languages
             foreach (var lang in Languages)
             {
-                var key = TranslationGridRow.GetKey(lang, PluralForms.One);
-                if (!Row.Translations.ContainsKey(key))
+                // Create "one" form if missing
+                var oneKey = TranslationGridRow.GetKey(lang, PluralForms.One);
+                if (!Row.Translations.ContainsKey(oneKey))
                 {
-                    Row.Translations[key] = new TranslationCell
+                    Row.Translations[oneKey] = new TranslationCell
                     {
                         LanguageCode = lang,
                         PluralForm = PluralForms.One,
+                        Value = null,
+                        OriginalValue = null,
+                        IsDirty = true
+                    };
+                }
+
+                // Create "other" form if missing (for languages that had no translation)
+                var otherKey = TranslationGridRow.GetKey(lang, PluralForms.Other);
+                if (!Row.Translations.ContainsKey(otherKey))
+                {
+                    Row.Translations[otherKey] = new TranslationCell
+                    {
+                        LanguageCode = lang,
+                        PluralForm = PluralForms.Other,
                         Value = null,
                         OriginalValue = null,
                         IsDirty = true

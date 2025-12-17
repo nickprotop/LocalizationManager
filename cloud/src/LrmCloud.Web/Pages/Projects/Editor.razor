@@ -563,13 +563,17 @@ else
         // Build source texts from current UI state (may include unsaved edits)
         var sourceTexts = BuildSourceTextsFromRows(rowList, _project.DefaultLanguage);
 
+        // Build key metadata to tell API about unsaved state (e.g., IsPlural)
+        var keyMetadata = BuildKeyMetadataFromRows(rowList);
+
         var parameters = new DialogParameters
         {
             { nameof(TranslateDialog.ProjectId), ProjectId },
             { nameof(TranslateDialog.SourceLanguage), _project.DefaultLanguage },
             { nameof(TranslateDialog.AvailableLanguages), _languages },
             { nameof(TranslateDialog.KeysToTranslate), rowList.Select(r => r.KeyName).ToList() },
-            { nameof(TranslateDialog.SourceTexts), sourceTexts }
+            { nameof(TranslateDialog.SourceTexts), sourceTexts },
+            { nameof(TranslateDialog.KeyMetadata), keyMetadata }
         };
 
         var options = new DialogOptions
@@ -711,8 +715,13 @@ else
     {
         if (_project == null) return;
 
+        var rowList = new List<TranslationGridRow> { row };
+
         // Build source texts from current UI state (may include unsaved edits)
-        var sourceTexts = BuildSourceTextsFromRows(new List<TranslationGridRow> { row }, _project.DefaultLanguage);
+        var sourceTexts = BuildSourceTextsFromRows(rowList, _project.DefaultLanguage);
+
+        // Build key metadata to tell API about unsaved state (e.g., IsPlural)
+        var keyMetadata = BuildKeyMetadataFromRows(rowList);
 
         var parameters = new DialogParameters
         {
@@ -720,7 +729,8 @@ else
             { nameof(TranslateDialog.SourceLanguage), _project.DefaultLanguage },
             { nameof(TranslateDialog.AvailableLanguages), _languages },
             { nameof(TranslateDialog.KeysToTranslate), new List<string> { row.KeyName } },
-            { nameof(TranslateDialog.SourceTexts), sourceTexts }
+            { nameof(TranslateDialog.SourceTexts), sourceTexts },
+            { nameof(TranslateDialog.KeyMetadata), keyMetadata }
         };
 
         var options = new DialogOptions
@@ -738,7 +748,7 @@ else
         {
             // Apply translations to the drawer row only (cells will update in place)
             // User must click "Apply" to stage changes, then "Save" to persist
-            ApplyTranslationsToDrawerRow(row, translationResult);
+            await ApplyTranslationsToDrawerRow(row, translationResult);
         }
     }
 
@@ -747,7 +757,7 @@ else
     /// Unlike ApplyTranslationsToUI, this does NOT stage to _editedRows - the user must click Apply.
     /// Handles both non-plural and plural keys.
     /// </summary>
-    private void ApplyTranslationsToDrawerRow(TranslationGridRow row, TranslateResponseDto translationResult)
+    private async Task ApplyTranslationsToDrawerRow(TranslationGridRow row, TranslateResponseDto translationResult)
     {
         var appliedCount = 0;
 
@@ -779,10 +789,10 @@ else
 
         if (appliedCount > 0)
         {
-            // Refresh the drawer's plural form display to show new cells
-            _keyDetailDrawer?.RefreshActivePluralForms();
             Snackbar.Add($"Applied {appliedCount} translations. Click Apply to stage changes.", Severity.Success);
+            // First update parent state, then refresh drawer to show new cells/values
             StateHasChanged();
+            await InvokeAsync(() => _keyDetailDrawer?.RefreshActivePluralForms());
         }
     }
 
@@ -822,6 +832,25 @@ else
         }
 
         return sourceTexts;
+    }
+
+    /// <summary>
+    /// Builds a dictionary of key metadata from the current UI state.
+    /// This tells the API about unsaved changes like IsPlural conversions.
+    /// </summary>
+    private Dictionary<string, KeyTranslationMetadata> BuildKeyMetadataFromRows(List<TranslationGridRow> rows)
+    {
+        var metadata = new Dictionary<string, KeyTranslationMetadata>();
+
+        foreach (var row in rows)
+        {
+            metadata[row.KeyName] = new KeyTranslationMetadata
+            {
+                IsPlural = row.IsPlural
+            };
+        }
+
+        return metadata;
     }
 
     private async Task DeleteKey(TranslationGridRow row)

@@ -153,8 +153,14 @@ public class CloudTranslationService : ICloudTranslationService
             // Process each key and target language
             foreach (var key in keys)
             {
+                // Determine if key is plural: use KeyMetadata from client if provided (for unsaved UI changes),
+                // otherwise fall back to database value
+                var isPlural = request.KeyMetadata?.TryGetValue(key.KeyName, out var metadata) == true
+                    ? metadata.IsPlural
+                    : key.IsPlural;
+
                 // Get plural forms to process (empty string for non-plural keys)
-                var pluralForms = key.IsPlural
+                var pluralForms = isPlural
                     ? new[] { "one", "other", "zero", "two", "few", "many" }
                     : new[] { "" };
 

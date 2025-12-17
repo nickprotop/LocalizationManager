@@ -62,6 +62,26 @@ public class TranslateRequestDto
     /// Defaults to true for CLI compatibility.
     /// </summary>
     public bool SaveToDatabase { get; set; } = true;
+
+    /// <summary>
+    /// Optional metadata about keys being translated. When provided, overrides
+    /// database values for key properties like IsPlural. This allows translating
+    /// keys with unsaved UI changes.
+    /// Key = resource key name, Value = metadata.
+    /// </summary>
+    public Dictionary<string, KeyTranslationMetadata>? KeyMetadata { get; set; }
+}
+
+/// <summary>
+/// Metadata about a key being translated.
+/// </summary>
+public class KeyTranslationMetadata
+{
+    /// <summary>
+    /// Whether this key is plural. When true, translates all plural forms.
+    /// Overrides the database value when provided.
+    /// </summary>
+    public bool IsPlural { get; set; }
 }
 
 /// <summary>

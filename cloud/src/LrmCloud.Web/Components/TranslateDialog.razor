@@ -184,6 +184,13 @@
     [Parameter]
     public Dictionary<string, string>? SourceTexts { get; set; }
 
+    /// <summary>
+    /// Optional metadata about keys being translated. When provided, overrides database values
+    /// for key properties like IsPlural. This allows translating keys with unsaved UI changes.
+    /// </summary>
+    [Parameter]
+    public Dictionary<string, KeyTranslationMetadata>? KeyMetadata { get; set; }
+
     private List<TranslationProviderDto> _providers = new();
     private string? _selectedProvider;
     private HashSet<string> _selectedLanguages = new();
@@ -304,7 +311,8 @@
                 Overwrite = _overwrite,
                 Context = _context,
                 SaveToDatabase = false,  // Return translations for UI preview, don't save yet
-                SourceTexts = SourceTexts  // Pass current UI values if provided
+                SourceTexts = SourceTexts,  // Pass current UI values if provided
+                KeyMetadata = KeyMetadata   // Pass key metadata (e.g., IsPlural) for unsaved UI changes
             };
 
             _translationResult = await TranslationService.TranslateKeysAsync(ProjectId, request);
