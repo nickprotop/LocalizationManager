@@ -5,7 +5,7 @@ namespace LrmCloud.Api.Services.Translation;
 /// <summary>
 /// Service for cloud-based translation operations.
 /// Wraps LocalizationManager.Core translation providers with cloud-specific features:
-/// - API key hierarchy (project → user → organization → platform)
+/// - API key hierarchy (project → user → organization)
 /// - Usage tracking and limits
 /// - Caching
 /// </summary>

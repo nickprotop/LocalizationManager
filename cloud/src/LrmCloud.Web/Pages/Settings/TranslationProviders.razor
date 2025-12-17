@@ -81,44 +81,59 @@
 
                     <MudText Typo="Typo.subtitle2">API Key Configuration Hierarchy</MudText>
                     <MudText Typo="Typo.body2">
-                        For BYOK providers, API keys can be configured at multiple levels. Higher levels override lower levels:
+                        For BYOK providers, API keys can be configured at multiple levels. Higher priority overrides lower priority:
                     </MudText>
 
-                    <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Justify="Justify.Center">
-                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Secondary">Organization</MudChip>
-                            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
-                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary">User (You)</MudChip>
-                            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
-                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Success">Project</MudChip>
-                        </MudStack>
-                    </MudPaper>
+                    <MudStack Spacing="2">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary"><strong>Personal Projects:</strong></MudText>
+                        <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Justify="Justify.Center">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Success">Project</MudChip>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary">User (You)</MudChip>
+                            </MudStack>
+                        </MudPaper>
+
+                        <MudText Typo="Typo.caption" Color="Color.Secondary"><strong>Organization Projects:</strong></MudText>
+                        <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Justify="Justify.Center">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Success">Project</MudChip>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Secondary">Organization</MudChip>
+                            </MudStack>
+                        </MudPaper>
+                    </MudStack>
+
+                    <MudAlert Severity="Severity.Info" Dense="true">
+                        Your personal API keys are only used for your personal projects.
+                        Organization projects use organization-level keys to ensure consistent billing.
+                    </MudAlert>
 
                     <MudSimpleTable Dense="true" Hover="true">
                         <thead>
                             <tr>
                                 <th>Level</th>
                                 <th>Where to Configure</th>
-                                <th>Who Can Configure</th>
+                                <th>Used For</th>
                             </tr>
                         </thead>
                         <tbody>
+                            <tr style="background-color: var(--mud-palette-primary-lighten);">
+                                <td><MudChip T="string" Size="Size.Small" Color="Color.Primary">User</MudChip></td>
+                                <td><strong>This page</strong></td>
+                                <td>Your personal projects only</td>
+                            </tr>
                             <tr>
                                 <td><MudChip T="string" Size="Size.Small" Color="Color.Secondary">Organization</MudChip></td>
                                 <td>
                                     <MudLink Href="/app/organizations">Organizations</MudLink> &rarr; API Keys
                                 </td>
-                                <td>Organization admin/owner</td>
-                            </tr>
-                            <tr style="background-color: var(--mud-palette-primary-lighten);">
-                                <td><MudChip T="string" Size="Size.Small" Color="Color.Primary">User</MudChip></td>
-                                <td><strong>This page</strong></td>
-                                <td>You</td>
+                                <td>All projects in the organization</td>
                             </tr>
                             <tr>
                                 <td><MudChip T="string" Size="Size.Small" Color="Color.Success">Project</MudChip></td>
                                 <td>Projects &rarr; [Project] &rarr; Settings</td>
-                                <td>Project owner</td>
+                                <td>Overrides user/org keys for that project</td>
                             </tr>
                         </tbody>
                     </MudSimpleTable>

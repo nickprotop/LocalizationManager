@@ -7,13 +7,12 @@ using Microsoft.EntityFrameworkCore;
 namespace LrmCloud.Api.Services.Translation;
 
 /// <summary>
-/// Resolves API keys and configurations using the hierarchy: Project → User → Organization → Platform.
+/// Resolves API keys and configurations using the hierarchy: Project → User → Organization.
 /// </summary>
 public class ApiKeyHierarchyService : IApiKeyHierarchyService
 {
     private readonly AppDbContext _db;
     private readonly IApiKeyEncryptionService _encryption;
-    private readonly IConfiguration _configuration;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -22,12 +21,10 @@ public class ApiKeyHierarchyService : IApiKeyHierarchyService
 
     public ApiKeyHierarchyService(
         AppDbContext db,
-        IApiKeyEncryptionService encryption,
-        IConfiguration configuration)
+        IApiKeyEncryptionService encryption)
     {
         _db = db;
         _encryption = encryption;
-        _configuration = configuration;
     }
 
     public async Task<(string? ApiKey, string? Source)> ResolveApiKeyAsync(
@@ -74,13 +71,6 @@ public class ApiKeyHierarchyService : IApiKeyHierarchyService
             }
         }
 
-        // 4. Check platform-level key (from configuration)
-        var platformKey = GetPlatformApiKey(provider);
-        if (!string.IsNullOrEmpty(platformKey))
-        {
-            return (platformKey, "platform");
-        }
-
         return (null, null);
     }
 
@@ -96,18 +86,8 @@ public class ApiKeyHierarchyService : IApiKeyHierarchyService
             Provider = provider
         };
 
-        // Start with platform config
         var mergedConfig = new Dictionary<string, object?>();
         var configSources = new Dictionary<string, string>();
-        var platformConfig = GetPlatformConfig(provider);
-        if (platformConfig != null)
-        {
-            foreach (var kvp in platformConfig)
-            {
-                mergedConfig[kvp.Key] = kvp.Value;
-                configSources[kvp.Key] = "platform";
-            }
-        }
 
         // Merge organization config
         if (organizationId.HasValue)
@@ -202,17 +182,6 @@ public class ApiKeyHierarchyService : IApiKeyHierarchyService
                         }
                     }
                 }
-            }
-        }
-
-        // Check platform API key if no other source found
-        if (result.ApiKeySource == null)
-        {
-            var platformKey = GetPlatformApiKey(provider);
-            if (!string.IsNullOrEmpty(platformKey))
-            {
-                result.ApiKeySource = "platform";
-                result.MaskedApiKey = _encryption.Mask(platformKey);
             }
         }
 
@@ -508,40 +477,6 @@ public class ApiKeyHierarchyService : IApiKeyHierarchyService
             Config = config,
             UpdatedAt = updatedAt
         };
-    }
-
-    private string? GetPlatformApiKey(string provider)
-    {
-        // Check configuration for platform-level keys
-        var configKey = $"TranslationProviders:{provider}:ApiKey";
-        var apiKey = _configuration[configKey];
-
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            // Also check environment variables with standard naming
-            var envVarName = $"LRM_{provider.ToUpperInvariant()}_API_KEY";
-            apiKey = Environment.GetEnvironmentVariable(envVarName);
-        }
-
-        return apiKey;
-    }
-
-    private Dictionary<string, object?>? GetPlatformConfig(string provider)
-    {
-        // Check configuration for platform-level provider config
-        var section = _configuration.GetSection($"TranslationProviders:{provider}");
-        if (!section.Exists()) return null;
-
-        var config = new Dictionary<string, object?>();
-        foreach (var child in section.GetChildren())
-        {
-            if (child.Key != "ApiKey") // Don't include API key in config
-            {
-                config[child.Key] = child.Value;
-            }
-        }
-
-        return config.Count > 0 ? config : null;
     }
 
     private static string GetProviderDisplayName(string provider)

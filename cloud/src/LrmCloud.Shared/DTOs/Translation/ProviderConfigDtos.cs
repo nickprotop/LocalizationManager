@@ -10,7 +10,7 @@ public class ProviderConfigBase
 {
     /// <summary>
     /// Optional rate limit (requests per minute).
-    /// When null, the platform default is used.
+    /// When null, the provider default is used.
     /// </summary>
     public int? RateLimitPerMinute { get; set; }
 }
@@ -176,7 +176,7 @@ public class ProviderConfigDto
     public string Provider { get; set; } = string.Empty;
 
     /// <summary>
-    /// Configuration level: "platform", "organization", "user", "project".
+    /// Configuration level: "organization", "user", "project".
     /// </summary>
     public string Level { get; set; } = string.Empty;
 
@@ -239,7 +239,7 @@ public class ResolvedProviderConfigDto
     public bool IsConfigured { get; set; }
 
     /// <summary>
-    /// Where the API key comes from: "platform", "organization", "user", "project".
+    /// Where the API key comes from: "organization", "user", "project", or "lrm" for the managed provider.
     /// Null if no API key is configured.
     /// </summary>
     public string? ApiKeySource { get; set; }

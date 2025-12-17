@@ -4,7 +4,6 @@ using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.DTOs.Translation;
 using LrmCloud.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -47,8 +46,7 @@ public class CloudTranslationServiceTests : IDisposable
         };
 
         _encryptionService = new ApiKeyEncryptionService(_cloudConfiguration);
-        var mockConfiguration = new Mock<IConfiguration>();
-        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, mockConfiguration.Object);
+        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService);
         _loggerMock = new Mock<ILogger<CloudTranslationService>>();
         _lrmProviderMock = new Mock<ILrmTranslationProvider>();
 
@@ -309,7 +307,7 @@ public class CloudTranslationServiceTests : IDisposable
     [Fact]
     public async Task TranslateKeys_ShouldReturnError_WhenNoProviderConfigured()
     {
-        // Arrange - Create a special config without any platform keys and LRM disabled
+        // Arrange - Create a special config with LRM disabled and no user keys configured
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
@@ -333,8 +331,7 @@ public class CloudTranslationServiceTests : IDisposable
         };
 
         var encryptionService = new ApiKeyEncryptionService(cloudConfig);
-        var mockConfiguration = new Mock<IConfiguration>();
-        var hierarchyService = new ApiKeyHierarchyService(db, encryptionService, mockConfiguration.Object);
+        var hierarchyService = new ApiKeyHierarchyService(db, encryptionService);
         var loggerMock = new Mock<ILogger<CloudTranslationService>>();
         var lrmProviderMock = new Mock<ILrmTranslationProvider>();
         lrmProviderMock.Setup(x => x.IsAvailableAsync(It.IsAny<int>())).ReturnsAsync((false, "LRM disabled"));

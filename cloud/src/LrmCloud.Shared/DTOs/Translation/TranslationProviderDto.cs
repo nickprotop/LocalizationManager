@@ -46,7 +46,7 @@ public class TranslationProviderDto
     public string? Description { get; set; }
 
     /// <summary>
-    /// Source of the API key (if configured): "project", "user", "organization", "platform".
+    /// Source of the API key (if configured): "project", "user", "organization", or "lrm" for the managed provider.
     /// </summary>
     public string? ApiKeySource { get; set; }
 }

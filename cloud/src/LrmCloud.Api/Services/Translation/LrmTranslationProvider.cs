@@ -202,9 +202,10 @@ public class LrmTranslationProvider : ILrmTranslationProvider
                 result.FromCache = response.FromCache;
 
                 // Note: Usage tracking is handled by CloudTranslationService, not here
-                _logger.LogDebug(
-                    "LRM translation via {Backend}: {Chars} chars (billable to user {BillableUserId})",
-                    backend, sourceText.Length, billableUserId);
+                _logger.LogInformation(
+                    "LRM translation via {Backend}: {SourceLang} → {TargetLang}, {Chars} chars{FromCache}",
+                    backend, sourceLanguage, targetLanguage, sourceText.Length,
+                    response.FromCache ? " (cached)" : "");
 
                 return result; // Success - return immediately
             }
@@ -314,9 +315,8 @@ public class LrmTranslationProvider : ILrmTranslationProvider
                 }
             };
 
-            // Add any platform-level API keys here if we have them
-            // For now, we rely on free providers or self-hosted ones
-            ApplyPlatformConfig(config, backend);
+            // Apply backend-specific configuration from config.json
+            ApplyBackendConfig(config, backend);
 
             return TranslationProviderFactory.Create(backend, config);
         }
@@ -327,7 +327,7 @@ public class LrmTranslationProvider : ILrmTranslationProvider
         }
     }
 
-    private void ApplyPlatformConfig(ConfigurationModel config, string backend)
+    private void ApplyBackendConfig(ConfigurationModel config, string backend)
     {
         config.Translation ??= new TranslationConfiguration();
         config.Translation.ApiKeys ??= new TranslationApiKeys();

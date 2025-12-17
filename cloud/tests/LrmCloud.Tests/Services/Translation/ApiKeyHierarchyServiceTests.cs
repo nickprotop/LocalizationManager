@@ -3,8 +3,6 @@ using LrmCloud.Api.Services.Translation;
 using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Moq;
 using Xunit;
 
 namespace LrmCloud.Tests.Services.Translation;
@@ -43,9 +41,7 @@ public class ApiKeyHierarchyServiceTests : IDisposable
 
         _encryptionService = new ApiKeyEncryptionService(_cloudConfiguration);
 
-        // Create a mock IConfiguration for ApiKeyHierarchyService
-        var mockConfiguration = new Mock<IConfiguration>();
-        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, mockConfiguration.Object);
+        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService);
     }
 
     public void Dispose()
@@ -186,7 +182,7 @@ public class ApiKeyHierarchyServiceTests : IDisposable
         var user = await CreateTestUserAsync();
         var project = await CreateTestProjectAsync(userId: user.Id);
 
-        // Act - claude has no platform key configured
+        // Act - claude has no key configured at any level
         var (apiKey, source) = await _hierarchyService.ResolveApiKeyAsync("claude", project.Id, user.Id);
 
         // Assert
@@ -343,7 +339,7 @@ public class ApiKeyHierarchyServiceTests : IDisposable
         // Act
         var configured = await _hierarchyService.GetConfiguredProvidersAsync(project.Id, user.Id, org.Id);
 
-        // Assert - only user, organization, and project keys (no platform keys anymore)
+        // Assert - user, organization, and project keys
         Assert.Contains("deepl", configured.Keys);
         Assert.Contains("openai", configured.Keys);
         Assert.Contains("claude", configured.Keys);

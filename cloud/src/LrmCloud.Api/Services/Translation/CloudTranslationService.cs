@@ -60,7 +60,7 @@ public class CloudTranslationService : ICloudTranslationService
                 Description = available
                     ? $"LRM managed translation ({remaining:N0} chars remaining)"
                     : reason ?? "LRM translation unavailable",
-                ApiKeySource = "platform"
+                ApiKeySource = "lrm" // LRM managed provider, not user BYOK
             });
         }
 
@@ -332,7 +332,7 @@ public class CloudTranslationService : ICloudTranslationService
                     response.CharactersTranslated,
                     providerName,
                     isLrmProvider,
-                    isLrmProvider ? "platform" : keySource);
+                    isLrmProvider ? "lrm" : keySource);
 
                 // Track per-provider usage for analytics (against acting user for audit trail)
                 await TrackProviderUsageAsync(userId, request.Provider ?? "auto", response.CharactersTranslated, response.TranslatedCount);

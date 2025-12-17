@@ -71,7 +71,7 @@ public class UsageEvent
     public bool IsLrmProvider { get; set; }
 
     /// <summary>
-    /// Source of the API key: "user", "organization", "project", "platform".
+    /// Source of the API key: "user", "organization", "project", or "lrm" for the managed provider.
     /// </summary>
     [Required]
     [MaxLength(20)]

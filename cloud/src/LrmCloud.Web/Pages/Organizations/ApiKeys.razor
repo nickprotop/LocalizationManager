@@ -41,12 +41,12 @@
         <MudPaper Class="pa-4 mb-4">
             <MudText Typo="Typo.h6" Class="mb-2">Key Hierarchy</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
-                API keys are resolved in order: Project → User → Organization → Platform.
-                Organization keys are shared across all projects in this organization.
+                For organization projects, API keys are resolved in order: Project → Organization.
+                User's personal API keys are not used for organization projects to ensure consistent billing.
             </MudText>
 
             <MudAlert Severity="Severity.Info" Dense="true" Class="mb-0">
-                Keys configured here will be used by all projects in this organization unless overridden at the project or user level.
+                Keys configured here will be used by all projects in this organization unless overridden at the project level.
             </MudAlert>
         </MudPaper>
 
@@ -234,7 +234,7 @@
             Are you sure you want to remove the <strong>@_selectedProvider?.DisplayName</strong> API key?
         </MudText>
         <MudText Color="Color.Secondary" Class="mt-2">
-            Projects in this organization will fall back to user or platform-level keys.
+            Projects in this organization will fall back to project-level overrides if configured.
         </MudText>
     </DialogContent>
     <DialogActions>

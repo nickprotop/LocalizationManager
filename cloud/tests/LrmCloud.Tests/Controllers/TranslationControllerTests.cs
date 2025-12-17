@@ -9,7 +9,6 @@ using LrmCloud.Shared.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -52,8 +51,7 @@ public class TranslationControllerTests : IDisposable
         };
 
         _encryptionService = new ApiKeyEncryptionService(_cloudConfiguration);
-        var mockConfiguration = new Mock<IConfiguration>();
-        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService, mockConfiguration.Object);
+        _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService);
 
         var translationLoggerMock = new Mock<ILogger<CloudTranslationService>>();
         var lrmProviderMock = new Mock<ILrmTranslationProvider>();
