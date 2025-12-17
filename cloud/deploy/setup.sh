@@ -360,28 +360,29 @@ else
     CORS_CONFIG="null"
 fi
 
-# Write merged config.json
+# Write/merge config.json
 # Note: Inside Docker container, API always listens on 8080 (mapped to API_PORT on host)
 print_step "Writing config.json..."
 
 # Build the server section based on CORS config
 if [ "$CORS_CONFIG" = "null" ]; then
-    SERVER_SECTION='"server": {
-    "urls": "http://0.0.0.0:8080",
-    "environment": "'"${ENVIRONMENT}"'"
-  }'
+    SERVER_JSON='{
+      "urls": "http://0.0.0.0:8080",
+      "environment": "'"${ENVIRONMENT}"'"
+    }'
 else
-    SERVER_SECTION='"server": {
-    "urls": "http://0.0.0.0:8080",
-    "environment": "'"${ENVIRONMENT}"'",
-    "cors": '"${CORS_CONFIG}"'
-  }'
+    SERVER_JSON='{
+      "urls": "http://0.0.0.0:8080",
+      "environment": "'"${ENVIRONMENT}"'",
+      "cors": '"${CORS_CONFIG}"'
+    }'
 fi
 
-cat > "$CONFIG_FILE" <<EOF
+# Build the new config as JSON
+NEW_CONFIG=$(cat <<EOF
 {
   "\$schema": "./config.schema.json",
-  ${SERVER_SECTION},
+  "server": ${SERVER_JSON},
   "database": {
     "connectionString": "Host=lrmcloud-postgres;Port=5432;Database=lrmcloud;Username=lrm;Password=${POSTGRES_PASSWORD}",
     "autoMigrate": true
@@ -432,6 +433,30 @@ cat > "$CONFIG_FILE" <<EOF
   }
 }
 EOF
+)
+
+# Merge with existing config to preserve unknown fields (payment, lrmProvider, etc.)
+if [ -f "$CONFIG_FILE" ] && command -v jq &> /dev/null; then
+    # Use jq to deep merge: existing config as base, new config overwrites known fields
+    # This preserves fields like "payment", "lrmProvider" that setup.sh doesn't manage
+    MERGED_CONFIG=$(jq -s '.[0] * .[1]' "$CONFIG_FILE" <(echo "$NEW_CONFIG"))
+    echo "$MERGED_CONFIG" | jq '.' > "$CONFIG_FILE"
+    print_success "Config merged (preserved existing fields like payment, lrmProvider)"
+elif [ -f "$CONFIG_FILE" ] && [ "$EXISTING_CONFIG" = true ]; then
+    # No jq available but config exists - warn user
+    print_info "Warning: jq not installed. Cannot merge configs."
+    print_info "Existing fields (payment, lrmProvider, etc.) will be LOST!"
+    read -p "Continue anyway? [y/N]: " OVERWRITE_RESPONSE
+    if [ "$OVERWRITE_RESPONSE" != "y" ] && [ "$OVERWRITE_RESPONSE" != "Y" ]; then
+        print_error "Aborted. Install jq: sudo apt install jq"
+        exit 1
+    fi
+    echo "$NEW_CONFIG" | jq '.' > "$CONFIG_FILE" 2>/dev/null || echo "$NEW_CONFIG" > "$CONFIG_FILE"
+else
+    # New config - just write it
+    echo "$NEW_CONFIG" | jq '.' > "$CONFIG_FILE" 2>/dev/null || echo "$NEW_CONFIG" > "$CONFIG_FILE"
+fi
+
 chmod 644 "$CONFIG_FILE"  # 644 allows Docker container to read the file
 print_success "Config saved to $CONFIG_FILE"
 
