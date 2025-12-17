@@ -6,7 +6,6 @@ using LrmCloud.Shared.Entities;
 using LocalizationManager.Core.Configuration;
 using LocalizationManager.Core.Translation;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace LrmCloud.Api.Services.Translation;
 
@@ -26,13 +25,13 @@ public class CloudTranslationService : ICloudTranslationService
         AppDbContext db,
         IApiKeyHierarchyService keyHierarchy,
         ILrmTranslationProvider lrmProvider,
-        IOptions<CloudConfiguration> config,
+        CloudConfiguration config,
         ILogger<CloudTranslationService> logger)
     {
         _db = db;
         _keyHierarchy = keyHierarchy;
         _lrmProvider = lrmProvider;
-        _config = config.Value;
+        _config = config;
         _logger = logger;
     }
 
@@ -154,24 +153,46 @@ public class CloudTranslationService : ICloudTranslationService
             // Process each key and target language
             foreach (var key in keys)
             {
-                var sourceTranslation = key.Translations
-                    .FirstOrDefault(t => t.LanguageCode == sourceLanguage);
+                // Get plural forms to process (empty string for non-plural keys)
+                var pluralForms = key.IsPlural
+                    ? new[] { "one", "other", "zero", "two", "few", "many" }
+                    : new[] { "" };
 
-                if (sourceTranslation == null || string.IsNullOrEmpty(sourceTranslation.Value))
+                foreach (var pluralForm in pluralForms)
                 {
-                    response.SkippedCount++;
-                    continue;
-                }
+                    // Build lookup key for SourceTexts: "keyName" or "keyName:pluralForm"
+                    var sourceTextKey = string.IsNullOrEmpty(pluralForm)
+                        ? key.KeyName
+                        : $"{key.KeyName}:{pluralForm}";
 
-                foreach (var targetLang in request.TargetLanguages)
-                {
-                    if (targetLang == sourceLanguage)
+                    // Use provided source text if available, otherwise fall back to database value
+                    string? sourceText = null;
+                    if (request.SourceTexts?.TryGetValue(sourceTextKey, out var providedText) == true)
+                    {
+                        sourceText = providedText;
+                    }
+                    else
+                    {
+                        var sourceTranslation = key.Translations
+                            .FirstOrDefault(t => t.LanguageCode == sourceLanguage && t.PluralForm == pluralForm);
+                        sourceText = sourceTranslation?.Value;
+                    }
+
+                    // Skip empty source texts (but don't skip the whole key for plurals)
+                    if (string.IsNullOrEmpty(sourceText))
                     {
                         continue;
                     }
 
-                    var existingTranslation = key.Translations
-                        .FirstOrDefault(t => t.LanguageCode == targetLang);
+                    foreach (var targetLang in request.TargetLanguages)
+                    {
+                        if (targetLang == sourceLanguage)
+                        {
+                            continue;
+                        }
+
+                        var existingTranslation = key.Translations
+                            .FirstOrDefault(t => t.LanguageCode == targetLang && t.PluralForm == pluralForm);
 
                     // Skip if translation exists and we're not overwriting
                     if (!request.Overwrite && existingTranslation != null &&
@@ -188,7 +209,8 @@ public class CloudTranslationService : ICloudTranslationService
                     {
                         Key = key.KeyName,
                         TargetLanguage = targetLang,
-                        SourceText = sourceTranslation.Value
+                        PluralForm = pluralForm,
+                        SourceText = sourceText
                     };
 
                     try
@@ -198,10 +220,13 @@ public class CloudTranslationService : ICloudTranslationService
 
                         if (isLrmProvider)
                         {
+                            // Determine billable user for LRM quota check
+                            var lrmBillableUserId = await GetBillableUserIdAsync(project, userId);
+
                             // Use LRM managed provider
                             var lrmResult = await _lrmProvider.TranslateAsync(
-                                userId,
-                                sourceTranslation.Value,
+                                lrmBillableUserId,
+                                sourceText,
                                 sourceLanguage,
                                 targetLang,
                                 request.Context ?? key.Comment);
@@ -223,7 +248,7 @@ public class CloudTranslationService : ICloudTranslationService
                             // Use BYOK provider
                             var translationRequest = new TranslationRequest
                             {
-                                SourceText = sourceTranslation.Value,
+                                SourceText = sourceText,
                                 SourceLanguage = sourceLanguage,
                                 TargetLanguage = targetLang,
                                 Context = request.Context ?? key.Comment
@@ -253,6 +278,7 @@ public class CloudTranslationService : ICloudTranslationService
                                 {
                                     ResourceKeyId = key.Id,
                                     LanguageCode = targetLang,
+                                    PluralForm = pluralForm,
                                     Value = translatedText,
                                     Status = "translated"
                                 });
@@ -260,7 +286,7 @@ public class CloudTranslationService : ICloudTranslationService
                         }
 
                         response.TranslatedCount++;
-                        response.CharactersTranslated += sourceTranslation.Value.Length;
+                        response.CharactersTranslated += sourceText.Length;
                     }
                     catch (Exception ex)
                     {
@@ -272,6 +298,7 @@ public class CloudTranslationService : ICloudTranslationService
                     }
 
                     response.Results.Add(result);
+                    }
                 }
             }
 
@@ -281,15 +308,33 @@ public class CloudTranslationService : ICloudTranslationService
                 await _db.SaveChangesAsync();
             }
 
-            // Track other providers usage (LRM usage is tracked in LrmTranslationProvider)
-            if (!isLrmProvider && response.CharactersTranslated > 0)
-            {
-                await TrackOtherUsageAsync(userId, response.CharactersTranslated);
-            }
-
-            // Track per-provider usage for analytics
+            // Track usage against billable user (org owner for org projects)
             if (response.CharactersTranslated > 0)
             {
+                var billableUserId = await GetBillableUserIdAsync(project, userId);
+
+                if (isLrmProvider)
+                {
+                    await TrackLrmUsageAsync(billableUserId, response.CharactersTranslated);
+                }
+                else
+                {
+                    await TrackByokUsageAsync(billableUserId, response.CharactersTranslated);
+                }
+
+                // Log detailed usage event for analytics
+                var keySource = project.OrganizationId.HasValue ? "organization" : "user";
+                await LogUsageEventAsync(
+                    userId,
+                    billableUserId,
+                    projectId,
+                    project.OrganizationId,
+                    response.CharactersTranslated,
+                    providerName,
+                    isLrmProvider,
+                    isLrmProvider ? "platform" : keySource);
+
+                // Track per-provider usage for analytics (against acting user for audit trail)
                 await TrackProviderUsageAsync(userId, request.Provider ?? "auto", response.CharactersTranslated, response.TranslatedCount);
             }
 
@@ -336,9 +381,20 @@ public class CloudTranslationService : ICloudTranslationService
 
             if (isLrmProvider)
             {
+                // Determine billable user for LRM quota check
+                int lrmBillableUserId = userId;
+                if (projectId.HasValue)
+                {
+                    var project = await _db.Projects.FindAsync(projectId);
+                    if (project != null)
+                    {
+                        lrmBillableUserId = await GetBillableUserIdAsync(project, userId);
+                    }
+                }
+
                 // Use LRM managed provider
                 var lrmResult = await _lrmProvider.TranslateAsync(
-                    userId,
+                    lrmBillableUserId,
                     request.Text,
                     request.SourceLanguage,
                     request.TargetLanguage,
@@ -378,8 +434,40 @@ public class CloudTranslationService : ICloudTranslationService
                 response.TranslatedText = result.TranslatedText;
                 response.FromCache = result.FromCache;
 
-                // Track other providers usage
-                await TrackOtherUsageAsync(userId, request.Text.Length);
+                // Track BYOK usage against billable user
+                if (projectId.HasValue)
+                {
+                    var project = await _db.Projects.FindAsync(projectId);
+                    if (project != null)
+                    {
+                        var billableUserId = await GetBillableUserIdAsync(project, userId);
+                        await TrackByokUsageAsync(billableUserId, request.Text.Length);
+                    }
+                }
+                else
+                {
+                    // No project context - bill acting user
+                    await TrackByokUsageAsync(userId, request.Text.Length);
+                }
+            }
+
+            // Track LRM usage against billable user if we used LRM
+            if (isLrmProvider && response.Success)
+            {
+                if (projectId.HasValue)
+                {
+                    var project = await _db.Projects.FindAsync(projectId);
+                    if (project != null)
+                    {
+                        var billableUserId = await GetBillableUserIdAsync(project, userId);
+                        await TrackLrmUsageAsync(billableUserId, request.Text.Length);
+                    }
+                }
+                else
+                {
+                    // No project context - bill acting user
+                    await TrackLrmUsageAsync(userId, request.Text.Length);
+                }
             }
         }
         catch (Exception ex)
@@ -456,10 +544,21 @@ public class CloudTranslationService : ICloudTranslationService
     private async Task<string?> GetBestAvailableProviderAsync(
         int? projectId, int userId, int? organizationId)
     {
-        // Check LRM provider first (preferred - our managed service)
-        if (_config.LrmProvider.Enabled)
+        // Determine billable user for LRM quota check
+        int? billableUserId = userId;
+        if (organizationId.HasValue)
         {
-            var (available, _) = await _lrmProvider.IsAvailableAsync(userId);
+            var org = await _db.Organizations.FindAsync(organizationId.Value);
+            if (org != null)
+            {
+                billableUserId = org.OwnerId;
+            }
+        }
+
+        // Check LRM provider first (preferred - our managed service)
+        if (_config.LrmProvider.Enabled && billableUserId.HasValue)
+        {
+            var (available, _) = await _lrmProvider.IsAvailableAsync(billableUserId.Value);
             if (available)
             {
                 return "lrm";
@@ -481,8 +580,12 @@ public class CloudTranslationService : ICloudTranslationService
             "ollama"     // Local, needs setup
         };
 
+        // For org projects, don't include user's personal API keys - only use org/project keys
+        // This ensures org activity uses org resources, not personal resources
+        int? userIdForKeyLookup = organizationId.HasValue ? null : userId;
+
         var configuredProviders = await _keyHierarchy.GetConfiguredProvidersAsync(
-            projectId, userId, organizationId);
+            projectId, userIdForKeyLookup, organizationId);
 
         // Return first available provider from priority list
         foreach (var provider in preferredOrder)
@@ -505,9 +608,60 @@ public class CloudTranslationService : ICloudTranslationService
         return null;
     }
 
-    private async Task TrackOtherUsageAsync(int userId, long charsUsed)
+    /// <summary>
+    /// Determines who should be billed for translation on a project.
+    /// If project belongs to an organization, bills the org owner.
+    /// Otherwise, bills the acting user.
+    /// </summary>
+    private async Task<int> GetBillableUserIdAsync(Project project, int actingUserId)
     {
-        var user = await _db.Users.FindAsync(userId);
+        // If project belongs to org → bill org owner
+        if (project.OrganizationId.HasValue)
+        {
+            var org = await _db.Organizations.FindAsync(project.OrganizationId.Value);
+            if (org != null)
+            {
+                _logger.LogDebug(
+                    "Billing org owner {OwnerId} instead of acting user {ActingUserId} for org project {ProjectId}",
+                    org.OwnerId, actingUserId, project.Id);
+                return org.OwnerId;
+            }
+        }
+
+        // Personal project → bill acting user
+        return actingUserId;
+    }
+
+    private async Task TrackLrmUsageAsync(int billableUserId, long charsUsed)
+    {
+        var user = await _db.Users.FindAsync(billableUserId);
+        if (user == null)
+        {
+            return;
+        }
+
+        user.TranslationCharsUsed += (int)charsUsed;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        // Reset usage if reset date has passed
+        if (user.TranslationCharsResetAt.HasValue && user.TranslationCharsResetAt < DateTime.UtcNow)
+        {
+            user.TranslationCharsUsed = (int)charsUsed; // Reset and add current
+            user.TranslationCharsResetAt = DateTime.UtcNow.AddMonths(1);
+        }
+        else if (!user.TranslationCharsResetAt.HasValue)
+        {
+            // Set initial reset date
+            user.TranslationCharsResetAt = DateTime.UtcNow.AddMonths(1);
+        }
+
+        await _db.SaveChangesAsync();
+        _logger.LogDebug("LRM usage tracked: {Chars} chars for user {UserId}", charsUsed, billableUserId);
+    }
+
+    private async Task TrackByokUsageAsync(int billableUserId, long charsUsed)
+    {
+        var user = await _db.Users.FindAsync(billableUserId);
         if (user == null)
         {
             return;
@@ -517,7 +671,49 @@ public class CloudTranslationService : ICloudTranslationService
         user.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        _logger.LogDebug("Other providers usage tracked: {Chars} chars for user {UserId}", charsUsed, userId);
+        _logger.LogDebug("BYOK usage tracked: {Chars} chars for user {UserId}", charsUsed, billableUserId);
+    }
+
+    /// <summary>
+    /// Logs a detailed usage event for analytics and billing breakdown.
+    /// </summary>
+    private async Task LogUsageEventAsync(
+        int actingUserId,
+        int billableUserId,
+        int? projectId,
+        int? organizationId,
+        long charsUsed,
+        string provider,
+        bool isLrm,
+        string keySource)
+    {
+        try
+        {
+            var usageEvent = new UsageEvent
+            {
+                ActingUserId = actingUserId,
+                BilledUserId = billableUserId,
+                ProjectId = projectId,
+                OrganizationId = organizationId,
+                CharactersUsed = charsUsed,
+                Provider = provider,
+                IsLrmProvider = isLrm,
+                KeySource = keySource,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.UsageEvents.Add(usageEvent);
+            await _db.SaveChangesAsync();
+
+            _logger.LogDebug(
+                "Usage event logged: {Chars} chars via {Provider} (acting: {ActingUserId}, billed: {BilledUserId}, project: {ProjectId}, org: {OrgId})",
+                charsUsed, provider, actingUserId, billableUserId, projectId, organizationId);
+        }
+        catch (Exception ex)
+        {
+            // Don't fail the translation if event logging fails
+            _logger.LogWarning(ex, "Failed to log usage event");
+        }
     }
 
     private async Task TrackProviderUsageAsync(int userId, string providerName, long charsUsed, int apiCalls)
@@ -607,13 +803,17 @@ public class CloudTranslationService : ICloudTranslationService
     {
         try
         {
+            // For org projects, don't include user's personal API keys - only use org/project keys
+            // This ensures org activity uses org resources, not personal resources
+            int? userIdForKeyLookup = organizationId.HasValue ? null : userId;
+
             // Resolve API key and config from hierarchy
             var resolved = await _keyHierarchy.ResolveProviderConfigAsync(
-                providerName, projectId, userId, organizationId);
+                providerName, projectId, userIdForKeyLookup, organizationId);
 
             // Get the actual API key (not masked) for the provider
             var (apiKey, _) = await _keyHierarchy.ResolveApiKeyAsync(
-                providerName, projectId, userId, organizationId);
+                providerName, projectId, userIdForKeyLookup, organizationId);
 
             // Create config model with merged provider settings
             var config = new ConfigurationModel

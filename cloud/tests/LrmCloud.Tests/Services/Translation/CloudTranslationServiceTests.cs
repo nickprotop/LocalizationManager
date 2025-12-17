@@ -6,7 +6,6 @@ using LrmCloud.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -63,7 +62,7 @@ public class CloudTranslationServiceTests : IDisposable
             _db,
             _hierarchyService,
             _lrmProviderMock.Object,
-            Options.Create(_cloudConfiguration),
+            _cloudConfiguration,
             _loggerMock.Object);
     }
 
@@ -339,7 +338,7 @@ public class CloudTranslationServiceTests : IDisposable
         var loggerMock = new Mock<ILogger<CloudTranslationService>>();
         var lrmProviderMock = new Mock<ILrmTranslationProvider>();
         lrmProviderMock.Setup(x => x.IsAvailableAsync(It.IsAny<int>())).ReturnsAsync((false, "LRM disabled"));
-        var translationService = new CloudTranslationService(db, hierarchyService, lrmProviderMock.Object, Options.Create(cloudConfig), loggerMock.Object);
+        var translationService = new CloudTranslationService(db, hierarchyService, lrmProviderMock.Object, cloudConfig, loggerMock.Object);
 
         var user = new User
         {

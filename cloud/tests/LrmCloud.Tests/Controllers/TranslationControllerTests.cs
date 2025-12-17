@@ -11,7 +11,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -60,7 +59,7 @@ public class TranslationControllerTests : IDisposable
         var lrmProviderMock = new Mock<ILrmTranslationProvider>();
         lrmProviderMock.Setup(x => x.IsAvailableAsync(It.IsAny<int>())).ReturnsAsync((true, (string?)null));
         lrmProviderMock.Setup(x => x.GetRemainingCharsAsync(It.IsAny<int>())).ReturnsAsync(10000);
-        _translationService = new CloudTranslationService(_db, _hierarchyService, lrmProviderMock.Object, Options.Create(_cloudConfiguration), translationLoggerMock.Object);
+        _translationService = new CloudTranslationService(_db, _hierarchyService, lrmProviderMock.Object, _cloudConfiguration, translationLoggerMock.Object);
 
         var controllerLoggerMock = new Mock<ILogger<TranslationController>>();
         var authServiceMock = new Mock<ILrmAuthorizationService>();
