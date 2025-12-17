@@ -1,4 +1,4 @@
-@page "/app/organizations/{OrganizationId:int}/billing"
+@page "/organizations/{OrganizationId:int}/billing"
 @attribute [Authorize]
 @using LrmCloud.Shared.Constants
 @using LrmCloud.Shared.DTOs.Organizations
@@ -55,6 +55,13 @@ else
 
     <MudText Typo="Typo.h5" Class="mb-4">Billing & Usage</MudText>
 
+        <!-- Shared Quota Info -->
+        <MudAlert Severity="Severity.Info" Class="mb-4">
+            <MudText Typo="Typo.body2">
+                Organization usage counts against the owner's plan quota. All translation activity (LRM and BYOK) within organization projects is billed to the organization owner.
+            </MudText>
+        </MudAlert>
+
         <!-- Current Plan Card -->
         <MudCard Class="mb-6">
             <MudCardHeader>
@@ -78,7 +85,7 @@ else
                             <MudStack Row="true" Spacing="4">
                                 <div>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">Members</MudText>
-                                    <MudText Typo="Typo.body1">@_organization.MemberCount / @GetMemberLimit(_organization.Plan)</MudText>
+                                    <MudText Typo="Typo.body1">@_organization.MemberCount / @FormatLimit(_usageStats?.MaxMembers ?? 0)</MudText>
                                 </div>
                                 <div>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">Projects</MudText>
@@ -86,7 +93,7 @@ else
                                 </div>
                                 <div>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">LRM Translation</MudText>
-                                    <MudText Typo="Typo.body1">@GetCharacterLimit(_organization.Plan)</MudText>
+                                    <MudText Typo="Typo.body1">@UiHelpers.FormatNumber(_usageStats?.LrmCharsLimit ?? 0)/month</MudText>
                                 </div>
                             </MudStack>
                         </MudStack>
@@ -135,10 +142,13 @@ else
                     <MudItem xs="12" sm="6" md="3">
                         <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
                             <MudStack Spacing="1">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">OTHER PROVIDERS</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">BYOK PROVIDERS</MudText>
                                 <MudText Typo="Typo.h5">@UiHelpers.FormatNumber(_usageStats?.OtherCharsUsed ?? 0)</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-                                    BYOK + free (tracked)
+                                <MudProgressLinear Value="@UiHelpers.GetUsagePercentage(_usageStats?.OtherCharsUsed ?? 0, _usageStats?.OtherCharsLimit ?? 1)"
+                                                   Color="@UiHelpers.GetUsageColor(_usageStats?.OtherCharsUsed ?? 0, _usageStats?.OtherCharsLimit ?? 1)"
+                                                   Class="mt-2" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    of @UiHelpers.FormatNumber(_usageStats?.OtherCharsLimit ?? 0) limit
                                 </MudText>
                             </MudStack>
                         </MudPaper>
@@ -146,10 +156,10 @@ else
                     <MudItem xs="12" sm="6" md="3">
                         <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
                             <MudStack Spacing="1">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">API CALLS</MudText>
-                                <MudText Typo="Typo.h5">@UiHelpers.FormatNumber(_usageStats?.ApiCalls ?? 0)</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">PROJECTS</MudText>
+                                <MudText Typo="Typo.h5">@(_usageStats?.ProjectCount ?? 0)</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-                                    This billing period
+                                    In this organization
                                 </MudText>
                             </MudStack>
                         </MudPaper>
@@ -157,10 +167,10 @@ else
                     <MudItem xs="12" sm="6" md="3">
                         <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
                             <MudStack Spacing="1">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">STORAGE</MudText>
-                                <MudText Typo="Typo.h5">@UiHelpers.FormatBytes(_usageStats?.StorageBytes ?? 0)</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">TEAM MEMBERS</MudText>
+                                <MudText Typo="Typo.h5">@(_usageStats?.MemberCount ?? 0) / @(_usageStats?.MaxMembers == int.MaxValue ? "∞" : _usageStats?.MaxMembers.ToString() ?? "0")</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-                                    Resource files
+                                    Active members
                                 </MudText>
                             </MudStack>
                         </MudPaper>
@@ -179,6 +189,54 @@ else
                 </MudGrid>
             </MudCardContent>
         </MudCard>
+
+        <!-- Member Usage Breakdown (for admins/owners) -->
+        @if (_memberUsage != null && _memberUsage.Any())
+        {
+            <MudCard Class="mb-6">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.People" />
+                            <MudText Typo="Typo.h6">Usage by Member</MudText>
+                        </MudStack>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudSimpleTable Dense="true" Hover="true" Elevation="0">
+                        <thead>
+                            <tr>
+                                <th>Member</th>
+                                <th style="text-align: right">LRM Chars</th>
+                                <th style="text-align: right">BYOK Chars</th>
+                                <th style="text-align: right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var member in _memberUsage)
+                            {
+                                <tr>
+                                    <td>
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                            <MudAvatar Size="Size.Small" Color="@UiHelpers.GetHashColor(member.UserName)">
+                                                @UiHelpers.GetInitials(member.UserName)
+                                            </MudAvatar>
+                                            <MudStack Spacing="0">
+                                                <MudText Typo="Typo.body2">@member.UserName</MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">@member.Email</MudText>
+                                            </MudStack>
+                                        </MudStack>
+                                    </td>
+                                    <td style="text-align: right">@UiHelpers.FormatNumber(member.LrmCharsUsed)</td>
+                                    <td style="text-align: right">@UiHelpers.FormatNumber(member.ByokCharsUsed)</td>
+                                    <td style="text-align: right"><strong>@UiHelpers.FormatNumber(member.TotalCharsUsed)</strong></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                </MudCardContent>
+            </MudCard>
+        }
 
         <!-- Plan Comparison -->
         <MudCard>
@@ -227,33 +285,33 @@ else
                     <tbody>
                         <tr>
                             <td>Team Members</td>
-                            <td>Up to 3</td>
-                            <td>Up to 20</td>
-                            <td>Unlimited</td>
+                            <td><MudIcon Icon="@Icons.Material.Filled.Close" Color="Color.Default" Size="Size.Small" Title="Organizations require Team plan" /></td>
+                            <td>@FormatLimit(_subscription?.PlanLimits?.Team.MaxTeamMembers ?? 10)</td>
+                            <td>@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxTeamMembers ?? int.MaxValue)</td>
                         </tr>
                         <tr>
                             <td>LRM Translation/month</td>
-                            <td>10,000</td>
-                            <td>100,000</td>
-                            <td>Unlimited</td>
+                            <td>@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Free.TranslationChars ?? 5000)</td>
+                            <td>@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Team.TranslationChars ?? 50000)</td>
+                            <td>@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Enterprise.TranslationChars ?? 500000)</td>
                         </tr>
                         <tr>
                             <td>Other Providers/month</td>
-                            <td>50,000</td>
-                            <td>500,000</td>
-                            <td>Unlimited</td>
+                            <td>@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Free.OtherChars ?? 25000)</td>
+                            <td>@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Team.OtherChars ?? 250000)</td>
+                            <td>@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Enterprise.OtherChars ?? 2500000)</td>
                         </tr>
                         <tr>
                             <td>Projects</td>
-                            <td>Unlimited</td>
-                            <td>Unlimited</td>
-                            <td>Unlimited</td>
+                            <td>@FormatLimit(_subscription?.PlanLimits?.Free.MaxProjects ?? 3)</td>
+                            <td>@FormatLimit(_subscription?.PlanLimits?.Team.MaxProjects ?? int.MaxValue)</td>
+                            <td>@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxProjects ?? int.MaxValue)</td>
                         </tr>
                         <tr>
-                            <td>Translation Providers</td>
-                            <td>2</td>
-                            <td>All</td>
-                            <td>All + Custom</td>
+                            <td>API Keys (BYOK)</td>
+                            <td>@FormatLimit(_subscription?.PlanLimits?.Free.MaxApiKeys ?? 3)</td>
+                            <td>@FormatLimit(_subscription?.PlanLimits?.Team.MaxApiKeys ?? 10)</td>
+                            <td>@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxApiKeys ?? int.MaxValue)</td>
                         </tr>
                         <tr>
                             <td>API Access</td>
@@ -276,8 +334,8 @@ else
                         <tr>
                             <td><strong>Price</strong></td>
                             <td><strong>Free</strong></td>
-                            <td><strong>$29/month</strong></td>
-                            <td><strong>Contact us</strong></td>
+                            <td><strong>$@(_subscription?.PlanLimits?.Team.Price ?? 9)/month</strong></td>
+                            <td><strong>$@(_subscription?.PlanLimits?.Enterprise.Price ?? 29)/month</strong></td>
                         </tr>
                     </tbody>
                 </MudSimpleTable>
@@ -302,11 +360,11 @@ else
             <MudAlert Severity="Severity.Info" Class="mb-3">
                 @if (_selectedPlan == "team")
                 {
-                    <MudText>Team plan: $9/month with 50,000 LRM translation characters and 10 team members.</MudText>
+                    <MudText>Team plan: $@(_subscription?.PlanLimits?.Team.Price ?? 9)/month with @UiHelpers.FormatNumber(_subscription?.PlanLimits?.Team.TranslationChars ?? 50000) LRM translation characters and @FormatLimit(_subscription?.PlanLimits?.Team.MaxTeamMembers ?? 10) team members.</MudText>
                 }
                 else if (_selectedPlan == "enterprise")
                 {
-                    <MudText>Enterprise plan: $29/month with 500,000 LRM translation characters and unlimited team members.</MudText>
+                    <MudText>Enterprise plan: $@(_subscription?.PlanLimits?.Enterprise.Price ?? 29)/month with @UiHelpers.FormatNumber(_subscription?.PlanLimits?.Enterprise.TranslationChars ?? 500000) LRM translation characters and @FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxTeamMembers ?? int.MaxValue).ToLower() team members.</MudText>
                 }
             </MudAlert>
         }
@@ -352,6 +410,7 @@ else
     private OrganizationDto? _organization;
     private SubscriptionDto? _subscription;
     private OrganizationUsageDto? _usageStats;
+    private List<OrgMemberUsageDto>? _memberUsage;
     private bool _isLoading = true;
     private bool _isProcessing;
     private bool _upgradeDialogVisible;
@@ -371,12 +430,14 @@ else
             var orgTask = OrganizationService.GetOrganizationAsync(OrganizationId);
             var subscriptionTask = BillingService.GetSubscriptionAsync();
             var usageTask = UsageService.GetOrganizationStatsAsync(OrganizationId);
+            var memberUsageTask = UsageService.GetOrgMemberUsageAsync(OrganizationId);
 
-            await Task.WhenAll(orgTask, subscriptionTask, usageTask);
+            await Task.WhenAll(orgTask, subscriptionTask, usageTask, memberUsageTask);
 
             _organization = await orgTask;
             _subscription = await subscriptionTask;
             _usageStats = await usageTask;
+            _memberUsage = await memberUsageTask;
 
             if (_organization != null)
             {
@@ -452,27 +513,12 @@ else
         _ => "Standard plan"
     };
 
-    private static string GetMemberLimit(string plan) => plan.ToLower() switch
-    {
-        "free" => "3",
-        "team" => "20",
-        "enterprise" => "Unlimited",
-        _ => "3"
-    };
-
-    private static string GetCharacterLimit(string plan) => plan.ToLower() switch
-    {
-        "free" => "10,000/month",
-        "team" => "100,000/month",
-        "enterprise" => "Unlimited",
-        _ => "10,000/month"
-    };
-
-    private static int GetCharacterLimitNumber(string plan) => plan.ToLower() switch
-    {
-        "free" => 10000,
-        "team" => 100000,
-        "enterprise" => int.MaxValue,
-        _ => 10000
-    };
+    /// <summary>
+    /// Formats a limit value, showing "Unlimited" for int.MaxValue or "Up to X" for finite values.
+    /// </summary>
+    private static string FormatLimit(int limit) => limit >= int.MaxValue - 1
+        ? "Unlimited"
+        : limit <= 0
+            ? "N/A"
+            : $"Up to {limit:N0}";
 }
