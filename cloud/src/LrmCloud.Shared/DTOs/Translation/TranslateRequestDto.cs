@@ -13,6 +13,13 @@ public class TranslateRequestDto
     public List<string> Keys { get; set; } = new();
 
     /// <summary>
+    /// Optional source texts for each key. When provided, these values are used instead of
+    /// the saved database values. This allows translating unsaved edits from the UI.
+    /// Key = key name (for non-plural) or "keyName:pluralForm" (for plural), Value = source text to translate.
+    /// </summary>
+    public Dictionary<string, string>? SourceTexts { get; set; }
+
+    /// <summary>
     /// Target language codes to translate to.
     /// </summary>
     [Required]

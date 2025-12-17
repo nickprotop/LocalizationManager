@@ -67,6 +67,11 @@ public class TranslationResultDto
     public string TargetLanguage { get; set; } = string.Empty;
 
     /// <summary>
+    /// Plural form (e.g., "one", "other"). Empty for non-plural keys.
+    /// </summary>
+    public string PluralForm { get; set; } = string.Empty;
+
+    /// <summary>
     /// Original source text.
     /// </summary>
     public string SourceText { get; set; } = string.Empty;
