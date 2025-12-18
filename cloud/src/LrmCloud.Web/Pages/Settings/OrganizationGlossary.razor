@@ -1,0 +1,468 @@
+@page "/settings/glossary"
+@using LrmCloud.Shared.DTOs.Glossary
+@using LrmCloud.Web.Services
+@inject GlossaryService GlossaryService
+@inject OrganizationContextService OrgContext
+@inject OrganizationService OrganizationService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@attribute [Authorize]
+
+<PageTitle>Organization Glossary - LRM Cloud</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <div>
+        <MudText Typo="Typo.h4">
+            <MudIcon Icon="@Icons.Material.Filled.Book" Class="mr-2" Style="vertical-align: middle;" />
+            Organization Glossary
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Terms shared across ALL projects in your organization. Individual projects can override these.
+        </MudText>
+    </div>
+    @if (_canManage)
+    {
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog"
+                   Disabled="@(_organizationId == null)">
+            Add Term
+        </MudButton>
+    }
+</MudStack>
+
+@if (_organizationId == null)
+{
+    <MudAlert Severity="Severity.Warning">
+        No organization selected. Please select an organization to manage its glossary.
+    </MudAlert>
+}
+else if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_glossary == null)
+{
+    <MudAlert Severity="Severity.Error">Failed to load glossary.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        @* Stats *@
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Spacing="2">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                        <MudText>Total Terms</MudText>
+                        <MudText Typo="Typo.h6">@_glossary.TotalCount</MudText>
+                    </MudStack>
+                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                        <MudText>Languages</MudText>
+                        <MudText Typo="Typo.h6">@_glossary.Languages.Count</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        @* Filter *@
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                    <MudTextField @bind-Value="_searchTerm"
+                                  Placeholder="Search terms..."
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Immediate="true"
+                                  DebounceInterval="300"
+                                  Style="max-width: 300px" />
+
+                    @if (_glossary.Languages.Count > 0)
+                    {
+                        <MudSelect @bind-Value="_languageFilter"
+                                   Label="Language"
+                                   Style="max-width: 150px"
+                                   Margin="Margin.Dense">
+                            <MudSelectItem Value="@("")">All Languages</MudSelectItem>
+                            @foreach (var lang in _glossary.Languages)
+                            {
+                                <MudSelectItem Value="@lang">@lang.ToUpperInvariant()</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        @* Terms Table *@
+        <MudItem xs="12">
+            <MudPaper Elevation="2">
+                @if (FilteredTerms.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Class="ma-4">
+                        @if (_glossary.TotalCount == 0)
+                        {
+                            <span>No glossary terms defined yet. Click "Add Term" to create one.</span>
+                        }
+                        else
+                        {
+                            <span>No terms match your filters.</span>
+                        }
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudTable Items="FilteredTerms" Hover="true" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Term</MudTh>
+                            <MudTh>Source</MudTh>
+                            <MudTh>Translations</MudTh>
+                            @if (_canManage)
+                            {
+                                <MudTh Style="width: 120px">Actions</MudTh>
+                            }
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <MudStack Spacing="0">
+                                    <MudText Typo="Typo.body1" Style="font-weight: 500">@context.SourceTerm</MudText>
+                                    @if (!string.IsNullOrEmpty(context.Description))
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Description</MudText>
+                                    }
+                                </MudStack>
+                            </MudTd>
+                            <MudTd>
+                                <MudChip T="string" Size="Size.Small">@context.SourceLanguage.ToUpperInvariant()</MudChip>
+                            </MudTd>
+                            <MudTd>
+                                <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                                    @foreach (var (lang, translation) in context.Translations.Take(4))
+                                    {
+                                        <MudTooltip Text="@translation">
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                                                @lang.ToUpperInvariant(): @TruncateText(translation, 20)
+                                            </MudChip>
+                                        </MudTooltip>
+                                    }
+                                    @if (context.Translations.Count > 4)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info">+@(context.Translations.Count - 4)</MudChip>
+                                    }
+                                </MudStack>
+                            </MudTd>
+                            @if (_canManage)
+                            {
+                                <MudTd>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                   Size="Size.Small"
+                                                   OnClick="@(() => OpenEditDialog(context))" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="@(() => ConfirmDelete(context))" />
+                                </MudTd>
+                            }
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* Info Alert *@
+    <MudAlert Severity="Severity.Info" Class="mt-4" Dense="true">
+        Organization glossary terms are inherited by all projects. Projects can define their own terms which will override organization terms for the same source term and language.
+    </MudAlert>
+}
+
+@* Add/Edit Dialog *@
+<MudDialog @bind-Visible="_showDialog" Options="new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true }">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(_editingTerm == null ? "Add Glossary Term" : "Edit Glossary Term")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_formSourceTerm"
+                          Label="Source Term"
+                          Required="true"
+                          Placeholder="e.g., Dashboard"
+                          HelperText="The term in the source language" />
+
+            <MudSelect @bind-Value="_formSourceLanguage"
+                       Label="Source Language"
+                       Required="true">
+                @foreach (var lang in _availableLanguages)
+                {
+                    <MudSelectItem Value="@lang">@lang.ToUpperInvariant()</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudTextField @bind-Value="_formDescription"
+                          Label="Description (optional)"
+                          Lines="2"
+                          Placeholder="Context or usage notes" />
+
+            <MudCheckBox @bind-Value="_formCaseSensitive"
+                         Label="Case-sensitive matching"
+                         Color="Color.Primary" />
+
+            <MudDivider Class="my-2" />
+
+            <MudText Typo="Typo.subtitle1">Translations</MudText>
+            @foreach (var lang in _availableLanguages.Where(l => l != _formSourceLanguage))
+            {
+                <MudTextField @bind-Value="_formTranslations[lang]"
+                              Label="@($"Translation ({lang.ToUpperInvariant()})")"
+                              Placeholder="@($"Enter translation in {lang.ToUpperInvariant()}")" />
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="SaveTerm"
+                   Disabled="@(string.IsNullOrWhiteSpace(_formSourceTerm) || string.IsNullOrWhiteSpace(_formSourceLanguage))">
+            @(_editingTerm == null ? "Add" : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private int? _organizationId;
+    private GlossaryListResponse? _glossary;
+    private bool _isLoading = true;
+    private bool _canManage = false;
+    private string _searchTerm = "";
+    private string _languageFilter = "";
+
+    // Dialog state
+    private bool _showDialog;
+    private GlossaryTermDto? _editingTerm;
+    private string _formSourceTerm = "";
+    private string _formSourceLanguage = "en";
+    private string _formDescription = "";
+    private bool _formCaseSensitive;
+    private Dictionary<string, string> _formTranslations = new();
+    private List<string> _availableLanguages = new() { "en", "fr", "de", "es", "it", "el", "pt", "nl", "pl", "ru", "ja", "zh", "ko" };
+
+    private List<GlossaryTermDto> FilteredTerms => _glossary?.Terms
+        .Where(t => string.IsNullOrEmpty(_searchTerm) ||
+                    t.SourceTerm.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    t.Description?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) == true ||
+                    t.Translations.Values.Any(v => v.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase)))
+        .Where(t => string.IsNullOrEmpty(_languageFilter) ||
+                    t.SourceLanguage == _languageFilter ||
+                    t.Translations.ContainsKey(_languageFilter))
+        .ToList() ?? new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await OrgContext.InitializeAsync();
+        _organizationId = OrgContext.SelectedOrganizationId;
+
+        if (_organizationId.HasValue)
+        {
+            await CheckPermissionsAsync();
+            await LoadGlossaryAsync();
+        }
+        else
+        {
+            _isLoading = false;
+        }
+
+        OrgContext.OnOrganizationChanged += OnOrgChanged;
+    }
+
+    private async void OnOrgChanged()
+    {
+        _organizationId = OrgContext.SelectedOrganizationId;
+        if (_organizationId.HasValue)
+        {
+            await CheckPermissionsAsync();
+            await LoadGlossaryAsync();
+        }
+        else
+        {
+            _glossary = null;
+            _isLoading = false;
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CheckPermissionsAsync()
+    {
+        if (!_organizationId.HasValue)
+        {
+            _canManage = false;
+            return;
+        }
+
+        try
+        {
+            var orgs = await OrganizationService.GetOrganizationsAsync();
+            var org = orgs?.FirstOrDefault(o => o.Id == _organizationId.Value);
+            _canManage = org?.UserRole is "owner" or "admin";
+        }
+        catch
+        {
+            _canManage = false;
+        }
+    }
+
+    private async Task LoadGlossaryAsync()
+    {
+        if (!_organizationId.HasValue) return;
+
+        _isLoading = true;
+        try
+        {
+            _glossary = await GlossaryService.GetOrganizationGlossaryAsync(_organizationId.Value);
+
+            // Update available languages based on glossary
+            if (_glossary?.Languages.Count > 0)
+            {
+                _availableLanguages = _glossary.Languages
+                    .Union(_availableLanguages)
+                    .Distinct()
+                    .OrderBy(l => l)
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading glossary: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OpenAddDialog()
+    {
+        _editingTerm = null;
+        _formSourceTerm = "";
+        _formSourceLanguage = "en";
+        _formDescription = "";
+        _formCaseSensitive = false;
+        _formTranslations = new Dictionary<string, string>();
+        foreach (var lang in _availableLanguages.Where(l => l != "en"))
+        {
+            _formTranslations[lang] = "";
+        }
+        _showDialog = true;
+    }
+
+    private void OpenEditDialog(GlossaryTermDto term)
+    {
+        _editingTerm = term;
+        _formSourceTerm = term.SourceTerm;
+        _formSourceLanguage = term.SourceLanguage;
+        _formDescription = term.Description ?? "";
+        _formCaseSensitive = term.CaseSensitive;
+        _formTranslations = new Dictionary<string, string>(term.Translations);
+
+        // Ensure all languages have entries
+        foreach (var lang in _availableLanguages.Where(l => l != term.SourceLanguage))
+        {
+            if (!_formTranslations.ContainsKey(lang))
+                _formTranslations[lang] = "";
+        }
+        _showDialog = true;
+    }
+
+    private void CloseDialog()
+    {
+        _showDialog = false;
+        _editingTerm = null;
+    }
+
+    private async Task SaveTerm()
+    {
+        if (!_organizationId.HasValue || string.IsNullOrWhiteSpace(_formSourceTerm) || string.IsNullOrWhiteSpace(_formSourceLanguage))
+            return;
+
+        try
+        {
+            // Filter out empty translations
+            var translations = _formTranslations
+                .Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+            if (_editingTerm == null)
+            {
+                // Create new term
+                var request = new CreateGlossaryTermRequest
+                {
+                    SourceTerm = _formSourceTerm,
+                    SourceLanguage = _formSourceLanguage,
+                    Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
+                    CaseSensitive = _formCaseSensitive,
+                    Translations = translations
+                };
+
+                await GlossaryService.CreateOrganizationTermAsync(_organizationId.Value, request);
+                Snackbar.Add("Term added successfully", Severity.Success);
+            }
+            else
+            {
+                // Update existing term
+                var request = new UpdateGlossaryTermRequest
+                {
+                    SourceTerm = _formSourceTerm,
+                    SourceLanguage = _formSourceLanguage,
+                    Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
+                    CaseSensitive = _formCaseSensitive,
+                    Translations = translations
+                };
+
+                await GlossaryService.UpdateOrganizationTermAsync(_organizationId.Value, _editingTerm.Id, request);
+                Snackbar.Add("Term updated successfully", Severity.Success);
+            }
+
+            CloseDialog();
+            await LoadGlossaryAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ConfirmDelete(GlossaryTermDto term)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Delete Term",
+            $"Are you sure you want to delete the term \"{term.SourceTerm}\"? This will affect all projects that inherit this term.",
+            yesText: "Delete",
+            cancelText: "Cancel");
+
+        if (result == true && _organizationId.HasValue)
+        {
+            try
+            {
+                await GlossaryService.DeleteOrganizationTermAsync(_organizationId.Value, term.Id);
+                Snackbar.Add("Term deleted", Severity.Success);
+                await LoadGlossaryAsync();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private static string TruncateText(string text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+            return text;
+        return text[..maxLength] + "...";
+    }
+
+    public void Dispose()
+    {
+        OrgContext.OnOrganizationChanged -= OnOrgChanged;
+    }
+}
