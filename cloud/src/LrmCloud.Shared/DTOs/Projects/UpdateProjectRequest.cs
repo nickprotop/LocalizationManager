@@ -56,4 +56,10 @@ public class UpdateProjectRequest
     /// Required because OrganizationId being null could mean "don't change" or "remove from org".
     /// </summary>
     public bool UpdateOrganization { get; set; }
+
+    /// <summary>
+    /// Whether this project inherits glossary terms from the organization.
+    /// Only applies to organization projects.
+    /// </summary>
+    public bool? InheritOrganizationGlossary { get; set; }
 }

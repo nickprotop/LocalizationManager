@@ -119,6 +119,14 @@ public class Project
     [ForeignKey(nameof(ConfigUpdatedBy))]
     public User? ConfigUpdater { get; set; }
 
+    // Glossary settings
+    /// <summary>
+    /// Whether this project inherits glossary terms from the organization.
+    /// Only applies to organization projects. Default is true for new projects.
+    /// </summary>
+    [Column("inherit_organization_glossary")]
+    public bool InheritOrganizationGlossary { get; set; } = true;
+
     // Snapshot settings
     /// <summary>
     /// Number of days to retain snapshots. Null means keep forever.

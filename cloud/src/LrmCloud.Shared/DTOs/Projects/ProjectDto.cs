@@ -33,6 +33,12 @@ public class ProjectDto
     public bool AutoTranslate { get; set; }
     public bool AutoCreatePr { get; set; }
 
+    /// <summary>
+    /// Whether this project inherits glossary terms from the organization.
+    /// Only applies to organization projects.
+    /// </summary>
+    public bool InheritOrganizationGlossary { get; set; } = true;
+
     public string SyncStatus { get; set; } = "pending";
     public string? SyncError { get; set; }
     public DateTime? LastSyncedAt { get; set; }

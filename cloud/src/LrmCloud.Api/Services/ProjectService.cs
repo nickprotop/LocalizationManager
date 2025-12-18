@@ -386,6 +386,11 @@ public class ProjectService : IProjectService
                 project.AutoCreatePr = request.AutoCreatePr.Value;
             }
 
+            if (request.InheritOrganizationGlossary.HasValue)
+            {
+                project.InheritOrganizationGlossary = request.InheritOrganizationGlossary.Value;
+            }
+
             // Handle organization assignment/transfer
             if (request.UpdateOrganization)
             {
@@ -637,6 +642,7 @@ public class ProjectService : IProjectService
             GitHubDefaultBranch = project.GitHubDefaultBranch,
             AutoTranslate = project.AutoTranslate,
             AutoCreatePr = project.AutoCreatePr,
+            InheritOrganizationGlossary = project.InheritOrganizationGlossary,
             SyncStatus = project.SyncStatus,
             SyncError = project.SyncError,
             LastSyncedAt = project.LastSyncedAt,
