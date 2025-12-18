@@ -813,6 +813,13 @@ public class ResourceService : IResourceService
             // Update configuration if provided
             if (request.Configuration != null)
             {
+                // Security: Limit configuration size to prevent database bloat attacks
+                const int MaxConfigSize = 102_400; // 100KB
+                if (request.Configuration.Length > MaxConfigSize)
+                {
+                    return (false, null, $"Configuration exceeds maximum size of {MaxConfigSize / 1024}KB");
+                }
+
                 project.ConfigJson = request.Configuration;
                 project.ConfigUpdatedAt = DateTime.UtcNow;
                 project.ConfigUpdatedBy = userId;

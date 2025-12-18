@@ -8,6 +8,7 @@ using LrmCloud.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using System.Text.Json;
+using System.Xml;
 
 namespace LrmCloud.Api.Services;
 
@@ -20,6 +21,19 @@ public class ResourceSyncService
     private readonly ILogger<ResourceSyncService> _logger;
     private readonly IStorageService _storageService;
 
+    /// <summary>
+    /// Maximum allowed file size in bytes (5MB).
+    /// </summary>
+    private const int MaxFileSizeBytes = 5_242_880;
+
+    /// <summary>
+    /// Allowed file extensions for upload.
+    /// </summary>
+    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".resx", ".json"
+    };
+
     public ResourceSyncService(
         AppDbContext db,
         ILogger<ResourceSyncService> logger,
@@ -31,6 +45,87 @@ public class ResourceSyncService
     }
 
     /// <summary>
+    /// Validates a file for security and format compliance.
+    /// </summary>
+    /// <param name="file">File to validate.</param>
+    /// <exception cref="ArgumentException">Thrown when validation fails.</exception>
+    private void ValidateFile(FileDto file)
+    {
+        // Check file path is not empty
+        if (string.IsNullOrWhiteSpace(file.Path))
+        {
+            throw new ArgumentException("File path cannot be empty");
+        }
+
+        // Check file extension
+        var extension = Path.GetExtension(file.Path);
+        if (!AllowedExtensions.Contains(extension))
+        {
+            throw new ArgumentException(
+                $"File type '{extension}' is not allowed. Only .resx and .json files are supported.");
+        }
+
+        // Check file size
+        if (file.Content.Length > MaxFileSizeBytes)
+        {
+            throw new ArgumentException(
+                $"File '{file.Path}' exceeds maximum size of {MaxFileSizeBytes / 1024 / 1024}MB");
+        }
+
+        // Validate content matches the file type
+        if (extension.Equals(".resx", StringComparison.OrdinalIgnoreCase))
+        {
+            ValidateResxContent(file.Content, file.Path);
+        }
+        else if (extension.Equals(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            ValidateJsonContent(file.Content, file.Path);
+        }
+    }
+
+    /// <summary>
+    /// Validates RESX content for security (prevents XXE attacks).
+    /// </summary>
+    private static void ValidateResxContent(string content, string filePath)
+    {
+        try
+        {
+            var settings = new XmlReaderSettings
+            {
+                DtdProcessing = DtdProcessing.Prohibit,  // Block DTD (prevents XXE)
+                XmlResolver = null,                       // No external resources
+                MaxCharactersFromEntities = 0,            // Block entity expansion
+                MaxCharactersInDocument = 10_000_000      // 10MB limit
+            };
+
+            using var stringReader = new StringReader(content);
+            using var xmlReader = XmlReader.Create(stringReader, settings);
+
+            // Read through the entire document to validate
+            while (xmlReader.Read()) { }
+        }
+        catch (XmlException ex)
+        {
+            throw new ArgumentException($"Invalid XML in file '{filePath}': {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Validates JSON content.
+    /// </summary>
+    private static void ValidateJsonContent(string content, string filePath)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(content);
+        }
+        catch (JsonException ex)
+        {
+            throw new ArgumentException($"Invalid JSON in file '{filePath}': {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Stores uploaded files to S3/Minio for historical archive.
     /// Also maintains a "current/" folder with the latest version of all files for snapshots.
     /// </summary>
@@ -38,6 +133,12 @@ public class ResourceSyncService
     {
         if (files.Count == 0)
             return;
+
+        // Validate all files before processing
+        foreach (var file in files)
+        {
+            ValidateFile(file);
+        }
 
         var uploadTimestamp = DateTime.UtcNow;
         var uploadPath = $"uploads/{uploadTimestamp:yyyy-MM-dd-HH-mm-ss}";

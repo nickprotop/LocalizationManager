@@ -20,6 +20,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Http.Features;
 
 public class Program
 {
@@ -103,6 +104,24 @@ public class Program
 
             // Register configuration in DI
             builder.Services.AddCloudConfiguration(config);
+
+            // =============================================================================
+            // Security: Request Size Limits
+            // =============================================================================
+
+            // Limit request body size to prevent large file upload attacks
+            builder.Services.Configure<FormOptions>(options =>
+            {
+                options.ValueLengthLimit = 10_485_760;            // 10MB per value
+                options.MultipartBodyLengthLimit = 52_428_800;    // 50MB total for multipart
+                options.MemoryBufferThreshold = 1_048_576;        // 1MB before buffering to disk
+            });
+
+            // Also set Kestrel limits
+            builder.WebHost.ConfigureKestrel(serverOptions =>
+            {
+                serverOptions.Limits.MaxRequestBodySize = 52_428_800; // 50MB max request body
+            });
 
             // =============================================================================
             // Services

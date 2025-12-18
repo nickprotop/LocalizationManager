@@ -211,31 +211,45 @@ public class MinioStorageService : IStorageService
     /// <summary>
     /// Constructs the full object name for MinIO storage.
     /// Format: projects/{projectId}/{filePath}
+    /// Security: Validates against path traversal attacks.
     /// </summary>
     private static string GetObjectName(int projectId, string filePath)
     {
-        // Security: Prevent path traversal attacks
-        if (filePath.Contains("..") || filePath.Contains("./"))
+        if (string.IsNullOrWhiteSpace(filePath))
         {
-            throw new ArgumentException("Invalid file path: path traversal not allowed", nameof(filePath));
+            throw new ArgumentException("File path cannot be empty", nameof(filePath));
         }
 
-        // Normalize path separators
+        // Normalize path separators first (handle both Windows and Unix paths)
         filePath = filePath.Replace('\\', '/');
 
         // Remove leading slash if present
-        if (filePath.StartsWith('/'))
+        filePath = filePath.TrimStart('/');
+
+        // Build the full path
+        var fullPath = $"projects/{projectId}/{filePath}";
+
+        // Split into segments and validate each one
+        var segments = fullPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        // Security: Check for path traversal in ALL segments
+        // This catches: "..", ".", encoded variants after URL decoding, etc.
+        foreach (var segment in segments)
         {
-            filePath = filePath.Substring(1);
+            if (segment == ".." || segment == ".")
+            {
+                throw new ArgumentException("Invalid file path: path traversal not allowed", nameof(filePath));
+            }
+
+            // Also check for null bytes or other suspicious characters
+            if (segment.Contains('\0'))
+            {
+                throw new ArgumentException("Invalid file path: null bytes not allowed", nameof(filePath));
+            }
         }
 
-        // Additional validation: ensure no path traversal after normalization
-        if (filePath.Contains(".."))
-        {
-            throw new ArgumentException("Invalid file path: path traversal not allowed", nameof(filePath));
-        }
-
-        return $"projects/{projectId}/{filePath}";
+        // Rebuild the clean path from validated segments
+        return string.Join("/", segments);
     }
 
     public async Task<List<string>> ListSnapshotFilesAsync(int projectId, string snapshotId)

@@ -19,6 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Xml;
 using System.Xml.Linq;
 using LocalizationManager.Core.Models;
 
@@ -29,6 +30,19 @@ namespace LocalizationManager.Core;
 /// </summary>
 public class ResourceFileParser
 {
+    /// <summary>
+    /// Creates secure XML reader settings to prevent XXE and XML bomb attacks.
+    /// </summary>
+    private static XmlReaderSettings CreateSecureXmlSettings()
+    {
+        return new XmlReaderSettings
+        {
+            DtdProcessing = DtdProcessing.Prohibit,  // Block DTD processing (prevents XXE attacks)
+            XmlResolver = null,                       // Prevent external resource resolution
+            MaxCharactersFromEntities = 0,            // Block entity expansion (prevents XML bombs)
+            MaxCharactersInDocument = 10_000_000      // 10MB limit for document size
+        };
+    }
     /// <summary>
     /// Reads and parses a .resx file into a ResourceFile object.
     /// </summary>
@@ -50,7 +64,8 @@ public class ResourceFileParser
 
         try
         {
-            var xdoc = XDocument.Load(language.FilePath);
+            using var xmlReader = XmlReader.Create(language.FilePath, CreateSecureXmlSettings());
+            var xdoc = XDocument.Load(xmlReader);
             return ParseXDocument(xdoc, language);
         }
         catch (Exception ex)
@@ -71,7 +86,8 @@ public class ResourceFileParser
     {
         try
         {
-            var xdoc = XDocument.Load(reader);
+            using var xmlReader = XmlReader.Create(reader, CreateSecureXmlSettings());
+            var xdoc = XDocument.Load(xmlReader);
             return ParseXDocument(xdoc, metadata);
         }
         catch (Exception ex)
@@ -130,9 +146,16 @@ public class ResourceFileParser
             // Only load if file exists AND has content (not empty)
             var filePath = resourceFile.Language.FilePath;
             var fileInfo = new FileInfo(filePath);
-            var xdoc = fileInfo.Exists && fileInfo.Length > 0
-                ? XDocument.Load(filePath)
-                : CreateNewResxDocument();
+            XDocument xdoc;
+            if (fileInfo.Exists && fileInfo.Length > 0)
+            {
+                using var xmlReader = XmlReader.Create(filePath, CreateSecureXmlSettings());
+                xdoc = XDocument.Load(xmlReader);
+            }
+            else
+            {
+                xdoc = CreateNewResxDocument();
+            }
 
             var root = xdoc.Root;
             if (root == null)
