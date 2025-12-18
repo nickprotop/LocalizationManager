@@ -153,6 +153,207 @@ namespace LrmCloud.Api.Data.Migrations
                     b.ToTable("audit_log");
                 });
 
+            modelBuilder.Entity("LrmCloud.Shared.Entities.GlossaryProviderSync", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("EntryCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("entry_count");
+
+                    b.Property<string>("ExternalGlossaryId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("external_glossary_id");
+
+                    b.Property<DateTime?>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_synced_at");
+
+                    b.Property<int?>("OrganizationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("organization_id");
+
+                    b.Property<int?>("ProjectId")
+                        .HasColumnType("integer")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("ProviderName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider_name");
+
+                    b.Property<string>("SourceLanguage")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("source_language");
+
+                    b.Property<string>("SyncError")
+                        .HasColumnType("text")
+                        .HasColumnName("sync_error");
+
+                    b.Property<string>("SyncStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("sync_status");
+
+                    b.Property<string>("TargetLanguage")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("target_language");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("OrganizationId", "ProviderName", "SourceLanguage", "TargetLanguage")
+                        .IsUnique()
+                        .HasFilter("organization_id IS NOT NULL");
+
+                    b.HasIndex("ProjectId", "ProviderName", "SourceLanguage", "TargetLanguage")
+                        .IsUnique()
+                        .HasFilter("project_id IS NOT NULL");
+
+                    b.ToTable("glossary_provider_sync", t =>
+                        {
+                            t.HasCheckConstraint("CK_glossary_provider_sync_owner", "(project_id IS NOT NULL AND organization_id IS NULL) OR (project_id IS NULL AND organization_id IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("LrmCloud.Shared.Entities.GlossaryTerm", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("CaseSensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("case_sensitive");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<int?>("OrganizationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("organization_id");
+
+                    b.Property<int?>("ProjectId")
+                        .HasColumnType("integer")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("SourceLanguage")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("source_language");
+
+                    b.Property<string>("SourceTerm")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("source_term");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("OrganizationId", "SourceTerm", "SourceLanguage")
+                        .IsUnique()
+                        .HasFilter("organization_id IS NOT NULL");
+
+                    b.HasIndex("ProjectId", "SourceTerm", "SourceLanguage")
+                        .IsUnique()
+                        .HasFilter("project_id IS NOT NULL");
+
+                    b.ToTable("glossary_terms", t =>
+                        {
+                            t.HasCheckConstraint("CK_glossary_terms_owner", "(project_id IS NOT NULL AND organization_id IS NULL) OR (project_id IS NULL AND organization_id IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("LrmCloud.Shared.Entities.GlossaryTranslation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("TargetLanguage")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("target_language");
+
+                    b.Property<int>("TermId")
+                        .HasColumnType("integer")
+                        .HasColumnName("term_id");
+
+                    b.Property<string>("TranslatedTerm")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("translated_term");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TermId");
+
+                    b.HasIndex("TermId", "TargetLanguage")
+                        .IsUnique();
+
+                    b.ToTable("glossary_translations");
+                });
+
             modelBuilder.Entity("LrmCloud.Shared.Entities.Organization", b =>
                 {
                     b.Property<int>("Id")
@@ -460,6 +661,10 @@ namespace LrmCloud.Api.Data.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("github_webhook_secret");
+
+                    b.Property<bool>("InheritOrganizationGlossary")
+                        .HasColumnType("boolean")
+                        .HasColumnName("inherit_organization_glossary");
 
                     b.Property<DateTime?>("LastSyncedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1003,6 +1208,86 @@ namespace LrmCloud.Api.Data.Migrations
                     b.ToTable("translations");
                 });
 
+            modelBuilder.Entity("LrmCloud.Shared.Entities.TranslationMemory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Context")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("context");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("OrganizationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("SourceHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_hash");
+
+                    b.Property<string>("SourceLanguage")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("source_language");
+
+                    b.Property<string>("SourceText")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("source_text");
+
+                    b.Property<string>("TargetLanguage")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("target_language");
+
+                    b.Property<string>("TranslatedText")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("translated_text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("UseCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("use_count");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("SourceLanguage");
+
+                    b.HasIndex("TargetLanguage");
+
+                    b.HasIndex("UpdatedAt");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "SourceLanguage", "TargetLanguage", "SourceHash")
+                        .IsUnique();
+
+                    b.ToTable("translation_memories");
+                });
+
             modelBuilder.Entity("LrmCloud.Shared.Entities.TranslationUsageHistory", b =>
                 {
                     b.Property<int>("Id")
@@ -1387,6 +1672,58 @@ namespace LrmCloud.Api.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("LrmCloud.Shared.Entities.GlossaryProviderSync", b =>
+                {
+                    b.HasOne("LrmCloud.Shared.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("LrmCloud.Shared.Entities.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("LrmCloud.Shared.Entities.GlossaryTerm", b =>
+                {
+                    b.HasOne("LrmCloud.Shared.Entities.User", "Creator")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("LrmCloud.Shared.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("LrmCloud.Shared.Entities.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Creator");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("LrmCloud.Shared.Entities.GlossaryTranslation", b =>
+                {
+                    b.HasOne("LrmCloud.Shared.Entities.GlossaryTerm", "Term")
+                        .WithMany("Translations")
+                        .HasForeignKey("TermId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Term");
+                });
+
             modelBuilder.Entity("LrmCloud.Shared.Entities.Organization", b =>
                 {
                     b.HasOne("LrmCloud.Shared.Entities.User", "Owner")
@@ -1578,6 +1915,24 @@ namespace LrmCloud.Api.Data.Migrations
                     b.Navigation("ReviewedBy");
                 });
 
+            modelBuilder.Entity("LrmCloud.Shared.Entities.TranslationMemory", b =>
+                {
+                    b.HasOne("LrmCloud.Shared.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("LrmCloud.Shared.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("LrmCloud.Shared.Entities.TranslationUsageHistory", b =>
                 {
                     b.HasOne("LrmCloud.Shared.Entities.User", "User")
@@ -1631,6 +1986,11 @@ namespace LrmCloud.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("LrmCloud.Shared.Entities.GlossaryTerm", b =>
+                {
+                    b.Navigation("Translations");
                 });
 
             modelBuilder.Entity("LrmCloud.Shared.Entities.Organization", b =>

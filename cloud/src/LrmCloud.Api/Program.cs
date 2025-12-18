@@ -136,6 +136,8 @@ public class Program
             builder.Services.AddScoped<IResourceService, ResourceService>();
             builder.Services.AddScoped<ResourceSyncService>(); // File-based sync with Core backends
             builder.Services.AddScoped<SnapshotService>(); // Point-in-time snapshot management
+            builder.Services.AddScoped<TranslationMemoryService>(); // Translation Memory for reuse
+            builder.Services.AddScoped<GlossaryService>(); // Glossary management for consistent terminology
             builder.Services.AddScoped<IStorageService, MinioStorageService>();
 
             // Translation Services

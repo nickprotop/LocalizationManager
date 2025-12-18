@@ -44,6 +44,14 @@ public class AppDbContext : DbContext
     // Usage Events (detailed per-translation tracking)
     public DbSet<UsageEvent> UsageEvents => Set<UsageEvent>();
 
+    // Translation Memory
+    public DbSet<TranslationMemory> TranslationMemories => Set<TranslationMemory>();
+
+    // Glossary
+    public DbSet<GlossaryTerm> GlossaryTerms => Set<GlossaryTerm>();
+    public DbSet<GlossaryTranslation> GlossaryTranslations => Set<GlossaryTranslation>();
+    public DbSet<GlossaryProviderSync> GlossaryProviderSyncs => Set<GlossaryProviderSync>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -335,6 +343,122 @@ public class AppDbContext : DbContext
                 .HasForeignKey(e => e.OrganizationId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
+
+        // =====================================================================
+        // Translation Memory
+        // =====================================================================
+        modelBuilder.Entity<TranslationMemory>(entity =>
+        {
+            // Unique: user + source lang + target lang + source hash
+            entity.HasIndex(e => new { e.UserId, e.SourceLanguage, e.TargetLanguage, e.SourceHash }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.OrganizationId);
+            entity.HasIndex(e => e.SourceLanguage);
+            entity.HasIndex(e => e.TargetLanguage);
+            entity.HasIndex(e => e.UpdatedAt);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Match parent's soft-delete filter
+            entity.HasQueryFilter(e => e.User!.DeletedAt == null);
+        });
+
+        // =====================================================================
+        // Glossary Terms
+        // =====================================================================
+        modelBuilder.Entity<GlossaryTerm>(entity =>
+        {
+            // Unique per project (filtered index)
+            entity.HasIndex(e => new { e.ProjectId, e.SourceTerm, e.SourceLanguage })
+                .HasFilter("project_id IS NOT NULL")
+                .IsUnique();
+
+            // Unique per organization (filtered index)
+            entity.HasIndex(e => new { e.OrganizationId, e.SourceTerm, e.SourceLanguage })
+                .HasFilter("organization_id IS NOT NULL")
+                .IsUnique();
+
+            entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => e.OrganizationId);
+
+            entity.HasOne(e => e.Project)
+                .WithMany()
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Creator)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Check constraint: must have exactly one owner (project or organization)
+            entity.ToTable(t => t.HasCheckConstraint(
+                "CK_glossary_terms_owner",
+                "(project_id IS NOT NULL AND organization_id IS NULL) OR (project_id IS NULL AND organization_id IS NOT NULL)"
+            ));
+        });
+
+        // =====================================================================
+        // Glossary Translations
+        // =====================================================================
+        modelBuilder.Entity<GlossaryTranslation>(entity =>
+        {
+            entity.HasIndex(e => new { e.TermId, e.TargetLanguage }).IsUnique();
+            entity.HasIndex(e => e.TermId);
+
+            entity.HasOne(e => e.Term)
+                .WithMany(t => t.Translations)
+                .HasForeignKey(e => e.TermId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // =====================================================================
+        // Glossary Provider Sync
+        // =====================================================================
+        modelBuilder.Entity<GlossaryProviderSync>(entity =>
+        {
+            // Unique per project (filtered index)
+            entity.HasIndex(e => new { e.ProjectId, e.ProviderName, e.SourceLanguage, e.TargetLanguage })
+                .HasFilter("project_id IS NOT NULL")
+                .IsUnique();
+
+            // Unique per organization (filtered index)
+            entity.HasIndex(e => new { e.OrganizationId, e.ProviderName, e.SourceLanguage, e.TargetLanguage })
+                .HasFilter("organization_id IS NOT NULL")
+                .IsUnique();
+
+            entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => e.OrganizationId);
+
+            entity.HasOne(e => e.Project)
+                .WithMany()
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Check constraint: must have exactly one owner (project or organization)
+            entity.ToTable(t => t.HasCheckConstraint(
+                "CK_glossary_provider_sync_owner",
+                "(project_id IS NOT NULL AND organization_id IS NULL) OR (project_id IS NULL AND organization_id IS NOT NULL)"
+            ));
+        });
     }
 
     /// <summary>
@@ -369,6 +493,14 @@ public class AppDbContext : DbContext
                 key.UpdatedAt = DateTime.UtcNow;
             else if (entry.Entity is Translation translation)
                 translation.UpdatedAt = DateTime.UtcNow;
+            else if (entry.Entity is TranslationMemory tm)
+                tm.UpdatedAt = DateTime.UtcNow;
+            else if (entry.Entity is GlossaryTerm glossaryTerm)
+                glossaryTerm.UpdatedAt = DateTime.UtcNow;
+            else if (entry.Entity is GlossaryTranslation glossaryTranslation)
+                glossaryTranslation.UpdatedAt = DateTime.UtcNow;
+            else if (entry.Entity is GlossaryProviderSync glossarySync)
+                glossarySync.UpdatedAt = DateTime.UtcNow;
         }
     }
 }
