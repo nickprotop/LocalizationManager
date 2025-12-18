@@ -194,6 +194,11 @@ else
             View Snapshots
         </MudButton>
         <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.Book"
+                   OnClick="@(() => Navigation.NavigateTo($"/app/projects/{ProjectId}/glossary"))">
+            Glossary
+        </MudButton>
+        <MudButton Variant="Variant.Outlined"
                    StartIcon="@Icons.Material.Filled.Translate"
                    OnClick="@OpenTranslateDialog"
                    Disabled="@_isTranslating">

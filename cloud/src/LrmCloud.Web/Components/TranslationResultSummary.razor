@@ -17,25 +17,41 @@
     <MudDivider />
 
     <MudGrid Spacing="2">
-        <MudItem xs="4">
-            <MudPaper Class="pa-4 text-center" Elevation="0" Style="background-color: var(--mud-palette-success-lighten);">
-                <MudText Typo="Typo.h4" Color="Color.Success">@Result.TranslatedCount</MudText>
-                <MudText Typo="Typo.body2">Translated</MudText>
+        <MudItem xs="3">
+            <MudPaper Class="pa-3 text-center" Elevation="0" Style="background-color: var(--mud-palette-success-lighten);">
+                <MudText Typo="Typo.h5" Color="Color.Success">@Result.TranslatedCount</MudText>
+                <MudText Typo="Typo.caption">Translated</MudText>
             </MudPaper>
         </MudItem>
-        <MudItem xs="4">
-            <MudPaper Class="pa-4 text-center" Elevation="0" Style="background-color: var(--mud-palette-warning-lighten);">
-                <MudText Typo="Typo.h4" Color="Color.Warning">@Result.SkippedCount</MudText>
-                <MudText Typo="Typo.body2">Skipped</MudText>
+        <MudItem xs="3">
+            <MudPaper Class="pa-3 text-center" Elevation="0" Style="background-color: rgba(76, 175, 80, 0.15);">
+                <MudStack Row="true" Justify="Justify.Center" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Filled.Memory" Size="Size.Small" Color="Color.Success" />
+                    <MudText Typo="Typo.h5" Color="Color.Success">@TmCount</MudText>
+                </MudStack>
+                <MudText Typo="Typo.caption">From TM</MudText>
             </MudPaper>
         </MudItem>
-        <MudItem xs="4">
-            <MudPaper Class="pa-4 text-center" Elevation="0" Style="background-color: var(--mud-palette-error-lighten);">
-                <MudText Typo="Typo.h4" Color="Color.Error">@Result.FailedCount</MudText>
-                <MudText Typo="Typo.body2">Failed</MudText>
+        <MudItem xs="3">
+            <MudPaper Class="pa-3 text-center" Elevation="0" Style="background-color: var(--mud-palette-warning-lighten);">
+                <MudText Typo="Typo.h5" Color="Color.Warning">@Result.SkippedCount</MudText>
+                <MudText Typo="Typo.caption">Skipped</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="3">
+            <MudPaper Class="pa-3 text-center" Elevation="0" Style="background-color: var(--mud-palette-error-lighten);">
+                <MudText Typo="Typo.h5" Color="Color.Error">@Result.FailedCount</MudText>
+                <MudText Typo="Typo.caption">Failed</MudText>
             </MudPaper>
         </MudItem>
     </MudGrid>
+
+    @if (TmCount > 0)
+    {
+        <MudAlert Severity="Severity.Success" Dense="true" Icon="@Icons.Material.Filled.Memory">
+            @TmCount translation(s) reused from Translation Memory (no API cost)
+        </MudAlert>
+    }
 
     <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-2">
         <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
@@ -94,6 +110,14 @@
 
     [Parameter]
     public EventCallback OnClose { get; set; }
+
+    /// <summary>
+    /// Gets TM count from either DTO property or by counting results.
+    /// Supports both server-returned TmCount and client-side merged results.
+    /// </summary>
+    private int TmCount => Result.TmCount > 0
+        ? Result.TmCount
+        : Result.Results.Count(r => r.FromTm);
 
     private static string FormatElapsedTime(long ms)
     {

@@ -26,6 +26,11 @@ public class TranslateResponseDto
     public int SkippedCount { get; set; }
 
     /// <summary>
+    /// Number of translations that came from Translation Memory (no API cost).
+    /// </summary>
+    public int TmCount { get; set; }
+
+    /// <summary>
     /// Total characters translated (for usage tracking).
     /// </summary>
     public long CharactersTranslated { get; set; }
@@ -95,6 +100,11 @@ public class TranslationResultDto
     /// Whether the translation was from cache.
     /// </summary>
     public bool FromCache { get; set; }
+
+    /// <summary>
+    /// Whether the translation came from Translation Memory.
+    /// </summary>
+    public bool FromTm { get; set; }
 }
 
 /// <summary>
@@ -107,4 +117,9 @@ public class TranslateSingleResponseDto
     public string Provider { get; set; } = string.Empty;
     public string? Error { get; set; }
     public bool FromCache { get; set; }
+
+    /// <summary>
+    /// Whether the translation came from Translation Memory.
+    /// </summary>
+    public bool FromTm { get; set; }
 }

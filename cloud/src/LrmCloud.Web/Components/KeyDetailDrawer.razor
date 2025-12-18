@@ -1,43 +1,18 @@
 @using LrmCloud.Web.Models
 
 <MudStack Spacing="3">
-    <MudTextField Value="@Row.KeyName"
-                  Label="Key Name"
-                  Variant="Variant.Outlined"
-                  ReadOnly="true"
-                  Adornment="Adornment.End"
-                  AdornmentIcon="@Icons.Material.Filled.ContentCopy"
-                  OnAdornmentClick="@CopyKeyName" />
+    @* Key Name *@
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
+        <MudStack Spacing="0">
+            <MudText Typo="Typo.overline" Color="Color.Secondary">Key Name</MudText>
+            <MudText Typo="Typo.h6" Style="word-break: break-all;">@Row.KeyName</MudText>
+        </MudStack>
+        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                       Size="Size.Small"
+                       OnClick="@CopyKeyName" />
+    </MudStack>
 
-    @if (!string.IsNullOrEmpty(Row.Comment))
-    {
-        <MudTextField Value="@Row.Comment"
-                      Label="Comment"
-                      Variant="Variant.Outlined"
-                      Lines="2"
-                      ReadOnly="true" />
-    }
-
-    @* Key Type Toggle - only show if format supports plurals *@
-    @if (SupportsPluralKeys)
-    {
-        <MudPaper Outlined="true" Class="pa-3">
-            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                <MudText Typo="Typo.body2">Key Type</MudText>
-                <MudToggleGroup T="bool" Value="@Row.IsPlural" ValueChanged="@OnKeyTypeChanged" Color="Color.Primary" Size="Size.Small">
-                    <MudToggleItem Value="false" Text="Single" />
-                    <MudToggleItem Value="true" Text="Plural" />
-                </MudToggleGroup>
-            </MudStack>
-        </MudPaper>
-    }
-    else if (Row.IsPlural)
-    {
-        <MudAlert Severity="Severity.Warning" Dense="true">
-            This key is marked as plural but the project format (@ProjectFormat) doesn't support plurals.
-        </MudAlert>
-    }
-
+    @* Status & Type *@
     <MudStack Row="true" Spacing="2">
         <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(Row.Status)">
             @Row.Status
@@ -45,139 +20,147 @@
         @if (Row.IsPlural)
         {
             <MudChip T="string" Size="Size.Small" Color="Color.Info">
-                @GetActivePluralForms().Count() forms
+                Plural (@GetPluralFormCount() forms)
             </MudChip>
         }
     </MudStack>
 
+    @* Comment Preview *@
+    @if (!string.IsNullOrEmpty(Row.Comment))
+    {
+        <MudStack Spacing="0">
+            <MudText Typo="Typo.overline" Color="Color.Secondary">Comment</MudText>
+            <MudText Typo="Typo.body2" Style="font-style: italic;">
+                @Row.Comment
+            </MudText>
+        </MudStack>
+    }
+
     <MudDivider />
 
-    <MudText Typo="Typo.subtitle1">Translations</MudText>
+    @* Translations Preview *@
+    <MudText Typo="Typo.subtitle2">Translations</MudText>
 
-    @foreach (var lang in Languages)
-    {
-        var isDefault = lang == DefaultLanguage;
+    <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
+        <tbody>
+            @foreach (var lang in Languages)
+            {
+                var isDefault = lang == DefaultLanguage;
+                var status = GetLanguageStatus(lang);
 
-        @if (Row.IsPlural)
-        {
-            // Plural key: show active plural forms for this language
-            <MudStack Spacing="1">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">
-                        @lang.ToUpperInvariant()
-                        @if (isDefault)
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Primary" Class="ml-1">(default)</MudText>
-                        }
-                    </MudText>
-                    <MudIconButton Icon="@Icons.Material.Filled.Translate"
-                                   Size="Size.Small"
-                                   Color="Color.Primary"
-                                   OnClick="@(() => TranslateLanguage(lang))"
-                                   Disabled="@(isDefault)" />
-                </MudStack>
-
-                @foreach (var pluralForm in GetActivePluralForms())
+                @if (Row.IsPlural)
                 {
-                    var pf = pluralForm;
-                    var key = TranslationGridRow.GetKey(lang, pf);
-                    var cell = Row.Translations.GetValueOrDefault(key);
-                    var isDirty = cell?.IsDirty ?? false;
-                    var canRemove = pf != PluralForms.Other; // Can't remove "other" form
-
-                    <MudStack Spacing="0">
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                            <MudText Typo="Typo.caption" Color="Color.Tertiary">@pf</MudText>
-                            @if (canRemove)
+                    @* For plural keys, show each form *@
+                    var pluralForms = GetPluralFormsForLanguage(lang);
+                    var isFirst = true;
+                    @foreach (var (form, value) in pluralForms)
+                    {
+                        <tr>
+                            <td style="width: 70px; vertical-align: top; padding: 8px 4px;">
+                                @if (isFirst)
+                                {
+                                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                        <MudText Typo="Typo.body2" Style="font-weight: 500;">
+                                            @lang.ToUpperInvariant()
+                                        </MudText>
+                                        @if (isDefault)
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Warning" />
+                                        }
+                                    </MudStack>
+                                    isFirst = false;
+                                }
+                            </td>
+                            <td style="width: 50px; vertical-align: top; padding: 8px 4px;">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@form</MudText>
+                            </td>
+                            <td style="vertical-align: top; padding: 8px 4px;">
+                                @if (string.IsNullOrEmpty(value))
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Style="font-style: italic;">
+                                        (empty)
+                                    </MudText>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.body2" Style="word-break: break-word;">
+                                        @TruncateText(value, 80)
+                                    </MudText>
+                                }
+                            </td>
+                            <td style="width: 30px; text-align: center; vertical-align: top; padding: 8px 4px;">
+                                @if (isFirst || pluralForms.Count == 1)
+                                {
+                                    @switch (status)
+                                    {
+                                        case TranslationStatus.Complete:
+                                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" />
+                                            break;
+                                        case TranslationStatus.Partial:
+                                            <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" />
+                                            break;
+                                        case TranslationStatus.Missing:
+                                            <MudIcon Icon="@Icons.Material.Filled.Error" Size="Size.Small" Color="Color.Error" />
+                                            break;
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    @* For single keys, show one row *@
+                    var value = GetTranslationPreview(lang);
+                    <tr>
+                        <td style="width: 70px; vertical-align: top; padding: 8px 4px;">
+                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.body2" Style="font-weight: 500;">
+                                    @lang.ToUpperInvariant()
+                                </MudText>
+                                @if (isDefault)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Warning" />
+                                }
+                            </MudStack>
+                        </td>
+                        <td style="vertical-align: top; padding: 8px 4px;" colspan="2">
+                            @if (string.IsNullOrEmpty(value))
                             {
-                                <MudIconButton Icon="@Icons.Material.Filled.Close"
-                                               Size="Size.Small"
-                                               Color="Color.Error"
-                                               OnClick="@(() => RemovePluralForm(pf))" />
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Style="font-style: italic;">
+                                    (empty)
+                                </MudText>
                             }
-                        </MudStack>
-                        @if (cell != null)
-                        {
-                            <MudTextField T="string"
-                                          Value="@cell.Value"
-                                          ValueChanged="@(v => { cell.Value = v; OnValueChanged(cell); })"
-                                          Variant="Variant.Outlined"
-                                          Lines="1"
-                                          FullWidth="true"
-                                          Immediate="true"
-                                          Placeholder="@GetPluralPlaceholder(pf, isDefault)"
-                                          Class="@(isDirty ? "dirty-field" : "")" />
-                        }
-                    </MudStack>
+                            else
+                            {
+                                <MudText Typo="Typo.body2" Style="word-break: break-word;">
+                                    @TruncateText(value, 100)
+                                </MudText>
+                            }
+                        </td>
+                        <td style="width: 30px; text-align: center; vertical-align: top; padding: 8px 4px;">
+                            @switch (status)
+                            {
+                                case TranslationStatus.Complete:
+                                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" />
+                                    break;
+                                case TranslationStatus.Partial:
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" />
+                                    break;
+                                case TranslationStatus.Missing:
+                                    <MudIcon Icon="@Icons.Material.Filled.Error" Size="Size.Small" Color="Color.Error" />
+                                    break;
+                            }
+                        </td>
+                    </tr>
                 }
-
-                @* Add plural form dropdown *@
-                @{
-                    var availableForms = GetAvailablePluralForms();
-                }
-                @if (availableForms.Any())
-                {
-                    <MudMenu Label="+ Add plural form" Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Dense="true">
-                        @foreach (var form in availableForms)
-                        {
-                            var f = form;
-                            <MudMenuItem OnClick="@(() => AddPluralForm(f))">
-                                <MudStack Row="true" Spacing="2">
-                                    <MudText>@f</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@GetPluralFormDescription(f)</MudText>
-                                </MudStack>
-                            </MudMenuItem>
-                        }
-                    </MudMenu>
-                }
-
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    @GetPluralCharCount(lang) characters
-                </MudText>
-            </MudStack>
-        }
-        else
-        {
-            // Non-plural key: show single translation field
-            var cell = Row.Translations.GetValueOrDefault(lang);
-            var isDirty = cell?.IsDirty ?? false;
-
-            <MudStack Spacing="1">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">
-                        @lang.ToUpperInvariant()
-                        @if (isDefault)
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Primary" Class="ml-1">(default)</MudText>
-                        }
-                    </MudText>
-                    <MudIconButton Icon="@Icons.Material.Filled.Translate"
-                                   Size="Size.Small"
-                                   Color="Color.Primary"
-                                   OnClick="@(() => TranslateLanguage(lang))"
-                                   Disabled="@(isDefault)" />
-                </MudStack>
-                @if (cell != null)
-                {
-                    <MudTextField T="string"
-                                  Value="@cell.Value"
-                                  ValueChanged="@(v => { cell.Value = v; OnValueChanged(cell); })"
-                                  Variant="Variant.Outlined"
-                                  Lines="2"
-                                  FullWidth="true"
-                                  Immediate="true"
-                                  Placeholder="@(isDefault ? "Enter source text" : "Enter translation")"
-                                  Class="@(isDirty ? "dirty-field" : "")" />
-                }
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    @((cell?.Value?.Length ?? 0)) characters
-                </MudText>
-            </MudStack>
-        }
-    }
+            }
+        </tbody>
+    </MudSimpleTable>
 
     <MudDivider Class="my-2" />
 
+    @* Actions *@
     <MudStack Row="true" Justify="Justify.SpaceBetween">
         <MudButton Variant="Variant.Outlined"
                    Color="Color.Error"
@@ -192,52 +175,18 @@
                        Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.Translate"
                        OnClick="@HandleTranslateAll">
-                Translate All
+                Translate
             </MudButton>
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
                        Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Check"
-                       OnClick="@HandleSave"
-                       Disabled="@(!HasChanges)">
-                Apply
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       OnClick="@HandleEdit">
+                Edit
             </MudButton>
         </MudStack>
     </MudStack>
 </MudStack>
-
-@* Confirmation Dialog for Type Conversion *@
-<MudDialog @bind-Visible="_showConversionDialog">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Convert Key Type</MudText>
-    </TitleContent>
-    <DialogContent>
-        @if (_pendingIsPlural)
-        {
-            <MudText>
-                This will convert the key to <strong>plural</strong>. The current value will become the "other" form.
-                You can then add singular (one) and other plural forms.
-            </MudText>
-        }
-        else
-        {
-            <MudAlert Severity="Severity.Warning" Class="mb-3">
-                This will convert the key to <strong>single</strong>. Only the "other" form will be kept;
-                all other plural forms will be deleted.
-            </MudAlert>
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CancelConversion">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@ConfirmConversion">Convert</MudButton>
-    </DialogActions>
-</MudDialog>
-
-<style>
-    .dirty-field textarea, .dirty-field input {
-        background-color: rgba(255, 193, 7, 0.1) !important;
-    }
-</style>
 
 @code {
     [Parameter]
@@ -250,16 +199,7 @@
     public string DefaultLanguage { get; set; } = "en";
 
     [Parameter]
-    public string ProjectFormat { get; set; } = "json";
-
-    /// <summary>
-    /// Whether the project format supports plural keys (JSON does, RESX doesn't).
-    /// </summary>
-    [Parameter]
-    public bool SupportsPluralKeys { get; set; } = true;
-
-    [Parameter]
-    public EventCallback<TranslationGridRow> OnSave { get; set; }
+    public EventCallback<TranslationGridRow> OnEdit { get; set; }
 
     [Parameter]
     public EventCallback<TranslationGridRow> OnTranslate { get; set; }
@@ -267,262 +207,111 @@
     [Parameter]
     public EventCallback<TranslationGridRow> OnDelete { get; set; }
 
-    [Parameter]
-    public EventCallback<(TranslationGridRow Row, bool IsPlural)> OnTypeChanged { get; set; }
-
-
     [Inject]
     private ISnackbar Snackbar { get; set; } = default!;
 
     [Inject]
     private IJSRuntime JS { get; set; } = default!;
 
-    private bool _showConversionDialog;
-    private bool _pendingIsPlural;
-    private HashSet<string> _activePluralForms = new();
-
-    protected override void OnParametersSet()
+    private int GetPluralFormCount()
     {
-        RefreshActivePluralForms();
-    }
-
-    /// <summary>
-    /// Refreshes the active plural forms from the current Row state.
-    /// Call this after externally modifying Row.Translations (e.g., after translation).
-    /// </summary>
-    public void RefreshActivePluralForms()
-    {
-        // Initialize active plural forms from existing translations
-        _activePluralForms = GetExistingPluralForms();
-
-        // Ensure at least "other" form exists for plural keys
-        if (Row.IsPlural && !_activePluralForms.Contains(PluralForms.Other))
-        {
-            _activePluralForms.Add(PluralForms.Other);
-        }
-
-        // Add "one" by default for new plural keys
-        if (Row.IsPlural && _activePluralForms.Count == 1)
-        {
-            _activePluralForms.Add(PluralForms.One);
-        }
-
-        StateHasChanged();
-    }
-
-    private bool HasChanges => Row.Translations.Values.Any(t => t.IsDirty);
-
-    private HashSet<string> GetExistingPluralForms()
-    {
-        if (!Row.IsPlural) return new HashSet<string>();
+        if (!Row.IsPlural) return 0;
 
         return Row.Translations.Values
             .Where(t => !string.IsNullOrEmpty(t.PluralForm))
             .Select(t => t.PluralForm)
-            .ToHashSet();
+            .Distinct()
+            .Count();
     }
 
-    private IEnumerable<string> GetActivePluralForms()
+    private string? GetTranslationPreview(string lang)
     {
-        // Return forms in standard order
-        return PluralForms.All.Where(pf => _activePluralForms.Contains(pf));
-    }
-
-    private IEnumerable<string> GetAvailablePluralForms()
-    {
-        return PluralForms.All.Where(pf => !_activePluralForms.Contains(pf));
-    }
-
-    private void AddPluralForm(string pluralForm)
-    {
-        _activePluralForms.Add(pluralForm);
-
-        // Create empty cells for this plural form in all languages
-        foreach (var lang in Languages)
+        if (Row.IsPlural)
         {
-            var key = TranslationGridRow.GetKey(lang, pluralForm);
-            if (!Row.Translations.ContainsKey(key))
-            {
-                Row.Translations[key] = new TranslationCell
-                {
-                    LanguageCode = lang,
-                    PluralForm = pluralForm,
-                    Value = null,
-                    OriginalValue = null,
-                    IsDirty = true // Mark as dirty since it's new
-                };
-            }
-        }
+            // For plural keys, show the "other" form or first available
+            var otherKey = TranslationGridRow.GetKey(lang, PluralForms.Other);
+            var otherCell = Row.Translations.GetValueOrDefault(otherKey);
+            if (!string.IsNullOrEmpty(otherCell?.Value))
+                return otherCell.Value;
 
-        Snackbar.Add($"Added '{pluralForm}' plural form", Severity.Info);
-        StateHasChanged();
-    }
-
-    private void RemovePluralForm(string pluralForm)
-    {
-        if (pluralForm == PluralForms.Other)
-        {
-            Snackbar.Add("Cannot remove 'other' form - it's required", Severity.Warning);
-            return;
-        }
-
-        _activePluralForms.Remove(pluralForm);
-
-        // Mark cells for removal (set value to null and mark dirty)
-        foreach (var lang in Languages)
-        {
-            var key = TranslationGridRow.GetKey(lang, pluralForm);
-            if (Row.Translations.TryGetValue(key, out var cell))
-            {
-                cell.Value = null;
-                cell.IsDirty = true;
-            }
-        }
-
-        Snackbar.Add($"Removed '{pluralForm}' plural form. Save to apply changes.", Severity.Info);
-        StateHasChanged();
-    }
-
-    private void OnKeyTypeChanged(bool isPlural)
-    {
-        if (isPlural == Row.IsPlural) return;
-
-        _pendingIsPlural = isPlural;
-        _showConversionDialog = true;
-    }
-
-    private void CancelConversion()
-    {
-        _showConversionDialog = false;
-    }
-
-    private async Task ConfirmConversion()
-    {
-        _showConversionDialog = false;
-
-        if (_pendingIsPlural)
-        {
-            // Converting Single → Plural
-            // Move existing translations to "other" form
-            var keysToMove = Row.Translations.Keys.ToList();
-            foreach (var oldKey in keysToMove)
-            {
-                var cell = Row.Translations[oldKey];
-                if (string.IsNullOrEmpty(cell.PluralForm))
-                {
-                    // This is a non-plural translation, move to "other" form
-                    var newKey = TranslationGridRow.GetKey(cell.LanguageCode, PluralForms.Other);
-                    Row.Translations.Remove(oldKey);
-                    cell.PluralForm = PluralForms.Other;
-                    cell.IsDirty = true;
-                    Row.Translations[newKey] = cell;
-                }
-            }
-
-            // Initialize active forms
-            _activePluralForms = new HashSet<string> { PluralForms.One, PluralForms.Other };
-
-            // Create empty cells for both "one" and "other" forms for ALL languages
-            foreach (var lang in Languages)
-            {
-                // Create "one" form if missing
-                var oneKey = TranslationGridRow.GetKey(lang, PluralForms.One);
-                if (!Row.Translations.ContainsKey(oneKey))
-                {
-                    Row.Translations[oneKey] = new TranslationCell
-                    {
-                        LanguageCode = lang,
-                        PluralForm = PluralForms.One,
-                        Value = null,
-                        OriginalValue = null,
-                        IsDirty = true
-                    };
-                }
-
-                // Create "other" form if missing (for languages that had no translation)
-                var otherKey = TranslationGridRow.GetKey(lang, PluralForms.Other);
-                if (!Row.Translations.ContainsKey(otherKey))
-                {
-                    Row.Translations[otherKey] = new TranslationCell
-                    {
-                        LanguageCode = lang,
-                        PluralForm = PluralForms.Other,
-                        Value = null,
-                        OriginalValue = null,
-                        IsDirty = true
-                    };
-                }
-            }
+            // Fall back to any plural form with a value
+            return Row.Translations.Values
+                .Where(t => t.LanguageCode == lang && !string.IsNullOrEmpty(t.Value))
+                .Select(t => t.Value)
+                .FirstOrDefault();
         }
         else
         {
-            // Converting Plural → Single
-            // Keep only "other" form, move it to non-plural key
-            var keysToProcess = Row.Translations.Keys.ToList();
-            foreach (var oldKey in keysToProcess)
-            {
-                var cell = Row.Translations[oldKey];
-                if (cell.PluralForm == PluralForms.Other)
-                {
-                    // Keep this one, move to non-plural key
-                    Row.Translations.Remove(oldKey);
-                    cell.PluralForm = "";
-                    cell.IsDirty = true;
-                    Row.Translations[cell.LanguageCode] = cell;
-                }
-                else if (!string.IsNullOrEmpty(cell.PluralForm))
-                {
-                    // Remove other plural forms
-                    Row.Translations.Remove(oldKey);
-                }
-            }
+            return Row.Translations.GetValueOrDefault(lang)?.Value;
+        }
+    }
 
-            _activePluralForms.Clear();
+    /// <summary>
+    /// Gets all plural forms with their values for a language.
+    /// Returns forms in standard order (one, other, zero, two, few, many).
+    /// </summary>
+    private List<(string Form, string? Value)> GetPluralFormsForLanguage(string lang)
+    {
+        var result = new List<(string Form, string? Value)>();
+
+        foreach (var form in PluralForms.All)
+        {
+            var key = TranslationGridRow.GetKey(lang, form);
+            if (Row.Translations.TryGetValue(key, out var cell))
+            {
+                result.Add((form, cell.Value));
+            }
         }
 
-        Row.IsPlural = _pendingIsPlural;
+        // If no forms found, return at least "other" as empty
+        if (result.Count == 0)
+        {
+            result.Add((PluralForms.Other, null));
+        }
 
-        // Notify parent of type change
-        await OnTypeChanged.InvokeAsync((Row, _pendingIsPlural));
-
-        Snackbar.Add($"Converted to {(_pendingIsPlural ? "plural" : "single")} key. Save to apply changes.", Severity.Success);
-        StateHasChanged();
+        return result;
     }
 
-    private void OnValueChanged(TranslationCell cell)
+    private TranslationStatus GetLanguageStatus(string lang)
     {
-        cell.IsDirty = cell.Value != cell.OriginalValue;
+        if (lang == DefaultLanguage) return TranslationStatus.Complete;
+
+        if (Row.IsPlural)
+        {
+            var langCells = Row.Translations.Values
+                .Where(t => t.LanguageCode == lang && !string.IsNullOrEmpty(t.PluralForm))
+                .ToList();
+
+            if (!langCells.Any()) return TranslationStatus.Missing;
+
+            var hasAll = langCells.All(c => !string.IsNullOrEmpty(c.Value));
+            var hasAny = langCells.Any(c => !string.IsNullOrEmpty(c.Value));
+
+            if (hasAll) return TranslationStatus.Complete;
+            if (hasAny) return TranslationStatus.Partial;
+            return TranslationStatus.Missing;
+        }
+        else
+        {
+            var cell = Row.Translations.GetValueOrDefault(lang);
+            return string.IsNullOrEmpty(cell?.Value) ? TranslationStatus.Missing : TranslationStatus.Complete;
+        }
     }
 
-    private static string GetPluralPlaceholder(string pluralForm, bool isDefault) => pluralForm switch
+    private static string TruncateText(string text, int maxLength)
     {
-        "one" => isDefault ? "Singular (1 item)" : "Translate singular",
-        "other" => isDefault ? "Plural (2+ items)" : "Translate plural",
-        "zero" => isDefault ? "Zero (0 items)" : "Translate zero",
-        "two" => isDefault ? "Dual (exactly 2)" : "Translate dual",
-        "few" => isDefault ? "Few (2-4 items)" : "Translate few",
-        "many" => isDefault ? "Many (5+ items)" : "Translate many",
-        _ => isDefault ? $"Enter {pluralForm}" : $"Translate {pluralForm}"
+        if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+            return text;
+        return text[..maxLength] + "...";
+    }
+
+    private static Color GetStatusColor(TranslationStatus status) => status switch
+    {
+        TranslationStatus.Complete => Color.Success,
+        TranslationStatus.Partial => Color.Warning,
+        TranslationStatus.Missing => Color.Error,
+        _ => Color.Default
     };
-
-    private static string GetPluralFormDescription(string pluralForm) => pluralForm switch
-    {
-        "zero" => "(0 items)",
-        "one" => "(1 item)",
-        "two" => "(exactly 2)",
-        "few" => "(2-4 items)",
-        "many" => "(5+ items)",
-        "other" => "(default)",
-        _ => ""
-    };
-
-    private int GetPluralCharCount(string lang)
-    {
-        return GetActivePluralForms()
-            .Select(pf => TranslationGridRow.GetKey(lang, pf))
-            .Select(key => Row.Translations.GetValueOrDefault(key)?.Value?.Length ?? 0)
-            .Sum();
-    }
 
     private async Task CopyKeyName()
     {
@@ -530,14 +319,9 @@
         Snackbar.Add("Key name copied!", Severity.Success);
     }
 
-    private void TranslateLanguage(string langCode)
+    private async Task HandleEdit()
     {
-        Snackbar.Add($"Translate to {langCode} - coming soon!", Severity.Info);
-    }
-
-    private async Task HandleSave()
-    {
-        await OnSave.InvokeAsync(Row);
+        await OnEdit.InvokeAsync(Row);
     }
 
     private async Task HandleTranslateAll()
@@ -549,12 +333,4 @@
     {
         await OnDelete.InvokeAsync(Row);
     }
-
-    private static Color GetStatusColor(TranslationStatus status) => status switch
-    {
-        TranslationStatus.Complete => Color.Success,
-        TranslationStatus.Partial => Color.Warning,
-        TranslationStatus.Missing => Color.Error,
-        _ => Color.Default
-    };
 }

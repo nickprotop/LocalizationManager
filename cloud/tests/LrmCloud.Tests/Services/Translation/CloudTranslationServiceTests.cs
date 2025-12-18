@@ -1,4 +1,5 @@
 using LrmCloud.Api.Data;
+using LrmCloud.Api.Services;
 using LrmCloud.Api.Services.Translation;
 using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.DTOs.Translation;
@@ -15,9 +16,13 @@ public class CloudTranslationServiceTests : IDisposable
     private readonly AppDbContext _db;
     private readonly IApiKeyEncryptionService _encryptionService;
     private readonly IApiKeyHierarchyService _hierarchyService;
+    private readonly TranslationMemoryService _tmService;
+    private readonly GlossaryService _glossaryService;
     private readonly ICloudTranslationService _translationService;
     private readonly CloudConfiguration _cloudConfiguration;
     private readonly Mock<ILogger<CloudTranslationService>> _loggerMock;
+    private readonly Mock<ILogger<TranslationMemoryService>> _tmLoggerMock;
+    private readonly Mock<ILogger<GlossaryService>> _glossaryLoggerMock;
     private readonly Mock<ILrmTranslationProvider> _lrmProviderMock;
 
     public CloudTranslationServiceTests()
@@ -48,6 +53,7 @@ public class CloudTranslationServiceTests : IDisposable
         _encryptionService = new ApiKeyEncryptionService(_cloudConfiguration);
         _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService);
         _loggerMock = new Mock<ILogger<CloudTranslationService>>();
+        _tmLoggerMock = new Mock<ILogger<TranslationMemoryService>>();
         _lrmProviderMock = new Mock<ILrmTranslationProvider>();
 
         // Setup LRM provider mock defaults
@@ -56,10 +62,19 @@ public class CloudTranslationServiceTests : IDisposable
         _lrmProviderMock.Setup(x => x.GetRemainingCharsAsync(It.IsAny<int>()))
             .ReturnsAsync(10000);
 
+        // Setup TM service
+        _tmService = new TranslationMemoryService(_db, _tmLoggerMock.Object);
+
+        // Setup Glossary service
+        _glossaryLoggerMock = new Mock<ILogger<GlossaryService>>();
+        _glossaryService = new GlossaryService(_db, _glossaryLoggerMock.Object);
+
         _translationService = new CloudTranslationService(
             _db,
             _hierarchyService,
             _lrmProviderMock.Object,
+            _tmService,
+            _glossaryService,
             _cloudConfiguration,
             _loggerMock.Object);
     }
@@ -333,9 +348,13 @@ public class CloudTranslationServiceTests : IDisposable
         var encryptionService = new ApiKeyEncryptionService(cloudConfig);
         var hierarchyService = new ApiKeyHierarchyService(db, encryptionService);
         var loggerMock = new Mock<ILogger<CloudTranslationService>>();
+        var tmLoggerMock = new Mock<ILogger<TranslationMemoryService>>();
+        var glossaryLoggerMock = new Mock<ILogger<GlossaryService>>();
         var lrmProviderMock = new Mock<ILrmTranslationProvider>();
         lrmProviderMock.Setup(x => x.IsAvailableAsync(It.IsAny<int>())).ReturnsAsync((false, "LRM disabled"));
-        var translationService = new CloudTranslationService(db, hierarchyService, lrmProviderMock.Object, cloudConfig, loggerMock.Object);
+        var tmService = new TranslationMemoryService(db, tmLoggerMock.Object);
+        var glossaryService = new GlossaryService(db, glossaryLoggerMock.Object);
+        var translationService = new CloudTranslationService(db, hierarchyService, lrmProviderMock.Object, tmService, glossaryService, cloudConfig, loggerMock.Object);
 
         var user = new User
         {

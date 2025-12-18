@@ -37,6 +37,15 @@ public class TranslationGridRow
     public int Version { get; set; }
     public DateTime UpdatedAt { get; set; }
 
+    // Tracking original values for dirty detection
+    public string? OriginalComment { get; set; }
+    public bool OriginalIsPlural { get; set; }
+
+    /// <summary>
+    /// Whether the key metadata (Comment, IsPlural) has changed.
+    /// </summary>
+    public bool IsKeyMetadataDirty => Comment != OriginalComment || IsPlural != OriginalIsPlural;
+
     /// <summary>
     /// Translations keyed by "{languageCode}" for non-plural keys,
     /// or "{languageCode}:{pluralForm}" for plural keys.
@@ -145,6 +154,8 @@ public class TranslationGridRow
             Comment = Comment,
             Version = Version,
             UpdatedAt = UpdatedAt,
+            OriginalComment = OriginalComment,
+            OriginalIsPlural = OriginalIsPlural,
             Translations = new Dictionary<string, TranslationCell>()
         };
 
@@ -173,6 +184,8 @@ public class TranslationGridRow
     {
         Comment = source.Comment;
         IsPlural = source.IsPlural;
+        // Note: OriginalComment and OriginalIsPlural are preserved from this row,
+        // not copied from source, so dirty detection works correctly
 
         // Copy translations
         foreach (var kvp in source.Translations)

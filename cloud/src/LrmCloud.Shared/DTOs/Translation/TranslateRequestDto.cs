@@ -70,6 +70,35 @@ public class TranslateRequestDto
     /// Key = resource key name, Value = metadata.
     /// </summary>
     public Dictionary<string, KeyTranslationMetadata>? KeyMetadata { get; set; }
+
+    /// <summary>
+    /// Translation Memory options. Controls TM lookup and storage behavior.
+    /// </summary>
+    public TmOptions? TranslationMemory { get; set; }
+}
+
+/// <summary>
+/// Translation Memory options for translation requests.
+/// </summary>
+public class TmOptions
+{
+    /// <summary>
+    /// Whether to check TM for matches before calling translation provider.
+    /// Default: true
+    /// </summary>
+    public bool UseTm { get; set; } = true;
+
+    /// <summary>
+    /// Whether to store new translations in TM after successful translation.
+    /// Default: true
+    /// </summary>
+    public bool StoreInTm { get; set; } = true;
+
+    /// <summary>
+    /// Minimum match percentage to use from TM (100 = exact only, lower = include fuzzy).
+    /// Default: 100 (exact matches only)
+    /// </summary>
+    public int MinMatchPercent { get; set; } = 100;
 }
 
 /// <summary>
@@ -101,4 +130,9 @@ public class TranslateSingleRequestDto
     public string? Provider { get; set; }
 
     public string? Context { get; set; }
+
+    /// <summary>
+    /// Translation Memory options. Controls TM lookup and storage behavior.
+    /// </summary>
+    public TmOptions? TranslationMemory { get; set; }
 }

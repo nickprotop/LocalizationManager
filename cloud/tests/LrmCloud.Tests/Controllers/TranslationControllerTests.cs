@@ -2,6 +2,7 @@ using System.Security.Claims;
 using LrmCloud.Api.Authorization;
 using LrmCloud.Api.Controllers;
 using LrmCloud.Api.Data;
+using LrmCloud.Api.Services;
 using LrmCloud.Api.Services.Translation;
 using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.DTOs.Translation;
@@ -54,10 +55,14 @@ public class TranslationControllerTests : IDisposable
         _hierarchyService = new ApiKeyHierarchyService(_db, _encryptionService);
 
         var translationLoggerMock = new Mock<ILogger<CloudTranslationService>>();
+        var tmLoggerMock = new Mock<ILogger<TranslationMemoryService>>();
+        var glossaryLoggerMock = new Mock<ILogger<GlossaryService>>();
         var lrmProviderMock = new Mock<ILrmTranslationProvider>();
         lrmProviderMock.Setup(x => x.IsAvailableAsync(It.IsAny<int>())).ReturnsAsync((true, (string?)null));
         lrmProviderMock.Setup(x => x.GetRemainingCharsAsync(It.IsAny<int>())).ReturnsAsync(10000);
-        _translationService = new CloudTranslationService(_db, _hierarchyService, lrmProviderMock.Object, _cloudConfiguration, translationLoggerMock.Object);
+        var tmService = new TranslationMemoryService(_db, tmLoggerMock.Object);
+        var glossaryService = new GlossaryService(_db, glossaryLoggerMock.Object);
+        _translationService = new CloudTranslationService(_db, _hierarchyService, lrmProviderMock.Object, tmService, glossaryService, _cloudConfiguration, translationLoggerMock.Object);
 
         var controllerLoggerMock = new Mock<ILogger<TranslationController>>();
         var authServiceMock = new Mock<ILrmAuthorizationService>();

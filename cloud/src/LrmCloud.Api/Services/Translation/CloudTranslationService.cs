@@ -18,6 +18,8 @@ public class CloudTranslationService : ICloudTranslationService
     private readonly AppDbContext _db;
     private readonly IApiKeyHierarchyService _keyHierarchy;
     private readonly ILrmTranslationProvider _lrmProvider;
+    private readonly TranslationMemoryService _tmService;
+    private readonly GlossaryService _glossaryService;
     private readonly CloudConfiguration _config;
     private readonly ILogger<CloudTranslationService> _logger;
 
@@ -25,12 +27,16 @@ public class CloudTranslationService : ICloudTranslationService
         AppDbContext db,
         IApiKeyHierarchyService keyHierarchy,
         ILrmTranslationProvider lrmProvider,
+        TranslationMemoryService tmService,
+        GlossaryService glossaryService,
         CloudConfiguration config,
         ILogger<CloudTranslationService> logger)
     {
         _db = db;
         _keyHierarchy = keyHierarchy;
         _lrmProvider = lrmProvider;
+        _tmService = tmService;
+        _glossaryService = glossaryService;
         _config = config;
         _logger = logger;
     }
@@ -138,6 +144,29 @@ public class CloudTranslationService : ICloudTranslationService
             // Get source language
             var sourceLanguage = request.SourceLanguage ?? project.DefaultLanguage;
 
+            // Pre-fetch glossary entries for all target languages (only for AI providers)
+            var glossaryContextByLang = new Dictionary<string, string>();
+            var isAiProvider = IsAiProvider(providerName);
+            if (isAiProvider)
+            {
+                foreach (var targetLang in request.TargetLanguages)
+                {
+                    if (targetLang == sourceLanguage) continue;
+
+                    var entries = await _glossaryService.GetEntriesForLanguagePairAsync(
+                        projectId, sourceLanguage, targetLang);
+
+                    if (entries.Any())
+                    {
+                        var context = _glossaryService.BuildGlossaryContext(entries);
+                        if (!string.IsNullOrEmpty(context))
+                        {
+                            glossaryContextByLang[targetLang] = context;
+                        }
+                    }
+                }
+            }
+
             // Get keys to translate
             var keysQuery = _db.ResourceKeys
                 .Include(k => k.Translations)
@@ -221,53 +250,109 @@ public class CloudTranslationService : ICloudTranslationService
 
                     try
                     {
-                        string? translatedText;
+                        string? translatedText = null;
                         bool fromCache = false;
+                        bool fromTm = false;
 
-                        if (isLrmProvider)
+                        // Check Translation Memory first (if enabled)
+                        var useTm = request.TranslationMemory?.UseTm ?? true;
+                        var minMatchPercent = request.TranslationMemory?.MinMatchPercent ?? 100;
+
+                        if (useTm)
                         {
-                            // Determine billable user for LRM quota check
-                            var lrmBillableUserId = await GetBillableUserIdAsync(project, userId);
-
-                            // Use LRM managed provider
-                            var lrmResult = await _lrmProvider.TranslateAsync(
-                                lrmBillableUserId,
-                                sourceText,
-                                sourceLanguage,
-                                targetLang,
-                                request.Context ?? key.Comment);
-
-                            if (!lrmResult.Success)
-                            {
-                                result.Success = false;
-                                result.Error = lrmResult.Error;
-                                response.FailedCount++;
-                                response.Results.Add(result);
-                                continue;
-                            }
-
-                            translatedText = lrmResult.TranslatedText;
-                            fromCache = lrmResult.FromCache;
-                        }
-                        else
-                        {
-                            // Use BYOK provider
-                            var translationRequest = new TranslationRequest
+                            var tmLookup = await _tmService.LookupAsync(userId, new Shared.DTOs.TranslationMemory.TmLookupRequest
                             {
                                 SourceText = sourceText,
                                 SourceLanguage = sourceLanguage,
                                 TargetLanguage = targetLang,
-                                Context = request.Context ?? key.Comment
-                            };
+                                MinMatchPercent = minMatchPercent,
+                                MaxResults = 1,
+                                OrganizationId = project.OrganizationId
+                            });
 
-                            var translationResponse = await provider!.TranslateAsync(translationRequest);
-                            translatedText = translationResponse.TranslatedText;
-                            fromCache = translationResponse.FromCache;
+                            if (tmLookup.HasExactMatch || (minMatchPercent < 100 && tmLookup.Matches.Any()))
+                            {
+                                // Use TM match - no API call needed!
+                                var tmMatch = tmLookup.Matches.First();
+                                translatedText = tmMatch.TranslatedText;
+                                fromCache = true;
+                                fromTm = true;
+
+                                // Increment use count - must await to avoid DbContext concurrency issues
+                                await _tmService.IncrementUseCountAsync(tmMatch.Id);
+
+                                _logger.LogDebug("TM match ({MatchPercent}%) for {Key} ({SourceLang}->{TargetLang})",
+                                    tmMatch.MatchPercent, key.KeyName, sourceLanguage, targetLang);
+                            }
+                        }
+
+                        // Only call provider if TM didn't have a match
+                        if (!fromTm)
+                        {
+                            if (isLrmProvider)
+                            {
+                                // Determine billable user for LRM quota check
+                                var lrmBillableUserId = await GetBillableUserIdAsync(project, userId);
+
+                                // Use LRM managed provider
+                                var lrmResult = await _lrmProvider.TranslateAsync(
+                                    lrmBillableUserId,
+                                    sourceText,
+                                    sourceLanguage,
+                                    targetLang,
+                                    request.Context ?? key.Comment);
+
+                                if (!lrmResult.Success)
+                                {
+                                    result.Success = false;
+                                    result.Error = lrmResult.Error;
+                                    response.FailedCount++;
+                                    response.Results.Add(result);
+                                    continue;
+                                }
+
+                                translatedText = lrmResult.TranslatedText;
+                                fromCache = lrmResult.FromCache;
+                            }
+                            else
+                            {
+                                // Use BYOK provider
+                                // Build context with glossary for AI providers
+                                var baseContext = request.Context ?? key.Comment;
+                                var contextWithGlossary = baseContext;
+
+                                if (glossaryContextByLang.TryGetValue(targetLang, out var glossaryContext))
+                                {
+                                    // Prepend glossary context to existing context
+                                    contextWithGlossary = string.IsNullOrEmpty(baseContext)
+                                        ? glossaryContext
+                                        : $"{glossaryContext}\n\n{baseContext}";
+                                }
+
+                                var translationRequest = new TranslationRequest
+                                {
+                                    SourceText = sourceText,
+                                    SourceLanguage = sourceLanguage,
+                                    TargetLanguage = targetLang,
+                                    Context = contextWithGlossary
+                                };
+
+                                var translationResponse = await provider!.TranslateAsync(translationRequest);
+                                translatedText = translationResponse.TranslatedText;
+                                fromCache = translationResponse.FromCache;
+                            }
                         }
 
                         result.TranslatedText = translatedText ?? string.Empty;
                         result.Success = true;
                         result.FromCache = fromCache;
+                        result.FromTm = fromTm;
+
+                        // Track TM usage separately
+                        if (fromTm)
+                        {
+                            response.TmCount++;
+                        }
 
                         // Only save to database if requested (default for CLI, skip for UI preview)
                         if (request.SaveToDatabase)
@@ -293,6 +378,29 @@ public class CloudTranslationService : ICloudTranslationService
 
                         response.TranslatedCount++;
                         response.CharactersTranslated += sourceText.Length;
+
+                        // Store to Translation Memory (unless it came from TM or storage is disabled)
+                        var storeInTm = request.TranslationMemory?.StoreInTm ?? true;
+                        if (storeInTm && !fromTm && !string.IsNullOrEmpty(translatedText))
+                        {
+                            try
+                            {
+                                await _tmService.StoreAsync(userId, new Shared.DTOs.TranslationMemory.TmStoreRequest
+                                {
+                                    SourceText = sourceText,
+                                    TranslatedText = translatedText,
+                                    SourceLanguage = sourceLanguage,
+                                    TargetLanguage = targetLang,
+                                    Context = $"{project.Name}:{key.KeyName}",
+                                    OrganizationId = project.OrganizationId
+                                });
+                            }
+                            catch (Exception tmEx)
+                            {
+                                // Log but don't fail the translation
+                                _logger.LogWarning(tmEx, "Failed to store translation in TM for {Key}", key.KeyName);
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -385,6 +493,41 @@ public class CloudTranslationService : ICloudTranslationService
             var isLrmProvider = providerName.Equals("lrm", StringComparison.OrdinalIgnoreCase);
             response.Provider = providerName;
 
+            // Check Translation Memory first (if enabled)
+            var useTm = request.TranslationMemory?.UseTm ?? true;
+            var minMatchPercent = request.TranslationMemory?.MinMatchPercent ?? 100;
+
+            if (useTm)
+            {
+                var tmLookup = await _tmService.LookupAsync(userId, new Shared.DTOs.TranslationMemory.TmLookupRequest
+                {
+                    SourceText = request.Text,
+                    SourceLanguage = request.SourceLanguage,
+                    TargetLanguage = request.TargetLanguage,
+                    MinMatchPercent = minMatchPercent,
+                    MaxResults = 1,
+                    OrganizationId = organizationId
+                });
+
+                if (tmLookup.HasExactMatch || (minMatchPercent < 100 && tmLookup.Matches.Any()))
+                {
+                    // Use TM match - no API call needed!
+                    var tmMatch = tmLookup.Matches.First();
+                    response.Success = true;
+                    response.TranslatedText = tmMatch.TranslatedText;
+                    response.FromCache = true;
+                    response.FromTm = true;
+
+                    // Increment use count (fire and forget)
+                    _ = _tmService.IncrementUseCountAsync(tmMatch.Id);
+
+                    _logger.LogDebug("TM match ({MatchPercent}%) for single translation ({SourceLang}->{TargetLang})",
+                        tmMatch.MatchPercent, request.SourceLanguage, request.TargetLanguage);
+
+                    return response;
+                }
+            }
+
             if (isLrmProvider)
             {
                 // Determine billable user for LRM quota check
@@ -426,12 +569,31 @@ public class CloudTranslationService : ICloudTranslationService
                     return response;
                 }
 
+                // Build context with glossary for AI providers
+                var contextWithGlossary = request.Context;
+                if (IsAiProvider(providerName) && projectId.HasValue)
+                {
+                    var entries = await _glossaryService.GetEntriesForLanguagePairAsync(
+                        projectId.Value, request.SourceLanguage, request.TargetLanguage);
+
+                    if (entries.Any())
+                    {
+                        var glossaryContext = _glossaryService.BuildGlossaryContext(entries);
+                        if (!string.IsNullOrEmpty(glossaryContext))
+                        {
+                            contextWithGlossary = string.IsNullOrEmpty(request.Context)
+                                ? glossaryContext
+                                : $"{glossaryContext}\n\n{request.Context}";
+                        }
+                    }
+                }
+
                 var translationRequest = new TranslationRequest
                 {
                     SourceText = request.Text,
                     SourceLanguage = request.SourceLanguage,
                     TargetLanguage = request.TargetLanguage,
-                    Context = request.Context
+                    Context = contextWithGlossary
                 };
 
                 var result = await provider.TranslateAsync(translationRequest);
@@ -473,6 +635,29 @@ public class CloudTranslationService : ICloudTranslationService
                 {
                     // No project context - bill acting user
                     await TrackLrmUsageAsync(userId, request.Text.Length);
+                }
+            }
+
+            // Store to Translation Memory if successful (and storage is enabled)
+            var storeInTm = request.TranslationMemory?.StoreInTm ?? true;
+            if (storeInTm && response.Success && !string.IsNullOrEmpty(response.TranslatedText))
+            {
+                try
+                {
+                    await _tmService.StoreAsync(userId, new Shared.DTOs.TranslationMemory.TmStoreRequest
+                    {
+                        SourceText = request.Text,
+                        TranslatedText = response.TranslatedText,
+                        SourceLanguage = request.SourceLanguage,
+                        TargetLanguage = request.TargetLanguage,
+                        Context = request.Context,
+                        OrganizationId = organizationId
+                    });
+                }
+                catch (Exception tmEx)
+                {
+                    // Log but don't fail the translation
+                    _logger.LogWarning(tmEx, "Failed to store single translation in TM");
                 }
             }
         }
