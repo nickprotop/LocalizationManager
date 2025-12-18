@@ -1,0 +1,212 @@
+@page "/settings/translation-memory"
+@using LrmCloud.Shared.DTOs.TranslationMemory
+@using LrmCloud.Web.Services
+@inject TranslationMemoryService TmService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@attribute [Authorize]
+
+<PageTitle>Translation Memory - LRM Cloud</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">
+    <MudIcon Icon="@Icons.Material.Filled.Memory" Class="mr-2" Style="vertical-align: middle;" />
+    Translation Memory
+</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    Your personal translation memory stores past translations for reuse. Get exact and fuzzy matches automatically.
+</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_stats == null)
+{
+    <MudAlert Severity="Severity.Error">Failed to load Translation Memory statistics.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        @* Stats Overview *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Analytics" Class="mr-2" Style="vertical-align: middle;" />
+                    Statistics
+                </MudText>
+
+                <MudStack Spacing="3">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                        <MudText>Total Entries</MudText>
+                        <MudText Typo="Typo.h6">@_stats.TotalEntries.ToString("N0")</MudText>
+                    </MudStack>
+
+                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                        <MudText>Total Uses</MudText>
+                        <MudText Typo="Typo.h6" Color="Color.Success">@_stats.TotalUseCount.ToString("N0")</MudText>
+                    </MudStack>
+
+                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                        <MudText>Language Pairs</MudText>
+                        <MudText Typo="Typo.h6">@_stats.LanguagePairs.Count</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        @* Actions *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" Style="vertical-align: middle;" />
+                    Actions
+                </MudText>
+
+                <MudStack Spacing="2">
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                        Translation Memory automatically stores translations as you work.
+                        Suggestions appear when you translate similar content.
+                    </MudAlert>
+
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Error"
+                               StartIcon="@Icons.Material.Filled.DeleteForever"
+                               OnClick="ConfirmClearAll"
+                               Disabled="@(_stats.TotalEntries == 0)">
+                        Clear All TM Data
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        @* Language Pairs *@
+        @if (_stats.LanguagePairs.Any())
+        {
+            <MudItem xs="12">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.h6" Class="mb-4">
+                        <MudIcon Icon="@Icons.Material.Filled.Language" Class="mr-2" Style="vertical-align: middle;" />
+                        Language Pairs
+                    </MudText>
+
+                    <MudTable Items="_stats.LanguagePairs" Hover="true" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Source</MudTh>
+                            <MudTh>Target</MudTh>
+                            <MudTh Style="text-align: right">Entries</MudTh>
+                            <MudTh Style="text-align: right">Uses</MudTh>
+                            <MudTh>Actions</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <MudChip T="string" Size="Size.Small">@context.SourceLanguage.ToUpperInvariant()</MudChip>
+                            </MudTd>
+                            <MudTd>
+                                <MudChip T="string" Size="Size.Small">@context.TargetLanguage.ToUpperInvariant()</MudChip>
+                            </MudTd>
+                            <MudTd Style="text-align: right">@context.EntryCount.ToString("N0")</MudTd>
+                            <MudTd Style="text-align: right">@context.UseCount.ToString("N0")</MudTd>
+                            <MudTd>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="@(() => ConfirmClearPair(context))" />
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private TmStatsDto? _stats;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatsAsync();
+    }
+
+    private async Task LoadStatsAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await TmService.GetStatsAsync();
+            if (result.IsSuccess)
+            {
+                _stats = result.Data;
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to load TM stats", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ConfirmClearAll()
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Clear Translation Memory",
+            "Are you sure you want to delete all Translation Memory entries? This cannot be undone.",
+            yesText: "Delete All",
+            cancelText: "Cancel");
+
+        if (result == true)
+        {
+            await ClearAllAsync();
+        }
+    }
+
+    private async Task ClearAllAsync()
+    {
+        var result = await TmService.ClearAsync();
+        if (result.IsSuccess)
+        {
+            Snackbar.Add($"Cleared {result.Data} TM entries", Severity.Success);
+            await LoadStatsAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Failed to clear TM", Severity.Error);
+        }
+    }
+
+    private async Task ConfirmClearPair(TmLanguagePairStats pair)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Clear Language Pair",
+            $"Delete all {pair.EntryCount} entries for {pair.SourceLanguage.ToUpperInvariant()} -> {pair.TargetLanguage.ToUpperInvariant()}?",
+            yesText: "Delete",
+            cancelText: "Cancel");
+
+        if (result == true)
+        {
+            await ClearPairAsync(pair);
+        }
+    }
+
+    private async Task ClearPairAsync(TmLanguagePairStats pair)
+    {
+        var result = await TmService.ClearAsync(pair.SourceLanguage, pair.TargetLanguage);
+        if (result.IsSuccess)
+        {
+            Snackbar.Add($"Cleared {result.Data} entries for {pair.SourceLanguage} -> {pair.TargetLanguage}", Severity.Success);
+            await LoadStatsAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Failed to clear language pair", Severity.Error);
+        }
+    }
+}
