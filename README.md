@@ -39,6 +39,31 @@ Manage localization directly in VS Code with real-time diagnostics, code scannin
 ext install nickprotop.localization-manager
 ```
 
+### LRM Cloud
+
+![LRM Cloud Dashboard](assets/cloud-dashboard.png)
+
+**👉 [Try LRM Cloud Free →](https://lrm-cloud.com)**
+
+Cloud platform for team-based localization management with web dashboard and CLI sync.
+
+**Features:**
+- Web-based translation editor with real-time collaboration
+- Team management with role-based access (Owner, Admin, Member, Viewer)
+- 10 translation providers (free + paid + bring your own keys)
+- Git-style CLI sync: `lrm push` / `lrm pull`
+- Usage tracking and analytics
+- REST API for custom integrations
+
+**Plans:**
+| Plan | Price | Translation Credits | Projects | Team |
+|------|-------|---------------------|----------|------|
+| Free | $0/mo | 5K chars | 3 | Solo |
+| Team | $9/mo | 50K chars | Unlimited | 10 members |
+| Enterprise | $29/mo | 500K chars | Unlimited | Unlimited |
+
+*BYOK (Bring Your Own Keys) available on all plans with higher limits*
+
 ---
 
 ## Why This Tool Exists
