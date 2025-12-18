@@ -223,7 +223,18 @@ public class MinioStorageService : IStorageService
             throw new ArgumentException("File path cannot be empty", nameof(filePath));
         }
 
-        // Normalize path separators first (handle both Windows and Unix paths)
+        // Security: Decode URL-encoded characters to catch double-encoding attacks
+        // e.g., %252e%252e -> %2e%2e -> .. (path traversal attempt)
+        var decodedPath = Uri.UnescapeDataString(filePath);
+
+        // Keep decoding until no more changes (handles triple+ encoding)
+        while (decodedPath != filePath)
+        {
+            filePath = decodedPath;
+            decodedPath = Uri.UnescapeDataString(filePath);
+        }
+
+        // Normalize path separators (handle both Windows and Unix paths)
         filePath = filePath.Replace('\\', '/');
 
         // Remove leading slash if present
@@ -236,7 +247,6 @@ public class MinioStorageService : IStorageService
         var segments = fullPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
         // Security: Check for path traversal in ALL segments
-        // This catches: "..", ".", encoded variants after URL decoding, etc.
         foreach (var segment in segments)
         {
             if (segment == ".." || segment == ".")
@@ -244,10 +254,16 @@ public class MinioStorageService : IStorageService
                 throw new ArgumentException("Invalid file path: path traversal not allowed", nameof(filePath));
             }
 
-            // Also check for null bytes or other suspicious characters
+            // Check for null bytes or other suspicious characters
             if (segment.Contains('\0'))
             {
                 throw new ArgumentException("Invalid file path: null bytes not allowed", nameof(filePath));
+            }
+
+            // Check for URL-encoded sequences that shouldn't be in final path
+            if (segment.Contains('%'))
+            {
+                throw new ArgumentException("Invalid file path: encoded characters not allowed", nameof(filePath));
             }
         }
 
