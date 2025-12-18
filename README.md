@@ -7,6 +7,7 @@
 [![GitHub Issues](https://img.shields.io/github/issues/nickprotop/LocalizationManager)](https://github.com/nickprotop/LocalizationManager/issues)
 [![GitHub Stars](https://img.shields.io/github/stars/nickprotop/LocalizationManager?style=social)](https://github.com/nickprotop/LocalizationManager)
 [![GitHub Discussions](https://img.shields.io/github/discussions/nickprotop/LocalizationManager)](https://github.com/nickprotop/LocalizationManager/discussions)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?logo=buy-me-a-coffee&logoColor=white)](https://buymeacoffee.com/nickprotop)
 
 **A powerful, Linux-native command-line tool for managing .NET `.resx` localization files with an interactive Terminal UI and Web UI.**
 
@@ -638,6 +639,10 @@ MIT License - see [LICENSE](LICENSE) for details.
 - **Issues:** [GitHub Issues](https://github.com/nickprotop/LocalizationManager/issues)
 - **Discussions:** [GitHub Discussions](https://github.com/nickprotop/LocalizationManager/discussions)
 - **Documentation:** [Full Documentation](https://github.com/nickprotop/LocalizationManager/tree/main)
+
+If you find this project useful, consider supporting its development:
+
+<a href="https://buymeacoffee.com/nickprotop" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50"></a>
 
 ---
 
