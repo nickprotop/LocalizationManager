@@ -138,6 +138,10 @@ public class BillingService : IBillingService
                 MaxProjects = limits.FreeMaxProjects,
                 MaxTeamMembers = 0,
                 MaxApiKeys = limits.FreeMaxApiKeys,
+                MaxSnapshots = limits.FreeMaxSnapshots,
+                SnapshotRetentionDays = limits.FreeSnapshotRetentionDays,
+                MaxStorageBytes = limits.FreeMaxStorageBytes,
+                MaxFileSizeBytes = limits.FreeMaxFileSizeBytes,
                 Price = 0
             },
             Team = new PlanTierLimits
@@ -147,6 +151,10 @@ public class BillingService : IBillingService
                 MaxProjects = int.MaxValue,
                 MaxTeamMembers = limits.TeamMaxMembers,
                 MaxApiKeys = limits.TeamMaxApiKeys,
+                MaxSnapshots = limits.TeamMaxSnapshots,
+                SnapshotRetentionDays = limits.TeamSnapshotRetentionDays,
+                MaxStorageBytes = limits.TeamMaxStorageBytes,
+                MaxFileSizeBytes = limits.TeamMaxFileSizeBytes,
                 Price = 9
             },
             Enterprise = new PlanTierLimits
@@ -156,6 +164,10 @@ public class BillingService : IBillingService
                 MaxProjects = int.MaxValue,
                 MaxTeamMembers = int.MaxValue,
                 MaxApiKeys = int.MaxValue,
+                MaxSnapshots = limits.EnterpriseMaxSnapshots,
+                SnapshotRetentionDays = limits.EnterpriseSnapshotRetentionDays,
+                MaxStorageBytes = limits.EnterpriseMaxStorageBytes,
+                MaxFileSizeBytes = limits.EnterpriseMaxFileSizeBytes,
                 Price = 29
             }
         };

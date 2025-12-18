@@ -3,6 +3,7 @@ using LocalizationManager.Core.Backends;
 using LocalizationManager.Core.Configuration;
 using LocalizationManager.Core.Models;
 using LrmCloud.Api.Data;
+using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.DTOs.Sync;
 using LrmCloud.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -20,11 +21,7 @@ public class ResourceSyncService
     private readonly AppDbContext _db;
     private readonly ILogger<ResourceSyncService> _logger;
     private readonly IStorageService _storageService;
-
-    /// <summary>
-    /// Maximum allowed file size in bytes (5MB).
-    /// </summary>
-    private const int MaxFileSizeBytes = 5_242_880;
+    private readonly LimitsConfiguration _limits;
 
     /// <summary>
     /// Allowed file extensions for upload.
@@ -37,19 +34,22 @@ public class ResourceSyncService
     public ResourceSyncService(
         AppDbContext db,
         ILogger<ResourceSyncService> logger,
-        IStorageService storageService)
+        IStorageService storageService,
+        CloudConfiguration config)
     {
         _db = db;
         _logger = logger;
         _storageService = storageService;
+        _limits = config.Limits;
     }
 
     /// <summary>
     /// Validates a file for security and format compliance.
     /// </summary>
     /// <param name="file">File to validate.</param>
+    /// <param name="plan">User's plan for size limits.</param>
     /// <exception cref="ArgumentException">Thrown when validation fails.</exception>
-    private void ValidateFile(FileDto file)
+    private void ValidateFile(FileDto file, string plan)
     {
         // Check file path is not empty
         if (string.IsNullOrWhiteSpace(file.Path))
@@ -65,11 +65,13 @@ public class ResourceSyncService
                 $"File type '{extension}' is not allowed. Only .resx and .json files are supported.");
         }
 
-        // Check file size
-        if (file.Content.Length > MaxFileSizeBytes)
+        // Check file size against plan-based limit
+        var maxFileSizeBytes = _limits.GetMaxFileSizeBytes(plan);
+        if (file.Content.Length > maxFileSizeBytes)
         {
+            var maxMB = maxFileSizeBytes / 1024 / 1024;
             throw new ArgumentException(
-                $"File '{file.Path}' exceeds maximum size of {MaxFileSizeBytes / 1024 / 1024}MB");
+                $"File '{file.Path}' exceeds maximum size of {maxMB}MB for your plan.");
         }
 
         // Validate content matches the file type
@@ -129,15 +131,43 @@ public class ResourceSyncService
     /// Stores uploaded files to S3/Minio for historical archive.
     /// Also maintains a "current/" folder with the latest version of all files for snapshots.
     /// </summary>
-    public async Task StoreUploadedFilesAsync(int projectId, List<FileDto> files)
+    /// <param name="projectId">Project ID.</param>
+    /// <param name="files">Files to upload.</param>
+    /// <param name="userId">User ID for plan-based limits.</param>
+    public async Task StoreUploadedFilesAsync(int projectId, List<FileDto> files, int userId)
     {
         if (files.Count == 0)
             return;
 
-        // Validate all files before processing
+        // Get user's plan for limit checks
+        var user = await _db.Users.FindAsync(userId);
+        var plan = user?.Plan ?? "free";
+
+        // Calculate total size of new files
+        var newFilesSize = files.Sum(f => (long)System.Text.Encoding.UTF8.GetByteCount(f.Content));
+
+        // Get user's current storage usage
+        var userProjectIds = await _db.Projects
+            .Where(p => p.UserId == userId)
+            .Select(p => p.Id)
+            .ToListAsync();
+        var currentStorageUsed = await _storageService.GetTotalStorageSizeAsync(userProjectIds);
+
+        // Check storage limit
+        var maxStorageBytes = _limits.GetMaxStorageBytes(plan);
+        if (currentStorageUsed + newFilesSize > maxStorageBytes)
+        {
+            var usedMB = currentStorageUsed / 1024.0 / 1024.0;
+            var limitMB = maxStorageBytes / 1024.0 / 1024.0;
+            throw new InvalidOperationException(
+                $"Storage limit exceeded. Used: {usedMB:F1}MB, Limit: {limitMB:F0}MB. " +
+                "Delete files/snapshots or upgrade your plan.");
+        }
+
+        // Validate all files before processing (including per-file size limit)
         foreach (var file in files)
         {
-            ValidateFile(file);
+            ValidateFile(file, plan);
         }
 
         var uploadTimestamp = DateTime.UtcNow;

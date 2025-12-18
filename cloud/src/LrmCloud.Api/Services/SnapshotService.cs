@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using LrmCloud.Api.Data;
+using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.DTOs;
 using LrmCloud.Shared.DTOs.Snapshots;
 using LrmCloud.Shared.Entities;
@@ -16,15 +17,18 @@ public class SnapshotService
     private readonly AppDbContext _db;
     private readonly IStorageService _storageService;
     private readonly ILogger<SnapshotService> _logger;
+    private readonly LimitsConfiguration _limits;
 
     public SnapshotService(
         AppDbContext db,
         IStorageService storageService,
-        ILogger<SnapshotService> logger)
+        ILogger<SnapshotService> logger,
+        CloudConfiguration config)
     {
         _db = db;
         _storageService = storageService;
         _logger = logger;
+        _limits = config.Limits;
     }
 
     /// <summary>
@@ -45,6 +49,30 @@ public class SnapshotService
         string snapshotType,
         string? description = null)
     {
+        // Get project with user to check plan limits
+        var project = await _db.Projects
+            .Include(p => p.User)
+            .FirstOrDefaultAsync(p => p.Id == projectId);
+
+        if (project == null)
+        {
+            throw new InvalidOperationException($"Project {projectId} not found");
+        }
+
+        var plan = project.User?.Plan ?? "free";
+        var maxSnapshots = _limits.GetMaxSnapshots(plan);
+
+        // Check snapshot count limit BEFORE creating
+        var currentSnapshotCount = await _db.Set<Snapshot>()
+            .CountAsync(s => s.ProjectId == projectId);
+
+        if (currentSnapshotCount >= maxSnapshots)
+        {
+            throw new InvalidOperationException(
+                $"Snapshot limit reached ({currentSnapshotCount}/{maxSnapshots}). " +
+                "Delete older snapshots or upgrade your plan.");
+        }
+
         var snapshotId = GenerateSnapshotId();
         var storagePath = $"snapshots/{snapshotId}/";
 
@@ -76,12 +104,9 @@ public class SnapshotService
         _db.Set<Snapshot>().Add(snapshot);
         await _db.SaveChangesAsync();
 
-        // Apply retention policy if configured
-        var project = await _db.Projects.FindAsync(projectId);
-        if (project != null)
-        {
-            await ApplyRetentionPolicyAsync(projectId, project.SnapshotRetentionDays, project.MaxSnapshots);
-        }
+        // Apply plan-based retention policy
+        var retentionDays = _limits.GetSnapshotRetentionDays(plan);
+        await ApplyRetentionPolicyAsync(projectId, retentionDays, maxSnapshots);
 
         _logger.LogInformation("Created snapshot {SnapshotId} for project {ProjectId} with {Keys} keys by user {UserId}",
             snapshotId, projectId, dbState.Keys.Count, userId);
@@ -456,51 +481,45 @@ public class SnapshotService
     /// <summary>
     /// Applies retention policy by deleting old snapshots.
     /// </summary>
-    private async Task ApplyRetentionPolicyAsync(int projectId, int? retentionDays, int? maxSnapshots)
+    private async Task ApplyRetentionPolicyAsync(int projectId, int retentionDays, int maxSnapshots)
     {
         // Delete snapshots older than retention period
-        if (retentionDays.HasValue)
+        var cutoffDate = DateTime.UtcNow.AddDays(-retentionDays);
+        var oldSnapshots = await _db.Set<Snapshot>()
+            .Where(s => s.ProjectId == projectId && s.CreatedAt < cutoffDate)
+            .ToListAsync();
+
+        foreach (var snapshot in oldSnapshots)
         {
-            var cutoffDate = DateTime.UtcNow.AddDays(-retentionDays.Value);
-            var oldSnapshots = await _db.Set<Snapshot>()
-                .Where(s => s.ProjectId == projectId && s.CreatedAt < cutoffDate)
-                .ToListAsync();
+            await _storageService.DeleteSnapshotAsync(projectId, snapshot.SnapshotId);
+            _db.Set<Snapshot>().Remove(snapshot);
+        }
 
-            foreach (var snapshot in oldSnapshots)
-            {
-                await _storageService.DeleteSnapshotAsync(projectId, snapshot.SnapshotId);
-                _db.Set<Snapshot>().Remove(snapshot);
-            }
-
-            if (oldSnapshots.Count > 0)
-            {
-                await _db.SaveChangesAsync();
-                _logger.LogInformation("Deleted {Count} old snapshots for project {ProjectId} (retention: {Days} days)",
-                    oldSnapshots.Count, projectId, retentionDays.Value);
-            }
+        if (oldSnapshots.Count > 0)
+        {
+            await _db.SaveChangesAsync();
+            _logger.LogInformation("Deleted {Count} old snapshots for project {ProjectId} (retention: {Days} days)",
+                oldSnapshots.Count, projectId, retentionDays);
         }
 
         // Keep only maxSnapshots most recent
-        if (maxSnapshots.HasValue)
+        var excessSnapshots = await _db.Set<Snapshot>()
+            .Where(s => s.ProjectId == projectId)
+            .OrderByDescending(s => s.CreatedAt)
+            .Skip(maxSnapshots)
+            .ToListAsync();
+
+        foreach (var snapshot in excessSnapshots)
         {
-            var excessSnapshots = await _db.Set<Snapshot>()
-                .Where(s => s.ProjectId == projectId)
-                .OrderByDescending(s => s.CreatedAt)
-                .Skip(maxSnapshots.Value)
-                .ToListAsync();
+            await _storageService.DeleteSnapshotAsync(projectId, snapshot.SnapshotId);
+            _db.Set<Snapshot>().Remove(snapshot);
+        }
 
-            foreach (var snapshot in excessSnapshots)
-            {
-                await _storageService.DeleteSnapshotAsync(projectId, snapshot.SnapshotId);
-                _db.Set<Snapshot>().Remove(snapshot);
-            }
-
-            if (excessSnapshots.Count > 0)
-            {
-                await _db.SaveChangesAsync();
-                _logger.LogInformation("Deleted {Count} excess snapshots for project {ProjectId} (max: {Max})",
-                    excessSnapshots.Count, projectId, maxSnapshots.Value);
-            }
+        if (excessSnapshots.Count > 0)
+        {
+            await _db.SaveChangesAsync();
+            _logger.LogInformation("Deleted {Count} excess snapshots for project {ProjectId} (max: {Max})",
+                excessSnapshots.Count, projectId, maxSnapshots);
         }
     }
 

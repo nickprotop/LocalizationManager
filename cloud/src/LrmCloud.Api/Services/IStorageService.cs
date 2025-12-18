@@ -88,4 +88,18 @@ public interface IStorageService
     /// <param name="projectId">Project ID</param>
     /// <param name="snapshotId">Snapshot identifier</param>
     Task DeleteSnapshotAsync(int projectId, string snapshotId);
+
+    /// <summary>
+    /// Gets the total storage size for a project in bytes.
+    /// </summary>
+    /// <param name="projectId">Project ID</param>
+    /// <returns>Total size in bytes</returns>
+    Task<long> GetProjectStorageSizeAsync(int projectId);
+
+    /// <summary>
+    /// Gets the total storage size for multiple projects in bytes.
+    /// </summary>
+    /// <param name="projectIds">List of project IDs</param>
+    /// <returns>Total size in bytes across all projects</returns>
+    Task<long> GetTotalStorageSizeAsync(IEnumerable<int> projectIds);
 }

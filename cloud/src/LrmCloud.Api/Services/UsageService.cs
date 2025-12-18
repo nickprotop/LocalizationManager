@@ -14,12 +14,18 @@ public class UsageService : IUsageService
     private readonly AppDbContext _db;
     private readonly ILogger<UsageService> _logger;
     private readonly LimitsConfiguration _limits;
+    private readonly IStorageService _storageService;
 
-    public UsageService(AppDbContext db, ILogger<UsageService> logger, CloudConfiguration config)
+    public UsageService(
+        AppDbContext db,
+        ILogger<UsageService> logger,
+        CloudConfiguration config,
+        IStorageService storageService)
     {
         _db = db;
         _logger = logger;
         _limits = config.Limits;
+        _storageService = storageService;
     }
 
     public async Task<UsageStatsDto> GetUserStatsAsync(int userId)
@@ -63,6 +69,27 @@ public class UsageService : IUsageService
                        (k.ExpiresAt == null || k.ExpiresAt > DateTime.UtcNow))
             .CountAsync();
 
+        // Get storage size from MinIO for all user's projects
+        var userProjectIds = await _db.Projects
+            .Where(p => p.UserId == userId)
+            .Select(p => p.Id)
+            .ToListAsync();
+
+        var storageBytesUsed = 0L;
+        try
+        {
+            storageBytesUsed = await _storageService.GetTotalStorageSizeAsync(userProjectIds);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get storage size for user {UserId}", userId);
+        }
+
+        // Count total snapshots across all user's projects
+        var totalSnapshotCount = await _db.Snapshots
+            .Where(s => userProjectIds.Contains(s.ProjectId))
+            .CountAsync();
+
         return new UsageStatsDto
         {
             // LRM Translation usage (counts against plan)
@@ -84,7 +111,15 @@ public class UsageService : IUsageService
             // Plan limits
             MaxProjects = _limits.GetMaxProjects(user.Plan),
             MaxApiKeys = _limits.GetMaxApiKeys(user.Plan),
-            MaxTeamMembers = _limits.GetMaxTeamMembers(user.Plan)
+            MaxTeamMembers = _limits.GetMaxTeamMembers(user.Plan),
+            // Storage stats (calculated from MinIO)
+            StorageBytesUsed = storageBytesUsed,
+            StorageBytesLimit = _limits.GetMaxStorageBytes(user.Plan),
+            // Snapshot stats
+            TotalSnapshotCount = totalSnapshotCount,
+            MaxSnapshots = _limits.GetMaxSnapshots(user.Plan),
+            SnapshotRetentionDays = _limits.GetSnapshotRetentionDays(user.Plan),
+            MaxFileSizeBytes = _limits.GetMaxFileSizeBytes(user.Plan)
         };
     }
 
@@ -112,8 +147,17 @@ public class UsageService : IUsageService
 
         var owner = org.Owner;
 
-        // Storage tracking not implemented yet - return 0
+        // Get storage from MinIO for all org projects
+        var orgProjectIds = org.Projects.Select(p => p.Id).ToList();
         var storageBytes = 0L;
+        try
+        {
+            storageBytes = await _storageService.GetTotalStorageSizeAsync(orgProjectIds);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get storage size for organization {OrganizationId}", organizationId);
+        }
 
         // Calculate days remaining in billing cycle (reset on 1st of month)
         var now = DateTime.UtcNow;

@@ -493,6 +493,106 @@ public sealed class LimitsConfiguration
     public long EnterpriseOtherChars { get; init; } = 2_500_000; // 2.5M/month
 
     // ==========================================================================
+    // Snapshot Limits per Plan (per project)
+    // ==========================================================================
+
+    /// <summary>
+    /// Free tier: Maximum snapshots per project.
+    /// Default: 3 snapshots.
+    /// </summary>
+    [Range(1, 100)]
+    public int FreeMaxSnapshots { get; init; } = 3;
+
+    /// <summary>
+    /// Team tier: Maximum snapshots per project.
+    /// Default: 10 snapshots.
+    /// </summary>
+    [Range(1, 100)]
+    public int TeamMaxSnapshots { get; init; } = 10;
+
+    /// <summary>
+    /// Enterprise tier: Maximum snapshots per project.
+    /// Default: 30 snapshots.
+    /// </summary>
+    [Range(1, 100)]
+    public int EnterpriseMaxSnapshots { get; init; } = 30;
+
+    // ==========================================================================
+    // Snapshot Retention Days per Plan
+    // ==========================================================================
+
+    /// <summary>
+    /// Free tier: Snapshot retention in days.
+    /// Default: 7 days.
+    /// </summary>
+    [Range(1, 365)]
+    public int FreeSnapshotRetentionDays { get; init; } = 7;
+
+    /// <summary>
+    /// Team tier: Snapshot retention in days.
+    /// Default: 30 days.
+    /// </summary>
+    [Range(1, 365)]
+    public int TeamSnapshotRetentionDays { get; init; } = 30;
+
+    /// <summary>
+    /// Enterprise tier: Snapshot retention in days.
+    /// Default: 90 days.
+    /// </summary>
+    [Range(1, 365)]
+    public int EnterpriseSnapshotRetentionDays { get; init; } = 90;
+
+    // ==========================================================================
+    // Storage Limits per Plan (bytes per ACCOUNT, not per project)
+    // ==========================================================================
+
+    /// <summary>
+    /// Free tier: Maximum storage in bytes per account.
+    /// Default: 25 MB.
+    /// </summary>
+    [Range(1, long.MaxValue)]
+    public long FreeMaxStorageBytes { get; init; } = 26_214_400; // 25 MB
+
+    /// <summary>
+    /// Team tier: Maximum storage in bytes per account.
+    /// Default: 250 MB.
+    /// </summary>
+    [Range(1, long.MaxValue)]
+    public long TeamMaxStorageBytes { get; init; } = 262_144_000; // 250 MB
+
+    /// <summary>
+    /// Enterprise tier: Maximum storage in bytes per account.
+    /// Default: 500 MB.
+    /// </summary>
+    [Range(1, long.MaxValue)]
+    public long EnterpriseMaxStorageBytes { get; init; } = 524_288_000; // 500 MB
+
+    // ==========================================================================
+    // File Size Limits per Plan (bytes)
+    // ==========================================================================
+
+    /// <summary>
+    /// Free tier: Maximum file size in bytes.
+    /// Default: 1 MB.
+    /// </summary>
+    [Range(1, 100_000_000)]
+    public int FreeMaxFileSizeBytes { get; init; } = 1_048_576; // 1 MB
+
+    /// <summary>
+    /// Team tier: Maximum file size in bytes.
+    /// Default: 2 MB.
+    /// </summary>
+    [Range(1, 100_000_000)]
+    public int TeamMaxFileSizeBytes { get; init; } = 2_097_152; // 2 MB
+
+    /// <summary>
+    /// Enterprise tier: Maximum file size in bytes.
+    /// Default: 5 MB.
+    /// </summary>
+    [Range(1, 100_000_000)]
+    public int EnterpriseMaxFileSizeBytes { get; init; } = 5_242_880; // 5 MB
+
+    // ==========================================================================
     // General Limits (all tiers)
     // ==========================================================================
 
@@ -571,6 +671,46 @@ public sealed class LimitsConfiguration
         "team" => TeamMaxMembers,
         "enterprise" => int.MaxValue, // Unlimited
         _ => 0 // Free tier has no team support
+    };
+
+    /// <summary>
+    /// Get maximum snapshots per project for a given plan.
+    /// </summary>
+    public int GetMaxSnapshots(string plan) => plan?.ToLowerInvariant() switch
+    {
+        "team" => TeamMaxSnapshots,
+        "enterprise" => EnterpriseMaxSnapshots,
+        _ => FreeMaxSnapshots
+    };
+
+    /// <summary>
+    /// Get snapshot retention days for a given plan.
+    /// </summary>
+    public int GetSnapshotRetentionDays(string plan) => plan?.ToLowerInvariant() switch
+    {
+        "team" => TeamSnapshotRetentionDays,
+        "enterprise" => EnterpriseSnapshotRetentionDays,
+        _ => FreeSnapshotRetentionDays
+    };
+
+    /// <summary>
+    /// Get maximum storage bytes per account for a given plan.
+    /// </summary>
+    public long GetMaxStorageBytes(string plan) => plan?.ToLowerInvariant() switch
+    {
+        "team" => TeamMaxStorageBytes,
+        "enterprise" => EnterpriseMaxStorageBytes,
+        _ => FreeMaxStorageBytes
+    };
+
+    /// <summary>
+    /// Get maximum file size bytes for a given plan.
+    /// </summary>
+    public int GetMaxFileSizeBytes(string plan) => plan?.ToLowerInvariant() switch
+    {
+        "team" => TeamMaxFileSizeBytes,
+        "enterprise" => EnterpriseMaxFileSizeBytes,
+        _ => FreeMaxFileSizeBytes
     };
 }
 

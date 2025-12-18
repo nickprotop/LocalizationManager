@@ -106,7 +106,10 @@ public class MinioStorageService : IStorageService
     {
         try
         {
-            var objectPrefix = GetObjectName(projectId, prefix);
+            // For empty prefix, just use the project root
+            var objectPrefix = string.IsNullOrEmpty(prefix)
+                ? $"projects/{projectId}/"
+                : GetObjectName(projectId, prefix);
             var files = new List<string>();
 
             var listArgs = new ListObjectsArgs()
@@ -321,5 +324,43 @@ public class MinioStorageService : IStorageService
                 snapshotId, projectId);
             throw;
         }
+    }
+
+    public async Task<long> GetProjectStorageSizeAsync(int projectId)
+    {
+        try
+        {
+            var objectPrefix = $"projects/{projectId}/";
+            long totalSize = 0;
+
+            var listArgs = new ListObjectsArgs()
+                .WithBucket(_config.Storage.Bucket)
+                .WithPrefix(objectPrefix)
+                .WithRecursive(true);
+
+            var observable = _minioClient.ListObjectsEnumAsync(listArgs);
+
+            await foreach (var item in observable)
+            {
+                totalSize += (long)item.Size;
+            }
+
+            return totalSize;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting storage size for project {ProjectId}", projectId);
+            throw;
+        }
+    }
+
+    public async Task<long> GetTotalStorageSizeAsync(IEnumerable<int> projectIds)
+    {
+        long totalSize = 0;
+        foreach (var projectId in projectIds)
+        {
+            totalSize += await GetProjectStorageSizeAsync(projectId);
+        }
+        return totalSize;
     }
 }

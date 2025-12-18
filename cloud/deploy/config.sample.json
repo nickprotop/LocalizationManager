@@ -53,7 +53,19 @@
     "teamMaxApiKeys": 10,
     "enterpriseTranslationChars": 500000,
     "enterpriseOtherChars": 2500000,
-    "maxKeysPerProject": 10000
+    "maxKeysPerProject": 10000,
+    "freeMaxSnapshots": 3,
+    "teamMaxSnapshots": 10,
+    "enterpriseMaxSnapshots": 30,
+    "freeSnapshotRetentionDays": 7,
+    "teamSnapshotRetentionDays": 30,
+    "enterpriseSnapshotRetentionDays": 90,
+    "freeMaxStorageBytes": 26214400,
+    "teamMaxStorageBytes": 262144000,
+    "enterpriseMaxStorageBytes": 524288000,
+    "freeMaxFileSizeBytes": 1048576,
+    "teamMaxFileSizeBytes": 2097152,
+    "enterpriseMaxFileSizeBytes": 5242880
   },
   "payment": {
     "activeProvider": "stripe",

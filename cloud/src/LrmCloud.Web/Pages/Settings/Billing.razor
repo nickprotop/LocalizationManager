@@ -294,111 +294,11 @@ else
 
                 <MudDivider Class="mb-3" />
 
-                <MudSimpleTable Hover="true" Dense="true">
-                    <thead>
-                        <tr>
-                            <th>Feature</th>
-                            <th class="text-center">
-                                <MudStack AlignItems="AlignItems.Center">
-                                    <MudText>Free</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">$@((_subscription?.PlanLimits?.Free.Price ?? 0).ToString("0"))/mo</MudText>
-                                    @if (_subscription?.Plan?.ToLower() == "free")
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">Current</MudChip>
-                                    }
-                                </MudStack>
-                            </th>
-                            <th class="text-center">
-                                <MudStack AlignItems="AlignItems.Center">
-                                    <MudText>Team</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">$@((_subscription?.PlanLimits?.Team.Price ?? 9).ToString("0"))/mo</MudText>
-                                    @if (_subscription?.Plan?.ToLower() == "team")
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary">Current</MudChip>
-                                    }
-                                </MudStack>
-                            </th>
-                            <th class="text-center">
-                                <MudStack AlignItems="AlignItems.Center">
-                                    <MudText>Enterprise</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">$@((_subscription?.PlanLimits?.Enterprise.Price ?? 29).ToString("0"))/mo</MudText>
-                                    @if (_subscription?.Plan?.ToLower() == "enterprise")
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Tertiary">Current</MudChip>
-                                    }
-                                </MudStack>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>LRM Translation</td>
-                            <td class="text-center">@FormatChars(_subscription?.PlanLimits?.Free.TranslationChars ?? 5000)/mo</td>
-                            <td class="text-center">@FormatChars(_subscription?.PlanLimits?.Team.TranslationChars ?? 50000)/mo</td>
-                            <td class="text-center">@FormatChars(_subscription?.PlanLimits?.Enterprise.TranslationChars ?? 500000)/mo</td>
-                        </tr>
-                        <tr>
-                            <td>BYOK Providers</td>
-                            <td class="text-center">@FormatChars(_subscription?.PlanLimits?.Free.OtherChars ?? 25000)/mo</td>
-                            <td class="text-center">@FormatChars(_subscription?.PlanLimits?.Team.OtherChars ?? 250000)/mo</td>
-                            <td class="text-center">@FormatChars(_subscription?.PlanLimits?.Enterprise.OtherChars ?? 2500000)/mo</td>
-                        </tr>
-                        <tr>
-                            <td>Projects</td>
-                            <td class="text-center">@FormatLimit(_subscription?.PlanLimits?.Free.MaxProjects ?? 3)</td>
-                            <td class="text-center">@FormatLimit(_subscription?.PlanLimits?.Team.MaxProjects ?? int.MaxValue)</td>
-                            <td class="text-center">@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxProjects ?? int.MaxValue)</td>
-                        </tr>
-                        <tr>
-                            <td>Team Members</td>
-                            <td class="text-center">@FormatLimit(_subscription?.PlanLimits?.Free.MaxTeamMembers ?? 0)</td>
-                            <td class="text-center">@FormatLimit(_subscription?.PlanLimits?.Team.MaxTeamMembers ?? 10)</td>
-                            <td class="text-center">@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxTeamMembers ?? int.MaxValue)</td>
-                        </tr>
-                        <tr>
-                            <td>Translation Providers</td>
-                            <td class="text-center">All</td>
-                            <td class="text-center">All</td>
-                            <td class="text-center">All</td>
-                        </tr>
-                        <tr>
-                            <td>API Access</td>
-                            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-                            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-                            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-                        </tr>
-                        <tr>
-                            <td>Priority Support</td>
-                            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Close" Color="Color.Default" Size="Size.Small" /></td>
-                            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-                            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-                        </tr>
-                    </tbody>
-                </MudSimpleTable>
-
-                @if (_subscription?.BillingEnabled == true && _subscription.Plan?.ToLower() != "enterprise")
-                {
-                    <MudStack Row="true" Justify="Justify.Center" Class="mt-4" Spacing="2">
-                        @if (_subscription.Plan?.ToLower() == "free")
-                        {
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                       OnClick="@(() => ShowUpgradeDialog("team"))">
-                                Upgrade to Team - $@((_subscription?.PlanLimits?.Team.Price ?? 9).ToString("0"))/mo
-                            </MudButton>
-                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                                       OnClick="@(() => ShowUpgradeDialog("enterprise"))">
-                                Upgrade to Enterprise - $@((_subscription?.PlanLimits?.Enterprise.Price ?? 29).ToString("0"))/mo
-                            </MudButton>
-                        }
-                        else if (_subscription.Plan?.ToLower() == "team")
-                        {
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                       OnClick="@(() => ShowUpgradeDialog("enterprise"))">
-                                Upgrade to Enterprise - $@((_subscription?.PlanLimits?.Enterprise.Price ?? 29).ToString("0"))/mo
-                            </MudButton>
-                        }
-                    </MudStack>
-                }
+                <PlanComparisonTable
+                    Limits="@_subscription?.PlanLimits"
+                    CurrentPlan="@_subscription?.Plan"
+                    ShowUpgradeButtons="@(_subscription?.BillingEnabled == true)"
+                    OnUpgradeClick="@ShowUpgradeDialog" />
             </MudPaper>
         </MudItem>
     </MudGrid>

@@ -74,10 +74,52 @@ public class UsageStatsDto
     /// </summary>
     public int MaxTeamMembers { get; set; }
 
+    // Storage usage (account-wide)
+
+    /// <summary>
+    /// Total storage used by this user across all projects (bytes).
+    /// </summary>
+    public long StorageBytesUsed { get; set; }
+
+    /// <summary>
+    /// Maximum storage allowed on current plan (bytes).
+    /// </summary>
+    public long StorageBytesLimit { get; set; }
+
+    /// <summary>
+    /// Percentage of storage limit used (0-100).
+    /// </summary>
+    public double StorageUsagePercent => StorageBytesLimit > 0
+        ? Math.Min(100, Math.Round((double)StorageBytesUsed / StorageBytesLimit * 100, 1))
+        : 0;
+
+    // Snapshot usage and limits
+
+    /// <summary>
+    /// Total snapshot count across all user's projects.
+    /// </summary>
+    public int TotalSnapshotCount { get; set; }
+
+    /// <summary>
+    /// Maximum snapshots per project on current plan.
+    /// </summary>
+    public int MaxSnapshots { get; set; }
+
+    /// <summary>
+    /// Snapshot retention days on current plan.
+    /// </summary>
+    public int SnapshotRetentionDays { get; set; }
+
+    /// <summary>
+    /// Maximum file size in bytes on current plan.
+    /// </summary>
+    public int MaxFileSizeBytes { get; set; }
+
     // Computed limit properties
     public bool CanCreateProject => MaxProjects == int.MaxValue || ProjectCount < MaxProjects;
     public bool CanCreateApiKey => MaxApiKeys == int.MaxValue || ApiKeyCount < MaxApiKeys;
     public bool CanCreateOrganization => MaxTeamMembers > 0;
     public bool IsProjectLimitReached => MaxProjects != int.MaxValue && ProjectCount >= MaxProjects;
     public bool IsApiKeyLimitReached => MaxApiKeys != int.MaxValue && ApiKeyCount >= MaxApiKeys;
+    public bool IsStorageLimitReached => StorageBytesUsed >= StorageBytesLimit;
 }

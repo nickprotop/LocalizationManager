@@ -840,10 +840,10 @@ public class ResourceService : IResourceService
                 }
             }
 
-            // Store modified files to S3/Minio
+            // Store modified files to S3/Minio (with plan-based storage limits)
             if (request.ModifiedFiles.Count > 0)
             {
-                await _syncService.StoreUploadedFilesAsync(projectId, request.ModifiedFiles);
+                await _syncService.StoreUploadedFilesAsync(projectId, request.ModifiedFiles, userId);
             }
 
             // Create snapshot after files are uploaded to current/ folder

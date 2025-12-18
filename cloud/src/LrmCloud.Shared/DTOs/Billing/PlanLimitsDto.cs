@@ -52,6 +52,26 @@ public record PlanTierLimits
     public int MaxApiKeys { get; init; }
 
     /// <summary>
+    /// Maximum snapshots per project.
+    /// </summary>
+    public int MaxSnapshots { get; init; }
+
+    /// <summary>
+    /// Snapshot retention days.
+    /// </summary>
+    public int SnapshotRetentionDays { get; init; }
+
+    /// <summary>
+    /// Maximum storage bytes per account.
+    /// </summary>
+    public long MaxStorageBytes { get; init; }
+
+    /// <summary>
+    /// Maximum file size bytes.
+    /// </summary>
+    public int MaxFileSizeBytes { get; init; }
+
+    /// <summary>
     /// Monthly price in USD.
     /// </summary>
     public decimal Price { get; init; }
