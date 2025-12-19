@@ -392,7 +392,7 @@ public class RemoteUrlParserTests
         var result = RemoteUrlParser.Parse(url);
 
         // Act & Assert
-        Assert.Equal("https://lrm-cloud.com/api/projects/acme/my-app", result.ProjectApiUrl);
+        Assert.Equal("https://lrm-cloud.com/api/organizations/acme/projects/my-app", result.ProjectApiUrl);
     }
 
     [Fact]
