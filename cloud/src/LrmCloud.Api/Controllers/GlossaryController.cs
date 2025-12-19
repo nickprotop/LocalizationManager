@@ -13,6 +13,7 @@ namespace LrmCloud.Api.Controllers;
 /// Supports both project-level and organization-level glossaries.
 /// </summary>
 [ApiController]
+[Route("api")]
 [Authorize]
 public class GlossaryController : ApiControllerBase
 {
@@ -37,7 +38,7 @@ public class GlossaryController : ApiControllerBase
     /// <summary>
     /// Get all glossary terms for a project (includes inherited organization terms).
     /// </summary>
-    [HttpGet("api/projects/{projectId:int}/glossary")]
+    [HttpGet("projects/{projectId:int}/glossary")]
     [ProducesResponseType(typeof(ApiResponse<GlossaryListResponse>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 403)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
@@ -63,7 +64,7 @@ public class GlossaryController : ApiControllerBase
     /// <summary>
     /// Create a new project-level glossary term.
     /// </summary>
-    [HttpPost("api/projects/{projectId:int}/glossary")]
+    [HttpPost("projects/{projectId:int}/glossary")]
     [ProducesResponseType(typeof(ApiResponse<GlossaryTermDto>), 201)]
     [ProducesResponseType(typeof(ProblemDetails), 400)]
     [ProducesResponseType(typeof(ProblemDetails), 403)]
@@ -94,7 +95,7 @@ public class GlossaryController : ApiControllerBase
     /// <summary>
     /// Update a project-level glossary term.
     /// </summary>
-    [HttpPut("api/projects/{projectId:int}/glossary/{termId:int}")]
+    [HttpPut("projects/{projectId:int}/glossary/{termId:int}")]
     [ProducesResponseType(typeof(ApiResponse<GlossaryTermDto>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 400)]
     [ProducesResponseType(typeof(ProblemDetails), 403)]
@@ -131,7 +132,7 @@ public class GlossaryController : ApiControllerBase
     /// <summary>
     /// Delete a project-level glossary term.
     /// </summary>
-    [HttpDelete("api/projects/{projectId:int}/glossary/{termId:int}")]
+    [HttpDelete("projects/{projectId:int}/glossary/{termId:int}")]
     [ProducesResponseType(204)]
     [ProducesResponseType(typeof(ProblemDetails), 403)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
@@ -164,7 +165,7 @@ public class GlossaryController : ApiControllerBase
     /// <summary>
     /// Get all glossary terms for an organization.
     /// </summary>
-    [HttpGet("api/organizations/{organizationId:int}/glossary")]
+    [HttpGet("organizations/{organizationId:int}/glossary")]
     [ProducesResponseType(typeof(ApiResponse<GlossaryListResponse>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 403)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
@@ -188,7 +189,7 @@ public class GlossaryController : ApiControllerBase
     /// <summary>
     /// Create a new organization-level glossary term.
     /// </summary>
-    [HttpPost("api/organizations/{organizationId:int}/glossary")]
+    [HttpPost("organizations/{organizationId:int}/glossary")]
     [ProducesResponseType(typeof(ApiResponse<GlossaryTermDto>), 201)]
     [ProducesResponseType(typeof(ProblemDetails), 400)]
     [ProducesResponseType(typeof(ProblemDetails), 403)]
@@ -221,7 +222,7 @@ public class GlossaryController : ApiControllerBase
     /// <summary>
     /// Update an organization-level glossary term.
     /// </summary>
-    [HttpPut("api/organizations/{organizationId:int}/glossary/{termId:int}")]
+    [HttpPut("organizations/{organizationId:int}/glossary/{termId:int}")]
     [ProducesResponseType(typeof(ApiResponse<GlossaryTermDto>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 400)]
     [ProducesResponseType(typeof(ProblemDetails), 403)]
@@ -260,7 +261,7 @@ public class GlossaryController : ApiControllerBase
     /// <summary>
     /// Delete an organization-level glossary term.
     /// </summary>
-    [HttpDelete("api/organizations/{organizationId:int}/glossary/{termId:int}")]
+    [HttpDelete("organizations/{organizationId:int}/glossary/{termId:int}")]
     [ProducesResponseType(204)]
     [ProducesResponseType(typeof(ProblemDetails), 403)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
@@ -295,7 +296,7 @@ public class GlossaryController : ApiControllerBase
     /// <summary>
     /// Get a single glossary term by ID.
     /// </summary>
-    [HttpGet("api/glossary/{termId:int}")]
+    [HttpGet("glossary/{termId:int}")]
     [ProducesResponseType(typeof(ApiResponse<GlossaryTermDto>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 403)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
@@ -326,7 +327,7 @@ public class GlossaryController : ApiControllerBase
     /// Find glossary terms that match the given source text.
     /// Used by UI to show what terms will be applied during translation.
     /// </summary>
-    [HttpPost("api/projects/{projectId:int}/glossary/match")]
+    [HttpPost("projects/{projectId:int}/glossary/match")]
     [ProducesResponseType(typeof(ApiResponse<GlossaryUsageSummary>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 403)]
     public async Task<ActionResult<ApiResponse<GlossaryUsageSummary>>> FindMatchingTerms(
