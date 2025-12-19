@@ -128,7 +128,16 @@ public class Program
             // =============================================================================
 
             builder.Services.AddHttpClient(); // Required for GitHub OAuth
-            builder.Services.AddScoped<IMailService, SmtpMailService>();
+
+            // Register mail service based on configuration
+            if (config.Mail.Backend.Equals("imap", StringComparison.OrdinalIgnoreCase))
+            {
+                builder.Services.AddScoped<IMailService, ImapMailService>();
+            }
+            else
+            {
+                builder.Services.AddScoped<IMailService, SmtpMailService>();
+            }
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IGitHubAuthService, GitHubAuthService>();
             builder.Services.AddScoped<IOrganizationService, OrganizationService>();
@@ -138,6 +147,7 @@ public class Program
             builder.Services.AddScoped<SnapshotService>(); // Point-in-time snapshot management
             builder.Services.AddScoped<TranslationMemoryService>(); // Translation Memory for reuse
             builder.Services.AddScoped<GlossaryService>(); // Glossary management for consistent terminology
+            builder.Services.AddScoped<ReviewWorkflowService>(); // Review/approval workflow for translations
             builder.Services.AddScoped<IStorageService, MinioStorageService>();
 
             // Translation Services

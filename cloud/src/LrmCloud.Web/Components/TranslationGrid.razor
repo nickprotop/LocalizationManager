@@ -47,6 +47,23 @@
             <MudSelectItem T="TranslationStatus?" Value="@TranslationStatus.Missing">Missing</MudSelectItem>
         </MudSelect>
 
+        @if (WorkflowEnabled)
+        {
+            <MudSelect T="string?" @bind-Value="_workflowStatusFilter"
+                       Label="Workflow"
+                       Variant="Variant.Outlined"
+                       Dense="true"
+                       Margin="Margin.Dense"
+                       Class="ml-2"
+                       Style="max-width: 150px;">
+                <MudSelectItem T="string?" Value="@((string?)null)">All States</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("pending")">Pending</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("translated")">Translated</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("reviewed")">Reviewed</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("approved")">Approved</MudSelectItem>
+            </MudSelect>
+        }
+
         <MudMenu Icon="@Icons.Material.Filled.ViewColumn"
                  Label="Columns"
                  Variant="Variant.Outlined"
@@ -85,6 +102,28 @@
                        Class="mr-2">
                 Translate
             </MudButton>
+            @if (WorkflowEnabled && CanReview)
+            {
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Info"
+                           Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.RateReview"
+                           OnClick="@OnReviewSelected"
+                           Class="mr-2">
+                    Review
+                </MudButton>
+            }
+            @if (WorkflowEnabled && CanApprove)
+            {
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Success"
+                           Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.CheckCircle"
+                           OnClick="@OnApproveSelected"
+                           Class="mr-2">
+                    Approve
+                </MudButton>
+            }
             <MudButton Variant="Variant.Outlined"
                        Color="Color.Error"
                        Size="Size.Small"
@@ -315,8 +354,24 @@
     [Parameter]
     public EventCallback<string> OnSearchTextChanged { get; set; }
 
+    [Parameter]
+    public bool WorkflowEnabled { get; set; }
+
+    [Parameter]
+    public bool CanReview { get; set; }
+
+    [Parameter]
+    public bool CanApprove { get; set; }
+
+    [Parameter]
+    public EventCallback<IEnumerable<TranslationGridRow>> OnReviewClicked { get; set; }
+
+    [Parameter]
+    public EventCallback<IEnumerable<TranslationGridRow>> OnApproveClicked { get; set; }
+
     private string _searchText = string.Empty;
     private TranslationStatus? _statusFilter;
+    private string? _workflowStatusFilter;
     private HashSet<TranslationGridRow> _selectedItems = new();
     private HashSet<string> _hiddenLanguages = new();
 
@@ -414,6 +469,16 @@
     private void OnDeleteSelected()
     {
         OnDeleteClicked.InvokeAsync(_selectedItems);
+    }
+
+    private void OnReviewSelected()
+    {
+        OnReviewClicked.InvokeAsync(_selectedItems);
+    }
+
+    private void OnApproveSelected()
+    {
+        OnApproveClicked.InvokeAsync(_selectedItems);
     }
 
     /// <summary>

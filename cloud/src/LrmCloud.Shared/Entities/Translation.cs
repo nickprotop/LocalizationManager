@@ -62,6 +62,34 @@ public class Translation
     public User? ReviewedBy { get; set; }
 
     /// <summary>
+    /// When the translation was reviewed.
+    /// </summary>
+    [Column("reviewed_at")]
+    public DateTime? ReviewedAt { get; set; }
+
+    /// <summary>
+    /// User who approved the translation.
+    /// </summary>
+    [Column("approved_by_id")]
+    public int? ApprovedById { get; set; }
+
+    [ForeignKey(nameof(ApprovedById))]
+    public User? ApprovedBy { get; set; }
+
+    /// <summary>
+    /// When the translation was approved.
+    /// </summary>
+    [Column("approved_at")]
+    public DateTime? ApprovedAt { get; set; }
+
+    /// <summary>
+    /// Comment provided when rejecting a translation.
+    /// </summary>
+    [MaxLength(500)]
+    [Column("rejection_comment")]
+    public string? RejectionComment { get; set; }
+
+    /// <summary>
     /// Version for optimistic locking.
     /// </summary>
     [Column("version")]

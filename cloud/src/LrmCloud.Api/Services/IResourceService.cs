@@ -128,6 +128,10 @@ public interface IResourceService
     /// Pulls files from cloud - generates files from database.
     /// Generates files from database using Core's backends.
     /// </summary>
+    /// <param name="projectId">Project ID</param>
+    /// <param name="userId">User ID for permission check</param>
+    /// <param name="includeUnapproved">If true, include all translations regardless of workflow status.
+    /// If false (default), only include approved translations when workflow is enabled and requires approval.</param>
     Task<(bool Success, PullResponse? Response, string? ErrorMessage)> PullResourcesAsync(
-        int projectId, int userId);
+        int projectId, int userId, bool includeUnapproved = false);
 }

@@ -52,6 +52,10 @@ public class AppDbContext : DbContext
     public DbSet<GlossaryTranslation> GlossaryTranslations => Set<GlossaryTranslation>();
     public DbSet<GlossaryProviderSync> GlossaryProviderSyncs => Set<GlossaryProviderSync>();
 
+    // Review Workflow
+    public DbSet<ProjectReviewer> ProjectReviewers => Set<ProjectReviewer>();
+    public DbSet<OrganizationReviewer> OrganizationReviewers => Set<OrganizationReviewer>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -458,6 +462,61 @@ public class AppDbContext : DbContext
                 "CK_glossary_provider_sync_owner",
                 "(project_id IS NOT NULL AND organization_id IS NULL) OR (project_id IS NULL AND organization_id IS NOT NULL)"
             ));
+        });
+
+        // =====================================================================
+        // Project Reviewers
+        // =====================================================================
+        modelBuilder.Entity<ProjectReviewer>(entity =>
+        {
+            // Unique: one user can only have one role per project
+            entity.HasIndex(e => new { e.ProjectId, e.UserId }).IsUnique();
+            entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.Project)
+                .WithMany(p => p.Reviewers)
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.AddedBy)
+                .WithMany()
+                .HasForeignKey(e => e.AddedById)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // =====================================================================
+        // Organization Reviewers
+        // =====================================================================
+        modelBuilder.Entity<OrganizationReviewer>(entity =>
+        {
+            // Unique: one user can only have one role per organization
+            entity.HasIndex(e => new { e.OrganizationId, e.UserId }).IsUnique();
+            entity.HasIndex(e => e.OrganizationId);
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.Organization)
+                .WithMany(o => o.Reviewers)
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.AddedBy)
+                .WithMany()
+                .HasForeignKey(e => e.AddedById)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Match parent's soft-delete filter
+            entity.HasQueryFilter(e => e.Organization!.DeletedAt == null);
         });
     }
 

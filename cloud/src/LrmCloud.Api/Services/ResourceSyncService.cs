@@ -601,10 +601,16 @@ public class ResourceSyncService
     }
 
     /// <summary>
-    /// Generates files from database using Core's backends.
+    /// Generates resource files from database using Core's backends.
     /// </summary>
-    public async Task<List<FileDto>> GenerateFilesFromDatabaseAsync(
-        int projectId, string? configJson, string projectFormat, string defaultLanguage)
+    /// <param name="projectId">Project ID</param>
+    /// <param name="configJson">Configuration JSON</param>
+    /// <param name="projectFormat">Project format (resx, json, i18next)</param>
+    /// <param name="defaultLanguage">Default language code</param>
+    /// <param name="requiredStatus">If set, only include translations with this status (e.g., "approved", "reviewed")</param>
+    /// <returns>Tuple of (files, excludedCount)</returns>
+    public async Task<(List<FileDto> Files, int ExcludedCount)> GenerateFilesFromDatabaseAsync(
+        int projectId, string? configJson, string projectFormat, string defaultLanguage, string? requiredStatus = null)
     {
         // Deserialize configuration or use defaults
         var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -625,10 +631,32 @@ public class ResourceSyncService
         var backend = CreateBackendFromConfig(config, projectFormat);
 
         // Load all resource keys with translations
-        var keys = await _db.ResourceKeys
+        var keysQuery = _db.ResourceKeys
             .Include(k => k.Translations)
-            .Where(k => k.ProjectId == projectId)
-            .ToListAsync();
+            .Where(k => k.ProjectId == projectId);
+
+        var keys = await keysQuery.ToListAsync();
+
+        // Track excluded translations for workflow filtering
+        int excludedCount = 0;
+
+        // Filter translations based on required status if specified
+        if (!string.IsNullOrEmpty(requiredStatus))
+        {
+            foreach (var key in keys)
+            {
+                var translationsToRemove = key.Translations
+                    .Where(t => !StatusMeetsRequirement(t.Status, requiredStatus))
+                    .ToList();
+
+                excludedCount += translationsToRemove.Count;
+
+                foreach (var t in translationsToRemove)
+                {
+                    key.Translations.Remove(t);
+                }
+            }
+        }
 
         // Group translations by language
         var languageGroups = keys
@@ -725,7 +753,28 @@ public class ResourceSyncService
             }
         }
 
-        return files;
+        return (files, excludedCount);
+    }
+
+    /// <summary>
+    /// Checks if a translation status meets the required status level.
+    /// Status hierarchy: pending < translated < reviewed < approved
+    /// </summary>
+    private static bool StatusMeetsRequirement(string status, string requiredStatus)
+    {
+        // Status hierarchy
+        var statusLevels = new Dictionary<string, int>
+        {
+            ["pending"] = 0,
+            ["translated"] = 1,
+            ["reviewed"] = 2,
+            ["approved"] = 3
+        };
+
+        var currentLevel = statusLevels.GetValueOrDefault(status, 0);
+        var requiredLevel = statusLevels.GetValueOrDefault(requiredStatus, 0);
+
+        return currentLevel >= requiredLevel;
     }
 
     /// <summary>

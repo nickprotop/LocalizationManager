@@ -10,37 +10,40 @@ using Microsoft.AspNetCore.Mvc;
 namespace LrmCloud.Api.Controllers;
 
 /// <summary>
-/// API endpoints for user-based project access (username/projectName routes).
-/// These endpoints provide a user-friendly URL structure for CLI access.
+/// API endpoints for organization-based project access (orgSlug/projectSlug routes).
+/// These endpoints provide a user-friendly URL structure for CLI access to organization projects.
 /// </summary>
 [Authorize]
-[Route("api/users/{username}/projects/{projectName}")]
-public class UserProjectsController : ApiControllerBase
+[Route("api/organizations/{orgSlug}/projects/{projectSlug}")]
+public class OrgProjectsController : ApiControllerBase
 {
     private readonly IProjectService _projectService;
     private readonly IResourceService _resourceService;
-    private readonly ILogger<UserProjectsController> _logger;
+    private readonly IOrganizationService _organizationService;
+    private readonly ILogger<OrgProjectsController> _logger;
 
-    public UserProjectsController(
+    public OrgProjectsController(
         IProjectService projectService,
         IResourceService resourceService,
-        ILogger<UserProjectsController> logger)
+        IOrganizationService organizationService,
+        ILogger<OrgProjectsController> logger)
     {
         _projectService = projectService;
         _resourceService = resourceService;
+        _organizationService = organizationService;
         _logger = logger;
     }
 
     /// <summary>
-    /// Gets project by username and project name.
+    /// Gets project by organization slug and project slug.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<ProjectDto>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
-    public async Task<ActionResult<ApiResponse<ProjectDto>>> GetProject(string username, string projectName)
+    public async Task<ActionResult<ApiResponse<ProjectDto>>> GetProject(string orgSlug, string projectSlug)
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var project = await _projectService.GetProjectByNameAsync(username, projectName, userId);
+        var project = await _projectService.GetProjectByOrgSlugAsync(orgSlug, projectSlug, userId);
 
         if (project == null)
             return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
@@ -54,10 +57,10 @@ public class UserProjectsController : ApiControllerBase
     [HttpGet("configuration")]
     [ProducesResponseType(typeof(ApiResponse<ConfigurationDto>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
-    public async Task<ActionResult<ApiResponse<ConfigurationDto>>> GetConfiguration(string username, string projectName)
+    public async Task<ActionResult<ApiResponse<ConfigurationDto>>> GetConfiguration(string orgSlug, string projectSlug)
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var project = await _projectService.GetProjectByNameAsync(username, projectName, userId);
+        var project = await _projectService.GetProjectByOrgSlugAsync(orgSlug, projectSlug, userId);
 
         if (project == null)
             return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
@@ -79,12 +82,12 @@ public class UserProjectsController : ApiControllerBase
     [ProducesResponseType(typeof(ProblemDetails), 404)]
     [ProducesResponseType(typeof(ProblemDetails), 409)]
     public async Task<ActionResult<ApiResponse<ConfigurationDto>>> UpdateConfiguration(
-        string username,
-        string projectName,
+        string orgSlug,
+        string projectSlug,
         [FromBody] UpdateConfigurationRequest request)
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var project = await _projectService.GetProjectByNameAsync(username, projectName, userId);
+        var project = await _projectService.GetProjectByOrgSlugAsync(orgSlug, projectSlug, userId);
 
         if (project == null)
             return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
@@ -102,7 +105,7 @@ public class UserProjectsController : ApiControllerBase
             return BadRequest("CFG_UPDATE_FAILED", errorMessage!);
         }
 
-        _logger.LogInformation("User {UserId} updated configuration for project {ProjectId} via username/projectName route", userId, project.Id);
+        _logger.LogInformation("User {UserId} updated configuration for project {ProjectId} via org/project route", userId, project.Id);
         return Success(configuration!);
     }
 
@@ -113,12 +116,12 @@ public class UserProjectsController : ApiControllerBase
     [ProducesResponseType(typeof(ApiResponse<List<ResourceDto>>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<ActionResult<ApiResponse<List<ResourceDto>>>> GetResources(
-        string username,
-        string projectName,
+        string orgSlug,
+        string projectSlug,
         [FromQuery] string? language = null)
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var project = await _projectService.GetProjectByNameAsync(username, projectName, userId);
+        var project = await _projectService.GetProjectByOrgSlugAsync(orgSlug, projectSlug, userId);
 
         if (project == null)
             return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
@@ -135,12 +138,12 @@ public class UserProjectsController : ApiControllerBase
     [ProducesResponseType(typeof(ProblemDetails), 400)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<ActionResult<ApiResponse<PushResponse>>> PushFiles(
-        string username,
-        string projectName,
+        string orgSlug,
+        string projectSlug,
         [FromBody] PushRequest request)
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var project = await _projectService.GetProjectByNameAsync(username, projectName, userId);
+        var project = await _projectService.GetProjectByOrgSlugAsync(orgSlug, projectSlug, userId);
 
         if (project == null)
             return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
@@ -158,20 +161,16 @@ public class UserProjectsController : ApiControllerBase
     /// <summary>
     /// Pull files from the project - generates files from database.
     /// </summary>
-    /// <param name="username">Username of project owner</param>
-    /// <param name="projectName">Project name</param>
-    /// <param name="includeUnapproved">If true, include all translations regardless of workflow approval status.
-    /// If false (default), only include approved translations when project requires approval before export.</param>
     [HttpGet("sync/pull")]
     [ProducesResponseType(typeof(ApiResponse<PullResponse>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<ActionResult<ApiResponse<PullResponse>>> PullFiles(
-        string username,
-        string projectName,
+        string orgSlug,
+        string projectSlug,
         [FromQuery] bool includeUnapproved = false)
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var project = await _projectService.GetProjectByNameAsync(username, projectName, userId);
+        var project = await _projectService.GetProjectByOrgSlugAsync(orgSlug, projectSlug, userId);
 
         if (project == null)
             return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
@@ -192,10 +191,10 @@ public class UserProjectsController : ApiControllerBase
     [HttpGet("sync/status")]
     [ProducesResponseType(typeof(ApiResponse<SyncStatusDto>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
-    public async Task<ActionResult<ApiResponse<SyncStatusDto>>> GetSyncStatus(string username, string projectName)
+    public async Task<ActionResult<ApiResponse<SyncStatusDto>>> GetSyncStatus(string orgSlug, string projectSlug)
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var project = await _projectService.GetProjectByNameAsync(username, projectName, userId);
+        var project = await _projectService.GetProjectByOrgSlugAsync(orgSlug, projectSlug, userId);
 
         if (project == null)
             return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
@@ -215,12 +214,12 @@ public class UserProjectsController : ApiControllerBase
     [ProducesResponseType(typeof(ApiResponse<List<ConfigurationHistoryDto>>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<ActionResult<ApiResponse<List<ConfigurationHistoryDto>>>> GetConfigurationHistory(
-        string username,
-        string projectName,
+        string orgSlug,
+        string projectSlug,
         [FromQuery] int limit = 50)
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var project = await _projectService.GetProjectByNameAsync(username, projectName, userId);
+        var project = await _projectService.GetProjectByOrgSlugAsync(orgSlug, projectSlug, userId);
 
         if (project == null)
             return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");

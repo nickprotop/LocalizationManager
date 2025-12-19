@@ -906,7 +906,7 @@ public class ResourceService : IResourceService
     /// Pulls resources using file-based sync with Core backends.
     /// </summary>
     public async Task<(bool Success, PullResponse? Response, string? ErrorMessage)> PullResourcesAsync(
-        int projectId, int userId)
+        int projectId, int userId, bool includeUnapproved = false)
     {
         try
         {
@@ -930,17 +930,40 @@ public class ResourceService : IResourceService
                 _logger.LogInformation("Generated default config for project {ProjectId} on pull", projectId);
             }
 
-            // Generate files from database using Core's backends
-            var files = await _syncService.GenerateFilesFromDatabaseAsync(
-                projectId, configJson, project.Format, project.DefaultLanguage);
+            // Determine workflow filtering
+            string? requiredStatus = null;
+            int excludedCount = 0;
 
-            _logger.LogInformation("User {UserId} pulled {Count} files from project {ProjectId}",
-                userId, files.Count, projectId);
+            if (project.ReviewWorkflowEnabled && !includeUnapproved)
+            {
+                if (project.RequireApprovalBeforeExport)
+                {
+                    requiredStatus = "approved";
+                }
+                else if (project.RequireReviewBeforeExport)
+                {
+                    requiredStatus = "reviewed";
+                }
+            }
+
+            // Generate files from database using Core's backends
+            var (files, excluded) = await _syncService.GenerateFilesFromDatabaseAsync(
+                projectId, configJson, project.Format, project.DefaultLanguage, requiredStatus);
+
+            excludedCount = excluded;
+
+            _logger.LogInformation("User {UserId} pulled {Count} files from project {ProjectId}{ExcludedInfo}",
+                userId, files.Count, projectId,
+                excludedCount > 0 ? $" ({excludedCount} translations excluded due to workflow)" : "");
 
             return (true, new PullResponse
             {
                 Configuration = configJson,
-                Files = files
+                Files = files,
+                ExcludedTranslationCount = excludedCount,
+                WorkflowMessage = excludedCount > 0
+                    ? $"{excludedCount} translation(s) excluded (not yet {requiredStatus}). Use --include-unapproved to include all."
+                    : null
             }, null);
         }
         catch (Exception ex)

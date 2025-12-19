@@ -127,6 +127,33 @@ public class Project
     [Column("inherit_organization_glossary")]
     public bool InheritOrganizationGlossary { get; set; } = true;
 
+    // Review workflow settings
+    /// <summary>
+    /// Enable the review workflow for this project.
+    /// When false, all workflow features are disabled.
+    /// </summary>
+    [Column("review_workflow_enabled")]
+    public bool ReviewWorkflowEnabled { get; set; } = false;
+
+    /// <summary>
+    /// When enabled, translations must be reviewed before export/sync.
+    /// </summary>
+    [Column("require_review_before_export")]
+    public bool RequireReviewBeforeExport { get; set; } = false;
+
+    /// <summary>
+    /// When enabled, translations must be approved (after review) before export/sync.
+    /// </summary>
+    [Column("require_approval_before_export")]
+    public bool RequireApprovalBeforeExport { get; set; } = false;
+
+    /// <summary>
+    /// Whether this project inherits reviewers from the organization.
+    /// Only applies to organization projects.
+    /// </summary>
+    [Column("inherit_organization_reviewers")]
+    public bool InheritOrganizationReviewers { get; set; } = true;
+
     // Snapshot settings
     /// <summary>
     /// Number of days to retain snapshots. Null means keep forever.
@@ -151,4 +178,5 @@ public class Project
     public ICollection<ProjectApiKey> ProjectApiKeys { get; set; } = new List<ProjectApiKey>();
     public ICollection<SyncHistory> SyncHistory { get; set; } = new List<SyncHistory>();
     public ICollection<Snapshot> Snapshots { get; set; } = new List<Snapshot>();
+    public ICollection<ProjectReviewer> Reviewers { get; set; } = new List<ProjectReviewer>();
 }

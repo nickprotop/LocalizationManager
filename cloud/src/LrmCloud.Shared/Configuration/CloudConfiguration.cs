@@ -334,26 +334,33 @@ public sealed class PasswordRequirementsConfiguration
 public sealed class MailConfiguration
 {
     /// <summary>
-    /// SMTP server hostname.
-    /// Example: "localhost", "smtp.mailgun.org"
+    /// Mail backend to use: "smtp" (default) or "imap".
+    /// - smtp: Uses SMTP protocol for sending emails (traditional, supports local sendmail)
+    /// - imap: Uses IMAP for connecting to an existing mail infrastructure (reads from drafts, moves to sent)
     /// </summary>
-    [Required]
-    public required string Host { get; init; }
+    public string Backend { get; init; } = "smtp";
 
     /// <summary>
-    /// SMTP server port.
-    /// Common: 25 (unencrypted), 587 (STARTTLS), 465 (SSL/TLS)
+    /// SMTP server hostname (for smtp backend).
+    /// Example: "localhost", "smtp.mailgun.org"
+    /// </summary>
+    public string Host { get; init; } = "localhost";
+
+    /// <summary>
+    /// Server port.
+    /// SMTP common: 25 (unencrypted), 587 (STARTTLS), 465 (SSL/TLS)
+    /// IMAP common: 143 (unencrypted), 993 (SSL/TLS)
     /// </summary>
     [Range(1, 65535)]
     public int Port { get; init; } = 25;
 
     /// <summary>
-    /// SMTP username (optional for local sendmail).
+    /// Username for authentication (optional for local sendmail).
     /// </summary>
     public string? Username { get; init; }
 
     /// <summary>
-    /// SMTP password (optional for local sendmail).
+    /// Password for authentication (optional for local sendmail).
     /// </summary>
     public string? Password { get; init; }
 
@@ -373,9 +380,69 @@ public sealed class MailConfiguration
     public required string FromName { get; init; }
 
     /// <summary>
-    /// Whether to use SSL/TLS for SMTP connection.
+    /// Whether to use SSL/TLS for connection.
     /// </summary>
     public bool UseSsl { get; init; } = false;
+
+    /// <summary>
+    /// IMAP-specific configuration (only used when Backend = "imap").
+    /// </summary>
+    public ImapConfiguration? Imap { get; init; }
+}
+
+/// <summary>
+/// IMAP-specific configuration for the imap mail backend.
+/// This backend connects to an existing IMAP mail server and sends emails
+/// by creating them in the Drafts folder, then sending via SMTP submission.
+/// </summary>
+public sealed class ImapConfiguration
+{
+    /// <summary>
+    /// IMAP server hostname.
+    /// Example: "imap.example.com"
+    /// </summary>
+    [Required]
+    public required string Host { get; init; }
+
+    /// <summary>
+    /// IMAP server port (default: 993 for SSL, 143 for unencrypted).
+    /// </summary>
+    [Range(1, 65535)]
+    public int Port { get; init; } = 993;
+
+    /// <summary>
+    /// Whether to use SSL/TLS for IMAP connection.
+    /// </summary>
+    public bool UseSsl { get; init; } = true;
+
+    /// <summary>
+    /// SMTP submission server hostname (for sending via IMAP infrastructure).
+    /// If not specified, uses the main mail Host.
+    /// Example: "smtp.example.com"
+    /// </summary>
+    public string? SmtpHost { get; init; }
+
+    /// <summary>
+    /// SMTP submission port (default: 587 for STARTTLS, 465 for SSL).
+    /// </summary>
+    [Range(1, 65535)]
+    public int SmtpPort { get; init; } = 587;
+
+    /// <summary>
+    /// Whether to use SSL/TLS for SMTP submission.
+    /// </summary>
+    public bool SmtpUseSsl { get; init; } = false;
+
+    /// <summary>
+    /// Folder to store sent emails (default: "Sent").
+    /// The service will copy sent messages to this folder.
+    /// </summary>
+    public string SentFolder { get; init; } = "Sent";
+
+    /// <summary>
+    /// Whether to save sent emails to the Sent folder.
+    /// </summary>
+    public bool SaveToSent { get; init; } = true;
 }
 
 /// <summary>

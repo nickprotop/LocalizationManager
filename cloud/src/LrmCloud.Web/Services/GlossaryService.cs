@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using LrmCloud.Shared.Api;
 using LrmCloud.Shared.DTOs.Glossary;
 
 namespace LrmCloud.Web.Services;
@@ -28,7 +29,12 @@ public class GlossaryService
         try
         {
             var url = $"projects/{projectId}/glossary?includeInherited={includeInherited}";
-            return await _http.GetFromJsonAsync<GlossaryListResponse>(url);
+            var response = await _http.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<GlossaryListResponse>>();
+            return result?.Data;
         }
         catch (HttpRequestException ex)
         {
@@ -46,7 +52,8 @@ public class GlossaryService
         {
             var response = await _http.PostAsJsonAsync($"projects/{projectId}/glossary", request);
             response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<GlossaryTermDto>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<GlossaryTermDto>>();
+            return result?.Data;
         }
         catch (HttpRequestException ex)
         {
@@ -64,7 +71,8 @@ public class GlossaryService
         {
             var response = await _http.PutAsJsonAsync($"projects/{projectId}/glossary/{termId}", request);
             response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<GlossaryTermDto>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<GlossaryTermDto>>();
+            return result?.Data;
         }
         catch (HttpRequestException ex)
         {
@@ -101,7 +109,12 @@ public class GlossaryService
     {
         try
         {
-            return await _http.GetFromJsonAsync<GlossaryListResponse>($"organizations/{organizationId}/glossary");
+            var response = await _http.GetAsync($"organizations/{organizationId}/glossary");
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<GlossaryListResponse>>();
+            return result?.Data;
         }
         catch (HttpRequestException ex)
         {
@@ -119,7 +132,8 @@ public class GlossaryService
         {
             var response = await _http.PostAsJsonAsync($"organizations/{organizationId}/glossary", request);
             response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<GlossaryTermDto>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<GlossaryTermDto>>();
+            return result?.Data;
         }
         catch (HttpRequestException ex)
         {
@@ -137,7 +151,8 @@ public class GlossaryService
         {
             var response = await _http.PutAsJsonAsync($"organizations/{organizationId}/glossary/{termId}", request);
             response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<GlossaryTermDto>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<GlossaryTermDto>>();
+            return result?.Data;
         }
         catch (HttpRequestException ex)
         {
@@ -174,7 +189,12 @@ public class GlossaryService
     {
         try
         {
-            return await _http.GetFromJsonAsync<GlossaryTermDto>($"glossary/{termId}");
+            var response = await _http.GetAsync($"glossary/{termId}");
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<GlossaryTermDto>>();
+            return result?.Data;
         }
         catch (HttpRequestException ex)
         {
@@ -197,7 +217,8 @@ public class GlossaryService
             var url = $"projects/{projectId}/glossary/match?sourceLanguage={Uri.EscapeDataString(sourceLanguage)}&targetLanguage={Uri.EscapeDataString(targetLanguage)}";
             var response = await _http.PostAsJsonAsync(url, sourceText);
             response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<GlossaryUsageSummary>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<GlossaryUsageSummary>>();
+            return result?.Data;
         }
         catch (HttpRequestException ex)
         {

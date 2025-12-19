@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using LrmCloud.Api.Authorization;
 using LrmCloud.Api.Services;
+using LrmCloud.Shared.Api;
 using LrmCloud.Shared.DTOs.Glossary;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,7 +14,7 @@ namespace LrmCloud.Api.Controllers;
 /// </summary>
 [ApiController]
 [Authorize]
-public class GlossaryController : ControllerBase
+public class GlossaryController : ApiControllerBase
 {
     private readonly GlossaryService _glossaryService;
     private readonly ILrmAuthorizationService _authService;
@@ -37,22 +38,25 @@ public class GlossaryController : ControllerBase
     /// Get all glossary terms for a project (includes inherited organization terms).
     /// </summary>
     [HttpGet("api/projects/{projectId:int}/glossary")]
-    public async Task<ActionResult<GlossaryListResponse>> GetProjectGlossary(
+    [ProducesResponseType(typeof(ApiResponse<GlossaryListResponse>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<GlossaryListResponse>>> GetProjectGlossary(
         int projectId,
         [FromQuery] bool includeInherited = true)
     {
         var userId = GetUserId();
         if (!await _authService.HasProjectAccessAsync(userId, projectId))
-            return Forbid();
+            return Forbidden("GLOSSARY_ACCESS_DENIED", "You do not have access to this project");
 
         try
         {
             var result = await _glossaryService.GetProjectGlossaryAsync(projectId, includeInherited);
-            return Ok(result);
+            return Success(result);
         }
         catch (ArgumentException ex)
         {
-            return NotFound(new { error = ex.Message });
+            return NotFound("GLOSSARY_NOT_FOUND", ex.Message);
         }
     }
 
@@ -60,26 +64,30 @@ public class GlossaryController : ControllerBase
     /// Create a new project-level glossary term.
     /// </summary>
     [HttpPost("api/projects/{projectId:int}/glossary")]
-    public async Task<ActionResult<GlossaryTermDto>> CreateProjectTerm(
+    [ProducesResponseType(typeof(ApiResponse<GlossaryTermDto>), 201)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<GlossaryTermDto>>> CreateProjectTerm(
         int projectId,
         [FromBody] CreateGlossaryTermRequest request)
     {
         var userId = GetUserId();
         if (!await _authService.HasProjectAccessAsync(userId, projectId))
-            return Forbid();
+            return Forbidden("GLOSSARY_ACCESS_DENIED", "You do not have access to this project");
 
         try
         {
             var result = await _glossaryService.CreateProjectTermAsync(projectId, userId, request);
-            return CreatedAtAction(nameof(GetTerm), new { termId = result.Id }, result);
+            return Created(nameof(GetTerm), new { termId = result.Id }, result);
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return BadRequest("GLOSSARY_TERM_INVALID", ex.Message);
         }
         catch (ArgumentException ex)
         {
-            return NotFound(new { error = ex.Message });
+            return NotFound("GLOSSARY_NOT_FOUND", ex.Message);
         }
     }
 
@@ -87,32 +95,36 @@ public class GlossaryController : ControllerBase
     /// Update a project-level glossary term.
     /// </summary>
     [HttpPut("api/projects/{projectId:int}/glossary/{termId:int}")]
-    public async Task<ActionResult<GlossaryTermDto>> UpdateProjectTerm(
+    [ProducesResponseType(typeof(ApiResponse<GlossaryTermDto>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<GlossaryTermDto>>> UpdateProjectTerm(
         int projectId,
         int termId,
         [FromBody] UpdateGlossaryTermRequest request)
     {
         var userId = GetUserId();
         if (!await _authService.HasProjectAccessAsync(userId, projectId))
-            return Forbid();
+            return Forbidden("GLOSSARY_ACCESS_DENIED", "You do not have access to this project");
 
         // Verify term belongs to this project
         var existing = await _glossaryService.GetTermAsync(termId);
         if (existing == null || existing.ProjectId != projectId)
-            return NotFound(new { error = "Term not found in this project" });
+            return NotFound("GLOSSARY_TERM_NOT_FOUND", "Term not found in this project");
 
         try
         {
             var result = await _glossaryService.UpdateTermAsync(termId, request);
-            return Ok(result);
+            return Success(result);
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return BadRequest("GLOSSARY_TERM_INVALID", ex.Message);
         }
         catch (ArgumentException ex)
         {
-            return NotFound(new { error = ex.Message });
+            return NotFound("GLOSSARY_TERM_NOT_FOUND", ex.Message);
         }
     }
 
@@ -120,16 +132,19 @@ public class GlossaryController : ControllerBase
     /// Delete a project-level glossary term.
     /// </summary>
     [HttpDelete("api/projects/{projectId:int}/glossary/{termId:int}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<IActionResult> DeleteProjectTerm(int projectId, int termId)
     {
         var userId = GetUserId();
         if (!await _authService.HasProjectAccessAsync(userId, projectId))
-            return Forbid();
+            return Forbidden("GLOSSARY_ACCESS_DENIED", "You do not have access to this project");
 
         // Verify term belongs to this project
         var existing = await _glossaryService.GetTermAsync(termId);
         if (existing == null || existing.ProjectId != projectId)
-            return NotFound(new { error = "Term not found in this project" });
+            return NotFound("GLOSSARY_TERM_NOT_FOUND", "Term not found in this project");
 
         try
         {
@@ -138,7 +153,7 @@ public class GlossaryController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return NotFound(new { error = ex.Message });
+            return NotFound("GLOSSARY_TERM_NOT_FOUND", ex.Message);
         }
     }
 
@@ -150,20 +165,23 @@ public class GlossaryController : ControllerBase
     /// Get all glossary terms for an organization.
     /// </summary>
     [HttpGet("api/organizations/{organizationId:int}/glossary")]
-    public async Task<ActionResult<GlossaryListResponse>> GetOrganizationGlossary(int organizationId)
+    [ProducesResponseType(typeof(ApiResponse<GlossaryListResponse>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<GlossaryListResponse>>> GetOrganizationGlossary(int organizationId)
     {
         var userId = GetUserId();
         if (!await _authService.IsOrganizationMemberAsync(userId, organizationId))
-            return Forbid();
+            return Forbidden("GLOSSARY_ACCESS_DENIED", "You do not have access to this organization");
 
         try
         {
             var result = await _glossaryService.GetOrganizationGlossaryAsync(organizationId);
-            return Ok(result);
+            return Success(result);
         }
         catch (ArgumentException ex)
         {
-            return NotFound(new { error = ex.Message });
+            return NotFound("GLOSSARY_NOT_FOUND", ex.Message);
         }
     }
 
@@ -171,7 +189,11 @@ public class GlossaryController : ControllerBase
     /// Create a new organization-level glossary term.
     /// </summary>
     [HttpPost("api/organizations/{organizationId:int}/glossary")]
-    public async Task<ActionResult<GlossaryTermDto>> CreateOrganizationTerm(
+    [ProducesResponseType(typeof(ApiResponse<GlossaryTermDto>), 201)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<GlossaryTermDto>>> CreateOrganizationTerm(
         int organizationId,
         [FromBody] CreateGlossaryTermRequest request)
     {
@@ -179,20 +201,20 @@ public class GlossaryController : ControllerBase
 
         // Only admins/owners can create org-level terms
         if (!await _authService.IsOrganizationAdminAsync(userId, organizationId))
-            return Forbid();
+            return Forbidden("GLOSSARY_ACCESS_DENIED", "Only organization admins can create organization-level terms");
 
         try
         {
             var result = await _glossaryService.CreateOrganizationTermAsync(organizationId, userId, request);
-            return CreatedAtAction(nameof(GetTerm), new { termId = result.Id }, result);
+            return Created(nameof(GetTerm), new { termId = result.Id }, result);
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return BadRequest("GLOSSARY_TERM_INVALID", ex.Message);
         }
         catch (ArgumentException ex)
         {
-            return NotFound(new { error = ex.Message });
+            return NotFound("GLOSSARY_NOT_FOUND", ex.Message);
         }
     }
 
@@ -200,7 +222,11 @@ public class GlossaryController : ControllerBase
     /// Update an organization-level glossary term.
     /// </summary>
     [HttpPut("api/organizations/{organizationId:int}/glossary/{termId:int}")]
-    public async Task<ActionResult<GlossaryTermDto>> UpdateOrganizationTerm(
+    [ProducesResponseType(typeof(ApiResponse<GlossaryTermDto>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<GlossaryTermDto>>> UpdateOrganizationTerm(
         int organizationId,
         int termId,
         [FromBody] UpdateGlossaryTermRequest request)
@@ -209,25 +235,25 @@ public class GlossaryController : ControllerBase
 
         // Only admins/owners can update org-level terms
         if (!await _authService.IsOrganizationAdminAsync(userId, organizationId))
-            return Forbid();
+            return Forbidden("GLOSSARY_ACCESS_DENIED", "Only organization admins can update organization-level terms");
 
         // Verify term belongs to this organization
         var existing = await _glossaryService.GetTermAsync(termId);
         if (existing == null || existing.OrganizationId != organizationId)
-            return NotFound(new { error = "Term not found in this organization" });
+            return NotFound("GLOSSARY_TERM_NOT_FOUND", "Term not found in this organization");
 
         try
         {
             var result = await _glossaryService.UpdateTermAsync(termId, request);
-            return Ok(result);
+            return Success(result);
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return BadRequest("GLOSSARY_TERM_INVALID", ex.Message);
         }
         catch (ArgumentException ex)
         {
-            return NotFound(new { error = ex.Message });
+            return NotFound("GLOSSARY_TERM_NOT_FOUND", ex.Message);
         }
     }
 
@@ -235,18 +261,21 @@ public class GlossaryController : ControllerBase
     /// Delete an organization-level glossary term.
     /// </summary>
     [HttpDelete("api/organizations/{organizationId:int}/glossary/{termId:int}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<IActionResult> DeleteOrganizationTerm(int organizationId, int termId)
     {
         var userId = GetUserId();
 
         // Only admins/owners can delete org-level terms
         if (!await _authService.IsOrganizationAdminAsync(userId, organizationId))
-            return Forbid();
+            return Forbidden("GLOSSARY_ACCESS_DENIED", "Only organization admins can delete organization-level terms");
 
         // Verify term belongs to this organization
         var existing = await _glossaryService.GetTermAsync(termId);
         if (existing == null || existing.OrganizationId != organizationId)
-            return NotFound(new { error = "Term not found in this organization" });
+            return NotFound("GLOSSARY_TERM_NOT_FOUND", "Term not found in this organization");
 
         try
         {
@@ -255,7 +284,7 @@ public class GlossaryController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return NotFound(new { error = ex.Message });
+            return NotFound("GLOSSARY_TERM_NOT_FOUND", ex.Message);
         }
     }
 
@@ -267,27 +296,30 @@ public class GlossaryController : ControllerBase
     /// Get a single glossary term by ID.
     /// </summary>
     [HttpGet("api/glossary/{termId:int}")]
-    public async Task<ActionResult<GlossaryTermDto>> GetTerm(int termId)
+    [ProducesResponseType(typeof(ApiResponse<GlossaryTermDto>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    public async Task<ActionResult<ApiResponse<GlossaryTermDto>>> GetTerm(int termId)
     {
         var userId = GetUserId();
         var term = await _glossaryService.GetTermAsync(termId);
 
         if (term == null)
-            return NotFound(new { error = "Term not found" });
+            return NotFound("GLOSSARY_TERM_NOT_FOUND", "Term not found");
 
         // Check access
         if (term.ProjectId.HasValue)
         {
             if (!await _authService.HasProjectAccessAsync(userId, term.ProjectId.Value))
-                return Forbid();
+                return Forbidden("GLOSSARY_ACCESS_DENIED", "You do not have access to this term");
         }
         else if (term.OrganizationId.HasValue)
         {
             if (!await _authService.IsOrganizationMemberAsync(userId, term.OrganizationId.Value))
-                return Forbid();
+                return Forbidden("GLOSSARY_ACCESS_DENIED", "You do not have access to this term");
         }
 
-        return Ok(term);
+        return Success(term);
     }
 
     /// <summary>
@@ -295,7 +327,9 @@ public class GlossaryController : ControllerBase
     /// Used by UI to show what terms will be applied during translation.
     /// </summary>
     [HttpPost("api/projects/{projectId:int}/glossary/match")]
-    public async Task<ActionResult<GlossaryUsageSummary>> FindMatchingTerms(
+    [ProducesResponseType(typeof(ApiResponse<GlossaryUsageSummary>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    public async Task<ActionResult<ApiResponse<GlossaryUsageSummary>>> FindMatchingTerms(
         int projectId,
         [FromQuery] string sourceLanguage,
         [FromQuery] string targetLanguage,
@@ -303,12 +337,12 @@ public class GlossaryController : ControllerBase
     {
         var userId = GetUserId();
         if (!await _authService.HasProjectAccessAsync(userId, projectId))
-            return Forbid();
+            return Forbidden("GLOSSARY_ACCESS_DENIED", "You do not have access to this project");
 
         var result = await _glossaryService.FindMatchingTermsAsync(
             projectId, sourceLanguage, targetLanguage, sourceText);
 
-        return Ok(result);
+        return Success(result);
     }
 
     #endregion

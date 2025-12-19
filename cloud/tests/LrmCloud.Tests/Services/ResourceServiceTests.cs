@@ -716,4 +716,218 @@ public class ResourceServiceTests : IDisposable
         // Assert
         Assert.False(result.IsValid);
     }
+
+    // ============================================================
+    // Translation Status Workflow Tests
+    // ============================================================
+
+    [Fact]
+    public async Task UpdateTranslationAsync_SetReviewedStatus_Success()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        var key = await CreateTestResourceKeyAsync(project.Id, "test.key");
+
+        _mockProjectService.Setup(s => s.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var request = new UpdateTranslationRequest
+        {
+            Value = "Reviewed translation",
+            Status = TranslationStatus.Reviewed
+        };
+
+        // Act
+        var (success, translation, errorMessage) = await _resourceService.UpdateTranslationAsync(
+            project.Id, "test.key", "fr", user.Id, request);
+
+        // Assert
+        Assert.True(success);
+        Assert.NotNull(translation);
+        Assert.Equal(TranslationStatus.Reviewed, translation.Status);
+    }
+
+    [Fact]
+    public async Task UpdateTranslationAsync_SetApprovedStatus_Success()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        var key = await CreateTestResourceKeyAsync(project.Id, "test.key");
+
+        _mockProjectService.Setup(s => s.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var request = new UpdateTranslationRequest
+        {
+            Value = "Approved translation",
+            Status = TranslationStatus.Approved
+        };
+
+        // Act
+        var (success, translation, errorMessage) = await _resourceService.UpdateTranslationAsync(
+            project.Id, "test.key", "fr", user.Id, request);
+
+        // Assert
+        Assert.True(success);
+        Assert.NotNull(translation);
+        Assert.Equal(TranslationStatus.Approved, translation.Status);
+    }
+
+    [Fact]
+    public async Task BulkUpdateTranslationsAsync_MixedStatuses_Success()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await CreateTestResourceKeyAsync(project.Id, "key1");
+        await CreateTestResourceKeyAsync(project.Id, "key2");
+        await CreateTestResourceKeyAsync(project.Id, "key3");
+
+        _mockProjectService.Setup(s => s.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var updates = new List<BulkTranslationUpdate>
+        {
+            new BulkTranslationUpdate { KeyName = "key1", Value = "Value 1", Status = TranslationStatus.Pending },
+            new BulkTranslationUpdate { KeyName = "key2", Value = "Value 2", Status = TranslationStatus.Translated },
+            new BulkTranslationUpdate { KeyName = "key3", Value = "Value 3", Status = TranslationStatus.Approved }
+        };
+
+        // Act
+        var (success, updatedCount, errorMessage) = await _resourceService.BulkUpdateTranslationsAsync(
+            project.Id, "fr", user.Id, updates);
+
+        // Assert
+        Assert.True(success);
+        Assert.Equal(3, updatedCount);
+
+        // Verify each status
+        var translations = await _db.Translations
+            .Where(t => t.LanguageCode == "fr")
+            .ToListAsync();
+
+        Assert.Contains(translations, t => t.Status == TranslationStatus.Pending);
+        Assert.Contains(translations, t => t.Status == TranslationStatus.Translated);
+        Assert.Contains(translations, t => t.Status == TranslationStatus.Approved);
+    }
+
+    [Fact]
+    public async Task GetProjectStatsAsync_CountsByWorkflowStatus()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        var key = await CreateTestResourceKeyAsync(project.Id, "key1");
+
+        // Add translations with different workflow statuses
+        _db.Translations.AddRange(
+            new Shared.Entities.Translation { ResourceKeyId = key.Id, LanguageCode = "en", Value = "Pending", Status = TranslationStatus.Pending, UpdatedAt = DateTime.UtcNow },
+            new Shared.Entities.Translation { ResourceKeyId = key.Id, LanguageCode = "fr", Value = "Translated", Status = TranslationStatus.Translated, UpdatedAt = DateTime.UtcNow },
+            new Shared.Entities.Translation { ResourceKeyId = key.Id, LanguageCode = "de", Value = "Reviewed", Status = TranslationStatus.Reviewed, UpdatedAt = DateTime.UtcNow },
+            new Shared.Entities.Translation { ResourceKeyId = key.Id, LanguageCode = "es", Value = "Approved", Status = TranslationStatus.Approved, UpdatedAt = DateTime.UtcNow }
+        );
+        await _db.SaveChangesAsync();
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        // Act
+        var stats = await _resourceService.GetProjectStatsAsync(project.Id, user.Id);
+
+        // Assert
+        Assert.Equal(1, stats.TotalKeys);
+        Assert.Equal(4, stats.Languages.Count);
+    }
+
+    // ============================================================
+    // Language Management Tests
+    // ============================================================
+
+    [Fact]
+    public async Task GetProjectLanguagesAsync_ReturnsAllLanguages()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        var key = await CreateTestResourceKeyAsync(project.Id, "test.key");
+
+        _db.Translations.AddRange(
+            new Shared.Entities.Translation { ResourceKeyId = key.Id, LanguageCode = "en", Value = "English", UpdatedAt = DateTime.UtcNow },
+            new Shared.Entities.Translation { ResourceKeyId = key.Id, LanguageCode = "fr", Value = "French", UpdatedAt = DateTime.UtcNow },
+            new Shared.Entities.Translation { ResourceKeyId = key.Id, LanguageCode = "de", Value = "German", UpdatedAt = DateTime.UtcNow }
+        );
+        await _db.SaveChangesAsync();
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        // Act
+        var languages = await _resourceService.GetProjectLanguagesAsync(project.Id, user.Id);
+
+        // Assert
+        Assert.Equal(3, languages.Count);
+        Assert.Contains(languages, l => l.LanguageCode == "en");
+        Assert.Contains(languages, l => l.LanguageCode == "fr");
+        Assert.Contains(languages, l => l.LanguageCode == "de");
+    }
+
+    [Fact]
+    public async Task AddLanguageAsync_Success()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        var key = await CreateTestResourceKeyAsync(project.Id, "test.key");
+
+        _mockProjectService.Setup(s => s.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var request = new AddLanguageRequest { LanguageCode = "es" };
+
+        // Act
+        var (success, language, errorMessage) = await _resourceService.AddLanguageAsync(
+            project.Id, user.Id, request);
+
+        // Assert
+        Assert.True(success);
+        Assert.NotNull(language);
+        Assert.Equal("es", language.LanguageCode);
+    }
+
+    [Fact]
+    public async Task RemoveLanguageAsync_DeletesTranslations()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        var key = await CreateTestResourceKeyAsync(project.Id, "test.key");
+
+        _db.Translations.Add(new Shared.Entities.Translation
+        {
+            ResourceKeyId = key.Id,
+            LanguageCode = "fr",
+            Value = "French value",
+            UpdatedAt = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
+
+        _mockProjectService.Setup(s => s.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var request = new RemoveLanguageRequest { LanguageCode = "fr", ConfirmDelete = true };
+
+        // Act
+        var (success, errorMessage) = await _resourceService.RemoveLanguageAsync(
+            project.Id, user.Id, request);
+
+        // Assert
+        Assert.True(success);
+
+        var remainingTranslations = await _db.Translations
+            .Where(t => t.ResourceKey!.ProjectId == project.Id && t.LanguageCode == "fr")
+            .CountAsync();
+        Assert.Equal(0, remainingTranslations);
+    }
 }

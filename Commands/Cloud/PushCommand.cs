@@ -138,6 +138,8 @@ public class PushCommand : Command<PushCommandSettings>
             else
             {
                 apiClient.SetAccessToken(cloudConfig.AccessToken);
+                // Enable auto-refresh for JWT authentication
+                apiClient.EnableAutoRefresh(projectDirectory);
             }
 
             // Fetch remote project info and validate format compatibility

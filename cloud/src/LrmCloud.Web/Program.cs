@@ -48,6 +48,7 @@ builder.Services.AddScoped<TranslationService>();
 builder.Services.AddScoped<SnapshotService>();
 builder.Services.AddScoped<TranslationMemoryService>();
 builder.Services.AddScoped<GlossaryService>();
+builder.Services.AddScoped<ReviewWorkflowService>();
 builder.Services.AddScoped<CliApiKeyService>();
 builder.Services.AddScoped<UsageService>();
 builder.Services.AddScoped<LimitsService>();

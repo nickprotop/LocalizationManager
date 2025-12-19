@@ -198,9 +198,18 @@ public class CloudApiClient : IDisposable
     /// <summary>
     /// Pulls files from the cloud (V2 - generates files from database).
     /// </summary>
-    public async Task<PullResponse> PullResourcesAsync(CancellationToken cancellationToken = default)
+    /// <param name="includeUnapproved">If true, include all translations regardless of workflow approval status.
+    /// If false (default), only include approved translations when project requires approval before export.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task<PullResponse> PullResourcesAsync(
+        bool includeUnapproved = false,
+        CancellationToken cancellationToken = default)
     {
         var url = $"{_remoteUrl.ProjectApiUrl}/sync/pull";
+        if (includeUnapproved)
+        {
+            url += "?includeUnapproved=true";
+        }
         var response = await GetAsync<PullResponse>(url, cancellationToken);
         return response ?? throw new CloudApiException("Failed to pull resources");
     }
@@ -277,11 +286,87 @@ public class CloudApiClient : IDisposable
         return response ?? new List<CloudOrganization>();
     }
 
-    private Task<bool> TryRefreshTokenAsync(CancellationToken cancellationToken = default)
+    private async Task<bool> TryRefreshTokenAsync(CancellationToken cancellationToken = default)
     {
-        // Auto-refresh is currently disabled.
-        // Callers should handle token refresh externally using CloudConfigManager.
-        return Task.FromResult(false);
+        // Check if auto-refresh is enabled
+        if (string.IsNullOrEmpty(_projectDirectory))
+        {
+            return false;
+        }
+
+        try
+        {
+            // Load current cloud config to get refresh token
+            var cloudConfig = await CloudConfigManager.LoadAsync(_projectDirectory, cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(cloudConfig.RefreshToken))
+            {
+                return false;
+            }
+
+            // Check if refresh token is still valid
+            if (cloudConfig.RefreshTokenExpiresAt.HasValue && cloudConfig.RefreshTokenExpiresAt.Value <= DateTime.UtcNow)
+            {
+                return false;
+            }
+
+            // Call refresh endpoint directly (bypass normal request path to avoid recursion)
+            var url = $"{_remoteUrl.ApiBaseUrl}/auth/refresh";
+            var request = new RefreshTokenRequest { RefreshToken = cloudConfig.RefreshToken };
+
+            // Remove auth header temporarily to avoid sending expired token
+            var currentAuth = _httpClient.DefaultRequestHeaders.Authorization;
+            _httpClient.DefaultRequestHeaders.Authorization = null;
+
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync(url, request, _jsonOptions, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return false;
+                }
+
+                var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions, cancellationToken);
+                var loginResponse = apiResponse?.Data;
+
+                if (loginResponse == null || string.IsNullOrWhiteSpace(loginResponse.Token))
+                {
+                    return false;
+                }
+
+                // Update the access token in this client
+                SetAccessToken(loginResponse.Token);
+
+                // Save the new tokens to config
+                await CloudConfigManager.SetAuthenticationAsync(
+                    _projectDirectory,
+                    loginResponse.Token,
+                    loginResponse.ExpiresAt,
+                    loginResponse.RefreshToken,
+                    loginResponse.RefreshTokenExpiresAt,
+                    cancellationToken);
+
+                // Notify callback if registered
+                if (_onTokenRefreshed != null)
+                {
+                    await _onTokenRefreshed();
+                }
+
+                return true;
+            }
+            finally
+            {
+                // Restore auth header if refresh failed
+                if (_httpClient.DefaultRequestHeaders.Authorization == null && currentAuth != null)
+                {
+                    _httpClient.DefaultRequestHeaders.Authorization = currentAuth;
+                }
+            }
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     #endregion
@@ -293,6 +378,13 @@ public class CloudApiClient : IDisposable
         try
         {
             var response = await _httpClient.GetAsync(url, cancellationToken);
+
+            // Try to refresh token and retry once on 401
+            if (!response.IsSuccessStatusCode && await ShouldRetryAfterTokenRefreshAsync(response, cancellationToken))
+            {
+                response = await _httpClient.GetAsync(url, cancellationToken);
+            }
+
             await EnsureSuccessAsync(response, cancellationToken);
             var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<T>>(_jsonOptions, cancellationToken);
             return apiResponse != null ? apiResponse.Data : default;
@@ -308,6 +400,13 @@ public class CloudApiClient : IDisposable
         try
         {
             var response = await _httpClient.PostAsJsonAsync(url, request, _jsonOptions, cancellationToken);
+
+            // Try to refresh token and retry once on 401
+            if (!response.IsSuccessStatusCode && await ShouldRetryAfterTokenRefreshAsync(response, cancellationToken))
+            {
+                response = await _httpClient.PostAsJsonAsync(url, request, _jsonOptions, cancellationToken);
+            }
+
             await EnsureSuccessAsync(response, cancellationToken);
             var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<T>>(_jsonOptions, cancellationToken);
             return apiResponse != null ? apiResponse.Data : default;
@@ -323,6 +422,13 @@ public class CloudApiClient : IDisposable
         try
         {
             var response = await _httpClient.PutAsJsonAsync(url, request, _jsonOptions, cancellationToken);
+
+            // Try to refresh token and retry once on 401
+            if (!response.IsSuccessStatusCode && await ShouldRetryAfterTokenRefreshAsync(response, cancellationToken))
+            {
+                response = await _httpClient.PutAsJsonAsync(url, request, _jsonOptions, cancellationToken);
+            }
+
             await EnsureSuccessAsync(response, cancellationToken);
             var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<T>>(_jsonOptions, cancellationToken);
             return apiResponse != null ? apiResponse.Data : default;
@@ -333,23 +439,25 @@ public class CloudApiClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Checks if a 401 response can be retried after token refresh.
+    /// Returns true if the token was refreshed and the request should be retried.
+    /// </summary>
+    private async Task<bool> ShouldRetryAfterTokenRefreshAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+            && !IsUsingApiKey  // Don't refresh for API key auth
+            && !string.IsNullOrEmpty(_projectDirectory))
+        {
+            return await TryRefreshTokenAsync(cancellationToken);
+        }
+        return false;
+    }
+
     private async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken = default)
     {
         if (!response.IsSuccessStatusCode)
         {
-            // If 401 and using JWT (not API key) with auto-refresh enabled, try to refresh token
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized
-                && !IsUsingApiKey  // Don't refresh for API key auth
-                && !string.IsNullOrEmpty(_projectDirectory))
-            {
-                var refreshed = await TryRefreshTokenAsync(cancellationToken);
-                if (refreshed)
-                {
-                    // Token refreshed - throw special exception so caller can retry
-                    throw new CloudApiException("Token expired and refreshed", 401);
-                }
-            }
-
             var errorContent = await response.Content.ReadAsStringAsync();
             var statusCode = (int)response.StatusCode;
 
@@ -507,6 +615,18 @@ public class PullResponse
 {
     public string? Configuration { get; set; }
     public List<FileDto> Files { get; set; } = new();
+
+    /// <summary>
+    /// Number of translations excluded due to workflow requirements.
+    /// Only populated when project has review workflow enabled.
+    /// </summary>
+    public int ExcludedTranslationCount { get; set; }
+
+    /// <summary>
+    /// Informational message about excluded translations due to workflow.
+    /// Null if no translations were excluded.
+    /// </summary>
+    public string? WorkflowMessage { get; set; }
 }
 
 /// <summary>

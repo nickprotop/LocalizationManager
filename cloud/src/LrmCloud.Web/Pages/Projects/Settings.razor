@@ -4,8 +4,10 @@
 @using LrmCloud.Shared.DTOs.Resources
 @using LrmCloud.Shared.DTOs.Translation
 @using LrmCloud.Shared.DTOs.Organizations
+@using LrmCloud.Shared.DTOs.Reviews
 @using LrmCloud.Web.Helpers
 @inject ProjectService ProjectService
+@inject ReviewWorkflowService WorkflowService
 @inject ResourceService ResourceService
 @inject TranslationService TranslationService
 @inject OrganizationService OrganizationService
@@ -321,6 +323,204 @@ else
             }
         </MudTabPanel>
 
+        <MudTabPanel Text="Workflow" Icon="@Icons.Material.Filled.RateReview" OnClick="LoadWorkflowSettings">
+            @if (_loadingWorkflow)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_workflowSettings != null)
+            {
+                <MudStack Spacing="4">
+                    <MudAlert Severity="Severity.Info" Dense="true">
+                        <strong>Review Workflow:</strong> Enable to require translations to be reviewed and approved before export.
+                        This is useful for teams that need quality assurance.
+                    </MudAlert>
+
+                    @* Enable/Disable Workflow *@
+                    <MudPaper Elevation="1" Class="pa-4">
+                        <MudStack Spacing="2">
+                            <MudText Typo="Typo.subtitle1">Workflow Settings</MudText>
+                            <MudSwitch @bind-Value="_workflowSettings.ReviewWorkflowEnabled"
+                                       Color="Color.Primary"
+                                       Label="Enable Review Workflow"
+                                       LabelPosition="LabelPosition.Start" />
+
+                            @if (_workflowSettings.ReviewWorkflowEnabled)
+                            {
+                                <MudDivider Class="my-2" />
+                                <MudSwitch @bind-Value="_workflowSettings.RequireReviewBeforeExport"
+                                           Color="Color.Primary"
+                                           Label="Require Review Before Export"
+                                           LabelPosition="LabelPosition.Start"
+                                           Disabled="!_workflowSettings.ReviewWorkflowEnabled" />
+                                <MudSwitch @bind-Value="_workflowSettings.RequireApprovalBeforeExport"
+                                           Color="Color.Primary"
+                                           Label="Require Approval Before Export"
+                                           LabelPosition="LabelPosition.Start"
+                                           Disabled="!_workflowSettings.ReviewWorkflowEnabled" />
+                                @if (_project?.OrganizationId != null)
+                                {
+                                    <MudSwitch @bind-Value="_workflowSettings.InheritOrganizationReviewers"
+                                               Color="Color.Primary"
+                                               Label="Inherit Organization Reviewers"
+                                               LabelPosition="LabelPosition.Start"
+                                               Disabled="!_workflowSettings.ReviewWorkflowEnabled" />
+                                }
+                            }
+
+                            <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                           OnClick="SaveWorkflowSettings" Disabled="_savingWorkflow">
+                                    @if (_savingWorkflow)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                    }
+                                    Save Workflow Settings
+                                </MudButton>
+                            </MudStack>
+                        </MudStack>
+                    </MudPaper>
+
+                    @* Status Statistics *@
+                    @if (_workflowSettings.ReviewWorkflowEnabled && _workflowSettings.Stats != null)
+                    {
+                        <MudPaper Elevation="1" Class="pa-4">
+                            <MudText Typo="Typo.subtitle1" Class="mb-3">Translation Status Overview</MudText>
+                            <MudGrid>
+                                <MudItem xs="6" sm="3">
+                                    <MudStack AlignItems="AlignItems.Center">
+                                        <MudText Typo="Typo.h4" Color="Color.Default">@_workflowSettings.Stats.PendingCount</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Pending</MudText>
+                                    </MudStack>
+                                </MudItem>
+                                <MudItem xs="6" sm="3">
+                                    <MudStack AlignItems="AlignItems.Center">
+                                        <MudText Typo="Typo.h4" Color="Color.Info">@_workflowSettings.Stats.TranslatedCount</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Translated</MudText>
+                                    </MudStack>
+                                </MudItem>
+                                <MudItem xs="6" sm="3">
+                                    <MudStack AlignItems="AlignItems.Center">
+                                        <MudText Typo="Typo.h4" Color="Color.Warning">@_workflowSettings.Stats.ReviewedCount</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Reviewed</MudText>
+                                    </MudStack>
+                                </MudItem>
+                                <MudItem xs="6" sm="3">
+                                    <MudStack AlignItems="AlignItems.Center">
+                                        <MudText Typo="Typo.h4" Color="Color.Success">@_workflowSettings.Stats.ApprovedCount</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Approved</MudText>
+                                    </MudStack>
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+                    }
+
+                    @* Reviewers Management *@
+                    @if (_workflowSettings.ReviewWorkflowEnabled)
+                    {
+                        <MudPaper Elevation="1" Class="pa-4">
+                            <MudStack Spacing="3">
+                                <div class="d-flex justify-space-between align-center">
+                                    <MudText Typo="Typo.subtitle1">Project Reviewers</MudText>
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="OpenAddReviewerDialog">
+                                        Add Reviewer
+                                    </MudButton>
+                                </div>
+
+                                @if (_workflowSettings.Reviewers?.Any() == true || _workflowSettings.InheritedReviewers?.Any() == true)
+                                {
+                                    <MudTable Items="@GetAllReviewers()" Dense="true" Hover="true" Elevation="0">
+                                        <HeaderContent>
+                                            <MudTh>User</MudTh>
+                                            <MudTh>Role</MudTh>
+                                            <MudTh>Languages</MudTh>
+                                            <MudTh>Source</MudTh>
+                                            <MudTh Style="width: 80px">Actions</MudTh>
+                                        </HeaderContent>
+                                        <RowTemplate>
+                                            <MudTd DataLabel="User">
+                                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                    @if (!string.IsNullOrEmpty(context.AvatarUrl))
+                                                    {
+                                                        <MudAvatar Size="Size.Small">
+                                                            <MudImage Src="@context.AvatarUrl" />
+                                                        </MudAvatar>
+                                                    }
+                                                    else
+                                                    {
+                                                        <MudAvatar Size="Size.Small" Color="Color.Primary">
+                                                            @(context.Username?.FirstOrDefault().ToString().ToUpper() ?? "?")
+                                                        </MudAvatar>
+                                                    }
+                                                    <MudStack Spacing="0">
+                                                        <MudText Typo="Typo.body2">@(context.DisplayName ?? context.Username)</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@@@context.Username</MudText>
+                                                    </MudStack>
+                                                </MudStack>
+                                            </MudTd>
+                                            <MudTd DataLabel="Role">
+                                                <MudChip T="string" Size="Size.Small"
+                                                         Color="@(context.Role == "approver" ? Color.Success : Color.Info)">
+                                                    @(context.Role == "approver" ? "Approver" : "Reviewer")
+                                                </MudChip>
+                                            </MudTd>
+                                            <MudTd DataLabel="Languages">
+                                                @if (context.LanguageCodes?.Any() == true)
+                                                {
+                                                    <MudStack Row="true" Spacing="1">
+                                                        @foreach (var lang in context.LanguageCodes.Take(3))
+                                                        {
+                                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@lang</MudChip>
+                                                        }
+                                                        @if (context.LanguageCodes.Length > 3)
+                                                        {
+                                                            <MudText Typo="Typo.caption">+@(context.LanguageCodes.Length - 3) more</MudText>
+                                                        }
+                                                    </MudStack>
+                                                }
+                                                else
+                                                {
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">All languages</MudText>
+                                                }
+                                            </MudTd>
+                                            <MudTd DataLabel="Source">
+                                                @if (context.IsInherited)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Secondary">
+                                                        Organization
+                                                    </MudChip>
+                                                }
+                                                else
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                                                        Project
+                                                    </MudChip>
+                                                }
+                                            </MudTd>
+                                            <MudTd DataLabel="Actions">
+                                                @if (!context.IsInherited)
+                                                {
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                                                   OnClick="@(() => ConfirmRemoveReviewer(context))" />
+                                                }
+                                            </MudTd>
+                                        </RowTemplate>
+                                    </MudTable>
+                                }
+                                else
+                                {
+                                    <MudAlert Severity="Severity.Info" Dense="true">
+                                        No reviewers assigned. Project owners and organization admins can always review and approve.
+                                    </MudAlert>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                    }
+                </MudStack>
+            }
+        </MudTabPanel>
+
         <MudTabPanel Text="Danger Zone" Icon="@Icons.Material.Filled.Warning" BadgeColor="Color.Error">
             <MudPaper Class="pa-4" Elevation="0" Style="border: 2px solid var(--mud-palette-error);">
                 <MudStack Spacing="3">
@@ -455,6 +655,59 @@ else
     </DialogActions>
 </MudDialog>
 
+@* Add Reviewer Dialog *@
+<MudDialog @bind-Visible="_addReviewerDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Add Reviewer</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_newReviewerUserId" Label="User ID" InputType="InputType.Number"
+                          HelperText="Enter the user ID of the reviewer to add"
+                          Variant="Variant.Outlined" />
+            <MudSelect @bind-Value="_newReviewerRole" Label="Role" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("reviewer")">Reviewer (can mark as reviewed)</MudSelectItem>
+                <MudSelectItem Value="@("approver")">Approver (can review and approve)</MudSelectItem>
+            </MudSelect>
+            <MudTextField @bind-Value="_newReviewerLanguages" Label="Languages (optional)"
+                          HelperText="Comma-separated language codes (e.g., fr, de, es). Leave empty for all languages."
+                          Variant="Variant.Outlined" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _addReviewerDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddReviewer" Disabled="_addingReviewer || _newReviewerUserId <= 0">
+            @if (_addingReviewer)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Add
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Remove Reviewer Confirmation *@
+<MudDialog @bind-Visible="_removeReviewerDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Remove Reviewer?</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText>
+            Remove <strong>@(_reviewerToRemove?.DisplayName ?? _reviewerToRemove?.Username)</strong> as a reviewer?
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _removeReviewerDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="RemoveReviewer" Disabled="_removingReviewer">
+            @if (_removingReviewer)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Remove
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     [Parameter]
     public int ProjectId { get; set; }
@@ -501,6 +754,24 @@ else
     // Remove provider key
     private bool _removeProviderKeyDialogVisible;
     private bool _removingProviderKey;
+
+    // Workflow
+    private ReviewWorkflowSettingsDto? _workflowSettings;
+    private bool _loadingWorkflow;
+    private bool _workflowLoaded;
+    private bool _savingWorkflow;
+
+    // Add reviewer
+    private bool _addReviewerDialogVisible;
+    private int _newReviewerUserId;
+    private string _newReviewerRole = "reviewer";
+    private string _newReviewerLanguages = "";
+    private bool _addingReviewer;
+
+    // Remove reviewer
+    private bool _removeReviewerDialogVisible;
+    private ReviewerDto? _reviewerToRemove;
+    private bool _removingReviewer;
 
     protected override async Task OnInitializedAsync()
     {
@@ -809,4 +1080,155 @@ else
         "lrm" => "LRM managed",
         _ => "Unknown"
     };
+
+    // Workflow methods
+    private async Task LoadWorkflowSettings()
+    {
+        if (_project == null || _workflowLoaded) return;
+
+        _loadingWorkflow = true;
+        try
+        {
+            _workflowSettings = await WorkflowService.GetWorkflowSettingsAsync(_project.Id);
+            _workflowLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load workflow settings: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingWorkflow = false;
+        }
+    }
+
+    private async Task SaveWorkflowSettings()
+    {
+        if (_project == null || _workflowSettings == null) return;
+
+        _savingWorkflow = true;
+        try
+        {
+            var request = new UpdateWorkflowSettingsRequest
+            {
+                ReviewWorkflowEnabled = _workflowSettings.ReviewWorkflowEnabled,
+                RequireReviewBeforeExport = _workflowSettings.RequireReviewBeforeExport,
+                RequireApprovalBeforeExport = _workflowSettings.RequireApprovalBeforeExport,
+                InheritOrganizationReviewers = _workflowSettings.InheritOrganizationReviewers
+            };
+
+            var result = await WorkflowService.UpdateWorkflowSettingsAsync(_project.Id, request);
+            if (result != null)
+            {
+                _workflowSettings = result;
+                Snackbar.Add("Workflow settings saved", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Failed to save workflow settings", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to save workflow settings: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _savingWorkflow = false;
+        }
+    }
+
+    private IEnumerable<ReviewerDto> GetAllReviewers()
+    {
+        var reviewers = new List<ReviewerDto>();
+        if (_workflowSettings?.Reviewers != null)
+            reviewers.AddRange(_workflowSettings.Reviewers);
+        if (_workflowSettings?.InheritedReviewers != null)
+            reviewers.AddRange(_workflowSettings.InheritedReviewers);
+        return reviewers.OrderBy(r => r.IsInherited).ThenBy(r => r.Username);
+    }
+
+    private void OpenAddReviewerDialog()
+    {
+        _newReviewerUserId = 0;
+        _newReviewerRole = "reviewer";
+        _newReviewerLanguages = "";
+        _addReviewerDialogVisible = true;
+    }
+
+    private async Task AddReviewer()
+    {
+        if (_project == null || _newReviewerUserId <= 0) return;
+
+        _addingReviewer = true;
+        try
+        {
+            var request = new AddReviewerRequest
+            {
+                UserId = _newReviewerUserId,
+                Role = _newReviewerRole,
+                LanguageCodes = string.IsNullOrWhiteSpace(_newReviewerLanguages)
+                    ? null
+                    : _newReviewerLanguages.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(l => l.Trim().ToLowerInvariant())
+                        .ToArray()
+            };
+
+            var result = await WorkflowService.AddProjectReviewerAsync(_project.Id, request);
+            if (result != null)
+            {
+                _workflowSettings?.Reviewers?.Add(result);
+                Snackbar.Add($"Reviewer added", Severity.Success);
+                _addReviewerDialogVisible = false;
+            }
+            else
+            {
+                Snackbar.Add("Failed to add reviewer", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to add reviewer: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _addingReviewer = false;
+        }
+    }
+
+    private void ConfirmRemoveReviewer(ReviewerDto reviewer)
+    {
+        _reviewerToRemove = reviewer;
+        _removeReviewerDialogVisible = true;
+    }
+
+    private async Task RemoveReviewer()
+    {
+        if (_project == null || _reviewerToRemove == null) return;
+
+        _removingReviewer = true;
+        try
+        {
+            var result = await WorkflowService.RemoveProjectReviewerAsync(_project.Id, _reviewerToRemove.UserId);
+            if (result)
+            {
+                _workflowSettings?.Reviewers?.RemoveAll(r => r.UserId == _reviewerToRemove.UserId);
+                Snackbar.Add("Reviewer removed", Severity.Success);
+                _removeReviewerDialogVisible = false;
+                _reviewerToRemove = null;
+            }
+            else
+            {
+                Snackbar.Add("Failed to remove reviewer", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to remove reviewer: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _removingReviewer = false;
+        }
+    }
 }

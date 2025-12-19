@@ -202,6 +202,46 @@ public class ProjectService : IProjectService
         }
     }
 
+    public async Task<ProjectDto?> GetProjectByOrgSlugAsync(string orgSlug, string projectSlug, int userId)
+    {
+        try
+        {
+            // Look up organization by slug
+            var slugLower = orgSlug.ToLowerInvariant();
+            var organization = await _db.Organizations.FirstOrDefaultAsync(o => o.Slug == slugLower);
+            if (organization == null)
+            {
+                return null;
+            }
+
+            // Look up project by slug for that organization
+            var projectSlugLower = projectSlug.ToLowerInvariant();
+            var project = await _db.Projects
+                .Include(p => p.Organization)
+                .Include(p => p.ResourceKeys)
+                    .ThenInclude(k => k.Translations)
+                .FirstOrDefaultAsync(p => p.Slug == projectSlugLower && p.OrganizationId == organization.Id);
+
+            if (project == null)
+            {
+                return null;
+            }
+
+            // Verify access
+            if (!await CanViewProjectAsync(project.Id, userId))
+            {
+                return null;
+            }
+
+            return MapToProjectDto(project, userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting project by org slug {OrgSlug}/{ProjectSlug}", orgSlug, projectSlug);
+            return null;
+        }
+    }
+
     public async Task<List<ProjectDto>> GetUserProjectsAsync(int userId)
     {
         // Get personal projects

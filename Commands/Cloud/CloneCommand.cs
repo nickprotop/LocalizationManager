@@ -143,7 +143,7 @@ public class CloneCommand : Command<CloneCommandSettings>
 
             // 7. Fetch and validate remote project
             using var apiClient = new CloudApiClient(remoteUrl);
-            ConfigureAuth(apiClient, cloudConfig);
+            ConfigureAuth(apiClient, cloudConfig, targetDirectory);
 
             CloudProject? remoteProject = null;
             try
@@ -339,7 +339,7 @@ public class CloneCommand : Command<CloneCommandSettings>
         }
     }
 
-    private static void ConfigureAuth(CloudApiClient apiClient, CloudConfig config)
+    private static void ConfigureAuth(CloudApiClient apiClient, CloudConfig config, string? projectDirectory = null)
     {
         if (!string.IsNullOrWhiteSpace(config.ApiKey))
         {
@@ -348,6 +348,11 @@ public class CloneCommand : Command<CloneCommandSettings>
         else
         {
             apiClient.SetAccessToken(config.AccessToken);
+            // Enable auto-refresh for JWT authentication
+            if (!string.IsNullOrEmpty(projectDirectory))
+            {
+                apiClient.EnableAutoRefresh(projectDirectory);
+            }
         }
     }
 
@@ -442,7 +447,7 @@ public class CloneCommand : Command<CloneCommandSettings>
             AnsiConsole.Status()
                 .Start("Fetching resources...", ctx =>
                 {
-                    pullResponse = apiClient.PullResourcesAsync(ct).GetAwaiter().GetResult();
+                    pullResponse = apiClient.PullResourcesAsync(includeUnapproved: false, ct).GetAwaiter().GetResult();
                 });
         }
         catch (CloudApiException ex)

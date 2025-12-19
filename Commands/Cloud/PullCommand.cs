@@ -45,6 +45,11 @@ public class PullCommandSettings : BaseCommandSettings
     [Description("Pull only resources, skip configuration")]
     [DefaultValue(false)]
     public bool ResourcesOnly { get; set; }
+
+    [CommandOption("--include-unapproved")]
+    [Description("Include translations that haven't been approved yet (when project has review workflow enabled)")]
+    [DefaultValue(false)]
+    public bool IncludeUnapproved { get; set; }
 }
 
 /// <summary>
@@ -128,6 +133,8 @@ public class PullCommand : Command<PullCommandSettings>
             else
             {
                 apiClient.SetAccessToken(cloudConfig.AccessToken);
+                // Enable auto-refresh for JWT authentication
+                apiClient.EnableAutoRefresh(projectDirectory);
             }
 
             // Fetch remote project info and validate format compatibility
@@ -184,12 +191,19 @@ public class PullCommand : Command<PullCommandSettings>
             AnsiConsole.Status()
                 .Start("Fetching remote data...", ctx =>
                 {
-                    pullResponse = apiClient.PullResourcesAsync(cancellationToken).GetAwaiter().GetResult();
+                    pullResponse = apiClient.PullResourcesAsync(settings.IncludeUnapproved, cancellationToken).GetAwaiter().GetResult();
                 });
 
             if (pullResponse == null)
             {
                 throw new InvalidOperationException("Failed to pull resources from server");
+            }
+
+            // Show workflow message if translations were excluded
+            if (!string.IsNullOrEmpty(pullResponse.WorkflowMessage))
+            {
+                AnsiConsole.MarkupLine($"[yellow]⚠ {pullResponse.WorkflowMessage.EscapeMarkup()}[/]");
+                AnsiConsole.WriteLine();
             }
 
             // Detect conflicts and show diff

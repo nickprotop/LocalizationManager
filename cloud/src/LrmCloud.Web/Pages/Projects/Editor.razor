@@ -7,12 +7,14 @@
 @inject IJSRuntime JS
 @inject IDialogService DialogService
 @inject SnapshotService SnapshotService
+@inject ReviewWorkflowService WorkflowService
 @implements IAsyncDisposable
 @using LrmCloud.Web.Models
 @using LrmCloud.Web.Components
 @using LrmCloud.Web.Helpers
 @using LrmCloud.Shared.DTOs.Resources
 @using LrmCloud.Shared.DTOs.Translation
+@using LrmCloud.Shared.DTOs.Reviews
 @using MudBlazor
 
 <PageTitle>@(_project?.Name ?? "Editor") - LRM Cloud</PageTitle>
@@ -101,7 +103,12 @@ else
                      OnTranslateClicked="@OnTranslateSelected"
                      OnDeleteClicked="@OnDeleteSelected"
                      OnCellChanged="@OnCellChanged"
-                     OnSearchTextChanged="@OnSearchTextChanged" />
+                     OnSearchTextChanged="@OnSearchTextChanged"
+                     WorkflowEnabled="@_workflowEnabled"
+                     CanReview="@_canReview"
+                     CanApprove="@_canApprove"
+                     OnReviewClicked="@OnReviewSelected"
+                     OnApproveClicked="@OnApproveSelected" />
 
     <MudDrawer @bind-Open="_drawerOpen"
                Anchor="Anchor.Right"
@@ -190,6 +197,11 @@ else
     private bool _createSnapshotOnSave = true;
     private int _pendingSaveCount;
 
+    // Workflow
+    private bool _workflowEnabled;
+    private bool _canReview;
+    private bool _canApprove;
+
     /// <summary>
     /// Whether the current project format supports plural keys.
     /// JSON/i18next support plurals, RESX does not.
@@ -224,6 +236,10 @@ else
                     _languages.Remove(_project.DefaultLanguage);
                     _languages.Insert(0, _project.DefaultLanguage);
                 }
+
+                // Load workflow settings
+                await LoadWorkflowAsync();
+
                 // Grid will load data via ServerData callback
             }
         }
@@ -234,6 +250,30 @@ else
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task LoadWorkflowAsync()
+    {
+        try
+        {
+            var settings = await WorkflowService.GetWorkflowSettingsAsync(ProjectId);
+            if (settings != null)
+            {
+                _workflowEnabled = settings.ReviewWorkflowEnabled;
+
+                if (_workflowEnabled)
+                {
+                    // Check user permissions
+                    _canReview = await WorkflowService.CanReviewAsync(ProjectId);
+                    _canApprove = await WorkflowService.CanApproveAsync(ProjectId);
+                }
+            }
+        }
+        catch
+        {
+            // Workflow feature may not be enabled, ignore errors
+            _workflowEnabled = false;
         }
     }
 
@@ -950,6 +990,92 @@ else
             "Delete Key",
             $"Are you sure you want to delete '{row.KeyName}'? This action cannot be undone.",
             new List<string> { row.KeyName });
+    }
+
+    // ============================================================
+    // Review/Approve Actions
+    // ============================================================
+
+    private async Task OnReviewSelected(IEnumerable<TranslationGridRow> rows)
+    {
+        if (_project == null || !_workflowEnabled || !_canReview) return;
+
+        var translationIds = rows
+            .SelectMany(r => r.Translations.Values)
+            .Where(t => t.TranslationId.HasValue && t.Status == "translated")
+            .Select(t => t.TranslationId!.Value)
+            .ToList();
+
+        if (!translationIds.Any())
+        {
+            Snackbar.Add("No translations eligible for review (must be in 'translated' status)", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var request = new ReviewTranslationsRequest
+            {
+                TranslationIds = translationIds
+            };
+
+            var result = await WorkflowService.ReviewTranslationsAsync(ProjectId, request);
+            if (result != null)
+            {
+                Snackbar.Add($"Reviewed {result.ProcessedCount} translation(s){(result.SkippedCount > 0 ? $", {result.SkippedCount} skipped" : "")}", Severity.Success);
+
+                // Refresh grid to show new status
+                if (_translationGrid != null)
+                {
+                    await _translationGrid.ReloadAsync();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error reviewing translations: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OnApproveSelected(IEnumerable<TranslationGridRow> rows)
+    {
+        if (_project == null || !_workflowEnabled || !_canApprove) return;
+
+        var translationIds = rows
+            .SelectMany(r => r.Translations.Values)
+            .Where(t => t.TranslationId.HasValue && (t.Status == "reviewed" || t.Status == "translated"))
+            .Select(t => t.TranslationId!.Value)
+            .ToList();
+
+        if (!translationIds.Any())
+        {
+            Snackbar.Add("No translations eligible for approval (must be in 'translated' or 'reviewed' status)", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var request = new ApproveTranslationsRequest
+            {
+                TranslationIds = translationIds
+            };
+
+            var result = await WorkflowService.ApproveTranslationsAsync(ProjectId, request);
+            if (result != null)
+            {
+                Snackbar.Add($"Approved {result.ProcessedCount} translation(s){(result.SkippedCount > 0 ? $", {result.SkippedCount} skipped" : "")}", Severity.Success);
+
+                // Refresh grid to show new status
+                if (_translationGrid != null)
+                {
+                    await _translationGrid.ReloadAsync();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error approving translations: {ex.Message}", Severity.Error);
+        }
     }
 
     // ============================================================

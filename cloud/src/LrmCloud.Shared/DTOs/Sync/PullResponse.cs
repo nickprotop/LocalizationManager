@@ -16,4 +16,16 @@ public class PullResponse
     /// Includes all languages currently stored in the database.
     /// </summary>
     public List<FileDto> Files { get; set; } = new();
+
+    /// <summary>
+    /// Number of translations excluded due to workflow requirements.
+    /// Only populated when ReviewWorkflowEnabled is true and RequireApprovalBeforeExport or RequireReviewBeforeExport is set.
+    /// </summary>
+    public int ExcludedTranslationCount { get; set; }
+
+    /// <summary>
+    /// Informational message about excluded translations due to workflow.
+    /// Null if no translations were excluded.
+    /// </summary>
+    public string? WorkflowMessage { get; set; }
 }

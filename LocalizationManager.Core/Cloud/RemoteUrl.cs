@@ -59,7 +59,7 @@ public class RemoteUrl
             if (IsPersonalProject)
                 return $"{ApiBaseUrl}/users/{Username}/projects/{ProjectName}";
             else
-                return $"{ApiBaseUrl}/projects/{Organization}/{ProjectName}";
+                return $"{ApiBaseUrl}/organizations/{Organization}/projects/{ProjectName}";
         }
     }
 

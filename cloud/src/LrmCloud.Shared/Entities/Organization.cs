@@ -69,4 +69,5 @@ public class Organization
     public ICollection<OrganizationMember> Members { get; set; } = new List<OrganizationMember>();
     public ICollection<Project> Projects { get; set; } = new List<Project>();
     public ICollection<OrganizationApiKey> OrganizationApiKeys { get; set; } = new List<OrganizationApiKey>();
+    public ICollection<OrganizationReviewer> Reviewers { get; set; } = new List<OrganizationReviewer>();
 }

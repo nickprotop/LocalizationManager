@@ -104,6 +104,8 @@ public class StatusCommand : Command<StatusCommandSettings>
         else
         {
             apiClient.SetAccessToken(config.AccessToken);
+            // Enable auto-refresh for JWT authentication
+            apiClient.EnableAutoRefresh(projectDirectory);
         }
 
         // Fetch sync status
@@ -193,6 +195,8 @@ public class StatusCommand : Command<StatusCommandSettings>
         else
         {
             apiClient.SetAccessToken(config.AccessToken);
+            // Enable auto-refresh for JWT authentication
+            apiClient.EnableAutoRefresh(projectDirectory);
         }
 
         // Fetch user info

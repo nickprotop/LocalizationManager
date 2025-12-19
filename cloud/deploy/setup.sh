@@ -119,12 +119,24 @@ CURRENT_JWT=$(config_get '.auth.jwtSecret' '')
 CURRENT_ENCRYPTION=$(config_get '.encryption.tokenKey' '')
 CURRENT_API_KEY_SECRET=$(config_get '.apiKeyMasterSecret' '')
 
+CURRENT_MAIL_BACKEND=$(config_get '.mail.backend' 'smtp')
 CURRENT_MAIL_HOST=$(config_get '.mail.host' 'localhost')
 CURRENT_MAIL_PORT=$(config_get '.mail.port' '25')
 CURRENT_MAIL_USER=$(config_get '.mail.username' '')
 CURRENT_MAIL_PASS=$(config_get '.mail.password' '')
 CURRENT_MAIL_FROM=$(config_get '.mail.fromAddress' 'noreply@lrm-cloud.com')
 CURRENT_MAIL_NAME=$(config_get '.mail.fromName' 'LRM Cloud')
+CURRENT_MAIL_SSL=$(config_get '.mail.useSsl' 'false')
+
+# IMAP-specific settings
+CURRENT_IMAP_HOST=$(config_get '.mail.imap.host' '')
+CURRENT_IMAP_PORT=$(config_get '.mail.imap.port' '993')
+CURRENT_IMAP_SSL=$(config_get '.mail.imap.useSsl' 'true')
+CURRENT_IMAP_SMTP_HOST=$(config_get '.mail.imap.smtpHost' '')
+CURRENT_IMAP_SMTP_PORT=$(config_get '.mail.imap.smtpPort' '587')
+CURRENT_IMAP_SMTP_SSL=$(config_get '.mail.imap.smtpUseSsl' 'false')
+CURRENT_IMAP_SENT_FOLDER=$(config_get '.mail.imap.sentFolder' 'Sent')
+CURRENT_IMAP_SAVE_TO_SENT=$(config_get '.mail.imap.saveToSent' 'true')
 
 echo ""
 echo "Press Enter to keep current value, or type new value:"
@@ -200,29 +212,153 @@ read -p "Environment [$CURRENT_ENV]: " ENVIRONMENT
 ENVIRONMENT=${ENVIRONMENT:-$CURRENT_ENV}
 
 echo ""
-echo "Mail settings (leave empty for local sendmail):"
-read -p "Mail Host [$CURRENT_MAIL_HOST]: " MAIL_HOST
-MAIL_HOST=${MAIL_HOST:-$CURRENT_MAIL_HOST}
+echo -e "${BLUE}Mail Configuration:${NC}"
+echo "Mail backends:"
+echo "  1) smtp - Traditional SMTP (default, supports local sendmail)"
+echo "  2) imap - IMAP infrastructure (uses existing mail server)"
+echo ""
+read -p "Mail Backend [$CURRENT_MAIL_BACKEND]: " MAIL_BACKEND_INPUT
 
-read -p "Mail Port [$CURRENT_MAIL_PORT]: " MAIL_PORT
-MAIL_PORT=${MAIL_PORT:-$CURRENT_MAIL_PORT}
-
-read -p "Mail Username [$CURRENT_MAIL_USER]: " MAIL_USER
-MAIL_USER=${MAIL_USER:-$CURRENT_MAIL_USER}
-
-if [ -n "$MAIL_USER" ]; then
-    read -s -p "Mail Password [hidden]: " MAIL_PASS_INPUT
-    echo ""
-    MAIL_PASS=${MAIL_PASS_INPUT:-$CURRENT_MAIL_PASS}
-else
-    MAIL_PASS=""
-fi
+case "$MAIL_BACKEND_INPUT" in
+    1) MAIL_BACKEND="smtp" ;;
+    2) MAIL_BACKEND="imap" ;;
+    "") MAIL_BACKEND="$CURRENT_MAIL_BACKEND" ;;
+    *) MAIL_BACKEND="$MAIL_BACKEND_INPUT" ;;
+esac
 
 read -p "Mail From Address [$CURRENT_MAIL_FROM]: " MAIL_FROM
 MAIL_FROM=${MAIL_FROM:-$CURRENT_MAIL_FROM}
 
 read -p "Mail From Name [$CURRENT_MAIL_NAME]: " MAIL_NAME
 MAIL_NAME=${MAIL_NAME:-$CURRENT_MAIL_NAME}
+
+if [ "$MAIL_BACKEND" = "smtp" ]; then
+    echo ""
+    echo "SMTP settings (leave empty for local sendmail):"
+    read -p "SMTP Host [$CURRENT_MAIL_HOST]: " MAIL_HOST
+    MAIL_HOST=${MAIL_HOST:-$CURRENT_MAIL_HOST}
+
+    read -p "SMTP Port [$CURRENT_MAIL_PORT]: " MAIL_PORT
+    MAIL_PORT=${MAIL_PORT:-$CURRENT_MAIL_PORT}
+
+    read -p "SMTP Username [$CURRENT_MAIL_USER]: " MAIL_USER
+    MAIL_USER=${MAIL_USER:-$CURRENT_MAIL_USER}
+
+    if [ -n "$MAIL_USER" ]; then
+        read -s -p "SMTP Password [hidden]: " MAIL_PASS_INPUT
+        echo ""
+        MAIL_PASS=${MAIL_PASS_INPUT:-$CURRENT_MAIL_PASS}
+    else
+        MAIL_PASS=""
+    fi
+
+    if [ "$CURRENT_MAIL_SSL" = "true" ]; then
+        SSL_DEFAULT="Y/n"
+    else
+        SSL_DEFAULT="y/N"
+    fi
+    read -p "Use SSL/TLS? [$SSL_DEFAULT]: " MAIL_SSL_INPUT
+    if [ -z "$MAIL_SSL_INPUT" ]; then
+        MAIL_SSL="$CURRENT_MAIL_SSL"
+    elif [ "$MAIL_SSL_INPUT" = "y" ] || [ "$MAIL_SSL_INPUT" = "Y" ]; then
+        MAIL_SSL="true"
+    else
+        MAIL_SSL="false"
+    fi
+
+    # Clear IMAP settings for SMTP mode
+    IMAP_HOST=""
+    IMAP_PORT="993"
+    IMAP_SSL="true"
+    IMAP_SMTP_HOST=""
+    IMAP_SMTP_PORT="587"
+    IMAP_SMTP_SSL="false"
+    IMAP_SENT_FOLDER="Sent"
+    IMAP_SAVE_TO_SENT="true"
+else
+    # IMAP backend
+    echo ""
+    echo "IMAP settings:"
+    read -p "IMAP Host [$CURRENT_IMAP_HOST]: " IMAP_HOST
+    IMAP_HOST=${IMAP_HOST:-$CURRENT_IMAP_HOST}
+
+    read -p "IMAP Port [$CURRENT_IMAP_PORT]: " IMAP_PORT
+    IMAP_PORT=${IMAP_PORT:-$CURRENT_IMAP_PORT}
+
+    if [ "$CURRENT_IMAP_SSL" = "true" ]; then
+        IMAP_SSL_DEFAULT="Y/n"
+    else
+        IMAP_SSL_DEFAULT="y/N"
+    fi
+    read -p "IMAP Use SSL? [$IMAP_SSL_DEFAULT]: " IMAP_SSL_INPUT
+    if [ -z "$IMAP_SSL_INPUT" ]; then
+        IMAP_SSL="$CURRENT_IMAP_SSL"
+    elif [ "$IMAP_SSL_INPUT" = "y" ] || [ "$IMAP_SSL_INPUT" = "Y" ]; then
+        IMAP_SSL="true"
+    else
+        IMAP_SSL="false"
+    fi
+
+    echo ""
+    echo "SMTP submission settings (for sending via IMAP infrastructure):"
+    SMTP_HOST_DEFAULT=${CURRENT_IMAP_SMTP_HOST:-$IMAP_HOST}
+    read -p "SMTP Host [$SMTP_HOST_DEFAULT]: " IMAP_SMTP_HOST
+    IMAP_SMTP_HOST=${IMAP_SMTP_HOST:-$SMTP_HOST_DEFAULT}
+
+    read -p "SMTP Port [$CURRENT_IMAP_SMTP_PORT]: " IMAP_SMTP_PORT
+    IMAP_SMTP_PORT=${IMAP_SMTP_PORT:-$CURRENT_IMAP_SMTP_PORT}
+
+    if [ "$CURRENT_IMAP_SMTP_SSL" = "true" ]; then
+        SMTP_SSL_DEFAULT="Y/n"
+    else
+        SMTP_SSL_DEFAULT="y/N"
+    fi
+    read -p "SMTP Use SSL? [$SMTP_SSL_DEFAULT]: " IMAP_SMTP_SSL_INPUT
+    if [ -z "$IMAP_SMTP_SSL_INPUT" ]; then
+        IMAP_SMTP_SSL="$CURRENT_IMAP_SMTP_SSL"
+    elif [ "$IMAP_SMTP_SSL_INPUT" = "y" ] || [ "$IMAP_SMTP_SSL_INPUT" = "Y" ]; then
+        IMAP_SMTP_SSL="true"
+    else
+        IMAP_SMTP_SSL="false"
+    fi
+
+    echo ""
+    echo "Authentication (same credentials for IMAP and SMTP):"
+    read -p "Username [$CURRENT_MAIL_USER]: " MAIL_USER
+    MAIL_USER=${MAIL_USER:-$CURRENT_MAIL_USER}
+
+    if [ -n "$MAIL_USER" ]; then
+        read -s -p "Password [hidden]: " MAIL_PASS_INPUT
+        echo ""
+        MAIL_PASS=${MAIL_PASS_INPUT:-$CURRENT_MAIL_PASS}
+    else
+        MAIL_PASS=""
+    fi
+
+    echo ""
+    echo "Sent folder settings:"
+    read -p "Sent Folder Name [$CURRENT_IMAP_SENT_FOLDER]: " IMAP_SENT_FOLDER
+    IMAP_SENT_FOLDER=${IMAP_SENT_FOLDER:-$CURRENT_IMAP_SENT_FOLDER}
+
+    if [ "$CURRENT_IMAP_SAVE_TO_SENT" = "true" ]; then
+        SAVE_DEFAULT="Y/n"
+    else
+        SAVE_DEFAULT="y/N"
+    fi
+    read -p "Save to Sent folder? [$SAVE_DEFAULT]: " IMAP_SAVE_INPUT
+    if [ -z "$IMAP_SAVE_INPUT" ]; then
+        IMAP_SAVE_TO_SENT="$CURRENT_IMAP_SAVE_TO_SENT"
+    elif [ "$IMAP_SAVE_INPUT" = "y" ] || [ "$IMAP_SAVE_INPUT" = "Y" ]; then
+        IMAP_SAVE_TO_SENT="true"
+    else
+        IMAP_SAVE_TO_SENT="false"
+    fi
+
+    # Set SMTP host/port for the main config (used by IMAP backend as fallback)
+    MAIL_HOST="$IMAP_SMTP_HOST"
+    MAIL_PORT="$IMAP_SMTP_PORT"
+    MAIL_SSL="$IMAP_SMTP_SSL"
+fi
 
 # ============================================================================
 # CORS Configuration
@@ -406,12 +542,24 @@ NEW_CONFIG=$(cat <<EOF
     "jwtExpiryHours": ${CURRENT_JWT_EXPIRY}
   },
   "mail": {
+    "backend": "${MAIL_BACKEND}",
     "host": "${MAIL_HOST}",
     "port": ${MAIL_PORT},
     "username": "${MAIL_USER}",
     "password": "${MAIL_PASS}",
     "fromAddress": "${MAIL_FROM}",
-    "fromName": "${MAIL_NAME}"
+    "fromName": "${MAIL_NAME}",
+    "useSsl": ${MAIL_SSL},
+    "imap": {
+      "host": "${IMAP_HOST}",
+      "port": ${IMAP_PORT},
+      "useSsl": ${IMAP_SSL},
+      "smtpHost": "${IMAP_SMTP_HOST}",
+      "smtpPort": ${IMAP_SMTP_PORT},
+      "smtpUseSsl": ${IMAP_SMTP_SSL},
+      "sentFolder": "${IMAP_SENT_FOLDER}",
+      "saveToSent": ${IMAP_SAVE_TO_SENT}
+    }
   },
   "features": {
     "registration": ${CURRENT_REG},

@@ -29,6 +29,11 @@ public interface IProjectService
     Task<ProjectDto?> GetProjectByNameAsync(string username, string projectName, int userId);
 
     /// <summary>
+    /// Gets a project by organization slug and project slug.
+    /// </summary>
+    Task<ProjectDto?> GetProjectByOrgSlugAsync(string orgSlug, string projectSlug, int userId);
+
+    /// <summary>
     /// Gets all projects accessible by the user (personal + organization).
     /// </summary>
     Task<List<ProjectDto>> GetUserProjectsAsync(int userId);

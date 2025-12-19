@@ -134,7 +134,7 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
         }
 
         // 3. Fetch user's projects
-        var projects = FetchUserProjects(host, port, useHttps, config, cancellationToken);
+        var projects = FetchUserProjects(projectDirectory, host, port, useHttps, config, cancellationToken);
 
         // 4. Select or create project
         CloudProject? selectedProject = null;
@@ -314,7 +314,7 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
     }
 
     private List<CloudProject> FetchUserProjects(
-        string host, int port, bool useHttps, CloudConfig config, CancellationToken cancellationToken)
+        string projectDirectory, string host, int port, bool useHttps, CloudConfig config, CancellationToken cancellationToken)
     {
         var remoteUrl = CreateAuthRemoteUrl(host, port, useHttps);
         List<CloudProject> projects = new();
@@ -331,6 +331,8 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
                 else
                 {
                     apiClient.SetAccessToken(config.AccessToken);
+                    // Enable auto-refresh for JWT authentication
+                    apiClient.EnableAutoRefresh(projectDirectory);
                 }
 
                 projects = apiClient.GetUserProjectsAsync(cancellationToken).GetAwaiter().GetResult();
@@ -481,6 +483,8 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
                 else
                 {
                     apiClient.SetAccessToken(config.AccessToken);
+                    // Enable auto-refresh for JWT authentication
+                    apiClient.EnableAutoRefresh(projectDirectory);
                 }
 
                 var request = new CreateProjectRequest
