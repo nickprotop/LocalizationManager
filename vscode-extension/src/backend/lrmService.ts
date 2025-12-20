@@ -460,12 +460,14 @@ export class LrmService implements vscode.Disposable {
             return null;
         }
 
-        // Search for both .resx AND JSON files in workspace
+        // Search for all supported resource file types
         const excludePattern = '{**/.lrm/**,**/.backup/**,**/node_modules/**,**/bin/**,**/obj/**,**/.git/**,**/.vscode/**,**/.github/**,**/.idea/**,**/.vs/**,**/dist/**,**/build/**,**/.devcontainer/**,**/.claude/**}';
 
-        const [resxFiles, jsonFiles] = await Promise.all([
+        const [resxFiles, jsonFiles, androidFiles, iosFiles] = await Promise.all([
             vscode.workspace.findFiles('**/*.resx', excludePattern, 10),
-            vscode.workspace.findFiles('**/*.json', excludePattern, 50) // More results for filtering
+            vscode.workspace.findFiles('**/*.json', excludePattern, 50),
+            vscode.workspace.findFiles('**/res/values*/strings.xml', excludePattern, 10),
+            vscode.workspace.findFiles('**/*.lproj/*.strings', excludePattern, 10)
         ]);
 
         // Filter RESX files to exclude hidden directories (backup folders, etc.)
@@ -482,22 +484,50 @@ export class LrmService implements vscode.Disposable {
             return culture !== null || baseName.length > 0;
         });
 
+        // Filter Android files - must be in res/values* folder
+        const filteredAndroidFiles = androidFiles.filter(f => {
+            const dir = path.dirname(f.fsPath);
+            return /[/\\]res[/\\]values(-[a-z]{2}(-[A-Z]{2})?)?$/i.test(dir);
+        });
+
+        // Filter iOS files - must be in *.lproj folder
+        const filteredIosFiles = iosFiles.filter(f => {
+            const dir = path.dirname(f.fsPath);
+            return /\.lproj$/i.test(dir);
+        });
+
         // Group files by directory to find resource directories
         const jsonDirs = new Set(validJsonResources.map(f => path.dirname(f.fsPath)));
         const resxDirs = new Set(filteredResxFiles.map(f => path.dirname(f.fsPath)));
+        // For Android, get the parent "res" directory
+        const androidDirs = new Set(filteredAndroidFiles.map(f => {
+            const valuesDir = path.dirname(f.fsPath);
+            return path.dirname(valuesDir); // Go up from values/ to res/
+        }));
+        // For iOS, get the parent directory containing .lproj folders
+        const iosDirs = new Set(filteredIosFiles.map(f => {
+            const lprojDir = path.dirname(f.fsPath);
+            return path.dirname(lprojDir); // Go up from xx.lproj/ to parent
+        }));
 
         const hasResx = filteredResxFiles.length > 0;
         const hasJson = validJsonResources.length > 0;
+        const hasAndroid = filteredAndroidFiles.length > 0;
+        const hasIos = filteredIosFiles.length > 0;
 
-        if (!hasResx && !hasJson) {
+        const formatCount = [hasResx, hasJson, hasAndroid, hasIos].filter(Boolean).length;
+
+        if (formatCount === 0) {
             return null;
         }
 
-        if (hasResx && hasJson) {
-            // BOTH formats found - ask user which to use
+        if (formatCount > 1) {
+            // Multiple formats found - ask user which to use
             const choice = await this.promptFormatChoice(
                 Array.from(resxDirs),
-                Array.from(jsonDirs)
+                Array.from(jsonDirs),
+                Array.from(androidDirs),
+                Array.from(iosDirs)
             );
 
             if (!choice || choice.format === null) {
@@ -511,8 +541,21 @@ export class LrmService implements vscode.Disposable {
         if (hasResx) {
             return path.dirname(filteredResxFiles[0].fsPath);
         }
+        if (hasJson) {
+            return path.dirname(validJsonResources[0].fsPath);
+        }
+        if (hasAndroid) {
+            // Return the res/ directory (parent of values/)
+            const valuesDir = path.dirname(filteredAndroidFiles[0].fsPath);
+            return path.dirname(valuesDir);
+        }
+        if (hasIos) {
+            // Return the parent directory containing .lproj folders
+            const lprojDir = path.dirname(filteredIosFiles[0].fsPath);
+            return path.dirname(lprojDir);
+        }
 
-        return path.dirname(validJsonResources[0].fsPath);
+        return null;
     }
 
     /**
@@ -709,14 +752,16 @@ export class LrmService implements vscode.Disposable {
     }
 
     /**
-     * Prompts user to choose between RESX and JSON when both are found
+     * Prompts user to choose between multiple resource formats
      */
     private async promptFormatChoice(
         resxDirs: string[],
-        jsonDirs: string[]
-    ): Promise<{ format: 'resx' | 'json' | null; selectedDir?: string }> {
+        jsonDirs: string[],
+        androidDirs: string[] = [],
+        iosDirs: string[] = []
+    ): Promise<{ format: 'resx' | 'json' | 'android' | 'ios' | null; selectedDir?: string }> {
         interface FormatQuickPickItem extends vscode.QuickPickItem {
-            format: 'resx' | 'json';
+            format: 'resx' | 'json' | 'android' | 'ios';
             dir: string;
         }
 
@@ -725,7 +770,7 @@ export class LrmService implements vscode.Disposable {
         // Add RESX options
         for (const dir of resxDirs) {
             items.push({
-                label: '$(file-code) RESX',
+                label: '$(file-code) RESX (.NET)',
                 description: path.basename(dir),
                 detail: dir,
                 format: 'resx',
@@ -742,6 +787,28 @@ export class LrmService implements vscode.Disposable {
                 description: path.basename(dir),
                 detail: dir,
                 format: 'json',
+                dir: dir
+            });
+        }
+
+        // Add Android options
+        for (const dir of androidDirs) {
+            items.push({
+                label: '$(device-mobile) Android (strings.xml)',
+                description: path.basename(dir),
+                detail: dir,
+                format: 'android',
+                dir: dir
+            });
+        }
+
+        // Add iOS options
+        for (const dir of iosDirs) {
+            items.push({
+                label: '$(device-mobile) iOS (.strings)',
+                description: path.basename(dir),
+                detail: dir,
+                format: 'ios',
                 dir: dir
             });
         }

@@ -3,7 +3,7 @@ import { ApiClient, ScanResult, ResourceKeyDetails, ValidationResult, KeyUsage, 
 /**
  * Resource format type
  */
-export type ResourceFormat = 'resx' | 'json' | null;
+export type ResourceFormat = 'resx' | 'json' | 'i18next' | 'android' | 'ios' | null;
 
 /**
  * Shared cache service for the LRM extension.

@@ -327,9 +327,11 @@ function setupEventListeners(context: vscode.ExtensionContext, enableRealtimeSca
 
     outputChannel.appendLine('=== Extension activation complete ===');
 
-    // Listen for resource file changes (.resx and JSON)
+    // Listen for resource file changes (.resx, JSON, Android, iOS)
     const resxWatcher = vscode.workspace.createFileSystemWatcher('**/*.resx');
     const jsonWatcher = vscode.workspace.createFileSystemWatcher('**/*.json');
+    const androidWatcher = vscode.workspace.createFileSystemWatcher('**/res/values*/strings.xml');
+    const iosWatcher = vscode.workspace.createFileSystemWatcher('**/*.lproj/*.strings');
     const lrmConfigWatcher = vscode.workspace.createFileSystemWatcher('**/lrm.json');
 
     // Helper to handle resource file changes
@@ -385,6 +387,16 @@ function setupEventListeners(context: vscode.ExtensionContext, enableRealtimeSca
         }
     });
 
+    // Android file watchers (strings.xml in res/values* folders)
+    androidWatcher.onDidChange(handleResourceChange);
+    androidWatcher.onDidCreate(handleResourceChange);
+    androidWatcher.onDidDelete(handleResourceChange);
+
+    // iOS file watchers (.strings files in .lproj folders)
+    iosWatcher.onDidChange(handleResourceChange);
+    iosWatcher.onDidCreate(handleResourceChange);
+    iosWatcher.onDidDelete(handleResourceChange);
+
     // lrm.json config file watcher - triggers full refresh when format config changes
     lrmConfigWatcher.onDidChange(async () => {
         outputChannel.appendLine('lrm.json config changed, refreshing...');
@@ -410,7 +422,7 @@ function setupEventListeners(context: vscode.ExtensionContext, enableRealtimeSca
         await handleResourceChange();
     });
 
-    context.subscriptions.push(resxWatcher, jsonWatcher, lrmConfigWatcher);
+    context.subscriptions.push(resxWatcher, jsonWatcher, androidWatcher, iosWatcher, lrmConfigWatcher);
 
     // Scan visible editors on activation
     vscode.window.visibleTextEditors.forEach(editor => {
