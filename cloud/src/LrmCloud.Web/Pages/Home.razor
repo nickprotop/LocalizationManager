@@ -150,7 +150,7 @@ else
                         <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => NavigateToEditor(project.Id))" ClickPropagation="false">
                             Edit
                         </MudButton>
-                        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="@(() => OpenEditDialog(project))" ClickPropagation="false">
+                        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="@(() => NavigateToSettings(project.Id))" ClickPropagation="false">
                             Settings
                         </MudButton>
                     </MudCardActions>
@@ -170,7 +170,6 @@ else
 }
 
 <CreateProjectDialog @ref="_createDialog" OnProjectCreated="OnProjectCreated" />
-<EditProjectDialog @ref="_editDialog" OnProjectUpdated="OnProjectUpdated" OnProjectDeleted="OnProjectDeleted" />
 <ImportProjectDialog @ref="_importDialog" OnProjectImported="OnProjectCreated" OrganizationId="@OrgContext.SelectedOrganizationId" />
 
 @code {
@@ -180,7 +179,6 @@ else
     private UsageStatsDto? _usageStats;
     private bool _isLoading = true;
     private CreateProjectDialog? _createDialog;
-    private EditProjectDialog? _editDialog;
     private ImportProjectDialog? _importDialog;
 
     protected override async Task OnInitializedAsync()
@@ -241,9 +239,9 @@ else
         _createDialog?.Open();
     }
 
-    private void OpenEditDialog(ProjectDto project)
+    private void NavigateToSettings(int projectId)
     {
-        _editDialog?.Open(project);
+        Navigation.NavigateTo($"projects/{projectId}/settings");
     }
 
     private void OpenImportDialog()
@@ -258,22 +256,6 @@ else
         _stats.ProjectCount++;
         _stats.TotalKeys += project.KeyCount;
         StateHasChanged();
-    }
-
-    private async Task OnProjectUpdated(ProjectDto project)
-    {
-        var index = _projects.FindIndex(p => p.Id == project.Id);
-        if (index >= 0)
-        {
-            _projects[index] = project;
-            StateHasChanged();
-        }
-    }
-
-    private async Task OnProjectDeleted(int projectId)
-    {
-        _projects.RemoveAll(p => p.Id == projectId);
-        await LoadDataAsync(); // Refresh stats
     }
 
     private void NavigateToProject(int projectId)

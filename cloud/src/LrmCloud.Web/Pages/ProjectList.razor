@@ -108,7 +108,7 @@ else
                         <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => NavigateToEditor(project.Id))" ClickPropagation="false">
                             Edit
                         </MudButton>
-                        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="@(() => OpenEditDialog(project))" ClickPropagation="false">
+                        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="@(() => NavigateToSettings(project.Id))" ClickPropagation="false">
                             Settings
                         </MudButton>
                     </MudCardActions>
@@ -119,7 +119,6 @@ else
 }
 
 <CreateProjectDialog @ref="_createDialog" OnProjectCreated="OnProjectCreated" />
-<EditProjectDialog @ref="_editDialog" OnProjectUpdated="OnProjectUpdated" OnProjectDeleted="OnProjectDeleted" />
 
 @code {
     private List<ProjectDto> _projects = new();
@@ -127,7 +126,6 @@ else
     private string _searchText = string.Empty;
     private string _formatFilter = string.Empty;
     private CreateProjectDialog? _createDialog;
-    private EditProjectDialog? _editDialog;
     private bool _canCreateProject = true;
     private string? _limitMessage;
 
@@ -178,32 +176,14 @@ else
         _createDialog?.Open();
     }
 
-    private void OpenEditDialog(ProjectDto project)
+    private void NavigateToSettings(int projectId)
     {
-        _editDialog?.Open(project);
+        Navigation.NavigateTo($"projects/{projectId}/settings");
     }
 
     private async Task OnProjectCreated(ProjectDto project)
     {
         _projects.Insert(0, project);
-        LimitsService.InvalidateCache();
-        await CheckLimitsAsync();
-        StateHasChanged();
-    }
-
-    private async Task OnProjectUpdated(ProjectDto project)
-    {
-        var index = _projects.FindIndex(p => p.Id == project.Id);
-        if (index >= 0)
-        {
-            _projects[index] = project;
-            StateHasChanged();
-        }
-    }
-
-    private async Task OnProjectDeleted(int projectId)
-    {
-        _projects.RemoveAll(p => p.Id == projectId);
         LimitsService.InvalidateCache();
         await CheckLimitsAsync();
         StateHasChanged();

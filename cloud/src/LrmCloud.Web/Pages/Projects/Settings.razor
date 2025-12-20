@@ -85,16 +85,12 @@ else
                                           For="@(() => _model.Description)"
                                           Disabled="_isSubmitting" />
 
-                            <MudSelect @bind-Value="_model.Format"
-                                       Label="Format"
-                                       Variant="Variant.Outlined"
-                                       For="@(() => _model.Format)"
-                                       Disabled="_isSubmitting"
-                                       Required="true">
-                                <MudSelectItem Value="@("resx")">.resx (C#/.NET)</MudSelectItem>
-                                <MudSelectItem Value="@("json")">JSON Localization</MudSelectItem>
-                                <MudSelectItem Value="@("i18next")">i18next (JS/React)</MudSelectItem>
-                            </MudSelect>
+                            <MudTextField Value="@GetFormatDisplayName(_model.Format)"
+                                          Label="Format"
+                                          Variant="Variant.Outlined"
+                                          Disabled="true"
+                                          ReadOnly="true"
+                                          HelperText="Format cannot be changed after project creation" />
 
                             <MudTextField @bind-Value="_model.DefaultLanguage"
                                           Label="Default Language"
@@ -1079,6 +1075,16 @@ else
         "user" => "User key",
         "lrm" => "LRM managed",
         _ => "Unknown"
+    };
+
+    private static string GetFormatDisplayName(string? format) => format?.ToLowerInvariant() switch
+    {
+        "resx" => ".resx (C#/.NET)",
+        "json" => "JSON Localization",
+        "i18next" => "i18next (JS/React)",
+        "android" => "Android strings.xml",
+        "ios" => "iOS .strings/.stringsdict",
+        _ => format ?? "Unknown"
     };
 
     // Workflow methods

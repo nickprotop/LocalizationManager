@@ -22,11 +22,13 @@
                     <MudStack Row="true" Spacing="2" Class="mb-2">
                         <MudChip T="string" Size="Size.Small" Color="Color.Primary">.resx</MudChip>
                         <MudChip T="string" Size="Size.Small" Color="Color.Info">.json</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">.xml (Android)</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">.strings (iOS)</MudChip>
                     </MudStack>
 
                     <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                                    FilesChanged="OnFilesChanged"
-                                   Accept=".resx,.json"
+                                   Accept=".resx,.json,.xml,.strings,.stringsdict"
                                    MaximumFileCount="50"
                                    Class="mt-0">
                         <ActivatorContent>
@@ -35,7 +37,7 @@
                                 <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Secondary" />
                                 <MudText Typo="Typo.body1" Class="mt-2">Drop files here or click to browse</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    .resx or .json files (max 50 files)
+                                    .resx, .json, .xml (Android), .strings (iOS) files (max 50 files)
                                 </MudText>
                             </MudPaper>
                         </ActivatorContent>
@@ -102,6 +104,8 @@
                         <MudSelectItem Value="@("resx")">.resx (C#/.NET)</MudSelectItem>
                         <MudSelectItem Value="@("json")">JSON Localization</MudSelectItem>
                         <MudSelectItem Value="@("i18next")">i18next (JS/React)</MudSelectItem>
+                        <MudSelectItem Value="@("android")">Android strings.xml</MudSelectItem>
+                        <MudSelectItem Value="@("ios")">iOS .strings/.stringsdict</MudSelectItem>
                     </MudSelect>
 
                     <MudTextField @bind-Value="_defaultLanguage"
