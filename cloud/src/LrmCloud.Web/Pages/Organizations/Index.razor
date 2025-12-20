@@ -377,17 +377,17 @@ else
 
     private void NavigateToOrg(int id)
     {
-        Navigation.NavigateTo($"/app/organizations/{id}");
+        Navigation.NavigateTo($"organizations/{id}");
     }
 
     private void NavigateToMembers(int id)
     {
-        Navigation.NavigateTo($"/app/organizations/{id}/members");
+        Navigation.NavigateTo($"organizations/{id}/members");
     }
 
     private void NavigateToSettings(int id)
     {
-        Navigation.NavigateTo($"/app/organizations/{id}/settings");
+        Navigation.NavigateTo($"organizations/{id}/settings");
     }
 
     private IEnumerable<string> ValidateSlug(string? slug)

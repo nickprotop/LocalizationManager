@@ -31,14 +31,14 @@ else if (_organization == null)
 {
     <MudAlert Severity="Severity.Error">
         Organization not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/app/organizations">Back to Organizations</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="organizations">Back to Organizations</MudButton>
     </MudAlert>
 }
 else
 {
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
         <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                       OnClick="@(() => Navigation.NavigateTo("/app/organizations"))"
+                       OnClick="@(() => Navigation.NavigateTo("organizations"))"
                        Size="Size.Small" />
         <MudBreadcrumbs Items="_breadcrumbs" />
     </MudStack>
@@ -67,24 +67,24 @@ else
             <MudStack Row="true" Spacing="2">
                 <MudButton Variant="Variant.Outlined"
                            StartIcon="@Icons.Material.Filled.People"
-                           Href="@($"/app/organizations/{OrganizationId}/members")">
+                           Href="@($"organizations/{OrganizationId}/members")">
                     Members (@_organization.MemberCount)
                 </MudButton>
                 @if (OrganizationRole.IsAdminOrOwner(_organization.UserRole))
                 {
                     <MudButton Variant="Variant.Outlined"
                                StartIcon="@Icons.Material.Filled.Key"
-                               Href="@($"/app/organizations/{OrganizationId}/api-keys")">
+                               Href="@($"organizations/{OrganizationId}/api-keys")">
                         API Keys
                     </MudButton>
                     <MudButton Variant="Variant.Outlined"
                                StartIcon="@Icons.Material.Filled.CreditCard"
-                               Href="@($"/app/organizations/{OrganizationId}/billing")">
+                               Href="@($"organizations/{OrganizationId}/billing")">
                         Billing
                     </MudButton>
                     <MudButton Variant="Variant.Outlined"
                                StartIcon="@Icons.Material.Filled.Settings"
-                               Href="@($"/app/organizations/{OrganizationId}/settings")">
+                               Href="@($"organizations/{OrganizationId}/settings")">
                         Settings
                     </MudButton>
                 }
@@ -161,7 +161,7 @@ else
             <MudButton Variant="Variant.Outlined"
                        Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.Add"
-                       Href="/app/projects">
+                       Href="projects">
                 View All Projects
             </MudButton>
         }
@@ -180,7 +180,7 @@ else
             @foreach (var project in _orgProjects.Take(6))
             {
                 <MudItem xs="12" sm="6" md="4">
-                    <MudCard Elevation="2" Class="cursor-pointer" @onclick="@(() => Navigation.NavigateTo($"/app/projects/{project.Id}"))">
+                    <MudCard Elevation="2" Class="cursor-pointer" @onclick="@(() => Navigation.NavigateTo($"projects/{project.Id}"))">
                         <MudCardHeader>
                             <CardHeaderContent>
                                 <MudText Typo="Typo.subtitle1">@project.Name</MudText>
@@ -206,7 +206,7 @@ else
         @if (_orgProjects.Count > 6)
         {
             <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
-                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/app/projects">
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="projects">
                     View all @_orgProjects.Count projects
                 </MudButton>
             </MudStack>
@@ -275,7 +275,7 @@ else
 
                 _breadcrumbs = new List<BreadcrumbItem>
                 {
-                    new("Organizations", "/app/organizations"),
+                    new("Organizations", "organizations"),
                     new(_organization.Name, null, disabled: true)
                 };
             }
@@ -310,7 +310,7 @@ else
             if (success)
             {
                 Snackbar.Add($"You have left {_organization?.Name}", Severity.Info);
-                Navigation.NavigateTo("/app/organizations");
+                Navigation.NavigateTo("organizations");
             }
             else
             {

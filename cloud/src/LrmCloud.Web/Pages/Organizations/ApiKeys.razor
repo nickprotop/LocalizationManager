@@ -305,8 +305,8 @@
 
                 _breadcrumbs = new List<BreadcrumbItem>
                 {
-                    new("Organizations", "/app/organizations", icon: Icons.Material.Filled.Business),
-                    new(_organization.Name, $"/app/organizations/{OrganizationId}"),
+                    new("Organizations", "organizations", icon: Icons.Material.Filled.Business),
+                    new(_organization.Name, $"organizations/{OrganizationId}"),
                     new("API Keys", null, disabled: true)
                 };
             }

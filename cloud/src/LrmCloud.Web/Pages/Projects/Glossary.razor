@@ -341,8 +341,8 @@ else
             _inheritOrgGlossary = _project.InheritOrganizationGlossary;
             _breadcrumbs = new()
             {
-                new BreadcrumbItem("Projects", "/app/projects"),
-                new BreadcrumbItem(_projectName, $"/app/projects/{ProjectId}"),
+                new BreadcrumbItem("Projects", "projects"),
+                new BreadcrumbItem(_projectName, $"projects/{ProjectId}"),
                 new BreadcrumbItem("Glossary", null, disabled: true)
             };
         }

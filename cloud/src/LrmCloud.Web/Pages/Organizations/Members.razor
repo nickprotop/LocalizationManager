@@ -24,14 +24,14 @@ else if (_organization == null)
 {
     <MudAlert Severity="Severity.Error">
         Organization not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/app/organizations">Back to Organizations</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="organizations">Back to Organizations</MudButton>
     </MudAlert>
 }
 else
 {
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
         <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                       OnClick="@(() => Navigation.NavigateTo($"/app/organizations/{OrganizationId}"))"
+                       OnClick="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}"))"
                        Size="Size.Small" />
         <MudBreadcrumbs Items="_breadcrumbs" />
     </MudStack>
@@ -317,8 +317,8 @@ else
 
                 _breadcrumbs = new List<BreadcrumbItem>
                 {
-                    new("Organizations", "/app/organizations"),
-                    new(_organization.Name, $"/app/organizations/{OrganizationId}"),
+                    new("Organizations", "organizations"),
+                    new(_organization.Name, $"organizations/{OrganizationId}"),
                     new("Members", null, disabled: true)
                 };
             }

@@ -12,8 +12,8 @@
 <MudLayout>
     <MudAppBar Elevation="1" Dense="@_isMobile">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
-        <MudLink Href="/app" Typo="Typo.h6" Color="Color.Inherit" Underline="Underline.None" Class="ml-3 d-none d-sm-flex">LRM Cloud</MudLink>
-        <MudLink Href="/app" Typo="Typo.h6" Color="Color.Inherit" Underline="Underline.None" Class="ml-2 d-flex d-sm-none">LRM</MudLink>
+        <MudLink Href="" Typo="Typo.h6" Color="Color.Inherit" Underline="Underline.None" Class="ml-3 d-none d-sm-flex">LRM Cloud</MudLink>
+        <MudLink Href="" Typo="Typo.h6" Color="Color.Inherit" Underline="Underline.None" Class="ml-2 d-flex d-sm-none">LRM</MudLink>
         <MudDivider Vertical="true" FlexItem="true" Class="mx-2 d-none d-sm-flex" />
         <OrgSelector />
         <MudSpacer />
@@ -31,16 +31,16 @@
                         <MudText Typo="Typo.body2" Color="Color.Secondary">@context.User.Identity?.Name</MudText>
                     </MudMenuItem>
                     <MudDivider />
-                    <MudMenuItem Href="/app/settings/profile" Icon="@Icons.Material.Filled.Person">Profile</MudMenuItem>
-                    <MudMenuItem Href="/app/settings/api-keys" Icon="@Icons.Material.Filled.Key">API Keys</MudMenuItem>
-                    <MudMenuItem Href="/app/settings/usage" Icon="@Icons.Material.Filled.Analytics">Usage</MudMenuItem>
-                    <MudMenuItem Href="/app/settings/billing" Icon="@Icons.Material.Filled.CreditCard">Billing</MudMenuItem>
+                    <MudMenuItem Href="settings/profile" Icon="@Icons.Material.Filled.Person">Profile</MudMenuItem>
+                    <MudMenuItem Href="settings/api-keys" Icon="@Icons.Material.Filled.Key">API Keys</MudMenuItem>
+                    <MudMenuItem Href="settings/usage" Icon="@Icons.Material.Filled.Analytics">Usage</MudMenuItem>
+                    <MudMenuItem Href="settings/billing" Icon="@Icons.Material.Filled.CreditCard">Billing</MudMenuItem>
                     <MudDivider />
                     <MudMenuItem OnClick="@Logout" Icon="@Icons.Material.Filled.Logout">Logout</MudMenuItem>
                 </MudMenu>
             </Authorized>
             <NotAuthorized>
-                <MudButton Variant="Variant.Text" Color="Color.Inherit" Href="/app/login" Size="@(_isMobile ? Size.Small : Size.Medium)">Login</MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Inherit" Href="login" Size="@(_isMobile ? Size.Small : Size.Medium)">Login</MudButton>
             </NotAuthorized>
         </AuthorizeView>
     </MudAppBar>
@@ -117,6 +117,6 @@
     private async Task Logout()
     {
         await AuthService.LogoutAsync();
-        Navigation.NavigateTo("/app/login", forceLoad: true);
+        Navigation.NavigateTo("login", forceLoad: true);
     }
 }

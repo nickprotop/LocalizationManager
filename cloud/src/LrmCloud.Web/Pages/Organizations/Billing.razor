@@ -34,21 +34,21 @@ else if (_organization == null)
 {
     <MudAlert Severity="Severity.Error">
         Organization not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/app/organizations">Back to Organizations</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="organizations">Back to Organizations</MudButton>
     </MudAlert>
 }
 else if (!OrganizationRole.IsAdminOrOwner(_organization.UserRole))
 {
     <MudAlert Severity="Severity.Warning">
         You don't have permission to access billing information.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"/app/organizations/{OrganizationId}")">Back to Organization</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"organizations/{OrganizationId}")">Back to Organization</MudButton>
     </MudAlert>
 }
 else
 {
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
         <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                       OnClick="@(() => Navigation.NavigateTo($"/app/organizations/{OrganizationId}"))"
+                       OnClick="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}"))"
                        Size="Size.Small" />
         <MudBreadcrumbs Items="_breadcrumbs" />
     </MudStack>
@@ -443,8 +443,8 @@ else
             {
                 _breadcrumbs = new List<BreadcrumbItem>
                 {
-                    new("Organizations", "/app/organizations"),
-                    new(_organization.Name, $"/app/organizations/{OrganizationId}"),
+                    new("Organizations", "organizations"),
+                    new(_organization.Name, $"organizations/{OrganizationId}"),
                     new("Billing", null, disabled: true)
                 };
             }
@@ -481,8 +481,8 @@ else
             var baseUrl = Navigation.BaseUri.TrimEnd('/');
             var result = await BillingService.CreateCheckoutAsync(
                 _selectedPlan,
-                $"{baseUrl}/app/organizations/{OrganizationId}/billing?success=true",
-                $"{baseUrl}/app/organizations/{OrganizationId}/billing?canceled=true"
+                $"{baseUrl}/organizations/{OrganizationId}/billing?success=true",
+                $"{baseUrl}/organizations/{OrganizationId}/billing?canceled=true"
             );
 
             if (result?.SessionUrl != null)

@@ -106,7 +106,8 @@ public class LrmAuthStateProvider : AuthenticationStateProvider
             new(ClaimTypes.Email, user.Email),
             new(ClaimTypes.Name, user.Username),
             new("plan", user.Plan),
-            new("email_verified", user.EmailVerified.ToString().ToLower())
+            new("email_verified", user.EmailVerified.ToString().ToLower()),
+            new("is_superadmin", user.IsSuperAdmin.ToString().ToLower())
         };
 
         if (!string.IsNullOrEmpty(user.DisplayName))

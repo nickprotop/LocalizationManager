@@ -55,5 +55,6 @@ builder.Services.AddScoped<LimitsService>();
 builder.Services.AddScoped<OrganizationService>();
 builder.Services.AddScoped<OrganizationContextService>();
 builder.Services.AddScoped<BillingService>();
+builder.Services.AddScoped<AdminService>();
 
 await builder.Build().RunAsync();

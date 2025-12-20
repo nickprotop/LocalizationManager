@@ -62,7 +62,15 @@ else
                                 </div>
                             </MudListItem>
                         }
-                        @if (_subscription.CancelAtPeriodEnd)
+                        @if (_subscription.Status?.ToLower() == "incomplete")
+                        {
+                            <MudListItem>
+                                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                                    Your payment is pending. Please complete the payment to activate your subscription.
+                                </MudAlert>
+                            </MudListItem>
+                        }
+                        else if (_subscription.CancelAtPeriodEnd)
                         {
                             <MudListItem>
                                 <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
@@ -179,7 +187,7 @@ else
                     </MudStack>
 
                     <MudButton Variant="Variant.Text" Color="Color.Primary" Class="mt-3"
-                               Href="/app/settings/usage" FullWidth="true">
+                               Href="settings/usage" FullWidth="true">
                         View Full Usage Dashboard
                     </MudButton>
                 }

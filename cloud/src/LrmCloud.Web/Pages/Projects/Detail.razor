@@ -23,7 +23,7 @@ else if (_project == null)
 {
     <MudAlert Severity="Severity.Error">
         Project not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/app">Go to Dashboard</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="">Go to Dashboard</MudButton>
     </MudAlert>
 }
 else
@@ -31,7 +31,7 @@ else
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
             <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                           OnClick="@(() => Navigation.NavigateTo("/app"))"
+                           OnClick="@(() => Navigation.NavigateTo(""))"
                            Size="Size.Small" />
             <MudText Typo="Typo.h4">@_project.Name</MudText>
             <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetFormatColor(_project.Format)">@_project.Format</MudChip>
@@ -41,13 +41,13 @@ else
             <MudButton Variant="Variant.Outlined"
                        Color="Color.Secondary"
                        StartIcon="@Icons.Material.Filled.Settings"
-                       OnClick="@(() => Navigation.NavigateTo($"/app/projects/{ProjectId}/settings"))">
+                       OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/settings"))">
                 Settings
             </MudButton>
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.Edit"
-                       OnClick="@(() => Navigation.NavigateTo($"/app/projects/{ProjectId}/editor"))">
+                       OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/editor"))">
                 Open Editor
             </MudButton>
         </MudStack>
@@ -185,17 +185,17 @@ else
     <MudStack Row="true" Spacing="2" Class="flex-wrap">
         <MudButton Variant="Variant.Outlined"
                    StartIcon="@Icons.Material.Filled.Edit"
-                   OnClick="@(() => Navigation.NavigateTo($"/app/projects/{ProjectId}/editor"))">
+                   OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/editor"))">
             Open Editor
         </MudButton>
         <MudButton Variant="Variant.Outlined"
                    StartIcon="@Icons.Material.Filled.History"
-                   OnClick="@(() => Navigation.NavigateTo($"/app/projects/{ProjectId}/snapshots"))">
+                   OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/snapshots"))">
             View Snapshots
         </MudButton>
         <MudButton Variant="Variant.Outlined"
                    StartIcon="@Icons.Material.Filled.Book"
-                   OnClick="@(() => Navigation.NavigateTo($"/app/projects/{ProjectId}/glossary"))">
+                   OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/glossary"))">
             Glossary
         </MudButton>
         <MudButton Variant="Variant.Outlined"
