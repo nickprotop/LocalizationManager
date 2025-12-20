@@ -547,6 +547,8 @@
                     <a href="#projects" class="sidebar-link">Projects</a>
                     <a href="#resource-editor" class="sidebar-link">Resource Editor</a>
                     <a href="#translation" class="sidebar-link">Translation</a>
+                    <a href="#translation-memory" class="sidebar-link">Translation Memory</a>
+                    <a href="#glossary" class="sidebar-link">Glossary</a>
                     <a href="#cli-sync" class="sidebar-link">CLI Sync</a>
                     <a href="#teams" class="sidebar-link">Teams & Organizations</a>
                     <a href="#billing" class="sidebar-link">Billing & Plans</a>
@@ -682,6 +684,145 @@
                     <li>Select translation provider</li>
                     <li>Click <strong>"Translate"</strong></li>
                 </ol>
+
+                <h2 id="translation-memory">Translation Memory</h2>
+                <p>Translation Memory (TM) automatically stores your translations for reuse, saving costs and ensuring consistency across your projects.</p>
+
+                <h3>What is Translation Memory?</h3>
+                <p>Translation Memory is a database that remembers every translation you make. When you translate similar or identical text in the future, the system can retrieve cached translations instead of making new API calls.</p>
+
+                <h3>Key Benefits</h3>
+                <ul>
+                    <li><strong>Cost Savings</strong> - Avoid redundant API calls for repeated text</li>
+                    <li><strong>Consistency</strong> - Same source text always produces the same translation</li>
+                    <li><strong>Speed</strong> - Instant matches from cache are faster than API calls</li>
+                    <li><strong>Learning</strong> - Your TM grows over time with every translation</li>
+                </ul>
+
+                <h3>How It Works</h3>
+                <p>When you translate text:</p>
+                <ol>
+                    <li><strong>TM Check</strong> - The system first searches your Translation Memory</li>
+                    <li><strong>Exact Match</strong> - If an identical translation exists, it's used immediately (no API call)</li>
+                    <li><strong>Fuzzy Match</strong> - Similar translations above the threshold are suggested</li>
+                    <li><strong>API Call</strong> - Only if no match is found, the translation provider is called</li>
+                    <li><strong>Store</strong> - New translations are automatically saved to your TM</li>
+                </ol>
+
+                <h3>Match Types</h3>
+                <table>
+                    <tr>
+                        <th>Type</th>
+                        <th>Match %</th>
+                        <th>Behavior</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Exact Match</strong></td>
+                        <td>100%</td>
+                        <td>Automatic reuse, no API call needed</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Fuzzy Match</strong></td>
+                        <td>70-99%</td>
+                        <td>Suggested based on similarity threshold</td>
+                    </tr>
+                    <tr>
+                        <td><strong>No Match</strong></td>
+                        <td>&lt;70%</td>
+                        <td>New translation via API</td>
+                    </tr>
+                </table>
+
+                <h3>Personal vs Organization TM</h3>
+                <p>Translation Memory works at two levels:</p>
+                <ul>
+                    <li><strong>Personal TM</strong> - Your individual translations, private to your account</li>
+                    <li><strong>Organization TM</strong> - Shared across all team members in your organization (Team/Enterprise plans)</li>
+                </ul>
+
+                <div class="info-box">
+                    <div class="info-box-title">TM Priority</div>
+                    <p>When looking for matches, the system checks both your personal TM and your organization's shared TM. This means your team benefits from collective translation work.</p>
+                </div>
+
+                <h3>Viewing TM Statistics</h3>
+                <p>Your dashboard shows TM statistics including:</p>
+                <ul>
+                    <li>Total entries stored</li>
+                    <li>Reuse count (how often TM matches were used)</li>
+                    <li>Breakdown by language pair</li>
+                </ul>
+
+                <h2 id="glossary">Glossary</h2>
+                <p>The Glossary feature helps maintain consistent terminology across all your translations by defining approved terms and their translations.</p>
+
+                <h3>What is a Glossary?</h3>
+                <p>A glossary is a curated list of domain-specific terms with their approved translations. When translating, AI providers are instructed to use these exact translations for matching terms.</p>
+
+                <h3>Key Benefits</h3>
+                <ul>
+                    <li><strong>Terminology Consistency</strong> - Same term always translates the same way</li>
+                    <li><strong>Brand Compliance</strong> - Ensure product names are never translated</li>
+                    <li><strong>Domain Accuracy</strong> - Use industry-specific terminology correctly</li>
+                    <li><strong>Team Standardization</strong> - Everyone uses the same approved terms</li>
+                </ul>
+
+                <h3>Types of Glossaries</h3>
+                <table>
+                    <tr>
+                        <th>Type</th>
+                        <th>Scope</th>
+                        <th>Use Case</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Project Glossary</strong></td>
+                        <td>Single project</td>
+                        <td>Product-specific terminology</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Organization Glossary</strong></td>
+                        <td>All org projects</td>
+                        <td>Company-wide brand terms</td>
+                    </tr>
+                </table>
+
+                <h3>Glossary Inheritance</h3>
+                <p>Projects can inherit terms from their organization's glossary:</p>
+                <ul>
+                    <li>Organization terms apply to all projects by default</li>
+                    <li>Project-specific terms can override organization terms</li>
+                    <li>Inheritance can be disabled per-project if needed</li>
+                </ul>
+
+                <h3>Managing Glossary Terms</h3>
+                <p>To add a glossary term:</p>
+                <ol>
+                    <li>Open your project and go to <strong>"Glossary"</strong></li>
+                    <li>Click <strong>"Add Term"</strong></li>
+                    <li>Enter the source term (e.g., "Dashboard")</li>
+                    <li>Add translations for target languages (e.g., French: "Tableau de bord")</li>
+                    <li>Optionally add a description for context</li>
+                    <li>Choose case sensitivity (exact match vs. any case)</li>
+                    <li>Click <strong>"Save"</strong></li>
+                </ol>
+
+                <div class="info-box">
+                    <div class="info-box-title">Case Sensitivity</div>
+                    <p>By default, terms are matched case-insensitively ("dashboard" matches "Dashboard"). Enable case-sensitive matching for terms where capitalization matters.</p>
+                </div>
+
+                <h3>How Terms are Enforced</h3>
+                <p>When using AI-powered translation providers (OpenAI, Claude, etc.):</p>
+                <ol>
+                    <li>Matching glossary terms are detected in your source text</li>
+                    <li>The AI is instructed to use exact translations for those terms</li>
+                    <li>Translations respect your glossary even for complex sentences</li>
+                </ol>
+
+                <div class="info-box">
+                    <div class="info-box-title">Provider Support</div>
+                    <p>Glossary enforcement works best with AI providers (OpenAI, Claude, Azure OpenAI). Traditional providers like Google Translate don't support contextual instructions.</p>
+                </div>
 
                 <h2 id="cli-sync">CLI Sync</h2>
                 <p>Sync your local resource files with LRM Cloud using the CLI.</p>
