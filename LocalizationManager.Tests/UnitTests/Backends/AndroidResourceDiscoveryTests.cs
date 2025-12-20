@@ -13,7 +13,8 @@ public class AndroidResourceDiscoveryTests : IDisposable
 
     public AndroidResourceDiscoveryTests()
     {
-        _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "AndroidResources");
+        // searchPath should be the res folder directly (containing values/ folders)
+        _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "AndroidResources", "res");
         _tempDirectory = Path.Combine(Path.GetTempPath(), $"AndroidDiscoveryTests_{Guid.NewGuid()}");
         Directory.CreateDirectory(_tempDirectory);
     }

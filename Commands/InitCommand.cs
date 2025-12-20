@@ -274,16 +274,13 @@ public class InitCommand : Command<InitCommandSettings>
 
     private int CreateAndroidResources(InitCommandSettings settings, string resourcePath)
     {
-        // Android uses res/values/strings.xml structure
-        var resDir = Path.Combine(resourcePath, "res");
-        Directory.CreateDirectory(resDir);
-
+        // Android: resourcePath IS the res folder (containing values/ folders)
         // Default language uses "values" folder
-        var defaultDir = Path.Combine(resDir, "values");
+        var defaultDir = Path.Combine(resourcePath, "values");
         Directory.CreateDirectory(defaultDir);
         var defaultFilePath = Path.Combine(defaultDir, "strings.xml");
 
-        AnsiConsole.MarkupLine($"[green]Creating[/] res/values/strings.xml...");
+        AnsiConsole.MarkupLine($"[green]Creating[/] values/strings.xml...");
 
         var xmlContent = $@"<?xml version=""1.0"" encoding=""utf-8""?>
 <resources>
@@ -301,11 +298,11 @@ public class InitCommand : Command<InitCommandSettings>
             {
                 var code = lang.Trim();
                 var folder = $"values-{code}";
-                var langDir = Path.Combine(resDir, folder);
+                var langDir = Path.Combine(resourcePath, folder);
                 Directory.CreateDirectory(langDir);
                 var langFilePath = Path.Combine(langDir, "strings.xml");
 
-                AnsiConsole.MarkupLine($"[green]Creating[/] res/{folder}/strings.xml...");
+                AnsiConsole.MarkupLine($"[green]Creating[/] {folder}/strings.xml...");
 
                 var langXmlContent = $@"<?xml version=""1.0"" encoding=""utf-8""?>
 <resources>

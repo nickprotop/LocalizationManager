@@ -36,15 +36,14 @@ public class AndroidResourceDiscovery : IResourceDiscovery
         if (!Directory.Exists(searchPath))
             return result;
 
-        // Find the res folder
-        var resPath = FindResFolder(searchPath);
-        if (resPath == null)
-            return result;
-
+        // searchPath should be the res folder directly (containing values/ folders)
         // Find all values* folders
-        var valuesFolders = Directory.GetDirectories(resPath)
+        var valuesFolders = Directory.GetDirectories(searchPath)
             .Where(d => AndroidCultureMapper.IsValidResourceFolder(Path.GetFileName(d)))
             .ToList();
+
+        if (!valuesFolders.Any())
+            return result;
 
         // Check if we have a bare "values" folder (traditional Android default)
         var hasValuesFolder = valuesFolders.Any(f =>
@@ -87,63 +86,6 @@ public class AndroidResourceDiscovery : IResourceDiscovery
     /// <inheritdoc />
     public Task<List<LanguageInfo>> DiscoverLanguagesAsync(string searchPath, CancellationToken ct = default)
         => Task.FromResult(DiscoverLanguages(searchPath));
-
-    /// <summary>
-    /// Finds the res folder in the search path.
-    /// Supports multiple Android project structures.
-    /// </summary>
-    private string? FindResFolder(string searchPath)
-    {
-        // Check if path is already the res folder
-        if (Path.GetFileName(searchPath).Equals("res", StringComparison.OrdinalIgnoreCase) &&
-            HasValuesFolder(searchPath))
-        {
-            return searchPath;
-        }
-
-        // Check for direct res subfolder
-        var resPath = Path.Combine(searchPath, "res");
-        if (Directory.Exists(resPath) && HasValuesFolder(resPath))
-            return resPath;
-
-        // Check for app/src/main/res (standard Android project)
-        var mainResPath = Path.Combine(searchPath, "app", "src", "main", "res");
-        if (Directory.Exists(mainResPath) && HasValuesFolder(mainResPath))
-            return mainResPath;
-
-        // Check for src/main/res (module structure)
-        var srcMainResPath = Path.Combine(searchPath, "src", "main", "res");
-        if (Directory.Exists(srcMainResPath) && HasValuesFolder(srcMainResPath))
-            return srcMainResPath;
-
-        return null;
-    }
-
-    /// <summary>
-    /// Checks if a path has any valid values folder (values or values-*).
-    /// </summary>
-    private bool HasValuesFolder(string path)
-    {
-        // Check for default values folder
-        if (Directory.Exists(Path.Combine(path, "values")))
-            return true;
-
-        // Check for any values-* folder with strings.xml
-        try
-        {
-            foreach (var dir in Directory.GetDirectories(path, "values*"))
-            {
-                if (File.Exists(Path.Combine(dir, _resourceFileName)))
-                    return true;
-            }
-        }
-        catch
-        {
-            // Ignore directory access errors
-        }
-
-        return false;
-    }
 
     /// <summary>
     /// Gets a display-friendly name for a culture code.

@@ -15,7 +15,8 @@ public class AndroidResourceReaderTests
 
     public AndroidResourceReaderTests()
     {
-        _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "AndroidResources");
+        // searchPath should be the res folder directly (containing values/ folders)
+        _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "AndroidResources", "res");
         _reader = new AndroidResourceReader();
         _discovery = new AndroidResourceDiscovery();
     }
