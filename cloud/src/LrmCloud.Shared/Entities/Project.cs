@@ -70,7 +70,7 @@ public class Project
     [Required]
     [MaxLength(50)]
     [Column("format")]
-    public required string Format { get; set; } // resx, json, i18next
+    public required string Format { get; set; } // resx, json, i18next, android, ios
 
     [MaxLength(10)]
     [Column("default_language")]

@@ -514,6 +514,12 @@ public class ProjectService : IProjectService
                 return (false, "Project not found");
             }
 
+            // Delete related audit logs first (not cascaded by FK)
+            var auditLogs = await _db.AuditLogs
+                .Where(a => a.ProjectId == projectId)
+                .ToListAsync();
+            _db.AuditLogs.RemoveRange(auditLogs);
+
             // Hard delete (cascades to resource keys and translations)
             _db.Projects.Remove(project);
             await _db.SaveChangesAsync();
@@ -749,11 +755,15 @@ public class ProjectService : IProjectService
             }
         }
 
-        // Update configuration
-        project.ConfigJson = request.ConfigJson;
-        project.ConfigVersion = Guid.NewGuid().ToString();
-        project.ConfigUpdatedAt = DateTime.UtcNow;
-        project.ConfigUpdatedBy = userId;
+        // Update configuration only if a new config is provided
+        // Don't overwrite existing config with null (CLI may push without local lrm.json)
+        if (!string.IsNullOrWhiteSpace(request.ConfigJson))
+        {
+            project.ConfigJson = request.ConfigJson;
+            project.ConfigVersion = Guid.NewGuid().ToString();
+            project.ConfigUpdatedAt = DateTime.UtcNow;
+            project.ConfigUpdatedBy = userId;
+        }
 
         await _db.SaveChangesAsync();
 
@@ -873,6 +883,22 @@ public class ProjectService : IProjectService
             config["Resx"] = new Dictionary<string, object>
             {
                 ["BaseName"] = "SharedResource"
+            };
+        }
+        else if (format == "android")
+        {
+            // Android: Use strings as default base name
+            config["Android"] = new Dictionary<string, object>
+            {
+                ["BaseName"] = "strings"
+            };
+        }
+        else if (format == "ios")
+        {
+            // iOS: Use Localizable as default base name
+            config["Ios"] = new Dictionary<string, object>
+            {
+                ["BaseName"] = "Localizable"
             };
         }
 

@@ -28,7 +28,7 @@ public class ResourceSyncService
     /// </summary>
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".resx", ".json"
+        ".resx", ".json", ".xml", ".strings", ".stringsdict"
     };
 
     public ResourceSyncService(
@@ -62,7 +62,7 @@ public class ResourceSyncService
         if (!AllowedExtensions.Contains(extension))
         {
             throw new ArgumentException(
-                $"File type '{extension}' is not allowed. Only .resx and .json files are supported.");
+                $"File type '{extension}' is not allowed. Supported: .resx, .json, .xml, .strings, .stringsdict");
         }
 
         // Check file size against plan-based limit
@@ -82,6 +82,62 @@ public class ResourceSyncService
         else if (extension.Equals(".json", StringComparison.OrdinalIgnoreCase))
         {
             ValidateJsonContent(file.Content, file.Path);
+        }
+        else if (extension.Equals(".xml", StringComparison.OrdinalIgnoreCase))
+        {
+            // Android strings.xml is also XML
+            ValidateResxContent(file.Content, file.Path);
+        }
+        else if (extension.Equals(".strings", StringComparison.OrdinalIgnoreCase))
+        {
+            ValidateStringsContent(file.Content, file.Path);
+        }
+        else if (extension.Equals(".stringsdict", StringComparison.OrdinalIgnoreCase))
+        {
+            // stringsdict is plist XML format
+            ValidateResxContent(file.Content, file.Path);
+        }
+    }
+
+    /// <summary>
+    /// Validates iOS .strings file content (key = value format).
+    /// </summary>
+    private static void ValidateStringsContent(string content, string filePath)
+    {
+        // Basic validation: iOS .strings files should have "key" = "value"; patterns
+        // Empty files are valid for new language creation
+        if (string.IsNullOrWhiteSpace(content))
+            return;
+
+        // Check for basic .strings syntax - should contain at least one key-value pair
+        // or be valid format (comments are also allowed)
+        var lines = content.Split('\n');
+        var hasValidContent = false;
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrEmpty(trimmed))
+                continue;
+
+            // Comments are valid
+            if (trimmed.StartsWith("/*") || trimmed.StartsWith("//") || trimmed.EndsWith("*/"))
+            {
+                hasValidContent = true;
+                continue;
+            }
+
+            // Key-value pairs should have the pattern "key" = "value";
+            if (trimmed.StartsWith("\"") && trimmed.Contains("=") && trimmed.EndsWith(";"))
+            {
+                hasValidContent = true;
+                continue;
+            }
+        }
+
+        if (!hasValidContent && lines.Length > 0)
+        {
+            throw new ArgumentException($"Invalid iOS .strings format in file '{filePath}'");
         }
     }
 
@@ -234,6 +290,42 @@ public class ResourceSyncService
             return config.DefaultLanguageCode ?? "en";
         }
 
+        // Android format: res/values-es/strings.xml → "es", res/values/strings.xml → default
+        if (effectiveFormat == "android")
+        {
+            // Extract folder name from path (values, values-es, values-zh-rCN)
+            var parts = filePath.Replace("\\", "/").Split('/');
+            foreach (var part in parts)
+            {
+                if (part.StartsWith("values-", StringComparison.OrdinalIgnoreCase))
+                {
+                    // values-es → es, values-zh-rCN → zh-CN
+                    var langPart = part.Substring(7);
+                    return LocalizationManager.Core.Backends.Android.AndroidCultureMapper.FolderToCode($"values-{langPart}");
+                }
+                if (part.Equals("values", StringComparison.OrdinalIgnoreCase))
+                {
+                    return config.DefaultLanguageCode ?? "en";
+                }
+            }
+            return config.DefaultLanguageCode ?? "en";
+        }
+
+        // iOS format: en.lproj/Localizable.strings → "en", Base.lproj → default
+        if (effectiveFormat == "ios")
+        {
+            // Extract .lproj folder name from path
+            var parts = filePath.Replace("\\", "/").Split('/');
+            foreach (var part in parts)
+            {
+                if (part.EndsWith(".lproj", StringComparison.OrdinalIgnoreCase))
+                {
+                    return LocalizationManager.Core.Backends.iOS.IosCultureMapper.LprojToCode(part);
+                }
+            }
+            return config.DefaultLanguageCode ?? "en";
+        }
+
         // JSON: Explicit i18next mode via project format or config
         if (effectiveFormat == "i18next" || config.Json?.I18nextCompatible == true)
         {
@@ -328,7 +420,7 @@ public class ResourceSyncService
 
     /// <summary>
     /// Detects the naming convention used by the provided files.
-    /// Returns "i18next", "standard", "resx", or "unknown".
+    /// Returns "i18next", "standard", "resx", "android", "ios", or "unknown".
     /// </summary>
     public string DetectNamingConvention(List<FileDto> files)
     {
@@ -338,6 +430,17 @@ public class ResourceSyncService
         // Check if all files are RESX
         if (files.All(f => f.Path.EndsWith(".resx", StringComparison.OrdinalIgnoreCase)))
             return "resx";
+
+        // Check if Android format (strings.xml in values folders)
+        if (files.All(f => f.Path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) &&
+            (f.Path.Contains("values/") || f.Path.Contains("values-") || f.Path.Contains("values\\"))))
+            return "android";
+
+        // Check if iOS format (.strings or .stringsdict in .lproj folders)
+        if (files.All(f => (f.Path.EndsWith(".strings", StringComparison.OrdinalIgnoreCase) ||
+            f.Path.EndsWith(".stringsdict", StringComparison.OrdinalIgnoreCase)) &&
+            f.Path.Contains(".lproj")))
+            return "ios";
 
         // Check if all files are JSON
         if (!files.All(f => f.Path.EndsWith(".json", StringComparison.OrdinalIgnoreCase)))
@@ -446,6 +549,34 @@ public class ResourceSyncService
                     $"To fix this, either:\n" +
                     $"  • Rename your files to i18next format (en.json, fr.json), or\n" +
                     $"  • Change project format to 'json' in project settings");
+            }
+
+            return (true, null);
+        }
+
+        // Android projects
+        if (projectFormat == "android")
+        {
+            if (detectedConvention != "android" && detectedConvention != "unknown")
+            {
+                return (false,
+                    $"Project format is 'android' but files don't use Android format. " +
+                    $"Expected: res/values/strings.xml, res/values-es/strings.xml. " +
+                    $"Files: {fileNames}");
+            }
+
+            return (true, null);
+        }
+
+        // iOS projects
+        if (projectFormat == "ios")
+        {
+            if (detectedConvention != "ios" && detectedConvention != "unknown")
+            {
+                return (false,
+                    $"Project format is 'ios' but files don't use iOS format. " +
+                    $"Expected: en.lproj/Localizable.strings, es.lproj/Localizable.strings. " +
+                    $"Files: {fileNames}");
             }
 
             return (true, null);
@@ -782,6 +913,8 @@ public class ResourceSyncService
     /// Priority: 1) Config setting, 2) Stored files in current/, 3) Default value
     /// For RESX: default is "SharedResource" per ASP.NET Core convention
     /// For JSON: default is "strings"
+    /// For Android: default is "strings"
+    /// For iOS: default is "Localizable"
     /// </summary>
     private async Task<string> GetBaseNameFromStoredFilesAsync(int projectId, string effectiveFormat, ConfigurationModel config)
     {
@@ -812,7 +945,19 @@ public class ResourceSyncService
                         // RESX: SharedResource.resx or SharedResource.el.resx → "SharedResource"
                         return GetResxBaseName(fileName);
                     }
-                    else if (effectiveFormat != "resx" && fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                    else if (effectiveFormat == "android" && fileName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Android: strings.xml → "strings"
+                        return Path.GetFileNameWithoutExtension(fileName);
+                    }
+                    else if (effectiveFormat == "ios" && (fileName.EndsWith(".strings", StringComparison.OrdinalIgnoreCase) ||
+                                                          fileName.EndsWith(".stringsdict", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        // iOS: Localizable.strings → "Localizable"
+                        return Path.GetFileNameWithoutExtension(fileName);
+                    }
+                    else if (effectiveFormat != "resx" && effectiveFormat != "android" && effectiveFormat != "ios" &&
+                             fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
                     {
                         // JSON: Check if i18next (filename is culture code) or standard
                         var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
@@ -835,10 +980,14 @@ public class ResourceSyncService
             _logger.LogWarning(ex, "Failed to get base name from stored files for project {ProjectId}", projectId);
         }
 
-        // Fallback to defaults per ASP.NET Core conventions
-        // RESX: "SharedResource" is the standard name for shared/global resources
-        // JSON: "strings" is a common convention
-        return effectiveFormat == "resx" ? "SharedResource" : "strings";
+        // Fallback to defaults per conventions
+        return effectiveFormat switch
+        {
+            "resx" => "SharedResource",
+            "android" => "strings",
+            "ios" => "Localizable",
+            _ => "strings"
+        };
     }
 
     /// <summary>
@@ -854,6 +1003,23 @@ public class ResourceSyncService
                 return $"{language.BaseName}.resx";
             }
             return $"{language.BaseName}.{language.Code}.resx";
+        }
+
+        // Android format: res/values-es/strings.xml or res/values/strings.xml (default)
+        if (effectiveFormat == "android")
+        {
+            // For default language, use bare "values" folder (standard Android convention)
+            // For other languages, use "values-xx" folder
+            var cultureCode = language.IsDefault ? "" : language.Code;
+            var folder = LocalizationManager.Core.Backends.Android.AndroidCultureMapper.CodeToFolder(cultureCode);
+            return $"res/{folder}/{language.BaseName}.xml";
+        }
+
+        // iOS format: es.lproj/Localizable.strings or en.lproj/Localizable.strings
+        if (effectiveFormat == "ios")
+        {
+            var lprojFolder = LocalizationManager.Core.Backends.iOS.IosCultureMapper.CodeToLproj(language.Code);
+            return $"{lprojFolder}/{language.BaseName}.strings";
         }
 
         // i18next format: en.json, fr.json (project format or config flag)

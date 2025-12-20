@@ -276,13 +276,17 @@ public class PushCommand : Command<PushCommandSettings>
         bool force,
         CancellationToken cancellationToken)
     {
-        // Get team configuration JSON
-        var configJson = Core.Configuration.ConfigurationManager
-            .LoadTeamConfigurationAsync(projectDirectory, cancellationToken)
-            .GetAwaiter()
-            .GetResult();
+        // Only push configuration if lrm.json exists locally
+        // This prevents overwriting the server's auto-generated config with empty values
+        var configPath = Path.Combine(projectDirectory, "lrm.json");
+        if (!File.Exists(configPath))
+        {
+            AnsiConsole.MarkupLine("[dim]No local lrm.json - skipping configuration push[/]");
+            return;
+        }
 
-        var configJsonString = System.Text.Json.JsonSerializer.Serialize(configJson);
+        // Read raw config file content
+        var configJsonString = File.ReadAllText(configPath);
 
         // Get current remote version if not forcing
         string? baseVersion = null;
