@@ -418,6 +418,7 @@ public class AuthService : IAuthService
                 AvatarUrl = user.AvatarUrl,
                 EmailVerified = user.EmailVerified,
                 Plan = user.Plan,
+                IsSuperAdmin = user.IsSuperAdmin,
                 CreatedAt = user.CreatedAt
             },
             Token = token,
@@ -543,6 +544,7 @@ public class AuthService : IAuthService
                 AvatarUrl = user.AvatarUrl,
                 EmailVerified = user.EmailVerified,
                 Plan = user.Plan,
+                IsSuperAdmin = user.IsSuperAdmin,
                 CreatedAt = user.CreatedAt
             },
             Token = token,
@@ -608,6 +610,7 @@ public class AuthService : IAuthService
             Plan = user.Plan,
             PaymentCustomerId = user.PaymentCustomerId,
             PaymentProvider = user.PaymentProvider,
+            IsSuperAdmin = user.IsSuperAdmin,
             TranslationCharsUsed = user.TranslationCharsUsed,
             TranslationCharsLimit = user.TranslationCharsLimit,
             TranslationCharsResetAt = user.TranslationCharsResetAt,
@@ -669,6 +672,7 @@ public class AuthService : IAuthService
             Plan = user.Plan,
             PaymentCustomerId = user.PaymentCustomerId,
             PaymentProvider = user.PaymentProvider,
+            IsSuperAdmin = user.IsSuperAdmin,
             TranslationCharsUsed = user.TranslationCharsUsed,
             TranslationCharsLimit = user.TranslationCharsLimit,
             TranslationCharsResetAt = user.TranslationCharsResetAt,

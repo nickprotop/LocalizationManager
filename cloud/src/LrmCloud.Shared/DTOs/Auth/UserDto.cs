@@ -9,5 +9,6 @@ public class UserDto
     public string? AvatarUrl { get; set; }
     public bool EmailVerified { get; set; }
     public string Plan { get; set; } = "free";
+    public bool IsSuperAdmin { get; set; }
     public DateTime CreatedAt { get; set; }
 }

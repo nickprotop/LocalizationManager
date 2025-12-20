@@ -174,6 +174,9 @@ public class Program
             // Authorization Service
             builder.Services.AddScoped<ILrmAuthorizationService, LrmAuthorizationService>();
 
+            // Admin Service
+            builder.Services.AddScoped<IAdminService, AdminService>();
+
             // Background Jobs
             builder.Services.AddHostedService<UsageResetService>();
 
@@ -270,7 +273,11 @@ public class Program
                 };
             });
 
-            builder.Services.AddAuthorization();
+            builder.Services.AddAuthorization(options =>
+            {
+                options.AddPolicy("SuperAdmin", policy =>
+                    policy.RequireClaim("is_superadmin", "true"));
+            });
 
             builder.Services.AddControllers()
                 .AddJsonOptions(options =>
@@ -407,6 +414,36 @@ public class Program
                 {
                     Log.Error(ex, "Database migration failed");
                     throw;
+                }
+
+                // Seed superadmins from configuration
+                var superAdminEmails = config.SuperAdmin?.Emails ?? new List<string>();
+                if (superAdminEmails.Count > 0)
+                {
+                    Log.Information("Checking superadmin configuration for {Count} email(s)", superAdminEmails.Count);
+                    foreach (var email in superAdminEmails)
+                    {
+                        var normalizedEmail = email.ToLowerInvariant().Trim();
+                        var user = db.Users.FirstOrDefault(u => u.Email == normalizedEmail);
+                        if (user != null)
+                        {
+                            if (!user.IsSuperAdmin)
+                            {
+                                user.IsSuperAdmin = true;
+                                user.UpdatedAt = DateTime.UtcNow;
+                                db.SaveChanges();
+                                Log.Information("User {Email} set as superadmin", normalizedEmail);
+                            }
+                            else
+                            {
+                                Log.Debug("User {Email} is already a superadmin", normalizedEmail);
+                            }
+                        }
+                        else
+                        {
+                            Log.Warning("Superadmin user {Email} not found in database (will be set when user registers)", normalizedEmail);
+                        }
+                    }
                 }
             }
 

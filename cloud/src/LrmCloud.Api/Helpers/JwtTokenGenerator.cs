@@ -25,7 +25,8 @@ public static class JwtTokenGenerator
             new(ClaimTypes.Name, user.Username ?? user.Email!),
             new("auth_type", user.AuthType),
             new("plan", user.Plan),
-            new("email_verified", user.EmailVerified.ToString())
+            new("email_verified", user.EmailVerified.ToString()),
+            new("is_superadmin", user.IsSuperAdmin.ToString().ToLowerInvariant())
         };
 
         var tokenDescriptor = new SecurityTokenDescriptor

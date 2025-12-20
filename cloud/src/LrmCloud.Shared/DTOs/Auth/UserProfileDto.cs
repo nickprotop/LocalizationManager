@@ -22,6 +22,9 @@ public class UserProfileDto
     public string? PaymentCustomerId { get; set; }
     public string? PaymentProvider { get; set; }
 
+    // Admin
+    public bool IsSuperAdmin { get; set; }
+
     // LRM Translation Usage & Limits (counts against plan)
     public int TranslationCharsUsed { get; set; }
     public int TranslationCharsLimit { get; set; }
