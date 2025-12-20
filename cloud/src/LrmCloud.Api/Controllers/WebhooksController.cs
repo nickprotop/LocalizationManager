@@ -94,10 +94,35 @@ public class WebhooksController : ControllerBase
             return BadRequest($"Missing {signatureHeader} header");
         }
 
+        // Collect additional headers for PayPal verification
+        var webhookHeaders = new Dictionary<string, string>();
+        if (providerName == "paypal")
+        {
+            // PayPal requires additional headers for webhook verification
+            var headerNames = new[]
+            {
+                "PAYPAL-AUTH-ALGO",
+                "PAYPAL-CERT-URL",
+                "PAYPAL-TRANSMISSION-ID",
+                "PAYPAL-TRANSMISSION-TIME",
+                "PAYPAL-TRANSMISSION-SIG"
+            };
+
+            foreach (var headerName in headerNames)
+            {
+                var value = Request.Headers[headerName].FirstOrDefault();
+                if (!string.IsNullOrEmpty(value))
+                {
+                    webhookHeaders[headerName] = value;
+                }
+            }
+        }
+
         try
         {
-            // Process webhook with provider
-            var result = await provider.ProcessWebhookAsync(payload, signature);
+            // Process webhook with provider (pass headers for PayPal verification)
+            var result = await provider.ProcessWebhookAsync(payload, signature,
+                webhookHeaders.Count > 0 ? webhookHeaders : null);
 
             if (!result.Success)
             {

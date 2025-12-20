@@ -56,6 +56,9 @@ public class AppDbContext : DbContext
     public DbSet<ProjectReviewer> ProjectReviewers => Set<ProjectReviewer>();
     public DbSet<OrganizationReviewer> OrganizationReviewers => Set<OrganizationReviewer>();
 
+    // Billing & Webhooks
+    public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -517,6 +520,17 @@ public class AppDbContext : DbContext
 
             // Match parent's soft-delete filter
             entity.HasQueryFilter(e => e.Organization!.DeletedAt == null);
+        });
+
+        // =====================================================================
+        // Webhook Events (Idempotency)
+        // =====================================================================
+        modelBuilder.Entity<WebhookEvent>(entity =>
+        {
+            // Unique constraint to prevent duplicate processing
+            entity.HasIndex(e => new { e.ProviderEventId, e.ProviderName }).IsUnique();
+            entity.HasIndex(e => e.ProcessedAt);
+            entity.HasIndex(e => e.UserId);
         });
     }
 
