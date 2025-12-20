@@ -290,7 +290,7 @@ public class ResourceSyncService
             return config.DefaultLanguageCode ?? "en";
         }
 
-        // Android format: res/values-es/strings.xml → "es", res/values/strings.xml → default
+        // Android format: values-es/strings.xml → "es", values/strings.xml → default
         if (effectiveFormat == "android")
         {
             // Extract folder name from path (values, values-es, values-zh-rCN)
@@ -561,7 +561,7 @@ public class ResourceSyncService
             {
                 return (false,
                     $"Project format is 'android' but files don't use Android format. " +
-                    $"Expected: res/values/strings.xml, res/values-es/strings.xml. " +
+                    $"Expected: values/strings.xml, values-es/strings.xml. " +
                     $"Files: {fileNames}");
             }
 
@@ -1005,14 +1005,15 @@ public class ResourceSyncService
             return $"{language.BaseName}.{language.Code}.resx";
         }
 
-        // Android format: res/values-es/strings.xml or res/values/strings.xml (default)
+        // Android format: values-es/strings.xml or values/strings.xml (default)
+        // Note: searchPath is the res folder directly, so paths are relative to res/
         if (effectiveFormat == "android")
         {
             // For default language, use bare "values" folder (standard Android convention)
             // For other languages, use "values-xx" folder
             var cultureCode = language.IsDefault ? "" : language.Code;
             var folder = LocalizationManager.Core.Backends.Android.AndroidCultureMapper.CodeToFolder(cultureCode);
-            return $"res/{folder}/{language.BaseName}.xml";
+            return $"{folder}/{language.BaseName}.xml";
         }
 
         // iOS format: es.lproj/Localizable.strings or en.lproj/Localizable.strings
