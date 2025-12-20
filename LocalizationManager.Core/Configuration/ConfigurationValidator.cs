@@ -56,9 +56,10 @@ public class ConfigurationValidator
         }
 
         var format = config.ResourceFormat.ToLowerInvariant();
-        if (format != "resx" && format != "json")
+        var validFormats = new[] { "resx", "json", "android", "ios" };
+        if (!validFormats.Contains(format))
         {
-            result.AddError($"Invalid ResourceFormat: '{config.ResourceFormat}'. Must be 'resx' or 'json'.");
+            result.AddError($"Invalid ResourceFormat: '{config.ResourceFormat}'. Must be one of: {string.Join(", ", validFormats)}.");
             return result;
         }
 
@@ -187,9 +188,10 @@ public class ConfigurationValidator
         }
 
         var format = newFormat.ToLowerInvariant();
-        if (format != "resx" && format != "json")
+        var validFormats = new[] { "resx", "json", "i18next", "android", "ios" };
+        if (!validFormats.Contains(format))
         {
-            result.AddError($"Invalid format: '{newFormat}'. Must be 'resx' or 'json'.");
+            result.AddError($"Invalid format: '{newFormat}'. Must be one of: {string.Join(", ", validFormats)}.");
             return result;
         }
 
@@ -207,19 +209,24 @@ public class ConfigurationValidator
         }
 
         // Check if resource files exist in the new format
-        var resourcePath = Path.Combine(_projectDirectory, "Resources");
-        if (!Directory.Exists(resourcePath))
+        var hasMatchingFiles = format switch
         {
-            return result; // No resources yet, safe to change
-        }
+            "resx" => Directory.GetFiles(_projectDirectory, "*.resx", SearchOption.AllDirectories).Any(),
+            "json" or "i18next" => Directory.GetFiles(_projectDirectory, "*.json", SearchOption.AllDirectories)
+                .Where(f => !Path.GetFileName(f).StartsWith("lrm", StringComparison.OrdinalIgnoreCase))
+                .Any(),
+            "android" => Directory.GetFiles(_projectDirectory, "strings.xml", SearchOption.AllDirectories)
+                .Where(f => f.Contains(Path.DirectorySeparatorChar + "values"))
+                .Any(),
+            "ios" => Directory.GetFiles(_projectDirectory, "*.strings", SearchOption.AllDirectories)
+                .Where(f => Path.GetDirectoryName(f)?.EndsWith(".lproj") == true)
+                .Any(),
+            _ => false
+        };
 
-        var currentFiles = format == "resx"
-            ? Directory.GetFiles(resourcePath, "*.resx", SearchOption.AllDirectories)
-            : Directory.GetFiles(resourcePath, "*.json", SearchOption.AllDirectories);
-
-        if (currentFiles.Length == 0)
+        if (!hasMatchingFiles)
         {
-            result.AddError($"Cannot change format to '{newFormat}' - no {newFormat} files found. Please migrate resources first using 'lrm convert' command.");
+            result.AddError($"Cannot change format to '{newFormat}' - no matching resource files found.");
         }
 
         return result;

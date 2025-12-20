@@ -25,7 +25,7 @@ public class InitCommandSettings : CommandSettings
     public bool Interactive { get; set; }
 
     [CommandOption("--format <FORMAT>")]
-    [Description("Resource format: resx or json (default: json)")]
+    [Description("Resource format: resx, json, android, or ios (default: json)")]
     public string Format { get; set; } = "json";
 
     [CommandOption("--default-lang <CODE>")]
@@ -81,7 +81,7 @@ public class InitCommand : Command<InitCommandSettings>
         var format = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("Select [green]resource format[/]:")
-                .AddChoices("json", "resx"));
+                .AddChoices("json", "resx", "android", "ios"));
 
         // 2. Resource path
         var path = AnsiConsole.Prompt(
@@ -142,18 +142,21 @@ public class InitCommand : Command<InitCommandSettings>
     private int CreateResources(InitCommandSettings settings, string resourcePath)
     {
         // Validate format
-        if (settings.Format != "json" && settings.Format != "resx")
+        var validFormats = new[] { "json", "resx", "android", "ios" };
+        if (!validFormats.Contains(settings.Format.ToLowerInvariant()))
         {
-            AnsiConsole.MarkupLine($"[red]Error:[/] Invalid format '{settings.Format}'. Must be 'json' or 'resx'.");
+            AnsiConsole.MarkupLine($"[red]Error:[/] Invalid format '{settings.Format}'. Must be one of: {string.Join(", ", validFormats)}.");
             return 1;
         }
 
         // Check if directory exists with resources
         if (Directory.Exists(resourcePath))
         {
-            var existingFiles = Directory.GetFiles(resourcePath, "*.json", SearchOption.TopDirectoryOnly)
+            var existingFiles = Directory.GetFiles(resourcePath, "*.json", SearchOption.AllDirectories)
                 .Where(f => !Path.GetFileName(f).StartsWith("lrm", StringComparison.OrdinalIgnoreCase))
-                .Concat(Directory.GetFiles(resourcePath, "*.resx", SearchOption.TopDirectoryOnly))
+                .Concat(Directory.GetFiles(resourcePath, "*.resx", SearchOption.AllDirectories))
+                .Concat(Directory.GetFiles(resourcePath, "strings.xml", SearchOption.AllDirectories))
+                .Concat(Directory.GetFiles(resourcePath, "*.strings", SearchOption.AllDirectories))
                 .ToList();
 
             if (existingFiles.Any() && !settings.SkipConfirmation)
@@ -169,6 +172,16 @@ public class InitCommand : Command<InitCommandSettings>
 
         // Create directory
         Directory.CreateDirectory(resourcePath);
+
+        // Handle Android and iOS separately due to different folder structures
+        if (settings.Format == "android")
+        {
+            return CreateAndroidResources(settings, resourcePath);
+        }
+        else if (settings.Format == "ios")
+        {
+            return CreateIosResources(settings, resourcePath);
+        }
 
         var factory = new ResourceBackendFactory();
         var backend = factory.GetBackend(settings.Format);
@@ -257,6 +270,142 @@ public class InitCommand : Command<InitCommandSettings>
         AnsiConsole.MarkupLine($"  [grey]4.[/] lrm validate [grey]# Check for issues[/]");
 
         return 0;
+    }
+
+    private int CreateAndroidResources(InitCommandSettings settings, string resourcePath)
+    {
+        // Android uses res/values/strings.xml structure
+        var resDir = Path.Combine(resourcePath, "res");
+        Directory.CreateDirectory(resDir);
+
+        // Default language uses "values" folder
+        var defaultDir = Path.Combine(resDir, "values");
+        Directory.CreateDirectory(defaultDir);
+        var defaultFilePath = Path.Combine(defaultDir, "strings.xml");
+
+        AnsiConsole.MarkupLine($"[green]Creating[/] res/values/strings.xml...");
+
+        var xmlContent = $@"<?xml version=""1.0"" encoding=""utf-8""?>
+<resources>
+    <!-- Application title -->
+    <string name=""app_name"">My Application</string>
+    <!-- Welcome message shown to users -->
+    <string name=""welcome_message"">Welcome!</string>
+</resources>";
+        File.WriteAllText(defaultFilePath, xmlContent);
+
+        // Create additional language files
+        if (!string.IsNullOrEmpty(settings.Languages))
+        {
+            foreach (var lang in settings.Languages.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var code = lang.Trim();
+                var folder = $"values-{code}";
+                var langDir = Path.Combine(resDir, folder);
+                Directory.CreateDirectory(langDir);
+                var langFilePath = Path.Combine(langDir, "strings.xml");
+
+                AnsiConsole.MarkupLine($"[green]Creating[/] res/{folder}/strings.xml...");
+
+                var langXmlContent = $@"<?xml version=""1.0"" encoding=""utf-8""?>
+<resources>
+    <!-- Application title -->
+    <string name=""app_name""></string>
+    <!-- Welcome message shown to users -->
+    <string name=""welcome_message""></string>
+</resources>";
+                File.WriteAllText(langFilePath, langXmlContent);
+            }
+        }
+
+        // Create lrm.json config
+        var config = new ConfigurationModel
+        {
+            DefaultLanguageCode = settings.DefaultLanguage,
+            ResourceFormat = "android"
+        };
+
+        var configPath = Path.Combine(resourcePath, "lrm.json");
+        var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+        var configJson = JsonSerializer.Serialize(config, jsonOptions);
+        File.WriteAllText(configPath, configJson);
+
+        PrintSuccessMessage(resourcePath);
+        return 0;
+    }
+
+    private int CreateIosResources(InitCommandSettings settings, string resourcePath)
+    {
+        // iOS uses xx.lproj/Localizable.strings structure
+
+        // Default language uses Base.lproj or en.lproj
+        var defaultFolder = settings.DefaultLanguage.Equals("en", StringComparison.OrdinalIgnoreCase)
+            ? "en.lproj"
+            : $"{settings.DefaultLanguage}.lproj";
+        var defaultDir = Path.Combine(resourcePath, defaultFolder);
+        Directory.CreateDirectory(defaultDir);
+        var defaultFilePath = Path.Combine(defaultDir, "Localizable.strings");
+
+        AnsiConsole.MarkupLine($"[green]Creating[/] {defaultFolder}/Localizable.strings...");
+
+        var stringsContent = @"/* Application title */
+""app_name"" = ""My Application"";
+
+/* Welcome message shown to users */
+""welcome_message"" = ""Welcome!"";
+";
+        File.WriteAllText(defaultFilePath, stringsContent);
+
+        // Create additional language files
+        if (!string.IsNullOrEmpty(settings.Languages))
+        {
+            foreach (var lang in settings.Languages.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var code = lang.Trim();
+                var folder = $"{code}.lproj";
+                var langDir = Path.Combine(resourcePath, folder);
+                Directory.CreateDirectory(langDir);
+                var langFilePath = Path.Combine(langDir, "Localizable.strings");
+
+                AnsiConsole.MarkupLine($"[green]Creating[/] {folder}/Localizable.strings...");
+
+                var langStringsContent = @"/* Application title */
+""app_name"" = """";
+
+/* Welcome message shown to users */
+""welcome_message"" = """";
+";
+                File.WriteAllText(langFilePath, langStringsContent);
+            }
+        }
+
+        // Create lrm.json config
+        var config = new ConfigurationModel
+        {
+            DefaultLanguageCode = settings.DefaultLanguage,
+            ResourceFormat = "ios"
+        };
+
+        var configPath = Path.Combine(resourcePath, "lrm.json");
+        var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+        var configJson = JsonSerializer.Serialize(config, jsonOptions);
+        File.WriteAllText(configPath, configJson);
+
+        PrintSuccessMessage(resourcePath);
+        return 0;
+    }
+
+    private void PrintSuccessMessage(string resourcePath)
+    {
+        AnsiConsole.MarkupLine($"[green]Created[/] lrm.json configuration");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[green]Initialization complete![/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[grey]Next steps:[/]");
+        AnsiConsole.MarkupLine($"  [grey]1.[/] cd {resourcePath}");
+        AnsiConsole.MarkupLine($"  [grey]2.[/] lrm edit     [grey]# Interactive editor[/]");
+        AnsiConsole.MarkupLine($"  [grey]3.[/] lrm add      [grey]# Add new keys[/]");
+        AnsiConsole.MarkupLine($"  [grey]4.[/] lrm validate [grey]# Check for issues[/]");
     }
 
     private static string GetCultureDisplayName(string code)

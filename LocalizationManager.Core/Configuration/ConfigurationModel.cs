@@ -34,7 +34,7 @@ public class ConfigurationModel
     public WebConfiguration? Web { get; set; }
 
     /// <summary>
-    /// Resource format: "resx" (default) or "json".
+    /// Resource format: "resx", "json", "i18next", "android", or "ios".
     /// Used to specify which backend to use for resource file operations.
     /// If not set, auto-detects based on existing files in the resource path.
     /// </summary>
@@ -51,6 +51,18 @@ public class ConfigurationModel
     /// Only applicable when ResourceFormat is "resx".
     /// </summary>
     public ResxFormatConfiguration? Resx { get; set; }
+
+    /// <summary>
+    /// Android-specific configuration settings.
+    /// Only applicable when ResourceFormat is "android".
+    /// </summary>
+    public AndroidFormatConfiguration? Android { get; set; }
+
+    /// <summary>
+    /// iOS-specific configuration settings.
+    /// Only applicable when ResourceFormat is "ios".
+    /// </summary>
+    public IosFormatConfiguration? Ios { get; set; }
 }
 
 /// <summary>
@@ -631,4 +643,30 @@ public class ResxFormatConfiguration
     /// Default: "SharedResource"
     /// </summary>
     public string BaseName { get; set; } = "SharedResource";
+}
+
+/// <summary>
+/// Configuration settings for Android resource format.
+/// </summary>
+public class AndroidFormatConfiguration
+{
+    /// <summary>
+    /// Base filename for resources (without extension).
+    /// Example: "strings" produces "strings.xml" in each values folder.
+    /// Default: "strings"
+    /// </summary>
+    public string BaseName { get; set; } = "strings";
+}
+
+/// <summary>
+/// Configuration settings for iOS resource format.
+/// </summary>
+public class IosFormatConfiguration
+{
+    /// <summary>
+    /// Base filename for resources (without extension).
+    /// Example: "Localizable" produces "Localizable.strings" and "Localizable.stringsdict".
+    /// Default: "Localizable"
+    /// </summary>
+    public string BaseName { get; set; } = "Localizable";
 }

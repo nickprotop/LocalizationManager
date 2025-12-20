@@ -51,7 +51,9 @@ app.Configure(config =>
         .WithExample(new[] { "init" })
         .WithExample(new[] { "init", "-i" })
         .WithExample(new[] { "init", "--format", "json", "--default-lang", "en" })
-        .WithExample(new[] { "init", "--format", "resx", "--languages", "fr,de,el" });
+        .WithExample(new[] { "init", "--format", "resx", "--languages", "fr,de,el" })
+        .WithExample(new[] { "init", "--format", "android", "--languages", "es,fr" })
+        .WithExample(new[] { "init", "--format", "ios", "--default-lang", "en", "--languages", "es,fr" });
 
     config.AddCommand<ConvertCommand>("convert")
         .WithDescription("Convert resource files between formats")

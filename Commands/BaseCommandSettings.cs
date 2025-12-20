@@ -45,7 +45,7 @@ public class BaseCommandSettings : CommandSettings
     public string? ConfigFilePath { get; set; }
 
     [CommandOption("--backend <BACKEND>")]
-    [Description("Resource backend: resx or json (auto-detected if not specified)")]
+    [Description("Resource backend: resx, json, i18next, android, or ios (auto-detected if not specified)")]
     public string? Backend { get; set; }
 
     /// <summary>

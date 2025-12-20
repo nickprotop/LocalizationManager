@@ -72,31 +72,25 @@ public class CloudSyncValidator
         var result = new SyncValidationResult();
 
         // Check what files exist locally
-        var (hasResxFiles, hasJsonFiles) = DetectLocalResourceFiles();
+        var (hasResxFiles, hasJsonFiles, hasAndroidFiles, hasIosFiles) = DetectLocalResourceFiles();
 
-        if (!hasResxFiles && !hasJsonFiles)
+        if (!hasResxFiles && !hasJsonFiles && !hasAndroidFiles && !hasIosFiles)
         {
             // No resource files yet - that's fine
             return result;
         }
 
         var remoteFormat = remoteProject.Format?.ToLowerInvariant() ?? "json";
+        var detectedFormat = DetectLocalFormat();
 
-        if (remoteFormat == "resx" && !hasResxFiles)
+        if (detectedFormat != null && detectedFormat != remoteFormat)
         {
-            result.AddError($"Cannot link to cloud project with format 'resx' - no .resx files found locally.");
-            if (hasJsonFiles)
-            {
-                result.AddError("Your local project has .json files. Use 'lrm convert' to migrate, or create a new cloud project with format 'json'.");
-            }
+            result.AddError($"Cannot link to cloud project with format '{remoteFormat}' - local project uses '{detectedFormat}'.");
+            result.AddError($"Create a new cloud project with format '{detectedFormat}' instead.");
         }
-        else if (remoteFormat == "json" && !hasJsonFiles)
+        else if (detectedFormat == null && (hasResxFiles || hasJsonFiles || hasAndroidFiles || hasIosFiles))
         {
-            result.AddError($"Cannot link to cloud project with format 'json' - no .json files found locally.");
-            if (hasResxFiles)
-            {
-                result.AddError("Your local project has .resx files. Use 'lrm convert' to migrate, or create a new cloud project with format 'resx'.");
-            }
+            result.AddWarning("Multiple resource formats detected locally. Consider consolidating to a single format.");
         }
 
         return result;
@@ -108,16 +102,20 @@ public class CloudSyncValidator
     /// </summary>
     public string? DetectLocalFormat()
     {
-        var (hasResxFiles, hasJsonFiles) = DetectLocalResourceFiles();
+        var (hasResxFiles, hasJsonFiles, hasAndroidFiles, hasIosFiles) = DetectLocalResourceFiles();
 
-        if (hasResxFiles && !hasJsonFiles)
+        // Check for mobile formats first (more specific patterns)
+        if (hasAndroidFiles && !hasResxFiles && !hasJsonFiles && !hasIosFiles)
+            return "android";
+        if (hasIosFiles && !hasResxFiles && !hasJsonFiles && !hasAndroidFiles)
+            return "ios";
+        if (hasResxFiles && !hasJsonFiles && !hasAndroidFiles && !hasIosFiles)
             return "resx";
-        if (hasJsonFiles && !hasResxFiles)
+        if (hasJsonFiles && !hasResxFiles && !hasAndroidFiles && !hasIosFiles)
             return "json";
-        if (hasResxFiles && hasJsonFiles)
-            return null; // Mixed - can't determine
 
-        return null; // No files
+        // Multiple formats detected - can't determine
+        return null;
     }
 
     private void ValidateFormatCompatibility(ConfigurationModel localConfig, CloudProject remoteProject, SyncValidationResult result)
@@ -176,27 +174,30 @@ public class CloudSyncValidator
             return; // No format specified, skip this check
         }
 
-        var (hasResxFiles, hasJsonFiles) = DetectLocalResourceFiles();
+        var (hasResxFiles, hasJsonFiles, hasAndroidFiles, hasIosFiles) = DetectLocalResourceFiles();
 
-        if (configFormat == "resx")
+        // Map format to expected files
+        var hasExpectedFiles = configFormat switch
         {
-            if (!hasResxFiles && hasJsonFiles)
-            {
-                result.AddError("lrm.json specifies format 'resx' but only .json files found.");
-                result.AddError("Either update lrm.json to use format 'json', or convert files with 'lrm convert --to resx'.");
-            }
-        }
-        else if (configFormat == "json")
+            "resx" => hasResxFiles,
+            "json" or "i18next" => hasJsonFiles,
+            "android" => hasAndroidFiles,
+            "ios" => hasIosFiles,
+            _ => true // Unknown format, skip check
+        };
+
+        if (!hasExpectedFiles)
         {
-            if (!hasJsonFiles && hasResxFiles)
+            var detectedFormat = DetectLocalFormat();
+            if (detectedFormat != null)
             {
-                result.AddError("lrm.json specifies format 'json' but only .resx files found.");
-                result.AddError("Either update lrm.json to use format 'resx', or convert files with 'lrm convert --to json'.");
+                result.AddError($"lrm.json specifies format '{configFormat}' but local files appear to be '{detectedFormat}'.");
+                result.AddError($"Either update lrm.json to use format '{detectedFormat}', or ensure correct resource files exist.");
             }
         }
     }
 
-    private (bool hasResx, bool hasJson) DetectLocalResourceFiles()
+    private (bool hasResx, bool hasJson, bool hasAndroid, bool hasIos) DetectLocalResourceFiles()
     {
         // Check in the project directory itself
         var resxFiles = Directory.GetFiles(_projectDirectory, "*.resx", SearchOption.AllDirectories)
@@ -210,6 +211,19 @@ public class CloudSyncValidator
             .Where(f => !Path.GetFileName(f).EndsWith(".schema.json", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
-        return (resxFiles.Length > 0, jsonFiles.Length > 0);
+        // Check for Android: res/values*/strings.xml pattern
+        var androidFiles = Directory.GetFiles(_projectDirectory, "strings.xml", SearchOption.AllDirectories)
+            .Where(f => !f.Contains("bin") && !f.Contains("obj"))
+            .Where(f => f.Contains(Path.DirectorySeparatorChar + "values") ||
+                        f.Contains(Path.DirectorySeparatorChar + "values-"))
+            .ToArray();
+
+        // Check for iOS: *.lproj/*.strings pattern
+        var iosFiles = Directory.GetFiles(_projectDirectory, "*.strings", SearchOption.AllDirectories)
+            .Where(f => !f.Contains("bin") && !f.Contains("obj"))
+            .Where(f => Path.GetDirectoryName(f)?.EndsWith(".lproj") == true)
+            .ToArray();
+
+        return (resxFiles.Length > 0, jsonFiles.Length > 0, androidFiles.Length > 0, iosFiles.Length > 0);
     }
 }
