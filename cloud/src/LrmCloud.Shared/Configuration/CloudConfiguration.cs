@@ -57,6 +57,12 @@ public sealed class CloudConfiguration
     public PaymentConfiguration? Payment { get; init; }
 
     /// <summary>
+    /// Superadmin configuration.
+    /// Controls which users have full system access.
+    /// </summary>
+    public SuperAdminConfiguration? SuperAdmin { get; init; }
+
+    /// <summary>
     /// Legacy Stripe configuration property.
     /// Use Payment.Stripe instead for new code.
     /// </summary>
@@ -1193,4 +1199,17 @@ public sealed class PayPalKeySet
     /// Get from PayPal Developer Dashboard > Webhooks.
     /// </summary>
     public string WebhookId { get; init; } = "";
+}
+
+/// <summary>
+/// Superadmin configuration.
+/// Controls which users have full system access.
+/// </summary>
+public sealed class SuperAdminConfiguration
+{
+    /// <summary>
+    /// List of email addresses that should be granted superadmin access.
+    /// On application startup, these users will be automatically set as superadmins.
+    /// </summary>
+    public List<string> Emails { get; init; } = new();
 }

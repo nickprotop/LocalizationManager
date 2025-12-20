@@ -117,8 +117,9 @@ public interface IPaymentProvider
     /// </summary>
     /// <param name="payload">Raw webhook payload body.</param>
     /// <param name="signature">Signature header value (provider-specific).</param>
+    /// <param name="headers">Additional HTTP headers needed for verification (PayPal requires multiple headers).</param>
     /// <returns>Parsed webhook result with normalized event data.</returns>
-    Task<WebhookResult> ProcessWebhookAsync(string payload, string? signature);
+    Task<WebhookResult> ProcessWebhookAsync(string payload, string? signature, IDictionary<string, string>? headers = null);
 
     #endregion
 }

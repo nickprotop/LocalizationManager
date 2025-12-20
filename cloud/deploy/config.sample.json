@@ -166,5 +166,8 @@
         "rateLimitPerMinute": 10
       }
     }
+  },
+  "superAdmin": {
+    "emails": ["admin@example.com"]
   }
 }

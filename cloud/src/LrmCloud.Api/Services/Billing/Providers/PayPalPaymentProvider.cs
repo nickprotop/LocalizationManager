@@ -375,12 +375,12 @@ public class PayPalPaymentProvider : IPaymentProvider
     #region Webhooks
 
     /// <inheritdoc />
-    public async Task<WebhookResult> ProcessWebhookAsync(string payload, string? signature)
+    public async Task<WebhookResult> ProcessWebhookAsync(string payload, string? signature, IDictionary<string, string>? headers = null)
     {
         EnsureEnabled();
 
-        // Verify webhook signature
-        var isValid = await VerifyWebhookSignatureAsync(payload, signature);
+        // Verify webhook signature using PayPal's verification API
+        var isValid = await VerifyWebhookSignatureAsync(payload, signature, headers);
         if (!isValid)
         {
             _logger.LogWarning("PayPal webhook signature verification failed");
@@ -490,18 +490,82 @@ public class PayPalPaymentProvider : IPaymentProvider
         };
     }
 
-    private async Task<bool> VerifyWebhookSignatureAsync(string payload, string? signature)
+    private async Task<bool> VerifyWebhookSignatureAsync(string payload, string? signature, IDictionary<string, string>? headers)
     {
         if (string.IsNullOrEmpty(PayPalConfig?.WebhookId))
         {
             _logger.LogWarning("PayPal webhook ID not configured, skipping signature verification");
-            return true; // Allow in development
+            return true; // Allow in development only
         }
 
-        // PayPal webhook verification requires multiple headers
-        // For simplicity, we'll trust the webhook if the webhook ID is configured
-        // In production, implement full signature verification
-        return true;
+        if (headers == null || string.IsNullOrEmpty(signature))
+        {
+            _logger.LogWarning("PayPal webhook missing required headers for verification");
+            return false;
+        }
+
+        // Extract required headers for PayPal verification
+        headers.TryGetValue("PAYPAL-AUTH-ALGO", out var authAlgo);
+        headers.TryGetValue("PAYPAL-CERT-URL", out var certUrl);
+        headers.TryGetValue("PAYPAL-TRANSMISSION-ID", out var transmissionId);
+        headers.TryGetValue("PAYPAL-TRANSMISSION-TIME", out var transmissionTime);
+
+        if (string.IsNullOrEmpty(authAlgo) || string.IsNullOrEmpty(certUrl) ||
+            string.IsNullOrEmpty(transmissionId) || string.IsNullOrEmpty(transmissionTime))
+        {
+            _logger.LogWarning("PayPal webhook missing required verification headers");
+            return false;
+        }
+
+        try
+        {
+            var accessToken = await GetAccessTokenAsync();
+
+            // Build the verification request per PayPal's API
+            var verificationRequest = new PayPalWebhookVerificationRequest
+            {
+                AuthAlgo = authAlgo,
+                CertUrl = certUrl,
+                TransmissionId = transmissionId,
+                TransmissionSig = signature,
+                TransmissionTime = transmissionTime,
+                WebhookId = PayPalConfig.WebhookId,
+                WebhookEvent = JsonSerializer.Deserialize<JsonElement>(payload)
+            };
+
+            var request = new HttpRequestMessage(HttpMethod.Post,
+                $"{PayPalConfig.ApiBaseUrl}/v1/notifications/verify-webhook-signature");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            request.Content = new StringContent(
+                JsonSerializer.Serialize(verificationRequest, JsonOptions),
+                Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.SendAsync(request);
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("PayPal webhook verification API failed: {StatusCode} - {Body}",
+                    response.StatusCode, responseBody);
+                return false;
+            }
+
+            var result = JsonSerializer.Deserialize<PayPalVerificationResponse>(responseBody, JsonOptions);
+            var isValid = result?.VerificationStatus == "SUCCESS";
+
+            if (!isValid)
+            {
+                _logger.LogWarning("PayPal webhook verification returned status: {Status}",
+                    result?.VerificationStatus ?? "null");
+            }
+
+            return isValid;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error verifying PayPal webhook signature");
+            return false;
+        }
     }
 
     #endregion
@@ -752,6 +816,37 @@ public class PayPalPaymentProvider : IPaymentProvider
 
         [JsonPropertyName("value")]
         public string? Value { get; set; }
+    }
+
+    // Models for webhook signature verification
+    private class PayPalWebhookVerificationRequest
+    {
+        [JsonPropertyName("auth_algo")]
+        public string? AuthAlgo { get; set; }
+
+        [JsonPropertyName("cert_url")]
+        public string? CertUrl { get; set; }
+
+        [JsonPropertyName("transmission_id")]
+        public string? TransmissionId { get; set; }
+
+        [JsonPropertyName("transmission_sig")]
+        public string? TransmissionSig { get; set; }
+
+        [JsonPropertyName("transmission_time")]
+        public string? TransmissionTime { get; set; }
+
+        [JsonPropertyName("webhook_id")]
+        public string? WebhookId { get; set; }
+
+        [JsonPropertyName("webhook_event")]
+        public JsonElement WebhookEvent { get; set; }
+    }
+
+    private class PayPalVerificationResponse
+    {
+        [JsonPropertyName("verification_status")]
+        public string? VerificationStatus { get; set; }
     }
 
     #endregion

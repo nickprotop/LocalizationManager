@@ -249,8 +249,9 @@ public class StripePaymentProvider : IPaymentProvider
     #region Webhooks
 
     /// <inheritdoc />
-    public Task<WebhookResult> ProcessWebhookAsync(string payload, string? signature)
+    public Task<WebhookResult> ProcessWebhookAsync(string payload, string? signature, IDictionary<string, string>? headers = null)
     {
+        // Stripe uses only the signature header, so headers parameter is ignored
         EnsureEnabled();
 
         Event stripeEvent;

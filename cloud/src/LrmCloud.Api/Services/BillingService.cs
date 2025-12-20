@@ -228,6 +228,21 @@ public class BillingService : IBillingService
             return;
         }
 
+        // Idempotency check: prevent duplicate webhook processing
+        if (!string.IsNullOrEmpty(result.ProviderEventId))
+        {
+            var alreadyProcessed = await _db.WebhookEvents.AnyAsync(e =>
+                e.ProviderEventId == result.ProviderEventId &&
+                e.ProviderName == result.ProviderName);
+
+            if (alreadyProcessed)
+            {
+                _logger.LogInformation("Webhook {EventId} from {Provider} already processed, skipping",
+                    result.ProviderEventId, result.ProviderName);
+                return;
+            }
+        }
+
         if (string.IsNullOrEmpty(result.CustomerId) && string.IsNullOrEmpty(result.SubscriptionId))
         {
             _logger.LogDebug("Webhook event {EventType} has no customer or subscription ID, skipping", result.EventType);
@@ -246,36 +261,86 @@ public class BillingService : IBillingService
             return;
         }
 
-        switch (result.EventType)
+        try
         {
-            case WebhookEventType.CheckoutCompleted:
-                await HandleCheckoutCompleted(user, result);
-                break;
+            switch (result.EventType)
+            {
+                case WebhookEventType.CheckoutCompleted:
+                    await HandleCheckoutCompleted(user, result);
+                    break;
 
-            case WebhookEventType.SubscriptionCreated:
-            case WebhookEventType.SubscriptionActivated:
-            case WebhookEventType.SubscriptionUpdated:
-                await HandleSubscriptionUpdated(user, result);
-                break;
+                case WebhookEventType.SubscriptionCreated:
+                    // For subscription created with pending/incomplete status, don't upgrade yet
+                    if (result.NewStatus == SubscriptionStatus.Incomplete ||
+                        result.NewStatus == SubscriptionStatus.None)
+                    {
+                        await HandleSubscriptionPending(user, result);
+                    }
+                    else
+                    {
+                        await HandleSubscriptionUpdated(user, result);
+                    }
+                    break;
 
-            case WebhookEventType.SubscriptionCanceled:
-            case WebhookEventType.SubscriptionExpired:
-                await HandleSubscriptionCanceled(user, result);
-                break;
+                case WebhookEventType.SubscriptionActivated:
+                case WebhookEventType.SubscriptionUpdated:
+                    await HandleSubscriptionUpdated(user, result);
+                    break;
 
-            case WebhookEventType.SubscriptionSuspended:
-            case WebhookEventType.PaymentFailed:
-                await HandlePaymentFailed(user, result);
-                break;
+                case WebhookEventType.SubscriptionCanceled:
+                case WebhookEventType.SubscriptionExpired:
+                    await HandleSubscriptionCanceled(user, result);
+                    break;
 
-            case WebhookEventType.PaymentSucceeded:
-                await HandlePaymentSucceeded(user, result);
-                break;
+                case WebhookEventType.SubscriptionSuspended:
+                case WebhookEventType.PaymentFailed:
+                    await HandlePaymentFailed(user, result);
+                    break;
 
-            default:
-                _logger.LogDebug("Unhandled webhook event type: {EventType}", result.EventType);
-                break;
+                case WebhookEventType.PaymentSucceeded:
+                    await HandlePaymentSucceeded(user, result);
+                    break;
+
+                default:
+                    _logger.LogDebug("Unhandled webhook event type: {EventType}", result.EventType);
+                    break;
+            }
+
+            // Record successful webhook processing
+            await RecordWebhookEventAsync(result, user.Id, true, null);
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling webhook {EventType} for user {UserId}",
+                result.EventType, user.Id);
+
+            // Record failed webhook processing
+            await RecordWebhookEventAsync(result, user.Id, false, ex.Message);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Records a webhook event to prevent duplicate processing.
+    /// </summary>
+    private async Task RecordWebhookEventAsync(WebhookResult result, int? userId, bool success, string? errorMessage)
+    {
+        if (string.IsNullOrEmpty(result.ProviderEventId))
+        {
+            return; // Can't record without an event ID
+        }
+
+        _db.WebhookEvents.Add(new WebhookEvent
+        {
+            ProviderEventId = result.ProviderEventId,
+            ProviderName = result.ProviderName,
+            EventType = result.EventType.ToString(),
+            UserId = userId,
+            Success = success,
+            ErrorMessage = errorMessage?.Length > 500 ? errorMessage[..500] : errorMessage
+        });
+
+        await _db.SaveChangesAsync();
     }
 
     /// <inheritdoc />
@@ -341,14 +406,47 @@ public class BillingService : IBillingService
             return;
         }
 
-        var plan = result.Plan ?? "team";
+        // CRITICAL: Verify subscription status with provider before upgrading
+        var provider = GetProviderForUser(user);
+        var subscription = await provider.GetSubscriptionAsync(result.SubscriptionId);
+
+        if (subscription == null)
+        {
+            _logger.LogWarning(
+                "Checkout completed webhook received but subscription {SubscriptionId} not found in {Provider}, not upgrading user {UserId}",
+                result.SubscriptionId, provider.ProviderName, user.Id);
+            return;
+        }
+
+        // Only upgrade if subscription is truly active (payment confirmed)
+        if (subscription.Status != SubscriptionStatus.Active &&
+            subscription.Status != SubscriptionStatus.Trialing)
+        {
+            _logger.LogWarning(
+                "Checkout completed but subscription {SubscriptionId} status is {Status}, not upgrading user {UserId}. " +
+                "Waiting for subscription activation webhook.",
+                result.SubscriptionId, subscription.Status, user.Id);
+
+            // Store subscription ID but keep as incomplete - don't upgrade plan
+            user.PaymentSubscriptionId = result.SubscriptionId;
+            user.SubscriptionStatus = MapSubscriptionStatus(subscription.Status);
+            user.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            return;
+        }
+
+        var plan = result.Plan ?? subscription.Plan ?? "team";
 
         user.Plan = plan;
         user.PaymentSubscriptionId = result.SubscriptionId;
         user.SubscriptionStatus = "active";
-        user.CancelAtPeriodEnd = result.CancelAtPeriodEnd ?? false;
+        user.CancelAtPeriodEnd = subscription.CancelAtPeriodEnd;
 
-        if (result.CurrentPeriodEnd.HasValue)
+        if (subscription.CurrentPeriodEnd.HasValue)
+        {
+            user.SubscriptionCurrentPeriodEnd = subscription.CurrentPeriodEnd.Value;
+        }
+        else if (result.CurrentPeriodEnd.HasValue)
         {
             user.SubscriptionCurrentPeriodEnd = result.CurrentPeriodEnd.Value;
         }
@@ -360,42 +458,99 @@ public class BillingService : IBillingService
         user.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Checkout completed for user {UserId}, plan {Plan}", user.Id, plan);
+        _logger.LogInformation("Checkout completed for user {UserId}, plan {Plan}, subscription status verified as {Status}",
+            user.Id, plan, subscription.Status);
     }
 
     private async Task HandleSubscriptionUpdated(User user, WebhookResult result)
     {
-        var plan = result.Plan ?? user.Plan;
-        var status = MapSubscriptionStatus(result.NewStatus);
+        // CRITICAL: Verify subscription status with provider before upgrading
+        if (!string.IsNullOrEmpty(result.SubscriptionId))
+        {
+            var provider = GetProviderForUser(user);
+            var subscription = await provider.GetSubscriptionAsync(result.SubscriptionId);
 
-        user.Plan = plan;
+            if (subscription == null)
+            {
+                _logger.LogWarning(
+                    "Subscription update webhook received but subscription {SubscriptionId} not found in {Provider}",
+                    result.SubscriptionId, provider.ProviderName);
+                return;
+            }
 
+            // Only upgrade if subscription is truly active
+            if (subscription.Status != SubscriptionStatus.Active &&
+                subscription.Status != SubscriptionStatus.Trialing)
+            {
+                _logger.LogWarning(
+                    "Subscription {SubscriptionId} status is {Status} (not active), not upgrading user {UserId}",
+                    result.SubscriptionId, subscription.Status, user.Id);
+
+                // Update status but don't upgrade plan
+                user.PaymentSubscriptionId = result.SubscriptionId;
+                user.SubscriptionStatus = MapSubscriptionStatus(subscription.Status);
+                user.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+                return;
+            }
+
+            // Use verified data from provider
+            var plan = subscription.Plan ?? result.Plan ?? user.Plan;
+
+            user.Plan = plan;
+            user.PaymentSubscriptionId = result.SubscriptionId;
+            user.SubscriptionStatus = MapSubscriptionStatus(subscription.Status);
+            user.CancelAtPeriodEnd = subscription.CancelAtPeriodEnd;
+
+            if (subscription.CurrentPeriodEnd.HasValue)
+            {
+                user.SubscriptionCurrentPeriodEnd = subscription.CurrentPeriodEnd.Value;
+            }
+
+            // Update limits based on plan
+            user.TranslationCharsLimit = _config.Limits.GetTranslationCharsLimit(plan);
+            user.OtherCharsLimit = _config.Limits.GetOtherCharsLimit(plan);
+
+            user.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("Subscription updated for user {UserId}, status {Status}, plan {Plan} (verified with provider)",
+                user.Id, subscription.Status, plan);
+        }
+        else
+        {
+            // No subscription ID - just update status from webhook
+            var status = MapSubscriptionStatus(result.NewStatus);
+            user.SubscriptionStatus = status;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("Subscription status updated for user {UserId}, status {Status}",
+                user.Id, status);
+        }
+    }
+
+    /// <summary>
+    /// Handles subscription created with pending/incomplete status.
+    /// Sets subscription ID but does NOT upgrade the plan - waiting for payment confirmation.
+    /// </summary>
+    private async Task HandleSubscriptionPending(User user, WebhookResult result)
+    {
+        // Store subscription ID but DON'T upgrade plan - waiting for payment
         if (!string.IsNullOrEmpty(result.SubscriptionId))
         {
             user.PaymentSubscriptionId = result.SubscriptionId;
         }
 
-        user.SubscriptionStatus = status;
-
-        if (result.CurrentPeriodEnd.HasValue)
-        {
-            user.SubscriptionCurrentPeriodEnd = result.CurrentPeriodEnd.Value;
-        }
-
-        if (result.CancelAtPeriodEnd.HasValue)
-        {
-            user.CancelAtPeriodEnd = result.CancelAtPeriodEnd.Value;
-        }
-
-        // Update limits based on plan
-        user.TranslationCharsLimit = _config.Limits.GetTranslationCharsLimit(plan);
-        user.OtherCharsLimit = _config.Limits.GetOtherCharsLimit(plan);
-
+        user.SubscriptionStatus = "incomplete";
+        // Keep current plan (free) until payment is confirmed
         user.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Subscription updated for user {UserId}, status {Status}, plan {Plan}",
-            user.Id, status, plan);
+        _logger.LogInformation(
+            "Subscription {SubscriptionId} created but pending payment for user {UserId}. " +
+            "User remains on {Plan} plan until payment is confirmed.",
+            result.SubscriptionId, user.Id, user.Plan);
     }
 
     private async Task HandleSubscriptionCanceled(User user, WebhookResult result)

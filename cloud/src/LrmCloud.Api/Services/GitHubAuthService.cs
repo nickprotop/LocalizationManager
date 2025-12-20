@@ -101,7 +101,9 @@ public class GitHubAuthService : IGitHubAuthService
                     DisplayName = user.DisplayName,
                     AvatarUrl = user.AvatarUrl,
                     EmailVerified = user.EmailVerified,
-                    Plan = user.Plan
+                    Plan = user.Plan,
+                    IsSuperAdmin = user.IsSuperAdmin,
+                    CreatedAt = user.CreatedAt
                 },
                 Token = token,
                 ExpiresAt = expiresAt,
