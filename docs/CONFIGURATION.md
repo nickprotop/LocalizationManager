@@ -67,7 +67,7 @@ YourProject/
 ```json
 {
   "DefaultLanguageCode": "en",
-  "ResourceFormat": "resx",
+  "ResourceFormat": "resx",  // or "json", "i18next", "android", "ios"
   "Json": {
     "UseNestedKeys": true,
     "IncludeMeta": true,
@@ -148,23 +148,33 @@ YourProject/
 
 **Type:** `string`
 **Default:** Auto-detect based on files in resource path
-**Values:** `"resx"` or `"json"`
+**Values:** `"resx"`, `"json"`, `"i18next"`, `"android"`, or `"ios"`
 
 ```json
 {
-  "ResourceFormat": "json"
+  "ResourceFormat": "android"
 }
 ```
 
 **Behavior:**
 - Specifies which resource file backend to use
-- If not set, auto-detects based on existing files (`.resx` files → RESX backend, `.json` files → JSON backend)
+- If not set, auto-detects based on existing files and folder structure
 - When set explicitly, forces the specified backend regardless of detected files
 
+**Auto-detection patterns:**
+| Format | Detection Pattern |
+|--------|-------------------|
+| `resx` | `*.resx` files |
+| `json` | `strings*.json` or `*.{culture}.json` files |
+| `i18next` | `{culture}.json` files (e.g., `en.json`, `fr.json`) |
+| `android` | `res/values*/strings.xml` folder structure |
+| `ios` | `*.lproj/*.strings` folder structure |
+
 **Use Cases:**
-- Force JSON format when both `.resx` and `.json` files exist
-- Initialize a new project with JSON format before creating resource files
+- Force a specific format when multiple formats exist
+- Initialize a new project before creating resource files
 - Override auto-detection when switching formats
+- Specify Android or iOS for mobile projects
 
 ---
 
@@ -230,6 +240,86 @@ Produces: `strings.json`, `strings.fr.json`, `strings.de.json`
 }
 ```
 Produces: `en.json`, `fr.json`, `de.json`
+
+---
+
+### Android
+
+**Type:** `object`
+**Purpose:** Configure Android resource file format (only applies when `ResourceFormat` is `"android"`)
+
+```json
+{
+  "ResourceFormat": "android",
+  "Android": {
+    "BaseName": "strings"
+  }
+}
+```
+
+#### Android Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `BaseName` | string | `"strings"` | Base filename for resources (produces `strings.xml`) |
+
+**Folder Structure:**
+```
+res/
+├── values/           # Default language
+│   └── strings.xml
+├── values-es/        # Spanish
+│   └── strings.xml
+├── values-fr/        # French
+│   └── strings.xml
+└── values-zh-rCN/    # Chinese (Simplified)
+    └── strings.xml
+```
+
+**Supported Elements:**
+- `<string name="key">value</string>` - Simple strings
+- `<plurals name="key">` - Plural forms with CLDR quantities
+- `<string-array name="key">` - String arrays
+- `translatable="false"` attribute preserved
+
+---
+
+### Ios
+
+**Type:** `object`
+**Purpose:** Configure iOS resource file format (only applies when `ResourceFormat` is `"ios"`)
+
+```json
+{
+  "ResourceFormat": "ios",
+  "Ios": {
+    "BaseName": "Localizable"
+  }
+}
+```
+
+#### iOS Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `BaseName` | string | `"Localizable"` | Base filename for resources (produces `Localizable.strings`) |
+
+**Folder Structure:**
+```
+en.lproj/
+├── Localizable.strings      # Simple strings
+└── Localizable.stringsdict  # Plurals (optional)
+es.lproj/
+├── Localizable.strings
+└── Localizable.stringsdict
+fr.lproj/
+├── Localizable.strings
+└── Localizable.stringsdict
+```
+
+**Supported Formats:**
+- `.strings` - Simple key-value pairs with comments
+- `.stringsdict` - Plist format for plural forms
 
 ---
 

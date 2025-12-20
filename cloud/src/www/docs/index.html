@@ -658,12 +658,14 @@
         <div class="container">
             <div class="ecosystem-intro">
                 <h2>The LRM Ecosystem</h2>
-                <p>LRM is a complete localization toolkit that works with any platform. Whether you're building with .NET, React, Vue, Angular, or Node.js, LRM provides the tools you need to manage, validate, translate, and collaborate on your localization resources.</p>
+                <p>LRM is a complete localization toolkit that works with any platform. Whether you're building with .NET, React, Vue, Angular, Node.js, Android, or iOS, LRM provides the tools you need to manage, validate, translate, and collaborate on your localization resources.</p>
                 <p>All LRM tools work with the same resource files, so you can use whichever interface fits your workflow - automate with the CLI, edit interactively in the terminal, get real-time feedback in VS Code, or collaborate with your team in the cloud.</p>
                 <div class="formats">
                     <span class="format-badge">.resx</span>
                     <span class="format-badge">JSON</span>
                     <span class="format-badge">i18next</span>
+                    <span class="format-badge">Android</span>
+                    <span class="format-badge">iOS</span>
                 </div>
             </div>
 
@@ -672,7 +674,7 @@
                 <div class="diagram-layer">
                     <div class="diagram-files">
                         <h3>Your Localization Files</h3>
-                        <p>.resx &middot; JSON &middot; i18next</p>
+                        <p>.resx &middot; JSON &middot; i18next &middot; Android &middot; iOS</p>
                     </div>
                     <div class="diagram-connector"></div>
                 </div>
@@ -708,17 +710,19 @@
                     <span class="platform-badge">Vue</span>
                     <span class="platform-badge">Angular</span>
                     <span class="platform-badge">Node.js</span>
-                    <span class="platform-badge">Any JSON i18n</span>
+                    <span class="platform-badge">Android</span>
+                    <span class="platform-badge">iOS</span>
                 </div>
 
                 <!-- Layer 3: Target Platforms -->
                 <div class="diagram-branch">
                     <div class="diagram-target">
-                        <h4>Web Applications</h4>
-                        <p>React, Vue, Angular, Node.js</p>
+                        <h4>Web & Mobile Applications</h4>
+                        <p>React, Vue, Angular, Node.js, Android, iOS</p>
                         <ul>
-                            <li>Use i18next or JSON natively</li>
-                            <li>Manage resources with LRM tools</li>
+                            <li>Android: strings.xml with plurals support</li>
+                            <li>iOS: .strings and .stringsdict formats</li>
+                            <li>i18next or JSON for web apps</li>
                             <li>Translate with 10+ providers</li>
                         </ul>
                     </div>

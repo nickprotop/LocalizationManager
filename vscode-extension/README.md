@@ -1,6 +1,6 @@
 # Localization Manager
 
-Manage .NET localization resources (.resx and JSON) with real-time validation, translation, and code scanning.
+Manage localization resources with real-time validation, translation, and code scanning. Supports **.resx**, **JSON**, **i18next**, **Android strings.xml**, and **iOS .strings** formats.
 
 ![Dashboard](https://raw.githubusercontent.com/nickprotop/LocalizationManager/main/vscode-extension/images/dashboard.png)
 
@@ -43,12 +43,15 @@ Get inline information and actions directly in your code.
 - Missing language warnings - click to translate
 - Click to open the key in Resource Editor
 
-### JSON Resource Support
-Works with both RESX and JSON localization formats:
-- **Standard JSON**: `strings.json`, `strings.fr.json` pattern
-- **i18next**: `en.json`, `fr.json` pattern with nested keys
+### Multi-Format Support
+Works with all major localization formats:
+- **.resx**: .NET resource files (`Resources.resx`, `Resources.fr.resx`)
+- **JSON**: Standard JSON (`strings.json`, `strings.fr.json`)
+- **i18next**: React/Vue/Angular (`en.json`, `fr.json`) with nested keys
+- **Android**: `res/values/strings.xml`, `res/values-es/strings.xml`
+- **iOS**: `en.lproj/Localizable.strings`, `es.lproj/Localizable.strings`
 
-Auto-detects format based on file naming and content patterns.
+Auto-detects format based on file naming and folder structure.
 
 ### Go to Definition (F12)
 Press F12 on any localization key in code to jump directly to its definition in the resource file.
@@ -75,11 +78,11 @@ Translate missing values using free or paid providers.
 
 ## Requirements
 - VS Code 1.80+
-- Workspace with .NET localization files (.resx or .json)
+- Workspace with localization files (.resx, .json, Android strings.xml, or iOS .strings)
 
 ## Quick Start
 1. Install the extension
-2. Open a workspace containing .resx or JSON resource files
+2. Open a workspace containing localization files (.resx, JSON, Android, or iOS)
 3. The extension auto-detects resources (if multiple formats found, you'll be asked to choose)
 4. Use Command Palette (Ctrl+Shift+P) → "LRM:" commands
 
@@ -97,7 +100,7 @@ Translate missing values using free or paid providers.
 ## Settings
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `lrm.resourcePath` | Path to resource folder (.resx or JSON) | Auto-detected |
+| `lrm.resourcePath` | Path to resource folder | Auto-detected |
 | `lrm.translationProvider` | Default provider | `mymemory` |
 | `lrm.enableRealtimeScan` | Live diagnostics | `true` |
 | `lrm.scanOnSave` | Scan on file save | `true` |

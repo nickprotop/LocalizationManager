@@ -102,7 +102,7 @@ public class CloudSyncValidatorTests : IDisposable
 
         // Assert
         Assert.False(result.CanSync);
-        Assert.Contains(result.Errors, e => e.Contains("lrm.json specifies format 'resx' but only .json files found"));
+        Assert.Contains(result.Errors, e => e.Contains("lrm.json specifies format 'resx' but local files appear to be 'json'"));
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public class CloudSyncValidatorTests : IDisposable
 
         // Assert
         Assert.False(result.CanSync);
-        Assert.Contains(result.Errors, e => e.Contains("lrm.json specifies format 'json' but only .resx files found"));
+        Assert.Contains(result.Errors, e => e.Contains("lrm.json specifies format 'json' but local files appear to be 'resx'"));
     }
 
     [Fact]
@@ -290,7 +290,7 @@ public class CloudSyncValidatorTests : IDisposable
         // Assert
         Assert.False(result.CanSync);
         Assert.Contains(result.Errors, e => e.Contains("Cannot link to cloud project with format 'resx'"));
-        Assert.Contains(result.Errors, e => e.Contains("no .resx files found"));
+        Assert.Contains(result.Errors, e => e.Contains("local project uses 'json'"));
     }
 
     [Fact]
@@ -306,7 +306,7 @@ public class CloudSyncValidatorTests : IDisposable
         // Assert
         Assert.False(result.CanSync);
         Assert.Contains(result.Errors, e => e.Contains("Cannot link to cloud project with format 'json'"));
-        Assert.Contains(result.Errors, e => e.Contains("no .json files found"));
+        Assert.Contains(result.Errors, e => e.Contains("local project uses 'resx'"));
     }
 
     [Fact]
@@ -320,7 +320,8 @@ public class CloudSyncValidatorTests : IDisposable
         var result = _validator.ValidateForLink(remoteProject);
 
         // Assert
-        Assert.Contains(result.Errors, e => e.Contains("lrm convert"));
+        // When formats don't match, suggests creating a new cloud project with the detected local format
+        Assert.Contains(result.Errors, e => e.Contains("Create a new cloud project with format 'resx'"));
     }
 
     #endregion

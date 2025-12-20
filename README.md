@@ -9,7 +9,7 @@
 [![GitHub Discussions](https://img.shields.io/github/discussions/nickprotop/LocalizationManager)](https://github.com/nickprotop/LocalizationManager/discussions)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?logo=buy-me-a-coffee&logoColor=white)](https://buymeacoffee.com/nickprotop)
 
-**A powerful, Linux-native command-line tool for managing .NET `.resx` localization files with an interactive Terminal UI and Web UI.**
+**A powerful, cross-platform command-line tool for managing localization files with an interactive Terminal UI and Web UI. Supports .NET `.resx`, JSON, i18next, Android `strings.xml`, and iOS `.strings` formats.**
 
 ![LRM Demo](assets/lrm-demo.gif)
 
@@ -68,12 +68,14 @@ Cloud platform for team-based localization management with web dashboard and CLI
 
 ## Why This Tool Exists
 
-Managing `.resx` files for .NET localization is painful on Linux:
+Managing localization files is painful:
 - **Visual Studio** and **ResXResourceManager** are Windows-only
-- **Manual XML editing** is error-prone and time-consuming
+- **Manual XML/JSON editing** is error-prone and time-consuming
+- **No unified tool** for .NET, Android, iOS, and web projects
 - **No Linux-native tools** with interactive editing existed
 
 LRM solves this by providing:
+- **Multi-format support** - .resx, JSON, i18next, Android, iOS
 - **First-class Linux support** with native binaries
 - **Interactive Terminal UI (TUI)** for visual editing
 - **Full CLI** for scripting and CI/CD automation
@@ -101,7 +103,7 @@ LRM solves this by providing:
 | **Self-contained** | ✅ Single binary | ❌ Needs .NET Runtime | ❌ Installer | ❌ Large install | ✅ |
 | **ARM64 Support** | ✅ Native | ❌ | ❌ | ❌ | ✅ Any editor |
 
-**LRM is the only Linux-native, CLI-first tool with an interactive TUI, Web UI, and REST API for .resx management.**
+**LRM is the only Linux-native, CLI-first tool with an interactive TUI, Web UI, and REST API for multi-format localization management (.resx, JSON, i18next, Android, iOS).**
 
 ---
 
@@ -128,32 +130,47 @@ LRM solves this by providing:
 
 ---
 
-## JSON Localization
+## Multi-Format Support
 
-> **Beyond .NET:** With JSON and i18next support, LRM becomes a universal localization tool for **React, Vue, Angular, Node.js**, and any project using JSON resources.
+> **Beyond .NET:** LRM is a universal localization tool supporting **React, Vue, Angular, Node.js, Android, iOS**, and any project using JSON or platform-specific resources.
 
-**The Killer Combo:** JSON localization + 10 translation providers = automated multilingual apps in any ecosystem.
+**The Killer Combo:** Multi-format support + 10 translation providers = automated multilingual apps in any ecosystem.
+
+### Supported Formats
+
+| Format | File Pattern | Use Case |
+|--------|-------------|----------|
+| **.resx** | `Resources.resx`, `Resources.fr.resx` | .NET applications |
+| **JSON** | `strings.json`, `strings.fr.json` | Web apps, Node.js |
+| **i18next** | `en.json`, `fr.json` | React, Vue, Angular |
+| **Android** | `res/values/strings.xml`, `res/values-fr/strings.xml` | Android apps |
+| **iOS** | `en.lproj/Localizable.strings`, `fr.lproj/Localizable.strings` | iOS/macOS apps |
+
+### Quick Start by Platform
 
 ```bash
-# Auto-translate your React/Vue/Angular app to 5 languages
+# Initialize Android project
+lrm init --format android --languages es,fr,de
+
+# Initialize iOS project
+lrm init --format ios --languages es,fr,de
+
+# Auto-translate your React/Vue/Angular app
 lrm translate --provider google --to fr,de,es,it,ja --path ./locales
+
+# Auto-translate Android app
+lrm translate --provider google --to es,fr --path ./app/src/main/res
 ```
 
-**Why JSON?**
-- **Human-readable** - Edit directly in any text editor, no special tools needed
-- **Git-friendly** - Clean diffs and easy merge conflict resolution
-- **Nested structure** - Organize keys hierarchically (`Errors.NotFound`, `Navigation.Home`)
-- **Universal** - Works with any framework, any language, any platform
+### Android Support
+- **Folder structure:** `res/values/strings.xml` (default), `res/values-es/strings.xml` (Spanish)
+- **Full support for:** `<string>`, `<plurals>`, `<string-array>`
+- **Comments and `translatable="false"` preserved**
 
-**Two Formats Supported:**
-- **Standard JSON** - `.json` files with nested keys and CLDR plural markers (`_plural: true`)
-- **i18next** - Full compatibility with suffix-based plurals (`items_one`, `items_other`) for React, Vue, Angular, Node.js
-
-**For .NET Developers:**
-The `LocalizationManager.JsonLocalization` NuGet package is a drop-in replacement for `IStringLocalizer<T>` - migrate from .resx with one command:
-```bash
-lrm convert --from resx --to json --path ./Resources
-```
+### iOS Support
+- **Folder structure:** `en.lproj/Localizable.strings`, `es.lproj/Localizable.strings`
+- **Full support for:** `.strings` and `.stringsdict` (plurals)
+- **Comments preserved in standard iOS format**
 
 **👉 [See JSON Localization Guide →](docs/JSON.md)** | [.NET NuGet Package →](LocalizationManager.JsonLocalization/README.md)
 
@@ -171,11 +188,14 @@ lrm convert --from resx --to json --path ./Resources
   - Secure API key management (environment variables, encrypted store, or config file)
   - Customizable models, prompts, and endpoints for AI providers
   - Plural form translation with CLDR support (zero/one/two/few/many/other)
-- **📦 JSON Localization** - Full support for JSON resource files alongside .resx
-  - Standard JSON format with nested keys and `_plural` markers
-  - i18next compatibility mode with suffix-based plurals (`_one`, `_other`)
-  - Auto-detection of format from file naming patterns
-  - Comments and metadata preservation
+- **📦 Multi-Format Support** - Unified management for all major localization formats
+  - **.resx** - .NET resource files with full XML preservation
+  - **JSON** - Standard JSON with nested keys and `_plural` markers
+  - **i18next** - Full compatibility with suffix-based plurals (`_one`, `_other`)
+  - **Android** - `strings.xml` with `<plurals>` and `<string-array>` support
+  - **iOS** - `.strings` and `.stringsdict` with plural support
+  - Auto-detection of format from file patterns
+  - Comments and metadata preservation across all formats
   - [See JSON format usage guide →](LocalizationManager.JsonLocalization/README.md)
 - **🚀 CI/CD Automation** - Production-ready workflows for GitHub Actions, GitLab CI, Azure DevOps
   - Validate → Check Missing → Auto-Translate → Re-validate → Commit
