@@ -162,6 +162,13 @@ public class User
     [Column("locked_until")]
     public DateTime? LockedUntil { get; set; }
 
+    // Admin
+    /// <summary>
+    /// Whether this user is a superadmin with full system access.
+    /// </summary>
+    [Column("is_superadmin")]
+    public bool IsSuperAdmin { get; set; }
+
     // Soft delete
     [Column("deleted_at")]
     public DateTime? DeletedAt { get; set; }
