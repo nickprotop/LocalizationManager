@@ -18,7 +18,8 @@
         <OrgSelector />
         <MudSpacer />
         <MudTooltip Text="Toggle dark mode">
-            <MudToggleIconButton @bind-Toggled="@_isDarkMode"
+            <MudToggleIconButton Toggled="@_isDarkMode"
+                                 ToggledChanged="@OnDarkModeToggled"
                                  Icon="@Icons.Material.Filled.DarkMode"
                                  ToggledIcon="@Icons.Material.Filled.LightMode"
                                  Color="Color.Inherit"
@@ -79,12 +80,10 @@
     {
         if (firstRender)
         {
-            // Detect system theme preference
-            if (_themeProvider != null)
-            {
-                _isDarkMode = await _themeProvider.GetSystemDarkModeAsync();
-                await InvokeAsync(StateHasChanged);
-            }
+            // Load saved theme preference (falls back to system preference if not set)
+            var theme = await JS.InvokeAsync<string>("lrmTheme.getPreference");
+            _isDarkMode = theme == "dark";
+            await InvokeAsync(StateHasChanged);
 
             // Check if mobile on first render
             await CheckMobileBreakpoint();
@@ -112,6 +111,12 @@
     private void ToggleDrawer()
     {
         _drawerOpen = !_drawerOpen;
+    }
+
+    private async Task OnDarkModeToggled(bool isDark)
+    {
+        _isDarkMode = isDark;
+        await JS.InvokeVoidAsync("lrmTheme.setPreference", isDark ? "dark" : "light");
     }
 
     private async Task Logout()
