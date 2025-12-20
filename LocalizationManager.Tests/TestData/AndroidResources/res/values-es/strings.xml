@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Aplicación de Prueba</string>
+    <string name="welcome_message">¡Bienvenido, %1$s!</string>
+    <string-array name="colors">
+        <item>Rojo</item>
+        <item>Verde</item>
+        <item>Azul</item>
+    </string-array>
+    <plurals name="item_count">
+        <item quantity="one">%d artículo</item>
+        <item quantity="other">%d artículos</item>
+    </plurals>
+    <string name="save_button">Guardar</string>
+    <string name="cancel_button">Cancelar</string>
+</resources>

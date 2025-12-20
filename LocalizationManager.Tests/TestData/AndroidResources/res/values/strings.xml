@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Application name -->
+    <string name="app_name">Test App</string>
+    <!-- Welcome message with placeholder -->
+    <string name="welcome_message">Welcome, %1$s!</string>
+    <!-- API key should not be translated -->
+    <string name="api_key" translatable="false">ABC123XYZ</string>
+    <!-- Color options -->
+    <string-array name="colors">
+        <item>Red</item>
+        <item>Green</item>
+        <item>Blue</item>
+    </string-array>
+    <!-- Item count plural -->
+    <plurals name="item_count">
+        <item quantity="zero">No items</item>
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
+    <!-- Simple strings -->
+    <string name="save_button">Save</string>
+    <string name="cancel_button">Cancel</string>
+</resources>

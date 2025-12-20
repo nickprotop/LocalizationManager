@@ -1,0 +1,16 @@
+/* Application name */
+"app_name" = "测试应用";
+
+/* Welcome message with placeholder */
+"welcome_message" = "欢迎，%@！";
+
+/* Save button */
+"save_button" = "保存";
+
+/* Cancel button */
+"cancel_button" = "取消";
+
+/* Color names */
+"color_red" = "红色";
+"color_green" = "绿色";
+"color_blue" = "蓝色";

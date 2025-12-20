@@ -21,6 +21,8 @@
 
 namespace LocalizationManager.Core.Abstractions;
 
+using LocalizationManager.Core.Configuration;
+
 /// <summary>
 /// Factory for creating resource backends.
 /// </summary>
@@ -35,11 +37,28 @@ public interface IResourceBackendFactory
     IResourceBackend GetBackend(string name);
 
     /// <summary>
+    /// Get backend by name with configuration.
+    /// </summary>
+    /// <param name="name">Backend name (e.g., "resx", "json").</param>
+    /// <param name="config">Configuration model with format-specific settings.</param>
+    /// <returns>The requested backend configured with the provided settings.</returns>
+    /// <exception cref="ArgumentException">Thrown when backend is not found.</exception>
+    IResourceBackend GetBackend(string name, ConfigurationModel? config);
+
+    /// <summary>
     /// Auto-detect backend from existing files in path.
     /// </summary>
     /// <param name="path">Path to search for resource files.</param>
     /// <returns>Detected backend or default backend.</returns>
     IResourceBackend ResolveFromPath(string path);
+
+    /// <summary>
+    /// Auto-detect backend from existing files in path with configuration.
+    /// </summary>
+    /// <param name="path">Path to search for resource files.</param>
+    /// <param name="config">Configuration model with format-specific settings.</param>
+    /// <returns>Detected backend or default backend.</returns>
+    IResourceBackend ResolveFromPath(string path, ConfigurationModel? config);
 
     /// <summary>
     /// List all available backends.

@@ -1,0 +1,16 @@
+/* Application name */
+"app_name" = "Test App";
+
+/* Welcome message with placeholder */
+"welcome_message" = "Welcome, %@!";
+
+/* Save button */
+"save_button" = "Save";
+
+/* Cancel button */
+"cancel_button" = "Cancel";
+
+/* Color names */
+"color_red" = "Red";
+"color_green" = "Green";
+"color_blue" = "Blue";
