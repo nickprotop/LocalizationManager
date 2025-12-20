@@ -1,0 +1,167 @@
+@page "/admin/logs"
+@using LrmCloud.Shared.DTOs.Admin
+@using LrmCloud.Web.Services
+@inject AdminService AdminService
+@attribute [Authorize]
+
+<PageTitle>Logs - LRM Cloud Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">
+    <MudIcon Icon="@Icons.Material.Filled.Article" Class="mr-2" Style="vertical-align: middle;" />
+    Application Logs
+</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    View and filter application logs for debugging and monitoring.
+</MudText>
+
+@* Filters *@
+<MudPaper Class="pa-4 mb-4" Elevation="2">
+    <MudGrid>
+        <MudItem xs="12" md="3">
+            <MudSelect T="string" @bind-Value="_levelFilter" Label="Log Level" Clearable="true">
+                <MudSelectItem Value="@("INF")">Info</MudSelectItem>
+                <MudSelectItem Value="@("WRN")">Warning</MudSelectItem>
+                <MudSelectItem Value="@("ERR")">Error</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="5">
+            <MudTextField @bind-Value="_search" Label="Search" Placeholder="Search in log messages..."
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudDatePicker @bind-Date="_fromDate" Label="From Date" Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudDatePicker @bind-Date="_toDate" Label="To Date" Clearable="true" />
+        </MudItem>
+    </MudGrid>
+    <div class="d-flex justify-end mt-2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadLogsAsync" StartIcon="@Icons.Material.Filled.Search">
+            Search
+        </MudButton>
+    </div>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_logs == null || _logs.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No logs found matching the criteria.</MudAlert>
+}
+else
+{
+    <MudPaper Elevation="2">
+        <MudTable Items="@_logs" Dense="true" Hover="true" FixedHeader="true" Height="calc(100vh - 400px)">
+            <HeaderContent>
+                <MudTh Style="width: 180px;">Timestamp</MudTh>
+                <MudTh Style="width: 80px;">Level</MudTh>
+                <MudTh>Message</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Timestamp">
+                    <MudText Typo="Typo.caption" Style="font-family: monospace;">
+                        @context.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")
+                    </MudText>
+                </MudTd>
+                <MudTd DataLabel="Level">
+                    <MudChip T="string" Size="Size.Small" Color="@GetLevelColor(context.Level)">
+                        @context.Level
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Message">
+                    <MudText Typo="Typo.body2" Style="font-family: monospace; word-break: break-word;">
+                        @context.Message
+                    </MudText>
+                    @if (!string.IsNullOrEmpty(context.Exception))
+                    {
+                        <MudExpansionPanels Dense="true" Class="mt-1">
+                            <MudExpansionPanel Text="Exception Details" Dense="true" MaxHeight="200">
+                                <pre style="font-size: 0.75rem; overflow: auto; white-space: pre-wrap; margin: 0;">@context.Exception</pre>
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+
+    @* Pagination *@
+    <div class="d-flex justify-space-between align-center mt-2">
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            Showing @_logs.Count logs (Page @_page)
+        </MudText>
+        <div class="d-flex gap-2">
+            <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(_page <= 1)" OnClick="PreviousPage">
+                Previous
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(_logs.Count < _pageSize)" OnClick="NextPage">
+                Next
+            </MudButton>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isLoading = true;
+    private List<LogEntryDto>? _logs;
+    private string? _levelFilter;
+    private string _search = "";
+    private DateTime? _fromDate;
+    private DateTime? _toDate;
+    private int _page = 1;
+    private int _pageSize = 100;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLogsAsync();
+    }
+
+    private async Task LoadLogsAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _logs = await AdminService.GetLogsAsync(
+                _levelFilter,
+                string.IsNullOrWhiteSpace(_search) ? null : _search,
+                _fromDate,
+                _toDate?.AddDays(1), // Include the entire end day
+                _page,
+                _pageSize);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task PreviousPage()
+    {
+        if (_page > 1)
+        {
+            _page--;
+            await LoadLogsAsync();
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (_logs?.Count == _pageSize)
+        {
+            _page++;
+            await LoadLogsAsync();
+        }
+    }
+
+    private static Color GetLevelColor(string level) => level.ToUpper() switch
+    {
+        "ERR" or "ERROR" or "FTL" or "FATAL" => Color.Error,
+        "WRN" or "WARNING" or "WARN" => Color.Warning,
+        "INF" or "INFO" => Color.Info,
+        "DBG" or "DEBUG" => Color.Default,
+        "VRB" or "VERBOSE" => Color.Secondary,
+        _ => Color.Default
+    };
+}

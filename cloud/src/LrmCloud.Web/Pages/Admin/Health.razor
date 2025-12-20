@@ -1,0 +1,240 @@
+@page "/admin/health"
+@using LrmCloud.Shared.DTOs.Admin
+@using LrmCloud.Web.Services
+@inject AdminService AdminService
+@attribute [Authorize]
+
+<PageTitle>System Health - LRM Cloud Admin</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h4">
+            <MudIcon Icon="@Icons.Material.Filled.HealthAndSafety" Class="mr-2" Style="vertical-align: middle;" />
+            System Health
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Real-time status of all system services.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadHealthAsync" StartIcon="@Icons.Material.Filled.Refresh">
+        Refresh
+    </MudButton>
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_health == null)
+{
+    <MudAlert Severity="Severity.Error">Failed to load system health status.</MudAlert>
+}
+else
+{
+    @* Overall Status Banner *@
+    <MudAlert Severity="@(_health.IsHealthy ? Severity.Success : Severity.Error)" Class="mb-4">
+        <div class="d-flex align-center">
+            <MudIcon Icon="@(_health.IsHealthy ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Error)" Class="mr-2" />
+            <MudText Typo="Typo.subtitle1">
+                System is @(_health.IsHealthy ? "Healthy" : "Unhealthy")
+            </MudText>
+        </div>
+    </MudAlert>
+
+    <MudGrid>
+        @* Database *@
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Medium" Class="mr-2"
+                                 Color="@(_health.Database.IsHealthy ? Color.Success : Color.Error)" />
+                        <MudText Typo="Typo.h6">Database</MudText>
+                    </div>
+                    <MudChip T="string" Size="Size.Small" Color="@(_health.Database.IsHealthy ? Color.Success : Color.Error)">
+                        @(_health.Database.IsHealthy ? "Healthy" : "Error")
+                    </MudChip>
+                </div>
+                <MudDivider Class="mb-3" />
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                        <MudText Typo="Typo.body2">@(_health.Database.IsHealthy ? "Connected" : "Disconnected")</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Latency</MudText>
+                        <MudText Typo="Typo.body2">@(_health.Database.LatencyMs.HasValue ? $"{_health.Database.LatencyMs}ms" : "-")</MudText>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
+        @* Redis *@
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Memory" Size="Size.Medium" Class="mr-2"
+                                 Color="@(_health.Redis.IsHealthy ? Color.Success : Color.Error)" />
+                        <MudText Typo="Typo.h6">Redis</MudText>
+                    </div>
+                    <MudChip T="string" Size="Size.Small" Color="@(_health.Redis.IsHealthy ? Color.Success : Color.Error)">
+                        @(_health.Redis.IsHealthy ? "Healthy" : "Error")
+                    </MudChip>
+                </div>
+                <MudDivider Class="mb-3" />
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                        <MudText Typo="Typo.body2">@(_health.Redis.IsHealthy ? "Connected" : "Disconnected")</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Latency</MudText>
+                        <MudText Typo="Typo.body2">@(_health.Redis.LatencyMs.HasValue ? $"{_health.Redis.LatencyMs}ms" : "-")</MudText>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
+        @* MinIO *@
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.CloudQueue" Size="Size.Medium" Class="mr-2"
+                                 Color="@(_health.MinIO.IsHealthy ? Color.Success : Color.Error)" />
+                        <MudText Typo="Typo.h6">MinIO Storage</MudText>
+                    </div>
+                    <MudChip T="string" Size="Size.Small" Color="@(_health.MinIO.IsHealthy ? Color.Success : Color.Error)">
+                        @(_health.MinIO.IsHealthy ? "Healthy" : "Error")
+                    </MudChip>
+                </div>
+                <MudDivider Class="mb-3" />
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                        <MudText Typo="Typo.body2">@(_health.MinIO.IsHealthy ? "Connected" : "Disconnected")</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Latency</MudText>
+                        <MudText Typo="Typo.body2">@(_health.MinIO.LatencyMs.HasValue ? $"{_health.MinIO.LatencyMs}ms" : "-")</MudText>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
+        @* PayPal *@
+        @if (_health.PayPal != null)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <div class="d-flex justify-space-between align-center mb-3">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Payment" Size="Size.Medium" Class="mr-2"
+                                     Color="@(_health.PayPal.IsHealthy ? Color.Success : Color.Error)" />
+                            <MudText Typo="Typo.h6">PayPal</MudText>
+                        </div>
+                        <MudChip T="string" Size="Size.Small" Color="@(_health.PayPal.IsHealthy ? Color.Success : Color.Error)">
+                            @(_health.PayPal.IsHealthy ? "Healthy" : "Error")
+                        </MudChip>
+                    </div>
+                    <MudDivider Class="mb-3" />
+                    <MudGrid>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                            <MudText Typo="Typo.body2">@(_health.PayPal.IsHealthy ? "Connected" : "Disconnected")</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Latency</MudText>
+                            <MudText Typo="Typo.body2">@(_health.PayPal.LatencyMs.HasValue ? $"{_health.PayPal.LatencyMs}ms" : "-")</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+        }
+
+        @* Stripe *@
+        @if (_health.Stripe != null)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <div class="d-flex justify-space-between align-center mb-3">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.CreditCard" Size="Size.Medium" Class="mr-2"
+                                     Color="@(_health.Stripe.IsHealthy ? Color.Success : Color.Error)" />
+                            <MudText Typo="Typo.h6">Stripe</MudText>
+                        </div>
+                        <MudChip T="string" Size="Size.Small" Color="@(_health.Stripe.IsHealthy ? Color.Success : Color.Error)">
+                            @(_health.Stripe.IsHealthy ? "Healthy" : "Error")
+                        </MudChip>
+                    </div>
+                    <MudDivider Class="mb-3" />
+                    <MudGrid>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                            <MudText Typo="Typo.body2">@(_health.Stripe.IsHealthy ? "Connected" : "Disconnected")</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Latency</MudText>
+                            <MudText Typo="Typo.body2">@(_health.Stripe.LatencyMs.HasValue ? $"{_health.Stripe.LatencyMs}ms" : "-")</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+
+    @* Server Info *@
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        <MudText Typo="Typo.h6" Class="mb-4">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" Style="vertical-align: middle;" />
+            Server Information
+        </MudText>
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Server Time (UTC)</MudText>
+                <MudText Typo="Typo.body1">@_health.ServerTime.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Uptime</MudText>
+                <MudText Typo="Typo.body1">@FormatUptime(_health.Uptime)</MudText>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Last Check</MudText>
+                <MudText Typo="Typo.body1">@DateTime.Now.ToString("HH:mm:ss")</MudText>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+}
+
+@code {
+    private bool _isLoading = true;
+    private SystemHealthDto? _health;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHealthAsync();
+    }
+
+    private async Task LoadHealthAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _health = await AdminService.GetHealthAsync();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static string FormatUptime(TimeSpan uptime)
+    {
+        if (uptime.TotalDays >= 1)
+            return $"{(int)uptime.TotalDays}d {uptime.Hours}h {uptime.Minutes}m";
+        if (uptime.TotalHours >= 1)
+            return $"{(int)uptime.TotalHours}h {uptime.Minutes}m";
+        return $"{uptime.Minutes}m {uptime.Seconds}s";
+    }
+}

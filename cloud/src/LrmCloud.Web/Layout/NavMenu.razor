@@ -1,14 +1,31 @@
+@using Microsoft.AspNetCore.Components.Authorization
+
 <MudNavMenu>
-    <MudNavLink Href="/app" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-    <MudNavLink Href="/app/projects" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Folder">Projects</MudNavLink>
-    <MudNavLink Href="/app/organizations" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Business">Organizations</MudNavLink>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+    <MudNavLink Href="projects" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Folder">Projects</MudNavLink>
+    <MudNavLink Href="organizations" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Business">Organizations</MudNavLink>
     <MudNavGroup Title="Settings" Icon="@Icons.Material.Filled.Settings" Expanded="false">
-        <MudNavLink Href="/app/settings/profile" Icon="@Icons.Material.Filled.Person">Profile</MudNavLink>
-        <MudNavLink Href="/app/settings/api-keys" Icon="@Icons.Material.Filled.Key">CLI API Keys</MudNavLink>
-        <MudNavLink Href="/app/settings/translation" Icon="@Icons.Material.Filled.Translate">Translation Providers</MudNavLink>
-        <MudNavLink Href="/app/settings/translation-memory" Icon="@Icons.Material.Filled.Memory">Translation Memory</MudNavLink>
-        <MudNavLink Href="/app/settings/glossary" Icon="@Icons.Material.Filled.Book">Organization Glossary</MudNavLink>
-        <MudNavLink Href="/app/settings/usage" Icon="@Icons.Material.Filled.Analytics">Usage</MudNavLink>
-        <MudNavLink Href="/app/settings/billing" Icon="@Icons.Material.Filled.CreditCard">Billing</MudNavLink>
+        <MudNavLink Href="settings/profile" Icon="@Icons.Material.Filled.Person">Profile</MudNavLink>
+        <MudNavLink Href="settings/api-keys" Icon="@Icons.Material.Filled.Key">CLI API Keys</MudNavLink>
+        <MudNavLink Href="settings/translation" Icon="@Icons.Material.Filled.Translate">Translation Providers</MudNavLink>
+        <MudNavLink Href="settings/translation-memory" Icon="@Icons.Material.Filled.Memory">Translation Memory</MudNavLink>
+        <MudNavLink Href="settings/glossary" Icon="@Icons.Material.Filled.Book">Organization Glossary</MudNavLink>
+        <MudNavLink Href="settings/usage" Icon="@Icons.Material.Filled.Analytics">Usage</MudNavLink>
+        <MudNavLink Href="settings/billing" Icon="@Icons.Material.Filled.CreditCard">Billing</MudNavLink>
     </MudNavGroup>
+    <AuthorizeView>
+        <Authorized>
+            @if (context.User.FindFirst("is_superadmin")?.Value == "true")
+            {
+                <MudNavGroup Title="Admin" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="false">
+                    <MudNavLink Href="admin" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+                    <MudNavLink Href="admin/analytics" Icon="@Icons.Material.Filled.TrendingUp">Analytics</MudNavLink>
+                    <MudNavLink Href="admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Users</MudNavLink>
+                    <MudNavLink Href="admin/organizations" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Business">Organizations</MudNavLink>
+                    <MudNavLink Href="admin/health" Icon="@Icons.Material.Filled.HealthAndSafety">System Health</MudNavLink>
+                    <MudNavLink Href="admin/logs" Icon="@Icons.Material.Filled.Article">Logs</MudNavLink>
+                </MudNavGroup>
+            }
+        </Authorized>
+    </AuthorizeView>
 </MudNavMenu>

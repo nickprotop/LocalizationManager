@@ -1,0 +1,407 @@
+@page "/admin"
+@using LrmCloud.Shared.DTOs.Admin
+@using LrmCloud.Web.Services
+@inject AdminService AdminService
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<PageTitle>Admin Dashboard - LRM Cloud</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">
+    <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Class="mr-2" Style="vertical-align: middle;" />
+    Admin Dashboard
+</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    System-wide statistics, health monitoring, and user management.
+</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* Stats Cards - Row 1 *@
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Primary" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h4">@(_stats?.TotalUsers.ToString("N0") ?? "-")</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Total Users</MudText>
+                    </div>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.CreditCard" Size="Size.Large" Color="Color.Success" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h4">@(_stats?.PaidUsers.ToString("N0") ?? "-")</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Active Subscribers</MudText>
+                    </div>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Large" Color="Color.Info" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h4">@(_stats?.TotalProjects.ToString("N0") ?? "-")</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Projects</MudText>
+                    </div>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Large" Color="Color.Warning" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h4">@(_stats?.TotalOrganizations.ToString("N0") ?? "-")</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Organizations</MudText>
+                    </div>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* Stats Cards - Row 2 (MRR) *@
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2" Style="cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("admin/analytics"))">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Color="Color.Success" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h4">$@(_revenue?.CurrentMrr.ToString("N0") ?? "-")</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Monthly Revenue</MudText>
+                    </div>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2" Style="cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("admin/analytics"))">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Large" Color="@(_userAnalytics?.GrowthRate >= 0 ? Color.Success : Color.Error)" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h4">@((_userAnalytics?.NewUsersThisMonth ?? 0) > 0 ? "+" : "")@(_userAnalytics?.NewUsersThisMonth.ToString("N0") ?? "-")</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">New Users (Month)</MudText>
+                    </div>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Translate" Size="Size.Large" Color="Color.Primary" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h4">@FormatNumber(_stats?.TotalTranslationCharsUsed ?? 0)</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">LRM Chars Used</MudText>
+                    </div>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Key" Size="Size.Large" Color="Color.Info" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h4">@FormatNumber(_stats?.TotalOtherCharsUsed ?? 0)</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">BYOK Chars Used</MudText>
+                    </div>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid>
+        @* System Health *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <div class="d-flex justify-space-between align-center mb-4">
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.HealthAndSafety" Class="mr-2" Style="vertical-align: middle;" />
+                        System Health
+                    </MudText>
+                    @if (_health != null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="@(_health.IsHealthy ? Color.Success : Color.Error)">
+                            @(_health.IsHealthy ? "Healthy" : "Unhealthy")
+                        </MudChip>
+                    }
+                </div>
+                @if (_health != null)
+                {
+                    <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+                        <tbody>
+                            <tr>
+                                <td><MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" Class="mr-2" />Database</td>
+                                <td>
+                                    <MudChip T="string" Size="Size.Small" Color="@(_health.Database.IsHealthy ? Color.Success : Color.Error)">
+                                        @(_health.Database.IsHealthy ? "OK" : "Error")
+                                    </MudChip>
+                                </td>
+                                <td>@(_health.Database.LatencyMs.HasValue ? $"{_health.Database.LatencyMs}ms" : "-")</td>
+                            </tr>
+                            <tr>
+                                <td><MudIcon Icon="@Icons.Material.Filled.Memory" Size="Size.Small" Class="mr-2" />Redis</td>
+                                <td>
+                                    <MudChip T="string" Size="Size.Small" Color="@(_health.Redis.IsHealthy ? Color.Success : Color.Error)">
+                                        @(_health.Redis.IsHealthy ? "OK" : "Error")
+                                    </MudChip>
+                                </td>
+                                <td>@(_health.Redis.LatencyMs.HasValue ? $"{_health.Redis.LatencyMs}ms" : "-")</td>
+                            </tr>
+                            <tr>
+                                <td><MudIcon Icon="@Icons.Material.Filled.CloudQueue" Size="Size.Small" Class="mr-2" />MinIO</td>
+                                <td>
+                                    <MudChip T="string" Size="Size.Small" Color="@(_health.MinIO.IsHealthy ? Color.Success : Color.Error)">
+                                        @(_health.MinIO.IsHealthy ? "OK" : "Error")
+                                    </MudChip>
+                                </td>
+                                <td>@(_health.MinIO.LatencyMs.HasValue ? $"{_health.MinIO.LatencyMs}ms" : "-")</td>
+                            </tr>
+                            @if (_health.PayPal != null)
+                            {
+                                <tr>
+                                    <td><MudIcon Icon="@Icons.Material.Filled.Payment" Size="Size.Small" Class="mr-2" />PayPal</td>
+                                    <td>
+                                        <MudChip T="string" Size="Size.Small" Color="@(_health.PayPal.IsHealthy ? Color.Success : Color.Error)">
+                                            @(_health.PayPal.IsHealthy ? "OK" : "Error")
+                                        </MudChip>
+                                    </td>
+                                    <td>@(_health.PayPal.LatencyMs.HasValue ? $"{_health.PayPal.LatencyMs}ms" : "-")</td>
+                                </tr>
+                            }
+                            @if (_health.Stripe != null)
+                            {
+                                <tr>
+                                    <td><MudIcon Icon="@Icons.Material.Filled.CreditCard" Size="Size.Small" Class="mr-2" />Stripe</td>
+                                    <td>
+                                        <MudChip T="string" Size="Size.Small" Color="@(_health.Stripe.IsHealthy ? Color.Success : Color.Error)">
+                                            @(_health.Stripe.IsHealthy ? "OK" : "Error")
+                                        </MudChip>
+                                    </td>
+                                    <td>@(_health.Stripe.LatencyMs.HasValue ? $"{_health.Stripe.LatencyMs}ms" : "-")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                        Server Time: @_health.ServerTime.ToString("yyyy-MM-dd HH:mm:ss") UTC
+                    </MudText>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Warning">Failed to load health status</MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+        @* Users by Plan *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.PieChart" Class="mr-2" Style="vertical-align: middle;" />
+                    Users by Plan
+                </MudText>
+                @if (_stats?.UsersByPlan != null)
+                {
+                    <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+                        <thead>
+                            <tr>
+                                <th>Plan</th>
+                                <th>Users</th>
+                                <th>%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var (plan, count) in _stats.UsersByPlan)
+                            {
+                                var percent = _stats.TotalUsers > 0 ? (count * 100.0 / _stats.TotalUsers) : 0;
+                                <tr>
+                                    <td>
+                                        <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(plan)">@plan.ToUpper()</MudChip>
+                                    </td>
+                                    <td>@count.ToString("N0")</td>
+                                    <td>@percent.ToString("F1")%</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No data available</MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+        @* Usage Summary *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.DataUsage" Class="mr-2" Style="vertical-align: middle;" />
+                    Total Usage
+                </MudText>
+                @if (_stats != null)
+                {
+                    <MudGrid>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">LRM Translation Chars</MudText>
+                            <MudText Typo="Typo.h5">@FormatBytes(_stats.TotalTranslationCharsUsed)</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Other Provider Chars</MudText>
+                            <MudText Typo="Typo.h5">@FormatBytes(_stats.TotalOtherCharsUsed)</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Database Size</MudText>
+                            <MudText Typo="Typo.h5">@FormatBytes(_stats.DatabaseSizeBytes)</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Storage Size</MudText>
+                            <MudText Typo="Typo.h5">@FormatBytes(_stats.StorageSizeBytes)</MudText>
+                        </MudItem>
+                    </MudGrid>
+                }
+            </MudPaper>
+        </MudItem>
+
+        @* Users by Auth Type *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Security" Class="mr-2" Style="vertical-align: middle;" />
+                    Users by Auth Type
+                </MudText>
+                @if (_stats?.UsersByAuthType != null)
+                {
+                    <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+                        <thead>
+                            <tr>
+                                <th>Auth Type</th>
+                                <th>Users</th>
+                                <th>%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var (authType, count) in _stats.UsersByAuthType)
+                            {
+                                var percent = _stats.TotalUsers > 0 ? (count * 100.0 / _stats.TotalUsers) : 0;
+                                <tr>
+                                    <td>
+                                        <MudIcon Icon="@GetAuthTypeIcon(authType)" Size="Size.Small" Class="mr-2" />
+                                        @authType
+                                    </td>
+                                    <td>@count.ToString("N0")</td>
+                                    <td>@percent.ToString("F1")%</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No data available</MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+        @* Quick Actions *@
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.FlashOn" Class="mr-2" Style="vertical-align: middle;" />
+                    Quick Actions
+                </MudText>
+                <div class="d-flex gap-2 flex-wrap">
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.TrendingUp"
+                               Href="admin/analytics">Analytics</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.People"
+                               Href="admin/users">Manage Users</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Business"
+                               Href="admin/organizations">View Organizations</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Warning" StartIcon="@Icons.Material.Filled.HealthAndSafety"
+                               Href="admin/health">System Health</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Article"
+                               Href="admin/logs">View Logs</MudButton>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool _isLoading = true;
+    private AdminStatsDto? _stats;
+    private SystemHealthDto? _health;
+    private RevenueAnalyticsDto? _revenue;
+    private UserAnalyticsDto? _userAnalytics;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var statsTask = AdminService.GetStatsAsync();
+            var healthTask = AdminService.GetHealthAsync();
+            var revenueTask = AdminService.GetRevenueAnalyticsAsync(1);
+            var userAnalyticsTask = AdminService.GetUserAnalyticsAsync(1);
+
+            await Task.WhenAll(statsTask, healthTask, revenueTask, userAnalyticsTask);
+
+            _stats = await statsTask;
+            _health = await healthTask;
+            _revenue = await revenueTask;
+            _userAnalytics = await userAnalyticsTask;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static Color GetPlanColor(string plan) => plan.ToLower() switch
+    {
+        "enterprise" => Color.Success,
+        "team" => Color.Primary,
+        _ => Color.Default
+    };
+
+    private static string GetAuthTypeIcon(string authType) => authType.ToLower() switch
+    {
+        "github" => Icons.Custom.Brands.GitHub,
+        _ => Icons.Material.Filled.Email
+    };
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes >= 1_073_741_824)
+            return $"{bytes / 1_073_741_824.0:F1} GB";
+        if (bytes >= 1_048_576)
+            return $"{bytes / 1_048_576.0:F1} MB";
+        if (bytes >= 1024)
+            return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes:N0}";
+    }
+
+    private static string FormatNumber(long number)
+    {
+        if (number >= 1_000_000_000)
+            return $"{number / 1_000_000_000.0:F1}B";
+        if (number >= 1_000_000)
+            return $"{number / 1_000_000.0:F1}M";
+        if (number >= 1_000)
+            return $"{number / 1_000.0:F1}K";
+        return number.ToString("N0");
+    }
+}

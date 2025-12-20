@@ -1,0 +1,154 @@
+@page "/admin/organizations"
+@using LrmCloud.Shared.DTOs.Admin
+@using LrmCloud.Web.Services
+@inject AdminService AdminService
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<PageTitle>Organizations - LRM Cloud Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">
+    <MudIcon Icon="@Icons.Material.Filled.Business" Class="mr-2" Style="vertical-align: middle;" />
+    Organizations
+</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    View all organizations and their details.
+</MudText>
+
+@* Search *@
+<MudPaper Class="pa-4 mb-4" Elevation="2">
+    <MudGrid>
+        <MudItem xs="12" md="10">
+            <MudTextField @bind-Value="_search" Label="Search" Placeholder="Search by name or slug..."
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" DebounceInterval="300" OnDebounceIntervalElapsed="OnSearchChanged" />
+        </MudItem>
+        <MudItem xs="12" md="2" Class="d-flex align-center">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadOrganizationsAsync" StartIcon="@Icons.Material.Filled.Refresh">
+                Refresh
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_orgs == null || _orgs.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No organizations found.</MudAlert>
+}
+else
+{
+    <MudTable Items="@_orgs" Dense="true" Hover="true" Elevation="2" Loading="@_isLoading">
+        <HeaderContent>
+            <MudTh>Organization</MudTh>
+            <MudTh>Owner</MudTh>
+            <MudTh>Members</MudTh>
+            <MudTh>Projects</MudTh>
+            <MudTh>Created</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Organization">
+                <div class="d-flex align-center">
+                    <MudAvatar Size="Size.Small" Class="mr-2" Color="Color.Primary">
+                        @context.Name[0].ToString().ToUpper()
+                    </MudAvatar>
+                    <div>
+                        <MudText Typo="Typo.body2">@context.Name</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Slug</MudText>
+                    </div>
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Owner">
+                <MudText Typo="Typo.body2">@context.OwnerEmail</MudText>
+            </MudTd>
+            <MudTd DataLabel="Members">
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary">@context.MemberCount</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Projects">
+                <MudChip T="string" Size="Size.Small" Color="Color.Info">@context.ProjectCount</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Created">
+                <MudText Typo="Typo.body2">@context.CreatedAt.ToString("MMM d, yyyy")</MudText>
+            </MudTd>
+            <MudTd DataLabel="Actions">
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                               OnClick="@(() => ViewOrganization(context.Id))" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 10, 20, 50, 100 }" />
+        </PagerContent>
+    </MudTable>
+
+    @* Pagination Info *@
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+        Showing @_orgs.Count of @_totalCount organizations (Page @_page)
+    </MudText>
+    <div class="d-flex gap-2 mt-2">
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(_page <= 1)" OnClick="PreviousPage">Previous</MudButton>
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(_orgs.Count < _pageSize)" OnClick="NextPage">Next</MudButton>
+    </div>
+}
+
+@code {
+    private bool _isLoading = true;
+    private List<AdminOrganizationDto>? _orgs;
+    private int _totalCount;
+    private string _search = "";
+    private int _page = 1;
+    private int _pageSize = 20;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrganizationsAsync();
+    }
+
+    private async Task LoadOrganizationsAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var (orgs, totalCount) = await AdminService.GetOrganizationsAsync(_search, _page, _pageSize);
+            _orgs = orgs;
+            _totalCount = totalCount;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OnSearchChanged(string value)
+    {
+        _search = value;
+        _page = 1;
+        await LoadOrganizationsAsync();
+    }
+
+    private async Task PreviousPage()
+    {
+        if (_page > 1)
+        {
+            _page--;
+            await LoadOrganizationsAsync();
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (_orgs?.Count == _pageSize)
+        {
+            _page++;
+            await LoadOrganizationsAsync();
+        }
+    }
+
+    private void ViewOrganization(int orgId)
+    {
+        Navigation.NavigateTo($"admin/organizations/{orgId}");
+    }
+}

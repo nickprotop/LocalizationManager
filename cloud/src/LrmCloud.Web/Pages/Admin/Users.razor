@@ -1,0 +1,380 @@
+@page "/admin/users"
+@using LrmCloud.Shared.DTOs.Admin
+@using LrmCloud.Web.Services
+@inject AdminService AdminService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@attribute [Authorize]
+
+<PageTitle>User Management - LRM Cloud Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">
+    <MudIcon Icon="@Icons.Material.Filled.People" Class="mr-2" Style="vertical-align: middle;" />
+    User Management
+</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    View and manage all users, their plans, and usage limits.
+</MudText>
+
+@* Search and Filters *@
+<MudPaper Class="pa-4 mb-4" Elevation="2">
+    <MudGrid>
+        <MudItem xs="12" md="5">
+            <MudTextField @bind-Value="_search" Label="Search" Placeholder="Search by email or username..."
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" DebounceInterval="300" OnDebounceIntervalElapsed="OnSearchChanged" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="string" Value="_planFilter" Label="Plan" Clearable="true" ValueChanged="OnPlanFilterChanged">
+                <MudSelectItem Value="@("free")">Free</MudSelectItem>
+                <MudSelectItem Value="@("team")">Team</MudSelectItem>
+                <MudSelectItem Value="@("enterprise")">Enterprise</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-center gap-2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadUsersAsync" StartIcon="@Icons.Material.Filled.Refresh">
+                Refresh
+            </MudButton>
+            @if (_selectedUserIds.Count > 0)
+            {
+                <MudMenu Label="@($"Bulk Actions ({_selectedUserIds.Count})")" Variant="Variant.Filled" Color="Color.Secondary"
+                         StartIcon="@Icons.Material.Filled.MoreVert" EndIcon="@Icons.Material.Filled.KeyboardArrowDown">
+                    <MudMenuItem Icon="@Icons.Material.Filled.Upgrade" OnClick="BulkChangePlanAsync">Change Plan</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.MarkEmailRead" OnClick="BulkVerifyEmailsAsync">Verify Emails</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.RestartAlt" OnClick="BulkResetUsageAsync">Reset Usage</MudMenuItem>
+                </MudMenu>
+            }
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_users == null || _users.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No users found.</MudAlert>
+}
+else
+{
+    <MudTable Items="@_users" Dense="true" Hover="true" Elevation="2" Loading="@_isLoading" MultiSelection="true"
+              @bind-SelectedItems="_selectedUsers" SelectOnRowClick="false">
+        <HeaderContent>
+            <MudTh><MudCheckBox T="bool" Value="@(_selectedUsers.Count == _users.Count && _users.Count > 0)"
+                                 ValueChanged="@(v => SelectAllUsers(v))" Size="Size.Small" /></MudTh>
+            <MudTh>User</MudTh>
+            <MudTh>Auth</MudTh>
+            <MudTh>Plan</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Created</MudTh>
+            <MudTh>Last Login</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                <MudCheckBox T="bool" Value="@(_selectedUsers.Contains(context))"
+                             ValueChanged="@(v => ToggleUserSelection(context, v))" Size="Size.Small" />
+            </MudTd>
+            <MudTd DataLabel="User">
+                <div class="d-flex align-center">
+                    <MudAvatar Size="Size.Small" Class="mr-2">
+                        @if (!string.IsNullOrEmpty(context.AvatarUrl))
+                        {
+                            <MudImage Src="@context.AvatarUrl" />
+                        }
+                        else
+                        {
+                            @context.Email[0].ToString().ToUpper()
+                        }
+                    </MudAvatar>
+                    <div>
+                        <MudText Typo="Typo.body2">
+                            @(context.DisplayName ?? context.Username)
+                            @if (context.IsSuperAdmin)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Warning" Class="ml-1" />
+                            }
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Email</MudText>
+                    </div>
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Auth">
+                <MudChip T="string" Size="Size.Small" Color="@(context.AuthType == "github" ? Color.Dark : Color.Default)">
+                    @if (context.AuthType == "github")
+                    {
+                        <MudIcon Icon="@Icons.Custom.Brands.GitHub" Size="Size.Small" Class="mr-1" />
+                    }
+                    @context.AuthType
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Plan">
+                <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(context.Plan)">@context.Plan.ToUpper()</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.EmailVerified)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Verified</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">Unverified</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Created">
+                <MudText Typo="Typo.body2">@context.CreatedAt.ToString("MMM d, yyyy")</MudText>
+            </MudTd>
+            <MudTd DataLabel="Last Login">
+                <MudText Typo="Typo.body2">
+                    @(context.LastLoginAt?.ToString("MMM d, yyyy") ?? "-")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Actions">
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                               OnClick="@(() => ViewUser(context.Id))" Title="View Details" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 10, 20, 50, 100 }" />
+        </PagerContent>
+    </MudTable>
+
+    @* Pagination Info *@
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+        Showing @_users.Count of @_totalCount users (Page @_page)
+        @if (_selectedUserIds.Count > 0)
+        {
+            <text> • @_selectedUserIds.Count selected</text>
+        }
+    </MudText>
+    <div class="d-flex gap-2 mt-2">
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(_page <= 1)" OnClick="PreviousPage">Previous</MudButton>
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(_users.Count < _pageSize)" OnClick="NextPage">Next</MudButton>
+    </div>
+}
+
+@* Bulk Change Plan Dialog *@
+<MudDialog @bind-Visible="_showChangePlanDialog">
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Change Plan for @_selectedUserIds.Count Users</MudText>
+        <MudSelect T="string" @bind-Value="_newPlan" Label="New Plan" Variant="Variant.Outlined">
+            <MudSelectItem Value="@("free")">Free</MudSelectItem>
+            <MudSelectItem Value="@("team")">Team ($9/mo)</MudSelectItem>
+            <MudSelectItem Value="@("enterprise")">Enterprise ($29/mo)</MudSelectItem>
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showChangePlanDialog = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmChangePlanAsync" Disabled="@(string.IsNullOrEmpty(_newPlan) || _isBulkActionLoading)">
+            @if (_isBulkActionLoading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Change Plan
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isBulkActionLoading = false;
+    private List<AdminUserDto>? _users;
+    private int _totalCount;
+    private string _search = "";
+    private string? _planFilter;
+    private int _page = 1;
+    private int _pageSize = 20;
+
+    // Selection state
+    private HashSet<AdminUserDto> _selectedUsers = new();
+    private List<int> _selectedUserIds => _selectedUsers.Select(u => u.Id).ToList();
+
+    // Dialog state
+    private bool _showChangePlanDialog = false;
+    private string? _newPlan;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var (users, totalCount) = await AdminService.GetUsersAsync(_search, _planFilter, _page, _pageSize);
+            _users = users;
+            _totalCount = totalCount;
+            _selectedUsers.Clear(); // Clear selection on reload
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OnSearchChanged(string value)
+    {
+        _search = value;
+        _page = 1;
+        await LoadUsersAsync();
+    }
+
+    private async Task OnPlanFilterChanged(string? value)
+    {
+        _planFilter = value;
+        _page = 1;
+        await LoadUsersAsync();
+    }
+
+    private async Task PreviousPage()
+    {
+        if (_page > 1)
+        {
+            _page--;
+            await LoadUsersAsync();
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (_users?.Count == _pageSize)
+        {
+            _page++;
+            await LoadUsersAsync();
+        }
+    }
+
+    private void ViewUser(int userId)
+    {
+        Navigation.NavigateTo($"admin/users/{userId}");
+    }
+
+    private static Color GetPlanColor(string plan) => plan.ToLower() switch
+    {
+        "enterprise" => Color.Success,
+        "team" => Color.Primary,
+        _ => Color.Default
+    };
+
+    // Selection methods
+    private void SelectAllUsers(bool selectAll)
+    {
+        if (selectAll && _users != null)
+        {
+            _selectedUsers = new HashSet<AdminUserDto>(_users);
+        }
+        else
+        {
+            _selectedUsers.Clear();
+        }
+    }
+
+    private void ToggleUserSelection(AdminUserDto user, bool selected)
+    {
+        if (selected)
+        {
+            _selectedUsers.Add(user);
+        }
+        else
+        {
+            _selectedUsers.Remove(user);
+        }
+    }
+
+    // Bulk action methods
+    private void BulkChangePlanAsync()
+    {
+        _newPlan = null;
+        _showChangePlanDialog = true;
+    }
+
+    private async Task ConfirmChangePlanAsync()
+    {
+        if (string.IsNullOrEmpty(_newPlan)) return;
+
+        _isBulkActionLoading = true;
+        try
+        {
+            var (success, error, result) = await AdminService.BulkChangePlanAsync(_selectedUserIds, _newPlan);
+            if (success && result != null)
+            {
+                Snackbar.Add($"Plan changed for {result.SuccessCount} users. {result.FailureCount} failed.", Severity.Success);
+                _showChangePlanDialog = false;
+                _selectedUsers.Clear();
+                await LoadUsersAsync();
+            }
+            else
+            {
+                Snackbar.Add($"Error: {error}", Severity.Error);
+            }
+        }
+        finally
+        {
+            _isBulkActionLoading = false;
+        }
+    }
+
+    private async Task BulkVerifyEmailsAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Verify Emails",
+            $"Are you sure you want to verify emails for {_selectedUserIds.Count} users?",
+            yesText: "Verify", cancelText: "Cancel");
+
+        if (confirmed != true) return;
+
+        _isBulkActionLoading = true;
+        try
+        {
+            var (success, error, result) = await AdminService.BulkVerifyEmailsAsync(_selectedUserIds);
+            if (success && result != null)
+            {
+                Snackbar.Add($"Verified {result.SuccessCount} users. {result.FailureCount} failed.", Severity.Success);
+                _selectedUsers.Clear();
+                await LoadUsersAsync();
+            }
+            else
+            {
+                Snackbar.Add($"Error: {error}", Severity.Error);
+            }
+        }
+        finally
+        {
+            _isBulkActionLoading = false;
+        }
+    }
+
+    private async Task BulkResetUsageAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Reset Usage",
+            $"Are you sure you want to reset usage counters for {_selectedUserIds.Count} users? This will set their translation characters to 0.",
+            yesText: "Reset", cancelText: "Cancel");
+
+        if (confirmed != true) return;
+
+        _isBulkActionLoading = true;
+        try
+        {
+            var (success, error, result) = await AdminService.BulkResetUsageAsync(_selectedUserIds);
+            if (success && result != null)
+            {
+                Snackbar.Add($"Reset usage for {result.SuccessCount} users. {result.FailureCount} failed.", Severity.Success);
+                _selectedUsers.Clear();
+                await LoadUsersAsync();
+            }
+            else
+            {
+                Snackbar.Add($"Error: {error}", Severity.Error);
+            }
+        }
+        finally
+        {
+            _isBulkActionLoading = false;
+        }
+    }
+}

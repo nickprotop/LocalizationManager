@@ -1,0 +1,403 @@
+@page "/admin/analytics"
+@using LrmCloud.Shared.DTOs.Admin
+@using LrmCloud.Web.Services
+@inject AdminService AdminService
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<PageTitle>Analytics - LRM Cloud</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">
+    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Class="mr-2" Style="vertical-align: middle;" />
+    Analytics
+</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    Revenue, user growth, and usage trends.
+</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+        @* Revenue Tab *@
+        <MudTabPanel Text="Revenue" Icon="@Icons.Material.Filled.AttachMoney">
+            @if (_revenue != null)
+            {
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="1">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Current MRR</MudText>
+                            <MudText Typo="Typo.h4" Color="Color.Success">$@_revenue.CurrentMrr.ToString("N2")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="1">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Previous MRR</MudText>
+                            <MudText Typo="Typo.h4">$@_revenue.PreviousMrr.ToString("N2")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="1">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Growth</MudText>
+                            <MudText Typo="Typo.h4" Color="@(_revenue.MrrGrowthPercent >= 0 ? Color.Success : Color.Error)">
+                                @(_revenue.MrrGrowthPercent >= 0 ? "+" : "")@_revenue.MrrGrowthPercent.ToString("N1")%
+                            </MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="1">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Paid Users</MudText>
+                            <MudText Typo="Typo.h4">@_revenue.MrrHistory.LastOrDefault()?.PaidUsers.ToString("N0")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                @* Revenue by Plan *@
+                <MudPaper Class="pa-4 mb-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-3">Revenue by Plan</MudText>
+                    @if (_revenue.RevenueByPlan.Any())
+                    {
+                        <MudSimpleTable Dense="true" Bordered="true">
+                            <thead>
+                                <tr>
+                                    <th>Plan</th>
+                                    <th>Monthly Revenue</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var (plan, amount) in _revenue.RevenueByPlan)
+                                {
+                                    <tr>
+                                        <td>
+                                            <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(plan)">@plan.ToUpper()</MudChip>
+                                        </td>
+                                        <td>$@amount.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info">No paid subscriptions yet</MudAlert>
+                    }
+                </MudPaper>
+
+                @* MRR History Chart *@
+                <MudPaper Class="pa-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-3">MRR History (12 Months)</MudText>
+                    @if (_revenue.MrrHistory.Any())
+                    {
+                        <MudChart ChartType="ChartType.Line"
+                                  ChartSeries="@_mrrChartSeries"
+                                  XAxisLabels="@_mrrChartLabels"
+                                  Width="100%"
+                                  Height="300px"
+                                  ChartOptions="@_chartOptions" />
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info">No historical data available</MudAlert>
+                    }
+                </MudPaper>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning">Failed to load revenue data</MudAlert>
+            }
+        </MudTabPanel>
+
+        @* Users Tab *@
+        <MudTabPanel Text="Users" Icon="@Icons.Material.Filled.People">
+            @if (_users != null)
+            {
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="1">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Total Users</MudText>
+                            <MudText Typo="Typo.h4">@_users.TotalUsers.ToString("N0")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="1">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">New This Month</MudText>
+                            <MudText Typo="Typo.h4" Color="Color.Success">+@_users.NewUsersThisMonth.ToString("N0")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="1">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Growth Rate</MudText>
+                            <MudText Typo="Typo.h4" Color="@(_users.GrowthRate >= 0 ? Color.Success : Color.Error)">
+                                @(_users.GrowthRate >= 0 ? "+" : "")@_users.GrowthRate.ToString("N1")%
+                            </MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="1">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Churn Rate</MudText>
+                            <MudText Typo="Typo.h4" Color="@(_users.ChurnRate > 5 ? Color.Error : Color.Default)">
+                                @_users.ChurnRate.ToString("N1")%
+                            </MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                @* User Growth Chart *@
+                <MudPaper Class="pa-4 mb-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-3">User Growth (12 Months)</MudText>
+                    @if (_users.GrowthHistory.Any())
+                    {
+                        <MudChart ChartType="ChartType.Bar"
+                                  ChartSeries="@_userGrowthChartSeries"
+                                  XAxisLabels="@_userGrowthChartLabels"
+                                  Width="100%"
+                                  Height="300px"
+                                  ChartOptions="@_chartOptions" />
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info">No historical data available</MudAlert>
+                    }
+                </MudPaper>
+
+                @* Conversion Funnel *@
+                <MudPaper Class="pa-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-3">Plan Distribution</MudText>
+                    @if (_users.ConversionFunnel.Any())
+                    {
+                        <MudSimpleTable Dense="true" Bordered="true">
+                            <thead>
+                                <tr>
+                                    <th>From Plan</th>
+                                    <th>To Plan</th>
+                                    <th>Count</th>
+                                    <th>Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var conversion in _users.ConversionFunnel)
+                                {
+                                    <tr>
+                                        <td><MudChip T="string" Size="Size.Small" Color="@GetPlanColor(conversion.FromPlan)">@conversion.FromPlan.ToUpper()</MudChip></td>
+                                        <td><MudChip T="string" Size="Size.Small" Color="@GetPlanColor(conversion.ToPlan)">@conversion.ToPlan.ToUpper()</MudChip></td>
+                                        <td>@conversion.Count.ToString("N0")</td>
+                                        <td>@conversion.Rate.ToString("N1")%</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info">No conversion data available</MudAlert>
+                    }
+                </MudPaper>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning">Failed to load user data</MudAlert>
+            }
+        </MudTabPanel>
+
+        @* Usage Tab *@
+        <MudTabPanel Text="Usage" Icon="@Icons.Material.Filled.DataUsage">
+            @if (_usage != null)
+            {
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="1">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Total Chars (30 days)</MudText>
+                            <MudText Typo="Typo.h4">@FormatNumber(_usage.TotalCharsThisMonth)</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="1">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">LRM Chars</MudText>
+                            <MudText Typo="Typo.h4" Color="Color.Primary">@FormatNumber(_usage.TotalLrmChars)</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="1">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">BYOK Chars</MudText>
+                            <MudText Typo="Typo.h4" Color="Color.Info">@FormatNumber(_usage.TotalByokChars)</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="1">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Growth</MudText>
+                            <MudText Typo="Typo.h4" Color="@(_usage.GrowthPercent >= 0 ? Color.Success : Color.Error)">
+                                @(_usage.GrowthPercent >= 0 ? "+" : "")@_usage.GrowthPercent.ToString("N1")%
+                            </MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                @* Usage by Provider *@
+                <MudPaper Class="pa-4 mb-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-3">Usage by Provider</MudText>
+                    @if (_usage.UsageByProvider.Any())
+                    {
+                        <MudSimpleTable Dense="true" Bordered="true">
+                            <thead>
+                                <tr>
+                                    <th>Provider</th>
+                                    <th>Characters</th>
+                                    <th>%</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    var totalProviderChars = _usage.UsageByProvider.Values.Sum();
+                                }
+                                @foreach (var (provider, chars) in _usage.UsageByProvider.OrderByDescending(x => x.Value))
+                                {
+                                    var percent = totalProviderChars > 0 ? (chars * 100.0 / totalProviderChars) : 0;
+                                    <tr>
+                                        <td>@provider</td>
+                                        <td>@FormatNumber(chars)</td>
+                                        <td>@percent.ToString("N1")%</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info">No usage data available</MudAlert>
+                    }
+                </MudPaper>
+
+                @* Daily Usage Chart *@
+                <MudPaper Class="pa-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-3">Daily Usage (30 Days)</MudText>
+                    @if (_usage.DailyTrends.Any())
+                    {
+                        <MudChart ChartType="ChartType.Line"
+                                  ChartSeries="@_usageChartSeries"
+                                  XAxisLabels="@_usageChartLabels"
+                                  Width="100%"
+                                  Height="300px"
+                                  ChartOptions="@_chartOptions" />
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info">No daily usage data available</MudAlert>
+                    }
+                </MudPaper>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning">Failed to load usage data</MudAlert>
+            }
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    private bool _isLoading = true;
+    private RevenueAnalyticsDto? _revenue;
+    private UserAnalyticsDto? _users;
+    private UsageAnalyticsDto? _usage;
+
+    // Chart data
+    private List<ChartSeries> _mrrChartSeries = new();
+    private string[] _mrrChartLabels = Array.Empty<string>();
+
+    private List<ChartSeries> _userGrowthChartSeries = new();
+    private string[] _userGrowthChartLabels = Array.Empty<string>();
+
+    private List<ChartSeries> _usageChartSeries = new();
+    private string[] _usageChartLabels = Array.Empty<string>();
+
+    private ChartOptions _chartOptions = new()
+    {
+        YAxisTicks = 5,
+        MaxNumYAxisTicks = 5
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var revenueTask = AdminService.GetRevenueAnalyticsAsync(12);
+            var usersTask = AdminService.GetUserAnalyticsAsync(12);
+            var usageTask = AdminService.GetUsageAnalyticsAsync(30);
+
+            await Task.WhenAll(revenueTask, usersTask, usageTask);
+
+            _revenue = await revenueTask;
+            _users = await usersTask;
+            _usage = await usageTask;
+
+            BuildCharts();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void BuildCharts()
+    {
+        // MRR Chart
+        if (_revenue?.MrrHistory != null && _revenue.MrrHistory.Any())
+        {
+            _mrrChartLabels = _revenue.MrrHistory.Select(m => m.Month.ToString("MMM yy")).ToArray();
+            _mrrChartSeries = new List<ChartSeries>
+            {
+                new ChartSeries { Name = "MRR ($)", Data = _revenue.MrrHistory.Select(m => (double)m.Mrr).ToArray() }
+            };
+        }
+
+        // User Growth Chart
+        if (_users?.GrowthHistory != null && _users.GrowthHistory.Any())
+        {
+            _userGrowthChartLabels = _users.GrowthHistory.Select(m => m.Month.ToString("MMM yy")).ToArray();
+            _userGrowthChartSeries = new List<ChartSeries>
+            {
+                new ChartSeries { Name = "New Users", Data = _users.GrowthHistory.Select(m => (double)m.NewUsers).ToArray() },
+                new ChartSeries { Name = "Active Users", Data = _users.GrowthHistory.Select(m => (double)m.ActiveUsers).ToArray() }
+            };
+        }
+
+        // Usage Chart
+        if (_usage?.DailyTrends != null && _usage.DailyTrends.Any())
+        {
+            // Take every 3rd day to avoid label crowding
+            var sampledTrends = _usage.DailyTrends.Where((_, i) => i % 3 == 0).ToList();
+            _usageChartLabels = sampledTrends.Select(d => d.Date.ToString("MM/dd")).ToArray();
+            _usageChartSeries = new List<ChartSeries>
+            {
+                new ChartSeries { Name = "LRM Chars", Data = sampledTrends.Select(d => (double)d.LrmChars / 1000).ToArray() },
+                new ChartSeries { Name = "BYOK Chars", Data = sampledTrends.Select(d => (double)d.ByokChars / 1000).ToArray() }
+            };
+        }
+    }
+
+    private static Color GetPlanColor(string plan) => plan.ToLower() switch
+    {
+        "enterprise" => Color.Success,
+        "team" => Color.Primary,
+        _ => Color.Default
+    };
+
+    private static string FormatNumber(long number)
+    {
+        if (number >= 1_000_000_000)
+            return $"{number / 1_000_000_000.0:F1}B";
+        if (number >= 1_000_000)
+            return $"{number / 1_000_000.0:F1}M";
+        if (number >= 1_000)
+            return $"{number / 1_000.0:F1}K";
+        return number.ToString("N0");
+    }
+}
