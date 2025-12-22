@@ -5,6 +5,8 @@ using LrmCloud.Shared.DTOs.Resources;
 using LrmCloud.Shared.DTOs.Sync;
 using LrmCloud.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace LrmCloud.Api.Services;
 
@@ -12,21 +14,18 @@ public class ResourceService : IResourceService
 {
     private readonly AppDbContext _db;
     private readonly IProjectService _projectService;
-    private readonly ResourceSyncService _syncService;
-    private readonly SnapshotService _snapshotService;
+    private readonly ISyncHistoryService _historyService;
     private readonly ILogger<ResourceService> _logger;
 
     public ResourceService(
         AppDbContext db,
         IProjectService projectService,
-        ResourceSyncService syncService,
-        SnapshotService snapshotService,
+        ISyncHistoryService historyService,
         ILogger<ResourceService> logger)
     {
         _db = db;
         _projectService = projectService;
-        _syncService = syncService;
-        _snapshotService = snapshotService;
+        _historyService = historyService;
         _logger = logger;
     }
 
@@ -59,6 +58,13 @@ public class ResourceService : IResourceService
             return null;
         }
 
+        // Get project for default language resolution
+        var project = await _db.Projects.FindAsync(projectId);
+        if (project == null)
+        {
+            return null;
+        }
+
         var key = await _db.ResourceKeys
             .Include(k => k.Translations)
             .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == keyName);
@@ -68,7 +74,7 @@ public class ResourceService : IResourceService
             return null;
         }
 
-        return MapToResourceKeyDetailDto(key);
+        return MapToResourceKeyDetailDto(key, project.DefaultLanguage);
     }
 
     public async Task<PagedResult<ResourceKeyDetailDto>> GetResourceKeysPagedAsync(
@@ -82,6 +88,13 @@ public class ResourceService : IResourceService
     {
         // Check permission
         if (!await _projectService.CanViewProjectAsync(projectId, userId))
+        {
+            return new PagedResult<ResourceKeyDetailDto> { Page = page, PageSize = pageSize };
+        }
+
+        // Get project for default language resolution
+        var project = await _db.Projects.FindAsync(projectId);
+        if (project == null)
         {
             return new PagedResult<ResourceKeyDetailDto> { Page = page, PageSize = pageSize };
         }
@@ -127,7 +140,7 @@ public class ResourceService : IResourceService
 
         return new PagedResult<ResourceKeyDetailDto>
         {
-            Items = keys.Select(MapToResourceKeyDetailDto).ToList(),
+            Items = keys.Select(k => MapToResourceKeyDetailDto(k, project.DefaultLanguage)).ToList(),
             TotalCount = totalCount,
             Page = page,
             PageSize = pageSize
@@ -473,6 +486,13 @@ public class ResourceService : IResourceService
             return new ProjectStatsDto();
         }
 
+        // Get project for default language resolution
+        var project = await _db.Projects.FindAsync(projectId);
+        if (project == null)
+        {
+            return new ProjectStatsDto();
+        }
+
         var keys = await _db.ResourceKeys
             .Include(k => k.Translations)
             .Where(k => k.ProjectId == projectId)
@@ -484,9 +504,10 @@ public class ResourceService : IResourceService
         };
 
         // Get all unique languages from translations
+        // Resolve empty string to project's default language for display
         var allLanguages = keys
             .SelectMany(k => k.Translations)
-            .Select(t => t.LanguageCode)
+            .Select(t => string.IsNullOrEmpty(t.LanguageCode) ? project.DefaultLanguage : t.LanguageCode)
             .Distinct()
             .ToList();
 
@@ -498,10 +519,15 @@ public class ResourceService : IResourceService
             var translatedKeysCount = 0;
             var pendingKeysCount = 0;
 
+            // Check if this is the resolved default language - need to also match empty string in DB
+            var isDefaultLang = languageCode == project.DefaultLanguage;
+
             foreach (var key in keys)
             {
+                // Match translations: exact language code OR empty string if this is default language
                 var translationsForLang = key.Translations
-                    .Where(t => t.LanguageCode == languageCode)
+                    .Where(t => t.LanguageCode == languageCode ||
+                                (isDefaultLang && string.IsNullOrEmpty(t.LanguageCode)))
                     .ToList();
 
                 if (translationsForLang.Count == 0)
@@ -666,6 +692,11 @@ public class ResourceService : IResourceService
 
     private ResourceKeyDetailDto MapToResourceKeyDetailDto(ResourceKey key)
     {
+        return MapToResourceKeyDetailDto(key, null);
+    }
+
+    private ResourceKeyDetailDto MapToResourceKeyDetailDto(ResourceKey key, string? defaultLanguage)
+    {
         return new ResourceKeyDetailDto
         {
             Id = key.Id,
@@ -677,16 +708,26 @@ public class ResourceService : IResourceService
             TranslationCount = key.Translations.Count,
             CreatedAt = key.CreatedAt,
             UpdatedAt = key.UpdatedAt,
-            Translations = key.Translations.Select(MapToTranslationDto).ToList()
+            Translations = key.Translations.Select(t => MapToTranslationDto(t, defaultLanguage)).ToList()
         };
     }
 
     private TranslationDto MapToTranslationDto(Shared.Entities.Translation translation)
     {
+        return MapToTranslationDto(translation, null);
+    }
+
+    private TranslationDto MapToTranslationDto(Shared.Entities.Translation translation, string? defaultLanguage)
+    {
+        // Resolve empty language code to project's default language for display
+        var langCode = string.IsNullOrEmpty(translation.LanguageCode) && !string.IsNullOrEmpty(defaultLanguage)
+            ? defaultLanguage
+            : translation.LanguageCode;
+
         return new TranslationDto
         {
             Id = translation.Id,
-            LanguageCode = translation.LanguageCode,
+            LanguageCode = langCode,
             Value = translation.Value,
             PluralForm = translation.PluralForm,
             Status = translation.Status,
@@ -767,244 +808,6 @@ public class ResourceService : IResourceService
     }
 
     // ============================================================
-    // NEW: File-based Cloud Sync (using Core backends)
-    // ============================================================
-
-    /// <summary>
-    /// Pushes resources using file-based sync with Core backends.
-    /// Supports incremental sync (modified + deleted files).
-    /// </summary>
-    public async Task<(bool Success, PushResponse? Response, string? ErrorMessage)> PushResourcesAsync(
-        int projectId, int userId, PushRequest request)
-    {
-        try
-        {
-            // Check permission
-            if (!await _projectService.CanManageResourcesAsync(projectId, userId))
-            {
-                return (false, null, "You don't have permission to push resources to this project");
-            }
-
-            var project = await _db.Projects.FindAsync(projectId);
-            if (project == null)
-            {
-                return (false, null, "Project not found");
-            }
-
-            // Validate file naming consistency with project format
-            if (request.ModifiedFiles.Count > 0)
-            {
-                var config = project.ConfigJson != null
-                    ? System.Text.Json.JsonSerializer.Deserialize<LocalizationManager.Core.Configuration.ConfigurationModel>(project.ConfigJson)
-                    : null;
-
-                var (isValid, errorMessage) = _syncService.ValidateFileNamingConsistency(
-                    request.ModifiedFiles, project.Format, config);
-
-                if (!isValid)
-                {
-                    return (false, null, errorMessage);
-                }
-            }
-
-            // Snapshot will be created after files are uploaded
-            Snapshot? snapshot = null;
-
-            // Update configuration if provided
-            if (request.Configuration != null)
-            {
-                // Security: Limit configuration size to prevent database bloat attacks
-                const int MaxConfigSize = 102_400; // 100KB
-                if (request.Configuration.Length > MaxConfigSize)
-                {
-                    return (false, null, $"Configuration exceeds maximum size of {MaxConfigSize / 1024}KB");
-                }
-
-                project.ConfigJson = request.Configuration;
-                project.ConfigUpdatedAt = DateTime.UtcNow;
-                project.ConfigUpdatedBy = userId;
-            }
-
-            // Handle deleted files - remove languages from database
-            if (request.DeletedFiles.Count > 0)
-            {
-                var config = project.ConfigJson != null
-                    ? System.Text.Json.JsonSerializer.Deserialize<LocalizationManager.Core.Configuration.ConfigurationModel>(project.ConfigJson)
-                    : new LocalizationManager.Core.Configuration.ConfigurationModel();
-
-                foreach (var deletedPath in request.DeletedFiles)
-                {
-                    // Extract language code from deleted file path
-                    var langCode = ExtractLanguageCodeFromPath(deletedPath, config!);
-                    await _syncService.DeleteLanguageTranslationsAsync(projectId, langCode);
-                }
-            }
-
-            // Store modified files to S3/Minio (with plan-based storage limits)
-            if (request.ModifiedFiles.Count > 0)
-            {
-                await _syncService.StoreUploadedFilesAsync(projectId, request.ModifiedFiles, userId);
-            }
-
-            // Create snapshot after files are uploaded to current/ folder
-            try
-            {
-                var description = request.Message ?? "Push from CLI";
-                snapshot = await _snapshotService.CreateSnapshotAsync(projectId, userId, "push", description);
-                _logger.LogInformation("Created snapshot {SnapshotId} after push for project {ProjectId}",
-                    snapshot.SnapshotId, projectId);
-            }
-            catch (Exception ex)
-            {
-                // Log but don't fail the push if snapshot creation fails
-                _logger.LogWarning(ex, "Failed to create snapshot after push for project {ProjectId}", projectId);
-            }
-
-            // Parse modified files to database
-            if (request.ModifiedFiles.Count > 0)
-            {
-                await _syncService.ParseFilesToDatabaseAsync(projectId, request.ModifiedFiles, project.ConfigJson, project.Format);
-            }
-
-            // Update project last sync time
-            project.LastSyncedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
-
-            // Record sync history
-            _db.SyncHistory.Add(new SyncHistory
-            {
-                ProjectId = projectId,
-                SyncType = "push",
-                Direction = "to_cloud",
-                Status = "completed",
-                Message = request.Message,
-                SnapshotId = snapshot?.SnapshotId,
-                CreatedAt = DateTime.UtcNow
-            });
-            await _db.SaveChangesAsync();
-
-            _logger.LogInformation(
-                "User {UserId} pushed {Modified} modified and {Deleted} deleted files to project {ProjectId}",
-                userId, request.ModifiedFiles.Count, request.DeletedFiles.Count, projectId);
-
-            return (true, new PushResponse
-            {
-                Success = true,
-                ModifiedCount = request.ModifiedFiles.Count,
-                DeletedCount = request.DeletedFiles.Count,
-                Message = $"Successfully pushed {request.ModifiedFiles.Count} modified and {request.DeletedFiles.Count} deleted files"
-            }, null);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error pushing resources to project {ProjectId}", projectId);
-            return (false, null, $"An error occurred while pushing resources: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Pulls resources using file-based sync with Core backends.
-    /// </summary>
-    public async Task<(bool Success, PullResponse? Response, string? ErrorMessage)> PullResourcesAsync(
-        int projectId, int userId, bool includeUnapproved = false)
-    {
-        try
-        {
-            // Check permission
-            if (!await _projectService.CanViewProjectAsync(projectId, userId))
-            {
-                return (false, null, "You don't have permission to view this project");
-            }
-
-            var project = await _db.Projects.FindAsync(projectId);
-            if (project == null)
-            {
-                return (false, null, "Project not found");
-            }
-
-            // Ensure ConfigJson is not empty - generate default if needed
-            var configJson = project.ConfigJson;
-            if (string.IsNullOrWhiteSpace(configJson))
-            {
-                configJson = ProjectService.GenerateDefaultConfig(project.Format, project.DefaultLanguage);
-                _logger.LogInformation("Generated default config for project {ProjectId} on pull", projectId);
-            }
-
-            // Determine workflow filtering
-            string? requiredStatus = null;
-            int excludedCount = 0;
-
-            if (project.ReviewWorkflowEnabled && !includeUnapproved)
-            {
-                if (project.RequireApprovalBeforeExport)
-                {
-                    requiredStatus = "approved";
-                }
-                else if (project.RequireReviewBeforeExport)
-                {
-                    requiredStatus = "reviewed";
-                }
-            }
-
-            // Generate files from database using Core's backends
-            var (files, excluded) = await _syncService.GenerateFilesFromDatabaseAsync(
-                projectId, configJson, project.Format, project.DefaultLanguage, requiredStatus);
-
-            excludedCount = excluded;
-
-            _logger.LogInformation("User {UserId} pulled {Count} files from project {ProjectId}{ExcludedInfo}",
-                userId, files.Count, projectId,
-                excludedCount > 0 ? $" ({excludedCount} translations excluded due to workflow)" : "");
-
-            return (true, new PullResponse
-            {
-                Configuration = configJson,
-                Files = files,
-                ExcludedTranslationCount = excludedCount,
-                WorkflowMessage = excludedCount > 0
-                    ? $"{excludedCount} translation(s) excluded (not yet {requiredStatus}). Use --include-unapproved to include all."
-                    : null
-            }, null);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error pulling resources from project {ProjectId}", projectId);
-            return (false, null, $"An error occurred while pulling resources: {ex.Message}");
-        }
-    }
-
-    private string ExtractLanguageCodeFromPath(string filePath, LocalizationManager.Core.Configuration.ConfigurationModel config)
-    {
-        var fileName = System.IO.Path.GetFileNameWithoutExtension(filePath);
-
-        // RESX format: Resources.el.resx → "el", Resources.resx → default language
-        if (config.ResourceFormat == "resx")
-        {
-            var parts = fileName.Split('.');
-            if (parts.Length > 1)
-            {
-                return parts[^1];
-            }
-            return config.DefaultLanguageCode ?? "en";
-        }
-
-        // JSON i18next format: el.json → "el"
-        if (config.Json?.I18nextCompatible == true)
-        {
-            return fileName;
-        }
-
-        // JSON standard format: strings.el.json → "el", strings.json → default language
-        var jsonParts = fileName.Split('.');
-        if (jsonParts.Length > 1)
-        {
-            return jsonParts[^1];
-        }
-
-        return config.DefaultLanguageCode ?? "en";
-    }
-
-    // ============================================================
     // Language Management
     // ============================================================
 
@@ -1038,15 +841,19 @@ public class ResourceService : IResourceService
             })
             .ToListAsync();
 
-        return languageData.Select(l => new ProjectLanguageDto
-        {
-            LanguageCode = l.LanguageCode,
-            DisplayName = GetLanguageDisplayName(l.LanguageCode),
-            IsDefault = l.LanguageCode == project.DefaultLanguage,
-            TranslatedCount = l.TranslatedCount,
-            TotalKeys = totalKeys,
-            CompletionPercentage = l.TotalCount > 0 ? Math.Round((double)l.TranslatedCount / l.TotalCount * 100, 1) : 0,
-            LastUpdated = l.LastUpdated
+        // Resolve empty language codes to project's default language for display
+        return languageData.Select(l => {
+            var resolvedLangCode = string.IsNullOrEmpty(l.LanguageCode) ? project.DefaultLanguage : l.LanguageCode;
+            return new ProjectLanguageDto
+            {
+                LanguageCode = resolvedLangCode,
+                DisplayName = GetLanguageDisplayName(resolvedLangCode),
+                IsDefault = resolvedLangCode == project.DefaultLanguage,
+                TranslatedCount = l.TranslatedCount,
+                TotalKeys = totalKeys,
+                CompletionPercentage = l.TotalCount > 0 ? Math.Round((double)l.TranslatedCount / l.TotalCount * 100, 1) : 0,
+                LastUpdated = l.LastUpdated
+            };
         }).OrderBy(l => !l.IsDefault).ThenBy(l => l.LanguageCode).ToList();
     }
 
@@ -1202,5 +1009,195 @@ public class ResourceService : IResourceService
         {
             return languageCode;
         }
+    }
+
+    // ============================================================
+    // Batch Save with History
+    // ============================================================
+
+    public async Task<BatchSaveResponse> BatchSaveWithHistoryAsync(
+        int projectId, int userId, BatchSaveRequest request)
+    {
+        // Check permission
+        if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+        {
+            throw new UnauthorizedAccessException("You don't have permission to manage resources in this project");
+        }
+
+        var response = new BatchSaveResponse();
+        var changes = new List<SyncChangeEntry>();
+
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+
+        try
+        {
+            // Process key metadata changes (comments)
+            foreach (var keyChange in request.KeyChanges)
+            {
+                var resourceKey = await _db.ResourceKeys
+                    .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == keyChange.KeyName);
+
+                if (resourceKey == null)
+                {
+                    _logger.LogWarning("Resource key {KeyName} not found for batch save", keyChange.KeyName);
+                    continue;
+                }
+
+                var beforeComment = resourceKey.Comment;
+
+                // Only record if comment actually changed
+                if (beforeComment != keyChange.Comment)
+                {
+                    resourceKey.Comment = keyChange.Comment;
+                    resourceKey.UpdatedAt = DateTime.UtcNow;
+                    resourceKey.Version++;
+                    response.KeysModified++;
+
+                    // Record the comment change (use empty lang to indicate key-level change)
+                    changes.Add(new SyncChangeEntry
+                    {
+                        Key = keyChange.KeyName,
+                        Lang = "",
+                        ChangeType = "modified",
+                        BeforeComment = beforeComment,
+                        AfterComment = keyChange.Comment
+                    });
+                }
+            }
+
+            // Process translation changes
+            foreach (var translationChange in request.TranslationChanges)
+            {
+                var resourceKey = await _db.ResourceKeys
+                    .Include(k => k.Translations)
+                    .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == translationChange.KeyName);
+
+                if (resourceKey == null)
+                {
+                    _logger.LogWarning("Resource key {KeyName} not found for batch save", translationChange.KeyName);
+                    continue;
+                }
+
+                var pluralForm = translationChange.PluralForm ?? "";
+                var translation = resourceKey.Translations
+                    .FirstOrDefault(t => t.LanguageCode == translationChange.LanguageCode && t.PluralForm == pluralForm);
+
+                string? beforeValue = translation?.Value;
+                string? beforeStatus = translation?.Status;
+
+                // Determine change type
+                string changeType;
+                if (translation == null)
+                {
+                    // New translation
+                    changeType = "added";
+                    var newValue = translationChange.Value ?? "";
+                    translation = new Shared.Entities.Translation
+                    {
+                        ResourceKeyId = resourceKey.Id,
+                        LanguageCode = translationChange.LanguageCode,
+                        PluralForm = pluralForm,
+                        Value = newValue,
+                        Status = translationChange.Status ?? TranslationStatus.Translated,
+                        Version = 1,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow,
+                        Hash = ComputeHash(newValue, null)
+                    };
+                    _db.Translations.Add(translation);
+                }
+                else
+                {
+                    // Existing translation - check if anything changed
+                    var valueChanged = translationChange.Value != null && translation.Value != translationChange.Value;
+                    var statusChanged = translationChange.Status != null && translation.Status != translationChange.Status;
+
+                    if (!valueChanged && !statusChanged)
+                    {
+                        continue; // No actual change
+                    }
+
+                    changeType = "modified";
+
+                    if (translationChange.Value != null)
+                    {
+                        translation.Value = translationChange.Value;
+                        // Update hash when value changes
+                        translation.Hash = ComputeHash(translationChange.Value, translation.Comment);
+                    }
+                    if (translationChange.Status != null)
+                    {
+                        translation.Status = translationChange.Status;
+                    }
+                    translation.UpdatedAt = DateTime.UtcNow;
+                    translation.Version++;
+                }
+
+                response.TranslationsModified++;
+
+                // Record the change
+                changes.Add(new SyncChangeEntry
+                {
+                    Key = translationChange.KeyName,
+                    Lang = translationChange.LanguageCode,
+                    ChangeType = changeType,
+                    BeforeValue = beforeValue,
+                    AfterValue = translation.Value,
+                    BeforeHash = null, // Not computing hash for web edits
+                    AfterHash = null
+                });
+            }
+
+            await _db.SaveChangesAsync();
+
+            // Record sync history if there were changes
+            if (changes.Count > 0)
+            {
+                var message = request.Message ?? "Updated via web editor";
+                var history = await _historyService.RecordPushAsync(
+                    projectId,
+                    userId,
+                    message,
+                    changes,
+                    "web-edit" // Operation type to distinguish from CLI push
+                );
+
+                response.HistoryId = history.HistoryId;
+
+                _logger.LogInformation(
+                    "User {UserId} batch saved {KeyChanges} key changes and {TranslationChanges} translation changes to project {ProjectId}, history {HistoryId}",
+                    userId, response.KeysModified, response.TranslationsModified, projectId, response.HistoryId);
+            }
+
+            await transaction.CommitAsync();
+            response.Applied = changes.Count;
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "Error in batch save for project {ProjectId}", projectId);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Computes a hash for a translation value and optional comment.
+    /// Must match the CLI's EntryHasher.ComputeHash algorithm.
+    /// </summary>
+    private static string ComputeHash(string value, string? comment)
+    {
+        var normalizedValue = value.Normalize(NormalizationForm.FormC);
+        var normalizedComment = comment?.Normalize(NormalizationForm.FormC);
+
+        var sb = new StringBuilder();
+        sb.Append(normalizedValue);
+        sb.Append('\0');
+        sb.Append(normalizedComment ?? "");
+
+        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 }

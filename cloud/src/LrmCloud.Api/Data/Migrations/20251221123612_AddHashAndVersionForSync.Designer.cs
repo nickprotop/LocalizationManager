@@ -3,6 +3,7 @@ using System;
 using LrmCloud.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LrmCloud.Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251221123612_AddHashAndVersionForSync")]
+    partial class AddHashAndVersionForSync
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1099,6 +1102,72 @@ namespace LrmCloud.Api.Data.Migrations
                     b.ToTable("snapshots");
                 });
 
+            modelBuilder.Entity("LrmCloud.Shared.Entities.SyncConflict", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("LanguageCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("language_code");
+
+                    b.Property<DateTime?>("LocalUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("local_updated_at");
+
+                    b.Property<string>("LocalValue")
+                        .HasColumnType("text")
+                        .HasColumnName("local_value");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("integer")
+                        .HasColumnName("project_id");
+
+                    b.Property<DateTime?>("RemoteUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("remote_updated_at");
+
+                    b.Property<string>("RemoteValue")
+                        .HasColumnType("text")
+                        .HasColumnName("remote_value");
+
+                    b.Property<string>("Resolution")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("resolution");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<int?>("ResolvedById")
+                        .HasColumnType("integer")
+                        .HasColumnName("resolved_by");
+
+                    b.Property<int?>("ResourceKeyId")
+                        .HasColumnType("integer")
+                        .HasColumnName("resource_key_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("ResolvedById");
+
+                    b.HasIndex("ResourceKeyId");
+
+                    b.ToTable("sync_conflicts");
+                });
+
             modelBuilder.Entity("LrmCloud.Shared.Entities.SyncHistory", b =>
                 {
                     b.Property<int>("Id")
@@ -1108,73 +1177,74 @@ namespace LrmCloud.Api.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("ChangesJson")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("changes_json");
+                    b.Property<string>("CommitSha")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("commit_sha");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<int>("EntriesAdded")
-                        .HasColumnType("integer")
-                        .HasColumnName("entries_added");
+                    b.Property<string>("Direction")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("direction");
 
-                    b.Property<int>("EntriesDeleted")
-                        .HasColumnType("integer")
-                        .HasColumnName("entries_deleted");
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
 
-                    b.Property<int>("EntriesModified")
+                    b.Property<int>("KeysAdded")
                         .HasColumnType("integer")
-                        .HasColumnName("entries_modified");
+                        .HasColumnName("keys_added");
 
-                    b.Property<string>("HistoryId")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("character varying(8)")
-                        .HasColumnName("history_id");
+                    b.Property<int>("KeysDeleted")
+                        .HasColumnType("integer")
+                        .HasColumnName("keys_deleted");
+
+                    b.Property<int>("KeysUpdated")
+                        .HasColumnType("integer")
+                        .HasColumnName("keys_updated");
 
                     b.Property<string>("Message")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("message");
 
-                    b.Property<string>("OperationType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("operation_type");
+                    b.Property<int?>("PrNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("pr_number");
+
+                    b.Property<string>("PrUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("pr_url");
 
                     b.Property<int>("ProjectId")
                         .HasColumnType("integer")
                         .HasColumnName("project_id");
 
-                    b.Property<int?>("RevertedFromId")
-                        .HasColumnType("integer")
-                        .HasColumnName("reverted_from_id");
+                    b.Property<string>("SnapshotId")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("snapshot_id");
 
                     b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
                         .HasColumnName("status");
 
-                    b.Property<int?>("UserId")
-                        .HasColumnType("integer")
-                        .HasColumnName("user_id");
+                    b.Property<string>("SyncType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("sync_type");
 
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("ProjectId");
-
-                    b.HasIndex("RevertedFromId");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("ProjectId", "HistoryId")
-                        .IsUnique();
 
                     b.ToTable("sync_history");
                 });
@@ -2049,6 +2119,29 @@ namespace LrmCloud.Api.Data.Migrations
                     b.Navigation("Project");
                 });
 
+            modelBuilder.Entity("LrmCloud.Shared.Entities.SyncConflict", b =>
+                {
+                    b.HasOne("LrmCloud.Shared.Entities.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LrmCloud.Shared.Entities.User", "ResolvedBy")
+                        .WithMany()
+                        .HasForeignKey("ResolvedById");
+
+                    b.HasOne("LrmCloud.Shared.Entities.ResourceKey", "ResourceKey")
+                        .WithMany()
+                        .HasForeignKey("ResourceKeyId");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("ResolvedBy");
+
+                    b.Navigation("ResourceKey");
+                });
+
             modelBuilder.Entity("LrmCloud.Shared.Entities.SyncHistory", b =>
                 {
                     b.HasOne("LrmCloud.Shared.Entities.Project", "Project")
@@ -2057,21 +2150,7 @@ namespace LrmCloud.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("LrmCloud.Shared.Entities.SyncHistory", "RevertedFrom")
-                        .WithMany()
-                        .HasForeignKey("RevertedFromId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("LrmCloud.Shared.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.Navigation("Project");
-
-                    b.Navigation("RevertedFrom");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("LrmCloud.Shared.Entities.Translation", b =>

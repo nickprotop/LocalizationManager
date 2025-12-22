@@ -1,0 +1,640 @@
+@page "/projects/{ProjectId:int}/history"
+@attribute [Authorize]
+@using LrmCloud.Shared.DTOs.Sync
+@using LrmCloud.Shared.DTOs.Projects
+@inject SyncHistoryService HistoryService
+@inject ProjectService ProjectService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Sync History - @(_project?.Name ?? "Project") - LRM Cloud</PageTitle>
+
+@if (_isLoading)
+{
+    <MudStack Spacing="4">
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" />
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" />
+    </MudStack>
+}
+else if (_project == null)
+{
+    <MudAlert Severity="Severity.Error">
+        Project not found or you don't have access to it.
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="">Go to Dashboard</MudButton>
+    </MudAlert>
+}
+else
+{
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                           OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))"
+                           Size="Size.Small" />
+            <MudText Typo="Typo.h4">Sync History</MudText>
+            <MudChip T="string" Size="Size.Small" Color="Color.Info">@_project.Name</MudChip>
+        </MudStack>
+
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Secondary"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="@LoadDataAsync"
+                   Disabled="@_isLoading">
+            Refresh
+        </MudButton>
+    </MudStack>
+
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+        View push and revert operations. Click on an entry to see detailed changes, or revert to undo a push.
+    </MudText>
+
+    @if (_historyResponse == null || _historyResponse.Items.Count == 0)
+    {
+        <MudPaper Class="pa-6" Elevation="2">
+            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary">No sync history yet</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">
+                    Push changes from the CLI to start building history.<br/>
+                    Use <code>lrm cloud push</code> to sync your local changes.
+                </MudText>
+            </MudStack>
+        </MudPaper>
+    }
+    else
+    {
+        <MudTimeline TimelinePosition="TimelinePosition.Start">
+            @foreach (var entry in _historyResponse.Items)
+            {
+                <MudTimelineItem Color="@GetOperationTypeColor(entry.OperationType, entry.Status)" Size="Size.Medium">
+                    <ItemOpposite>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            @entry.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @entry.CreatedAt.ToLocalTime().ToString("HH:mm")
+                        </MudText>
+                    </ItemOpposite>
+                    <ItemContent>
+                        <MudPaper Class="pa-4" Elevation="2">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
+                                <div>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                                        <MudIcon Icon="@GetOperationIcon(entry.OperationType)"
+                                                 Size="Size.Small"
+                                                 Color="@GetOperationTypeColor(entry.OperationType, entry.Status)" />
+                                        <MudText Typo="Typo.subtitle1" Style="font-family: monospace;">
+                                            @entry.HistoryId
+                                        </MudText>
+                                        <MudChip T="string" Size="Size.Small"
+                                                 Color="@GetOperationTypeColor(entry.OperationType, entry.Status)"
+                                                 Variant="Variant.Outlined">
+                                            @GetOperationDisplayName(entry.OperationType)
+                                        </MudChip>
+                                        @if (entry.Status == "reverted")
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text">
+                                                reverted
+                                            </MudChip>
+                                        }
+                                    </MudStack>
+
+                                    @if (!string.IsNullOrEmpty(entry.Message))
+                                    {
+                                        <MudText Typo="Typo.body2" Class="mb-2">@entry.Message</MudText>
+                                    }
+
+                                    <MudStack Row="true" Spacing="3" Class="flex-wrap">
+                                        @if (entry.EntriesAdded > 0)
+                                        {
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                                <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Success" />
+                                                <MudText Typo="Typo.caption" Color="Color.Success">@entry.EntriesAdded added</MudText>
+                                            </MudStack>
+                                        }
+                                        @if (entry.EntriesModified > 0)
+                                        {
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                                <MudIcon Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Warning" />
+                                                <MudText Typo="Typo.caption" Color="Color.Warning">@entry.EntriesModified modified</MudText>
+                                            </MudStack>
+                                        }
+                                        @if (entry.EntriesDeleted > 0)
+                                        {
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                                <MudIcon Icon="@Icons.Material.Filled.Remove" Size="Size.Small" Color="Color.Error" />
+                                                <MudText Typo="Typo.caption" Color="Color.Error">@entry.EntriesDeleted deleted</MudText>
+                                            </MudStack>
+                                        }
+                                        @if (!string.IsNullOrEmpty(entry.UserName) || !string.IsNullOrEmpty(entry.UserEmail))
+                                        {
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Color="Color.Secondary" />
+                                                <MudText Typo="Typo.caption">@(entry.UserName ?? entry.UserEmail)</MudText>
+                                            </MudStack>
+                                        }
+                                    </MudStack>
+                                </div>
+                                <MudStack Row="true" Spacing="1">
+                                    <MudTooltip Text="View details">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => ViewDetailAsync(entry))" />
+                                    </MudTooltip>
+                                    @if (CanRevert(entry.OperationType, entry.Status))
+                                    {
+                                        <MudTooltip Text="Revert this change">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Undo"
+                                                           Size="Size.Small"
+                                                           Color="Color.Warning"
+                                                           OnClick="@(() => OpenRevertDialog(entry))" />
+                                        </MudTooltip>
+                                    }
+                                </MudStack>
+                            </MudStack>
+                        </MudPaper>
+                    </ItemContent>
+                </MudTimelineItem>
+            }
+        </MudTimeline>
+
+        @if (_historyResponse.HasMore)
+        {
+            <MudStack AlignItems="AlignItems.Center" Class="mt-4">
+                <MudButton Variant="Variant.Outlined"
+                           OnClick="@LoadMoreAsync"
+                           Disabled="@_isLoadingMore">
+                    @if (_isLoadingMore)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    }
+                    Load More
+                </MudButton>
+            </MudStack>
+        }
+    }
+}
+
+@* View Details Dialog *@
+<MudDialog @bind-Visible="_detailDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true })">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@GetOperationIcon(_viewEntry?.OperationType ?? "push")" />
+            <MudText Typo="Typo.h6">@GetOperationDisplayName(_viewEntry?.OperationType ?? "push") Details</MudText>
+            <MudText Typo="Typo.subtitle1" Style="font-family: monospace;" Color="Color.Secondary">
+                @_viewEntry?.HistoryId
+            </MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_viewDetail != null)
+        {
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Operation</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@GetOperationTypeColor(_viewDetail.OperationType, _viewDetail.Status)">
+                        @GetOperationDisplayName(_viewDetail.OperationType)
+                    </MudChip>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@(_viewDetail.Status == "reverted" ? Color.Warning : Color.Success)">
+                        @_viewDetail.Status
+                    </MudChip>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Date</MudText>
+                    <MudText Typo="Typo.body1">@_viewDetail.CreatedAt.ToLocalTime().ToString("g")</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Author</MudText>
+                    <MudText Typo="Typo.body1">@(_viewDetail.UserName ?? _viewDetail.UserEmail ?? "Unknown")</MudText>
+                </MudItem>
+
+                @if (!string.IsNullOrEmpty(_viewDetail.Message))
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Message</MudText>
+                        <MudText Typo="Typo.body1">@_viewDetail.Message</MudText>
+                    </MudItem>
+                }
+
+                @if (!string.IsNullOrEmpty(_viewDetail.RevertedFromId))
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Reverted From</MudText>
+                        <MudText Typo="Typo.body1" Style="font-family: monospace;">@_viewDetail.RevertedFromId</MudText>
+                    </MudItem>
+                }
+
+                <MudItem xs="4">
+                    <MudPaper Class="pa-3 text-center" Elevation="1" Style="border-left: 3px solid var(--mud-palette-success);">
+                        <MudText Typo="Typo.h5" Color="Color.Success">@_viewDetail.EntriesAdded</MudText>
+                        <MudText Typo="Typo.caption">Added</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="4">
+                    <MudPaper Class="pa-3 text-center" Elevation="1" Style="border-left: 3px solid var(--mud-palette-warning);">
+                        <MudText Typo="Typo.h5" Color="Color.Warning">@_viewDetail.EntriesModified</MudText>
+                        <MudText Typo="Typo.caption">Modified</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="4">
+                    <MudPaper Class="pa-3 text-center" Elevation="1" Style="border-left: 3px solid var(--mud-palette-error);">
+                        <MudText Typo="Typo.h5" Color="Color.Error">@_viewDetail.EntriesDeleted</MudText>
+                        <MudText Typo="Typo.caption">Deleted</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            @if (_viewDetail.Changes.Any())
+            {
+                <MudDivider Class="my-4" />
+                <MudText Typo="Typo.subtitle2" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Difference" Size="Size.Small" Class="mr-1" />
+                    Changes (@_viewDetail.Changes.Count)
+                </MudText>
+
+                <MudPaper Class="pa-2" Elevation="0" Style="background-color: var(--mud-palette-surface); max-height: 400px; overflow-y: auto;">
+                    <MudSimpleTable Dense="true" Hover="true" Style="background-color: transparent;">
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">Type</th>
+                                <th>Key</th>
+                                <th style="width: 80px;">Lang</th>
+                                <th>Before</th>
+                                <th>After</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var change in _viewDetail.Changes.Take(100))
+                            {
+                                <tr>
+                                    <td>
+                                        <MudChip T="string" Size="Size.Small"
+                                                 Color="@GetChangeTypeColor(change.ChangeType)"
+                                                 Variant="Variant.Text">
+                                            @change.ChangeType
+                                        </MudChip>
+                                    </td>
+                                    <td style="font-family: monospace; word-break: break-all;">@change.Key</td>
+                                    <td><MudChip T="string" Size="Size.Small" Color="Color.Info">@change.Lang</MudChip></td>
+                                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                        @if (string.IsNullOrEmpty(change.BeforeValue))
+                                        {
+                                            <span style="color: var(--mud-palette-text-secondary); font-style: italic;">-</span>
+                                        }
+                                        else
+                                        {
+                                            <MudTooltip Text="@change.BeforeValue">
+                                                <span style="color: var(--mud-palette-error);">@TruncateValue(change.BeforeValue)</span>
+                                            </MudTooltip>
+                                        }
+                                    </td>
+                                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                        @if (string.IsNullOrEmpty(change.AfterValue))
+                                        {
+                                            <span style="color: var(--mud-palette-text-secondary); font-style: italic;">-</span>
+                                        }
+                                        else
+                                        {
+                                            <MudTooltip Text="@change.AfterValue">
+                                                <span style="color: var(--mud-palette-success);">@TruncateValue(change.AfterValue)</span>
+                                            </MudTooltip>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                    @if (_viewDetail.Changes.Count > 100)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center" Class="mt-2">
+                            Showing first 100 of @_viewDetail.Changes.Count changes
+                        </MudText>
+                    }
+                </MudPaper>
+            }
+        }
+        else if (_isLoadingDetail)
+        {
+            <MudStack AlignItems="AlignItems.Center" Class="pa-4">
+                <MudProgressCircular Indeterminate="true" />
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Loading details...</MudText>
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDetailDialog">Close</MudButton>
+        @if (_viewDetail != null && CanRevert(_viewDetail.OperationType, _viewDetail.Status))
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Warning" OnClick="@(() => OpenRevertDialogFromDetail())">
+                <MudIcon Icon="@Icons.Material.Filled.Undo" Class="mr-1" />
+                Revert This Change
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@* Revert Confirmation Dialog *@
+<MudDialog @bind-Visible="_revertDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-2" />
+            Revert Push
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_revertEntry != null)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-4">
+                This will undo all changes from push <strong style="font-family: monospace;">@_revertEntry.HistoryId</strong>.
+            </MudAlert>
+
+            <MudGrid>
+                @if (_revertEntry.EntriesAdded > 0)
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.body2">
+                            <MudIcon Icon="@Icons.Material.Filled.Remove" Size="Size.Small" Color="Color.Error" Class="mr-1" />
+                            <strong>@_revertEntry.EntriesAdded</strong> added entries will be <span style="color: var(--mud-palette-error);">removed</span>
+                        </MudText>
+                    </MudItem>
+                }
+                @if (_revertEntry.EntriesModified > 0)
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.body2">
+                            <MudIcon Icon="@Icons.Material.Filled.Undo" Size="Size.Small" Color="Color.Warning" Class="mr-1" />
+                            <strong>@_revertEntry.EntriesModified</strong> modified entries will be <span style="color: var(--mud-palette-warning);">restored to previous values</span>
+                        </MudText>
+                    </MudItem>
+                }
+                @if (_revertEntry.EntriesDeleted > 0)
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.body2">
+                            <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Success" Class="mr-1" />
+                            <strong>@_revertEntry.EntriesDeleted</strong> deleted entries will be <span style="color: var(--mud-palette-success);">restored</span>
+                        </MudText>
+                    </MudItem>
+                }
+            </MudGrid>
+
+            <MudTextField @bind-Value="_revertMessage"
+                          Label="Revert message (optional)"
+                          Placeholder="e.g., Rolling back broken translations"
+                          Class="mt-4" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseRevertDialog">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Warning" OnClick="RevertAsync" Disabled="_isReverting">
+            @if (_isReverting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Revert
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    private ProjectDto? _project;
+    private SyncHistoryListResponse? _historyResponse;
+    private bool _isLoading = true;
+    private bool _isLoadingMore;
+    private int _currentPage = 1;
+    private const int PageSize = 20;
+
+    // View details dialog
+    private bool _detailDialogVisible;
+    private SyncHistoryDto? _viewEntry;
+    private SyncHistoryDetailDto? _viewDetail;
+    private bool _isLoadingDetail;
+
+    // Revert dialog
+    private bool _revertDialogVisible;
+    private SyncHistoryDto? _revertEntry;
+    private string _revertMessage = "";
+    private bool _isReverting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        _currentPage = 1;
+        try
+        {
+            _project = await ProjectService.GetProjectAsync(ProjectId);
+            if (_project != null)
+            {
+                _historyResponse = await HistoryService.GetHistoryAsync(ProjectId, _currentPage, PageSize);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading history: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        if (_historyResponse == null || !_historyResponse.HasMore)
+            return;
+
+        _isLoadingMore = true;
+        try
+        {
+            _currentPage++;
+            var moreHistory = await HistoryService.GetHistoryAsync(ProjectId, _currentPage, PageSize);
+            if (moreHistory != null)
+            {
+                _historyResponse.Items.AddRange(moreHistory.Items);
+                _historyResponse.HasMore = moreHistory.HasMore;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading more history: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingMore = false;
+        }
+    }
+
+    // View Details Dialog
+    private async Task ViewDetailAsync(SyncHistoryDto entry)
+    {
+        _viewEntry = entry;
+        _viewDetail = null;
+        _detailDialogVisible = true;
+        _isLoadingDetail = true;
+        StateHasChanged();
+
+        try
+        {
+            _viewDetail = await HistoryService.GetHistoryDetailAsync(ProjectId, entry.HistoryId);
+            if (_viewDetail == null)
+            {
+                Snackbar.Add("Failed to load history details", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading details: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingDetail = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CloseDetailDialog()
+    {
+        _detailDialogVisible = false;
+        _viewEntry = null;
+        _viewDetail = null;
+    }
+
+    // Revert Dialog
+    private void OpenRevertDialog(SyncHistoryDto entry)
+    {
+        _revertEntry = entry;
+        _revertMessage = "";
+        _revertDialogVisible = true;
+    }
+
+    private void OpenRevertDialogFromDetail()
+    {
+        if (_viewEntry != null)
+        {
+            _detailDialogVisible = false;
+            OpenRevertDialog(_viewEntry);
+        }
+    }
+
+    private void CloseRevertDialog()
+    {
+        _revertDialogVisible = false;
+        _revertEntry = null;
+        _revertMessage = "";
+    }
+
+    private async Task RevertAsync()
+    {
+        if (_revertEntry == null)
+            return;
+
+        _isReverting = true;
+        try
+        {
+            var result = await HistoryService.RevertAsync(
+                ProjectId,
+                _revertEntry.HistoryId,
+                string.IsNullOrWhiteSpace(_revertMessage) ? null : _revertMessage);
+
+            if (result.IsSuccess && result.Data != null)
+            {
+                Snackbar.Add($"Successfully reverted push {_revertEntry.HistoryId}. {result.Data.EntriesRestored} entries restored.", Severity.Success);
+                _revertDialogVisible = false;
+
+                // Mark the reverted entry as reverted in the local list
+                var entry = _historyResponse?.Items.FirstOrDefault(e => e.HistoryId == _revertEntry.HistoryId);
+                if (entry != null)
+                {
+                    entry.Status = "reverted";
+                }
+
+                // Add the new revert entry to the top of the list
+                if (result.Data.History != null && _historyResponse != null)
+                {
+                    _historyResponse.Items.Insert(0, result.Data.History);
+                }
+
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Failed to revert", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error reverting: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isReverting = false;
+        }
+    }
+
+    // Helper methods
+    private static Color GetOperationTypeColor(string operationType, string status)
+    {
+        if (status == "reverted")
+            return Color.Warning;
+
+        return operationType.ToLower() switch
+        {
+            "push" => Color.Primary,
+            "web-edit" => Color.Info,
+            "revert" => Color.Warning,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetOperationIcon(string operationType) => operationType.ToLower() switch
+    {
+        "push" => Icons.Material.Filled.CloudUpload,
+        "web-edit" => Icons.Material.Filled.Edit,
+        "revert" => Icons.Material.Filled.Undo,
+        _ => Icons.Material.Filled.History
+    };
+
+    private static string GetOperationDisplayName(string operationType) => operationType.ToLower() switch
+    {
+        "push" => "Push",
+        "web-edit" => "Web Edit",
+        "revert" => "Revert",
+        _ => operationType
+    };
+
+    private static bool CanRevert(string operationType, string status)
+    {
+        if (status == "reverted")
+            return false;
+
+        // Both CLI push and web-edit can be reverted
+        return operationType.ToLower() is "push" or "web-edit";
+    }
+
+    private static Color GetChangeTypeColor(string changeType) => changeType.ToLower() switch
+    {
+        "added" => Color.Success,
+        "deleted" => Color.Error,
+        "modified" => Color.Warning,
+        _ => Color.Default
+    };
+
+    private static string TruncateValue(string value, int maxLength = 50)
+    {
+        if (string.IsNullOrEmpty(value))
+            return value;
+
+        return value.Length <= maxLength ? value : value.Substring(0, maxLength) + "...";
+    }
+}

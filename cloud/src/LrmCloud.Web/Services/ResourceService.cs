@@ -313,6 +313,31 @@ public class ResourceService
         }
     }
 
+    /// <summary>
+    /// Batch saves multiple changes with sync history recording
+    /// </summary>
+    public async Task<ServiceResult<BatchSaveResponse>> BatchSaveAsync(int projectId, BatchSaveRequest request)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync($"projects/{projectId}/batch-save", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<BatchSaveResponse>>();
+                if (result?.Data != null)
+                    return ServiceResult<BatchSaveResponse>.Success(result.Data);
+            }
+
+            var error = await ReadErrorMessageAsync(response);
+            return ServiceResult<BatchSaveResponse>.Failure(error);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<BatchSaveResponse>.Failure($"Failed to save: {ex.Message}");
+        }
+    }
+
     private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response)
     {
         try

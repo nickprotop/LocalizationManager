@@ -90,6 +90,14 @@ public class Translation
     public string? RejectionComment { get; set; }
 
     /// <summary>
+    /// SHA256 hash of the translation value + comment.
+    /// Used for three-way merge conflict detection.
+    /// </summary>
+    [MaxLength(64)]
+    [Column("hash")]
+    public string? Hash { get; set; }
+
+    /// <summary>
     /// Version for optimistic locking.
     /// </summary>
     [Column("version")]

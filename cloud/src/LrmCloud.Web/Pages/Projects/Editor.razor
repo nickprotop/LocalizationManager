@@ -6,7 +6,6 @@
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
 @inject IDialogService DialogService
-@inject SnapshotService SnapshotService
 @inject ReviewWorkflowService WorkflowService
 @implements IAsyncDisposable
 @using LrmCloud.Web.Models
@@ -153,11 +152,8 @@ else
         <MudTextField @bind-Value="_saveMessage"
                       Label="Message (optional)"
                       Placeholder="e.g., Updated French translations"
-                      HelperText="This message will be saved with the snapshot for history tracking"
+                      HelperText="This message will be recorded in sync history"
                       Lines="2" />
-        <MudCheckBox @bind-Value="_createSnapshotOnSave"
-                     Label="Create snapshot after saving"
-                     Class="mt-3" />
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="CloseSaveDialog">Cancel</MudButton>
@@ -194,7 +190,6 @@ else
     // Save dialog
     private bool _saveDialogVisible;
     private string _saveMessage = "";
-    private bool _createSnapshotOnSave = true;
     private int _pendingSaveCount;
 
     // Workflow
@@ -471,109 +466,101 @@ else
     private async Task SaveChangesWithMessage()
     {
         _saveDialogVisible = false;
-        await SaveChanges(_createSnapshotOnSave ? _saveMessage : null);
+        await SaveChanges();
     }
 
-    private async Task SaveChanges(string? snapshotMessage = null)
+    private async Task SaveChanges()
     {
         _isSaving = true;
-        var savedCount = 0;
-        var errorCount = 0;
-        var keyMetadataSaved = 0;
 
         try
         {
+            // Build the batch save request
+            var request = new BatchSaveRequest
+            {
+                Message = _saveMessage
+            };
+
             foreach (var row in _editedRows.Values)
             {
-                // Save key metadata (Comment, IsPlural) if changed
-                if (row.IsKeyMetadataDirty)
+                // Add key metadata changes (Comment only - IsPlural changes are more complex)
+                if (row.IsKeyMetadataDirty && row.Comment != row.OriginalComment)
                 {
-                    var keyRequest = new UpdateResourceKeyRequest
+                    request.KeyChanges.Add(new KeyChangeDto
                     {
-                        Comment = row.Comment,
-                        IsPlural = row.IsPlural
-                    };
-
-                    var keyResult = await ResourceService.UpdateResourceKeyAsync(
-                        ProjectId, row.KeyName, keyRequest);
-
-                    if (keyResult.IsSuccess)
-                    {
-                        // Update original values to mark as clean
-                        row.OriginalComment = row.Comment;
-                        row.OriginalIsPlural = row.IsPlural;
-                        keyMetadataSaved++;
-                    }
-                    else
-                    {
-                        errorCount++;
-                    }
+                        KeyName = row.KeyName,
+                        Comment = row.Comment
+                    });
                 }
 
-                // Save translations
-                foreach (var (langCode, cell) in row.Translations.Where(t => t.Value.IsDirty))
+                // Add translation changes
+                foreach (var (langKey, cell) in row.Translations.Where(t => t.Value.IsDirty))
                 {
-                    var request = new UpdateTranslationRequest
+                    request.TranslationChanges.Add(new TranslationChangeDto
                     {
+                        KeyName = row.KeyName,
+                        LanguageCode = cell.LanguageCode,
                         Value = cell.Value ?? "",
                         PluralForm = cell.PluralForm,
                         Status = "translated"
-                    };
+                    });
+                }
+            }
 
-                    var result = await ResourceService.UpdateTranslationAsync(
-                        ProjectId, row.KeyName, langCode, request);
+            // Call batch save API
+            var result = await ResourceService.BatchSaveAsync(ProjectId, request);
 
-                    if (result.IsSuccess)
+            if (result.IsSuccess && result.Data != null)
+            {
+                var response = result.Data;
+
+                // Mark all dirty cells as clean
+                foreach (var row in _editedRows.Values)
+                {
+                    if (row.Comment != row.OriginalComment)
+                    {
+                        row.OriginalComment = row.Comment;
+                    }
+
+                    foreach (var cell in row.Translations.Values.Where(t => t.IsDirty))
                     {
                         cell.IsDirty = false;
                         cell.OriginalValue = cell.Value;
-                        savedCount++;
-                    }
-                    else
-                    {
-                        errorCount++;
                     }
                 }
-            }
 
-            // Remove rows that have no more dirty changes (translations or key metadata)
-            var keysToRemove = _editedRows
-                .Where(kv => !kv.Value.Translations.Values.Any(t => t.IsDirty) && !kv.Value.IsKeyMetadataDirty)
-                .Select(kv => kv.Key)
-                .ToList();
-            foreach (var key in keysToRemove)
-            {
-                _editedRows.Remove(key);
-            }
-
-            _hasUnsavedChanges = _editedRows.Any(kv =>
-                kv.Value.Translations.Values.Any(t => t.IsDirty) || kv.Value.IsKeyMetadataDirty);
-
-            if (errorCount > 0)
-                Snackbar.Add($"Saved {savedCount} translations, {keyMetadataSaved} keys updated, {errorCount} failed", Severity.Warning);
-            else if (savedCount > 0 || keyMetadataSaved > 0)
-                Snackbar.Add($"Saved {savedCount} translations, {keyMetadataSaved} keys updated", Severity.Success);
-
-            // Create snapshot if message was provided and save was successful
-            if (!string.IsNullOrWhiteSpace(snapshotMessage) && (savedCount > 0 || keyMetadataSaved > 0) && errorCount == 0)
-            {
-                try
+                // Remove rows that have no more dirty changes
+                var keysToRemove = _editedRows
+                    .Where(kv => !kv.Value.Translations.Values.Any(t => t.IsDirty) && !kv.Value.IsKeyMetadataDirty)
+                    .Select(kv => kv.Key)
+                    .ToList();
+                foreach (var key in keysToRemove)
                 {
-                    var snapshotResult = await SnapshotService.CreateSnapshotAsync(ProjectId, snapshotMessage);
-                    if (snapshotResult.IsSuccess)
-                    {
-                        Snackbar.Add($"Snapshot {snapshotResult.Data?.SnapshotId} created", Severity.Info);
-                    }
+                    _editedRows.Remove(key);
                 }
-                catch (Exception snapshotEx)
-                {
-                    // Log but don't fail the save operation
-                    Snackbar.Add($"Changes saved but snapshot creation failed: {snapshotEx.Message}", Severity.Warning);
-                }
-            }
 
-            // Refresh stats
-            _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
+                _hasUnsavedChanges = _editedRows.Any(kv =>
+                    kv.Value.Translations.Values.Any(t => t.IsDirty) || kv.Value.IsKeyMetadataDirty);
+
+                // Show success message with history ID
+                var message = $"Saved {response.TranslationsModified} translations";
+                if (response.KeysModified > 0)
+                {
+                    message += $", {response.KeysModified} keys updated";
+                }
+                if (!string.IsNullOrEmpty(response.HistoryId))
+                {
+                    message += $" (history: {response.HistoryId})";
+                }
+                Snackbar.Add(message, Severity.Success);
+
+                // Refresh stats
+                _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
+            }
+            else
+            {
+                Snackbar.Add($"Error saving: {result.ErrorMessage}", Severity.Error);
+            }
         }
         catch (Exception ex)
         {

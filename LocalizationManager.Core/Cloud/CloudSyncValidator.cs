@@ -83,7 +83,11 @@ public class CloudSyncValidator
         var remoteFormat = remoteProject.Format?.ToLowerInvariant() ?? "json";
         var detectedFormat = DetectLocalFormat();
 
-        if (detectedFormat != null && detectedFormat != remoteFormat)
+        // Normalize formats for comparison (json and i18next are compatible - both use JSON files)
+        var normalizedRemote = NormalizeFormat(remoteFormat);
+        var normalizedDetected = detectedFormat != null ? NormalizeFormat(detectedFormat) : null;
+
+        if (normalizedDetected != null && normalizedDetected != normalizedRemote)
         {
             result.AddError($"Cannot link to cloud project with format '{remoteFormat}' - local project uses '{detectedFormat}'.");
             result.AddError($"Create a new cloud project with format '{detectedFormat}' instead.");
@@ -140,7 +144,8 @@ public class CloudSyncValidator
             return;
         }
 
-        if (localFormat != remoteFormat)
+        // Normalize formats for comparison (json and i18next are compatible)
+        if (NormalizeFormat(localFormat) != NormalizeFormat(remoteFormat))
         {
             result.AddError($"Format mismatch: local project uses '{localFormat}' but cloud project expects '{remoteFormat}'.");
             result.AddError($"To sync, either:");
@@ -161,8 +166,10 @@ public class CloudSyncValidator
 
         if (localDefault != remoteDefault)
         {
-            result.AddWarning($"Default language mismatch: local is '{localConfig.DefaultLanguageCode}', remote is '{remoteProject.DefaultLanguage}'.");
-            result.AddWarning("This may cause issues with which translations are considered 'source' strings.");
+            result.AddError($"Default language mismatch: local lrm.json specifies '{localConfig.DefaultLanguageCode}', but cloud project uses '{remoteProject.DefaultLanguage}'.");
+            result.AddError("Syncing with mismatched default languages would corrupt translation data.");
+            result.AddError("To fix: update DefaultLanguageCode in lrm.json to match the cloud project.");
+            result.AddError("Use --force to override this check (not recommended).");
         }
     }
 
@@ -195,6 +202,19 @@ public class CloudSyncValidator
                 result.AddError($"Either update lrm.json to use format '{detectedFormat}', or ensure correct resource files exist.");
             }
         }
+    }
+
+    /// <summary>
+    /// Normalizes format names for compatibility comparison.
+    /// JSON and i18next are compatible (both use JSON files with different naming conventions).
+    /// </summary>
+    private static string NormalizeFormat(string format)
+    {
+        return format.ToLowerInvariant() switch
+        {
+            "json" or "jsonlocalization" or "i18next" => "json",
+            _ => format.ToLowerInvariant()
+        };
     }
 
     private (bool hasResx, bool hasJson, bool hasAndroid, bool hasIos) DetectLocalResourceFiles()

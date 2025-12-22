@@ -291,6 +291,21 @@ app.Configure(config =>
             .WithExample(new[] { "cloud", "status" })
             .WithExample(new[] { "cloud", "status", "--format", "json" });
 
+        cfg.AddCommand<LogCommand>("log")
+            .WithDescription("Show sync history (push/revert operations)")
+            .WithExample(new[] { "cloud", "log" })
+            .WithExample(new[] { "cloud", "log", "-n", "20" })
+            .WithExample(new[] { "cloud", "log", "--oneline" })
+            .WithExample(new[] { "cloud", "log", "abc12345" })
+            .WithExample(new[] { "cloud", "log", "--format", "json" });
+
+        cfg.AddCommand<RevertCommand>("revert")
+            .WithDescription("Revert a previous push (undo changes)")
+            .WithExample(new[] { "cloud", "revert", "abc12345" })
+            .WithExample(new[] { "cloud", "revert", "abc12345", "-m", "Rolling back bug fix" })
+            .WithExample(new[] { "cloud", "revert", "abc12345", "--dry-run" })
+            .WithExample(new[] { "cloud", "revert", "abc12345", "-y" });
+
         cfg.AddCommand<LoginCommand>("login")
             .WithDescription("Authenticate with the cloud using email and password")
             .WithExample(new[] { "cloud", "login", "lrm-cloud.com" })
@@ -333,6 +348,42 @@ app.Configure(config =>
                 .WithDescription("Remove the remote URL configuration")
                 .WithExample(new[] { "cloud", "remote", "unset" })
                 .WithExample(new[] { "cloud", "remote", "unset", "-y" });
+        });
+
+        cfg.AddBranch("snapshot", snapshotCfg =>
+        {
+            snapshotCfg.SetDescription("Snapshot management commands for point-in-time backups");
+
+            snapshotCfg.AddCommand<ListSnapshotsCommand>("list")
+                .WithDescription("List all snapshots for the project")
+                .WithExample(new[] { "cloud", "snapshot", "list" })
+                .WithExample(new[] { "cloud", "snapshot", "list", "--page", "2" })
+                .WithExample(new[] { "cloud", "snapshot", "list", "--format", "json" });
+
+            snapshotCfg.AddCommand<CreateSnapshotCommand>("create")
+                .WithDescription("Create a new snapshot of the current project state")
+                .WithExample(new[] { "cloud", "snapshot", "create" })
+                .WithExample(new[] { "cloud", "snapshot", "create", "Before major refactor" });
+
+            snapshotCfg.AddCommand<ShowSnapshotCommand>("show")
+                .WithDescription("Show details of a specific snapshot")
+                .WithExample(new[] { "cloud", "snapshot", "show", "a1b2c3d4" })
+                .WithExample(new[] { "cloud", "snapshot", "show", "a1b2c3d4", "--format", "json" });
+
+            snapshotCfg.AddCommand<RestoreSnapshotCommand>("restore")
+                .WithDescription("Restore the project to a previous snapshot")
+                .WithExample(new[] { "cloud", "snapshot", "restore", "a1b2c3d4" })
+                .WithExample(new[] { "cloud", "snapshot", "restore", "a1b2c3d4", "--no-backup" })
+                .WithExample(new[] { "cloud", "snapshot", "restore", "a1b2c3d4", "-y" });
+
+            snapshotCfg.AddCommand<DeleteSnapshotCommand>("delete")
+                .WithDescription("Delete a snapshot")
+                .WithExample(new[] { "cloud", "snapshot", "delete", "a1b2c3d4" })
+                .WithExample(new[] { "cloud", "snapshot", "delete", "a1b2c3d4", "-y" });
+
+            snapshotCfg.AddCommand<DiffSnapshotsCommand>("diff")
+                .WithDescription("Compare two snapshots")
+                .WithExample(new[] { "cloud", "snapshot", "diff", "a1b2c3d4", "e5f6g7h8" });
         });
     });
 });

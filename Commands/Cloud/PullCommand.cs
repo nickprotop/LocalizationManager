@@ -2,11 +2,11 @@
 // Licensed under the MIT License
 
 using LocalizationManager.Core.Cloud;
+using LocalizationManager.Core.Cloud.Models;
 using LocalizationManager.Core.Configuration;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using System.ComponentModel;
-using System.Security;
 using System.Text.Json;
 
 namespace LocalizationManager.Commands.Cloud;
@@ -53,7 +53,7 @@ public class PullCommandSettings : BaseCommandSettings
 }
 
 /// <summary>
-/// Command to pull remote changes (resources + lrm.json) from the cloud.
+/// Command to pull remote changes (resources + lrm.json) from the cloud using key-level sync.
 /// </summary>
 public class PullCommand : Command<PullCommandSettings>
 {
@@ -103,8 +103,8 @@ public class PullCommand : Command<PullCommandSettings>
             }
 
             // Parse resolution strategy
-            var strategy = ParseStrategy(settings.Strategy);
-            if (strategy == null)
+            var (strategy, isValidStrategy) = ParseStrategy(settings.Strategy);
+            if (!isValidStrategy)
             {
                 AnsiConsole.MarkupLine($"[red]✗ Invalid strategy:[/] {settings.Strategy.EscapeMarkup()}");
                 AnsiConsole.MarkupLine("[dim]Valid strategies: local, remote, prompt, abort[/]");
@@ -185,13 +185,54 @@ public class PullCommand : Command<PullCommandSettings>
                 return 1;
             }
 
-            // Fetch remote data (V2 - pull files from database)
-            PullResponse? pullResponse = null;
+            // Load local configuration for backend options
+            var config = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
 
+            // Load sync state
+            var syncStateResult = SyncStateManager.LoadAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
+            var syncState = syncStateResult.State;
+
+            // Handle corrupted or legacy sync state
+            if (syncStateResult.WasCorrupted)
+            {
+                AnsiConsole.MarkupLine("[yellow]⚠ Sync state was corrupted - treating as first pull[/]");
+                syncState = null;
+            }
+            else if (syncStateResult.NeedsMigration)
+            {
+                AnsiConsole.MarkupLine("[yellow]⚠ Upgrading from file-based sync to key-level sync[/]");
+            }
+
+            // Get backend for the format
+            var backendFactory = new Core.Backends.ResourceBackendFactory();
+            Core.Abstractions.IResourceBackend backend;
+            try
+            {
+                backend = backendFactory.GetBackend(remoteProject!.Format, config);
+            }
+            catch (NotSupportedException)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ Unsupported format: {remoteProject.Format}[/]");
+                return 1;
+            }
+
+            // Extract local entries
+            var languages = backend.Discovery.DiscoverLanguages(projectDirectory);
+            var extractor = new LocalEntryExtractor(backend);
+
+            List<LocalEntry> localEntries = new();
+            AnsiConsole.Status()
+                .Start("Reading local files...", ctx =>
+                {
+                    localEntries = extractor.ExtractEntriesAsync(languages, cancellationToken).GetAwaiter().GetResult();
+                });
+
+            // Fetch remote entries
+            KeySyncPullResponse? pullResponse = null;
             AnsiConsole.Status()
                 .Start("Fetching remote data...", ctx =>
                 {
-                    pullResponse = apiClient.PullResourcesAsync(settings.IncludeUnapproved, cancellationToken).GetAwaiter().GetResult();
+                    pullResponse = apiClient.KeySyncPullAsync(cancellationToken: cancellationToken).GetAwaiter().GetResult();
                 });
 
             if (pullResponse == null)
@@ -199,48 +240,94 @@ public class PullCommand : Command<PullCommandSettings>
                 throw new InvalidOperationException("Failed to pull resources from server");
             }
 
-            // Show workflow message if translations were excluded
-            if (!string.IsNullOrEmpty(pullResponse.WorkflowMessage))
+            AnsiConsole.MarkupLine($"[dim]Remote: {pullResponse.Total} entries[/]");
+
+            // Perform three-way merge
+            var merger = new KeyLevelMerger();
+            MergeResult mergeResult;
+
+            if (syncState == null || !syncState.Entries.Any())
             {
-                AnsiConsole.MarkupLine($"[yellow]⚠ {pullResponse.WorkflowMessage.EscapeMarkup()}[/]");
-                AnsiConsole.WriteLine();
+                // First pull - accept all remote
+                mergeResult = merger.MergeForFirstPull(pullResponse.Entries);
+                AnsiConsole.MarkupLine("[dim]First pull - accepting all remote entries[/]");
+            }
+            else
+            {
+                // Normal merge
+                mergeResult = merger.MergeForPull(localEntries, pullResponse.Entries, syncState);
             }
 
-            // Detect conflicts and show diff
-            var conflictDetector = new ConflictDetector();
-            var conflicts = new List<ConflictDetector.Conflict>();
-
-            // Check configuration conflict
-            if (!settings.ResourcesOnly && pullResponse.Configuration != null)
+            // Handle config merge
+            ConfigMergeResult? configMergeResult = null;
+            if (!settings.ResourcesOnly && pullResponse.Config != null)
             {
-                if (File.Exists(localConfigPath))
-                {
-                    var localConfigJson = File.ReadAllText(localConfigPath);
-                    var configConflict = conflictDetector.DetectConfigurationConflict(localConfigJson, pullResponse.Configuration);
+                var configMerger = new ConfigMerger();
+                var localConfigJson = File.Exists(localConfigPath) ? File.ReadAllText(localConfigPath) : null;
+                var localProps = localConfigJson != null
+                    ? configMerger.ExtractConfigProperties(localConfigJson)
+                    : new Dictionary<string, (string Value, string Hash)>();
 
-                    if (configConflict != null)
+                configMergeResult = configMerger.MergeForPull(localProps, pullResponse.Config, syncState);
+            }
+
+            // Show changes summary
+            ShowMergeSummary(mergeResult, configMergeResult, settings);
+
+            // Handle conflicts
+            if (mergeResult.HasConflicts)
+            {
+                if (settings.Force || strategy == ResolutionChoice.Remote)
+                {
+                    // Force accept remote for all conflicts
+                    AnsiConsole.MarkupLine($"[yellow]⚠ {mergeResult.Conflicts.Count} conflict(s) - accepting remote values[/]");
+
+                    var resolutions = mergeResult.Conflicts.Select(c => new ConflictResolution
                     {
-                        conflicts.Add(configConflict);
+                        Key = c.Key,
+                        Lang = c.Lang,
+                        TargetType = ResolutionTargetType.Entry,
+                        Resolution = ResolutionChoice.Remote
+                    }).ToList();
+
+                    var localEntriesDict = localEntries.ToDictionary(e => (e.Key, e.Lang), e => e);
+                    mergeResult = merger.ApplyResolutions(mergeResult, resolutions, localEntriesDict);
+                }
+                else if (strategy == ResolutionChoice.Local)
+                {
+                    // Force keep local for all conflicts
+                    AnsiConsole.MarkupLine($"[yellow]⚠ {mergeResult.Conflicts.Count} conflict(s) - keeping local values[/]");
+
+                    var resolutions = mergeResult.Conflicts.Select(c => new ConflictResolution
+                    {
+                        Key = c.Key,
+                        Lang = c.Lang,
+                        TargetType = ResolutionTargetType.Entry,
+                        Resolution = ResolutionChoice.Local
+                    }).ToList();
+
+                    var localEntriesDict = localEntries.ToDictionary(e => (e.Key, e.Lang), e => e);
+                    mergeResult = merger.ApplyResolutions(mergeResult, resolutions, localEntriesDict);
+                }
+                else if (strategy == ResolutionChoice.Skip)
+                {
+                    AnsiConsole.MarkupLine($"[red]✗ {mergeResult.Conflicts.Count} conflict(s) detected - aborting[/]");
+                    ShowConflicts(mergeResult.Conflicts);
+                    return 1;
+                }
+                else
+                {
+                    // Interactive resolution
+                    if (!ResolveConflictsInteractively(merger, mergeResult, localEntries))
+                    {
+                        AnsiConsole.MarkupLine("[yellow]Pull cancelled[/]");
+                        return 0;
                     }
                 }
             }
 
-            // Check resource conflicts
-            ConflictDetector.DiffSummary? diffSummary = null;
-            if (!settings.ConfigOnly && pullResponse.Files.Count > 0)
-            {
-                var localResources = GetLocalResources(settings, projectDirectory);
-                var remoteResources = pullResponse.Files;
-                var resourceConflicts = conflictDetector.DetectResourceConflicts(localResources, remoteResources);
-                conflicts.AddRange(resourceConflicts);
-
-                diffSummary = conflictDetector.GetDiffSummary(localResources, remoteResources);
-            }
-
-            // Show changes summary
-            ShowChangesSummary(diffSummary, conflicts, settings);
-
-            if (diffSummary != null && !diffSummary.HasChanges && conflicts.Count == 0)
+            // Check if there's anything to do
+            if (mergeResult.ToWrite.Count == 0 && configMergeResult?.ToWrite.Count == 0)
             {
                 AnsiConsole.MarkupLine("[green]✓ Already up to date![/]");
                 return 0;
@@ -251,40 +338,6 @@ public class PullCommand : Command<PullCommandSettings>
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine("[yellow]Dry run - no changes will be made[/]");
                 return 0;
-            }
-
-            // Handle conflicts
-            if (conflicts.Any())
-            {
-                if (!settings.Force && strategy.Value == ConflictDetector.ResolutionStrategy.Abort)
-                {
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine("[red]✗ Conflicts detected. Use --force or --strategy to resolve.[/]");
-                    return 1;
-                }
-
-                if (!settings.Force && strategy.Value == ConflictDetector.ResolutionStrategy.Prompt)
-                {
-                    if (!ResolveConflictsInteractively(conflicts))
-                    {
-                        AnsiConsole.MarkupLine("[yellow]Pull cancelled[/]");
-                        return 0;
-                    }
-                }
-                else if (strategy.Value == ConflictDetector.ResolutionStrategy.Local)
-                {
-                    foreach (var conflict in conflicts)
-                    {
-                        conflict.Resolution = ConflictDetector.ResolutionStrategy.Local;
-                    }
-                }
-                else if (strategy.Value == ConflictDetector.ResolutionStrategy.Remote || settings.Force)
-                {
-                    foreach (var conflict in conflicts)
-                    {
-                        conflict.Resolution = ConflictDetector.ResolutionStrategy.Remote;
-                    }
-                }
             }
 
             // Confirm pull
@@ -311,44 +364,64 @@ public class PullCommand : Command<PullCommandSettings>
             // Apply changes
             try
             {
+                // Update config FIRST so backend uses correct settings for file regeneration
+                if (!settings.ResourcesOnly && configMergeResult?.ToWrite.Count > 0)
+                {
+                    AnsiConsole.Status()
+                        .Start("Updating configuration...", ctx =>
+                        {
+                            var configMerger = new ConfigMerger();
+                            var localConfigJson = File.Exists(localConfigPath) ? File.ReadAllText(localConfigPath) : "{}";
+                            var newConfigJson = configMerger.ApplyConfigChanges(localConfigJson, configMergeResult.ToWrite);
+                            File.WriteAllText(localConfigPath, newConfigJson);
+                        });
+
+                    // Reload config and backend after config update
+                    config = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
+                    backend = backendFactory.GetBackend(remoteProject!.Format, config);
+                    // Re-discover languages with updated config
+                    languages = backend.Discovery.DiscoverLanguages(projectDirectory);
+                }
+
                 AnsiConsole.Status()
                     .Start("Applying changes...", ctx =>
                     {
-                        if (!settings.ResourcesOnly && pullResponse.Configuration != null)
+                        // Update resources (now with correct backend from updated config)
+                        if (!settings.ConfigOnly && mergeResult.ToWrite.Count > 0)
                         {
-                            var configConflict = conflicts.FirstOrDefault(c => c.Type == ConflictDetector.ConflictType.ConfigurationConflict);
-                            if (configConflict?.Resolution != ConflictDetector.ResolutionStrategy.Local)
-                            {
-                                ctx.Status("Updating configuration...");
-                                ApplyConfigurationChanges(projectDirectory, pullResponse.Configuration, cancellationToken);
-                            }
-                        }
+                            ctx.Status("Regenerating resource files...");
+                            var regenerator = new FileRegenerator(backend, projectDirectory);
+                            var regenResult = regenerator.RegenerateFilesAsync(
+                                mergeResult.ToWrite,
+                                languages,
+                                cancellationToken).GetAwaiter().GetResult();
 
-                        if (!settings.ConfigOnly && pullResponse.Files.Count > 0)
-                        {
-                            ctx.Status("Updating resources...");
-                            ApplyResourceChanges(projectDirectory, pullResponse.Files, conflicts, cancellationToken);
+                            if (!regenResult.Success)
+                            {
+                                throw new Exception($"Failed to regenerate files: {regenResult.Error}");
+                            }
                         }
                     });
 
-                // Update sync state with pulled files
-                var syncStateFiles = new Dictionary<string, string>();
-                foreach (var file in pullResponse.Files)
-                {
-                    syncStateFiles[file.Path] = file.Hash ?? ComputeHash(file.Content);
-                }
-
-                var newSyncState = new Core.Cloud.Models.SyncState
-                {
-                    Timestamp = DateTime.UtcNow,
-                    ConfigHash = pullResponse.Configuration != null ? ComputeHash(pullResponse.Configuration) : null,
-                    Files = syncStateFiles
-                };
-
-                Core.Cloud.SyncStateManager.SaveAsync(projectDirectory, newSyncState, cancellationToken).GetAwaiter().GetResult();
+                // Update sync state
+                var newSyncState = BuildNewSyncState(mergeResult, configMergeResult, localEntries);
+                SyncStateManager.SaveAsync(projectDirectory, newSyncState, cancellationToken).GetAwaiter().GetResult();
 
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine("[green bold]✓ Pull completed successfully![/]");
+
+                if (mergeResult.ToWrite.Count > 0)
+                {
+                    AnsiConsole.MarkupLine($"  [dim]Updated: {mergeResult.ToWrite.Count} entries[/]");
+                }
+                if (mergeResult.AutoMerged > 0)
+                {
+                    AnsiConsole.MarkupLine($"  [dim]Auto-merged: {mergeResult.AutoMerged} entries[/]");
+                }
+                if (configMergeResult?.ToWrite.Count > 0)
+                {
+                    AnsiConsole.MarkupLine($"  [dim]Config properties: {configMergeResult.ToWrite.Count}[/]");
+                }
 
                 if (backupPath != null)
                 {
@@ -398,176 +471,230 @@ public class PullCommand : Command<PullCommandSettings>
         }
     }
 
-    private List<FileDto> GetLocalResources(PullCommandSettings settings, string projectDirectory)
+    private void ShowMergeSummary(MergeResult mergeResult, ConfigMergeResult? configMergeResult, PullCommandSettings settings)
     {
-        var languages = settings.DiscoverLanguages();
-        var localResources = new List<FileDto>();
+        AnsiConsole.MarkupLine("[blue]Merge summary:[/]");
 
-        foreach (var lang in languages)
+        if (mergeResult.AutoMerged > 0)
         {
-            var relativePath = GetRelativePath(lang.FilePath, projectDirectory);
-            var content = File.ReadAllText(lang.FilePath);  // Read raw file content
-            var hash = ComputeHash(content);
-
-            localResources.Add(new FileDto
-            {
-                Path = relativePath,
-                Content = content,
-                Hash = hash
-            });
+            AnsiConsole.MarkupLine($"  [green]↓ {mergeResult.AutoMerged} entry(ies) to update from remote[/]");
+        }
+        if (mergeResult.Unchanged > 0)
+        {
+            AnsiConsole.MarkupLine($"  [dim]= {mergeResult.Unchanged} entry(ies) unchanged[/]");
+        }
+        if (mergeResult.Conflicts.Count > 0)
+        {
+            AnsiConsole.MarkupLine($"  [yellow]! {mergeResult.Conflicts.Count} conflict(s) need resolution[/]");
+        }
+        if (configMergeResult?.ToWrite.Count > 0)
+        {
+            AnsiConsole.MarkupLine($"  [blue]~ {configMergeResult.ToWrite.Count} config property(ies) to update[/]");
+        }
+        if (configMergeResult?.Conflicts.Count > 0)
+        {
+            AnsiConsole.MarkupLine($"  [yellow]! {configMergeResult.Conflicts.Count} config conflict(s)[/]");
         }
 
-        return localResources;
+        AnsiConsole.WriteLine();
     }
 
-    private void ShowChangesSummary(
-        ConflictDetector.DiffSummary? diffSummary,
-        List<ConflictDetector.Conflict> conflicts,
-        PullCommandSettings settings)
+    private void ShowConflicts(List<EntryConflict> conflicts)
     {
-        if (diffSummary != null)
+        AnsiConsole.WriteLine();
+        foreach (var conflict in conflicts.Take(10))
         {
-            AnsiConsole.MarkupLine("[blue]Changes to pull:[/]");
-
-            if (diffSummary.FilesToAdd.Any())
-            {
-                AnsiConsole.MarkupLine($"  [green]+ {diffSummary.FilesToAdd.Count} file(s) to add[/]");
-            }
-
-            if (diffSummary.FilesToUpdate.Any())
-            {
-                AnsiConsole.MarkupLine($"  [yellow]~ {diffSummary.FilesToUpdate.Count} file(s) to update[/]");
-            }
-
-            if (diffSummary.FilesToDelete.Any())
-            {
-                AnsiConsole.MarkupLine($"  [red]- {diffSummary.FilesToDelete.Count} file(s) to delete[/]");
-            }
-
-            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"  [yellow]• {conflict.Key}[/] ({conflict.Lang})");
+            AnsiConsole.MarkupLine($"    Local:  \"{conflict.LocalValue?.EscapeMarkup() ?? "(missing)"}\"");
+            AnsiConsole.MarkupLine($"    Remote: \"{conflict.RemoteValue?.EscapeMarkup() ?? "(deleted)"}\"");
         }
-
-        if (conflicts.Any())
+        if (conflicts.Count > 10)
         {
-            AnsiConsole.MarkupLine($"[yellow]⚠ {conflicts.Count} conflict(s) detected[/]");
-            foreach (var conflict in conflicts)
-            {
-                AnsiConsole.MarkupLine($"  [yellow]• {conflict.Path.EscapeMarkup()}[/]");
-            }
-            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"  [dim]... and {conflicts.Count - 10} more[/]");
         }
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[dim]Use --force or --strategy to resolve conflicts[/]");
     }
 
-    private bool ResolveConflictsInteractively(List<ConflictDetector.Conflict> conflicts)
+    private bool ResolveConflictsInteractively(KeyLevelMerger merger, MergeResult mergeResult, List<LocalEntry> localEntries)
     {
-        AnsiConsole.MarkupLine("[yellow bold]Conflicts detected:[/]");
+        AnsiConsole.MarkupLine($"[yellow bold]Conflicts detected: {mergeResult.Conflicts.Count}[/]");
         AnsiConsole.WriteLine();
 
-        foreach (var conflict in conflicts)
+        // Offer batch resolution first
+        var batchChoice = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("How do you want to resolve conflicts?")
+                .AddChoices(new[]
+                {
+                    "Resolve each interactively",
+                    "Use remote for all",
+                    "Keep local for all",
+                    "Abort"
+                }));
+
+        if (batchChoice == "Abort")
         {
-            AnsiConsole.MarkupLine($"[yellow]Conflict in:[/] {conflict.Path.EscapeMarkup()}");
-
-            var choice = AnsiConsole.Prompt(
-                new SelectionPrompt<string>()
-                    .Title("How do you want to resolve this conflict?")
-                    .AddChoices(new[]
-                    {
-                        "Use remote version",
-                        "Keep local version",
-                        "Abort pull"
-                    }));
-
-            conflict.Resolution = choice switch
-            {
-                "Use remote version" => ConflictDetector.ResolutionStrategy.Remote,
-                "Keep local version" => ConflictDetector.ResolutionStrategy.Local,
-                _ => ConflictDetector.ResolutionStrategy.Abort
-            };
-
-            if (conflict.Resolution == ConflictDetector.ResolutionStrategy.Abort)
-            {
-                return false;
-            }
-
-            AnsiConsole.WriteLine();
+            return false;
         }
+
+        var resolutions = new List<ConflictResolution>();
+
+        if (batchChoice == "Use remote for all")
+        {
+            resolutions = mergeResult.Conflicts.Select(c => new ConflictResolution
+            {
+                Key = c.Key,
+                Lang = c.Lang,
+                TargetType = ResolutionTargetType.Entry,
+                Resolution = ResolutionChoice.Remote
+            }).ToList();
+        }
+        else if (batchChoice == "Keep local for all")
+        {
+            resolutions = mergeResult.Conflicts.Select(c => new ConflictResolution
+            {
+                Key = c.Key,
+                Lang = c.Lang,
+                TargetType = ResolutionTargetType.Entry,
+                Resolution = ResolutionChoice.Local,
+                EditedValue = c.LocalValue
+            }).ToList();
+        }
+        else
+        {
+            // Interactive resolution
+            for (int i = 0; i < mergeResult.Conflicts.Count; i++)
+            {
+                var conflict = mergeResult.Conflicts[i];
+
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine($"[yellow]Conflict {i + 1}/{mergeResult.Conflicts.Count}:[/] {conflict.Key.EscapeMarkup()} ({conflict.Lang})");
+                AnsiConsole.MarkupLine($"  [green]LOCAL:[/]  \"{conflict.LocalValue?.EscapeMarkup() ?? "(missing)"}\"");
+                AnsiConsole.MarkupLine($"  [blue]REMOTE:[/] \"{conflict.RemoteValue?.EscapeMarkup() ?? "(deleted)"}\"");
+                if (conflict.RemoteUpdatedAt.HasValue)
+                {
+                    AnsiConsole.MarkupLine($"  [dim]Remote updated: {conflict.RemoteUpdatedAt.Value:g}[/]");
+                }
+
+                var choice = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("Resolution:")
+                        .AddChoices(new[]
+                        {
+                            "[R]emote - Use remote version",
+                            "[L]ocal - Keep local version",
+                            "[E]dit - Enter custom value",
+                            "[S]kip - Abort entire pull"
+                        }));
+
+                var resolution = new ConflictResolution
+                {
+                    Key = conflict.Key,
+                    Lang = conflict.Lang,
+                    TargetType = ResolutionTargetType.Entry
+                };
+
+                if (choice.StartsWith("[R]"))
+                {
+                    resolution.Resolution = ResolutionChoice.Remote;
+                }
+                else if (choice.StartsWith("[L]"))
+                {
+                    resolution.Resolution = ResolutionChoice.Local;
+                    resolution.EditedValue = conflict.LocalValue;
+                }
+                else if (choice.StartsWith("[E]"))
+                {
+                    var editedValue = AnsiConsole.Ask<string>("Enter new value:");
+                    resolution.Resolution = ResolutionChoice.Edit;
+                    resolution.EditedValue = editedValue;
+                }
+                else
+                {
+                    return false;
+                }
+
+                resolutions.Add(resolution);
+            }
+        }
+
+        // Apply resolutions
+        var localEntriesDict = localEntries.ToDictionary(e => (e.Key, e.Lang), e => e);
+        var resolvedResult = merger.ApplyResolutions(mergeResult, resolutions, localEntriesDict);
+
+        // Copy resolved entries to original result
+        mergeResult.ToWrite.Clear();
+        mergeResult.ToWrite.AddRange(resolvedResult.ToWrite);
+        mergeResult.Conflicts.Clear();
 
         return true;
     }
 
-    private void ApplyConfigurationChanges(string projectDirectory, string remoteConfigJson, CancellationToken cancellationToken)
-    {
-        var config = JsonSerializer.Deserialize<ConfigurationModel>(remoteConfigJson);
-        if (config != null)
-        {
-            Core.Configuration.ConfigurationManager.SaveTeamConfigurationAsync(projectDirectory, config, cancellationToken).GetAwaiter().GetResult();
-        }
-    }
-
-    private void ApplyResourceChanges(
-        string projectDirectory,
-        List<FileDto> remoteResources,
-        List<ConflictDetector.Conflict> conflicts,
-        CancellationToken cancellationToken)
-    {
-        // Get normalized base path for security validation
-        var basePath = Path.GetFullPath(projectDirectory);
-
-        foreach (var resource in remoteResources)
-        {
-            var conflict = conflicts.FirstOrDefault(c => c.Path == resource.Path);
-
-            // Skip if conflict resolved to keep local
-            if (conflict?.Resolution == ConflictDetector.ResolutionStrategy.Local)
-            {
-                continue;
-            }
-
-            // Security: Validate path doesn't escape project directory
-            var fullPath = Path.GetFullPath(Path.Combine(projectDirectory, resource.Path));
-            if (!fullPath.StartsWith(basePath + Path.DirectorySeparatorChar) && fullPath != basePath)
-            {
-                throw new SecurityException($"Security error: path traversal detected in '{resource.Path}'");
-            }
-
-            var directory = Path.GetDirectoryName(fullPath);
-
-            if (directory != null && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            // Write raw file content (preserves original format)
-            File.WriteAllText(fullPath, resource.Content);
-        }
-    }
-
-    private ConflictDetector.ResolutionStrategy? ParseStrategy(string strategy)
+    private (ResolutionChoice? Choice, bool IsValid) ParseStrategy(string strategy)
     {
         return strategy.ToLowerInvariant() switch
         {
-            "local" => ConflictDetector.ResolutionStrategy.Local,
-            "remote" => ConflictDetector.ResolutionStrategy.Remote,
-            "prompt" => ConflictDetector.ResolutionStrategy.Prompt,
-            "abort" => ConflictDetector.ResolutionStrategy.Abort,
-            _ => null
+            "local" => (ResolutionChoice.Local, true),
+            "remote" => (ResolutionChoice.Remote, true),
+            "prompt" => (null, true), // Interactive - null choice but valid
+            "abort" => (ResolutionChoice.Skip, true),
+            _ => (null, false) // Invalid strategy
         };
     }
 
-    private string GetRelativePath(string fullPath, string projectDirectory)
+    private SyncState BuildNewSyncState(MergeResult mergeResult, ConfigMergeResult? configMergeResult, List<LocalEntry> localEntries)
     {
-        // projectDirectory already points to the correct resource directory
-        if (fullPath.StartsWith(projectDirectory))
+        var newState = new SyncState
         {
-            return fullPath.Substring(projectDirectory.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        }
-        return Path.GetFileName(fullPath);
-    }
+            Version = 2,
+            Timestamp = DateTime.UtcNow,
+            Entries = new Dictionary<string, Dictionary<string, string>>(),
+            ConfigProperties = new Dictionary<string, string>()
+        };
 
-    private string ComputeHash(string content)
-    {
-        using var sha256 = System.Security.Cryptography.SHA256.Create();
-        var hashBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(content));
-        return Convert.ToHexString(hashBytes).ToLowerInvariant();
+        // Add hashes from merged entries
+        foreach (var (key, lang, hash) in mergeResult.NewHashes.GetAllEntries())
+        {
+            if (!newState.Entries.ContainsKey(key))
+            {
+                newState.Entries[key] = new Dictionary<string, string>();
+            }
+            newState.Entries[key][lang] = hash;
+        }
+
+        // Add hashes from written entries (remote entries accepted)
+        foreach (var entry in mergeResult.ToWrite)
+        {
+            if (!newState.Entries.ContainsKey(entry.Key))
+            {
+                newState.Entries[entry.Key] = new Dictionary<string, string>();
+            }
+            newState.Entries[entry.Key][entry.Lang] = entry.Hash;
+        }
+
+        // Add hashes from local entries that weren't changed
+        foreach (var entry in localEntries)
+        {
+            if (!newState.Entries.ContainsKey(entry.Key))
+            {
+                newState.Entries[entry.Key] = new Dictionary<string, string>();
+            }
+            if (!newState.Entries[entry.Key].ContainsKey(entry.Lang))
+            {
+                newState.Entries[entry.Key][entry.Lang] = entry.Hash;
+            }
+        }
+
+        // Add config hashes
+        if (configMergeResult != null)
+        {
+            foreach (var (path, hash) in configMergeResult.NewHashes)
+            {
+                newState.ConfigProperties[path] = hash;
+            }
+        }
+
+        return newState;
     }
 }

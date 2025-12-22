@@ -56,7 +56,8 @@ public class ResourceBackendFactory : IResourceBackendFactory
         return lowerName switch
         {
             "resx" => new ResxResourceBackend(),
-            "json" => new JsonResourceBackend(config?.Json),
+            "json" or "jsonlocalization" => new JsonResourceBackend(config?.Json),
+            "i18next" => new JsonResourceBackend(config?.Json ?? new Configuration.JsonFormatConfiguration { I18nextCompatible = true }),
             "android" => new AndroidResourceBackend(
                 (config?.Android?.BaseName ?? "strings") + ".xml",
                 config?.DefaultLanguageCode),

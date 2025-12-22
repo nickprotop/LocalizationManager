@@ -32,7 +32,6 @@ public class AppDbContext : DbContext
 
     // Sync & Audit
     public DbSet<SyncHistory> SyncHistory => Set<SyncHistory>();
-    public DbSet<SyncConflict> SyncConflicts => Set<SyncConflict>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     // Snapshots
@@ -258,11 +257,23 @@ public class AppDbContext : DbContext
         {
             entity.HasIndex(e => e.ProjectId);
             entity.HasIndex(e => e.CreatedAt);
-        });
+            entity.HasIndex(e => new { e.ProjectId, e.HistoryId }).IsUnique();
+            entity.HasIndex(e => e.UserId);
 
-        modelBuilder.Entity<SyncConflict>(entity =>
-        {
-            entity.HasIndex(e => e.ProjectId);
+            entity.HasOne(e => e.Project)
+                .WithMany(p => p.SyncHistory)
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.RevertedFrom)
+                .WithMany()
+                .HasForeignKey(e => e.RevertedFromId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // =====================================================================

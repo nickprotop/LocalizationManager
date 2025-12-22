@@ -300,7 +300,9 @@ public class RemoteSetCommand : Command<RemoteSetCommandSettings>
         // Check I18nextCompatible for JSON projects
         if (remoteProject.Format == "json" || remoteProject.Format == "i18next")
         {
-            var localI18next = localConfig.Json?.I18nextCompatible ?? false;
+            // Local is i18next if either: format is "i18next" OR json.i18nextCompatible is true
+            var localFormat = localConfig.ResourceFormat?.ToLowerInvariant();
+            var localI18next = localFormat == "i18next" || (localConfig.Json?.I18nextCompatible ?? false);
             var remoteI18next = remoteProject.Format == "i18next";
 
             if (localI18next != remoteI18next)
@@ -329,16 +331,29 @@ public class RemoteSetCommand : Command<RemoteSetCommandSettings>
             result.AddWarning("This may affect which translations are considered 'source' strings.");
         }
 
-        // Check format matches
-        var localFormat = localConfig.ResourceFormat?.ToLowerInvariant();
-        if (!string.IsNullOrEmpty(localFormat))
+        // Check format matches (json and i18next are compatible)
+        var localFmt = localConfig.ResourceFormat?.ToLowerInvariant();
+        if (!string.IsNullOrEmpty(localFmt))
         {
-            var effectiveRemoteFormat = remoteProject.Format == "i18next" ? "json" : remoteProject.Format;
-            if (localFormat != effectiveRemoteFormat)
+            var normalizedLocal = NormalizeJsonFormat(localFmt);
+            var normalizedRemote = NormalizeJsonFormat(remoteProject.Format);
+            if (normalizedLocal != normalizedRemote)
             {
                 result.AddError($"Format mismatch: local lrm.json specifies '{localConfig.ResourceFormat}', but remote project uses '{remoteProject.Format}'");
             }
         }
+    }
+
+    /// <summary>
+    /// Normalizes JSON format names for compatibility comparison.
+    /// </summary>
+    private static string NormalizeJsonFormat(string? format)
+    {
+        return format?.ToLowerInvariant() switch
+        {
+            "json" or "jsonlocalization" or "i18next" => "json",
+            _ => format?.ToLowerInvariant() ?? ""
+        };
     }
 
     private static bool IsLocalhost(string host)

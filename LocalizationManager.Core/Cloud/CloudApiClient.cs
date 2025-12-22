@@ -4,6 +4,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using LocalizationManager.Core.Cloud.Models;
 
 namespace LocalizationManager.Core.Cloud;
 
@@ -20,6 +21,7 @@ public class CloudApiClient : IDisposable
     private string? _apiKey;
     private string? _projectDirectory;
     private Func<Task<bool>>? _onTokenRefreshed;
+    private int? _cachedProjectId;
 
     public CloudApiClient(RemoteUrl remoteUrl, HttpClient? httpClient = null)
     {
@@ -31,6 +33,7 @@ public class CloudApiClient : IDisposable
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true,
             WriteIndented = false
         };
     }
@@ -109,7 +112,45 @@ public class CloudApiClient : IDisposable
     public async Task<CloudProject> GetProjectAsync(CancellationToken cancellationToken = default)
     {
         var response = await GetAsync<CloudProject>(_remoteUrl.ProjectApiUrl, cancellationToken);
-        return response ?? throw new CloudApiException("Failed to retrieve project information");
+        if (response == null)
+            throw new CloudApiException("Failed to retrieve project information");
+
+        // Cache the project ID for sync operations
+        _cachedProjectId = response.Id;
+        return response;
+    }
+
+    /// <summary>
+    /// Gets the project ID, fetching from the API if not already cached.
+    /// </summary>
+    private async Task<int> GetProjectIdAsync(CancellationToken cancellationToken = default)
+    {
+        if (_cachedProjectId.HasValue)
+            return _cachedProjectId.Value;
+
+        var project = await GetProjectAsync(cancellationToken);
+        return project.Id;
+    }
+
+    /// <summary>
+    /// Builds the sync API URL for the current project.
+    /// Uses /api/projects/{projectId} route for sync operations.
+    /// </summary>
+    private async Task<string> GetSyncApiUrlAsync(string endpoint, CancellationToken cancellationToken = default)
+    {
+        var projectId = await GetProjectIdAsync(cancellationToken);
+        return $"{_remoteUrl.ApiBaseUrl}/projects/{projectId}/sync/{endpoint}";
+    }
+
+    /// <summary>
+    /// Builds the snapshot API URL for the current project.
+    /// Uses /api/projects/{projectId} route for snapshot operations.
+    /// </summary>
+    private async Task<string> GetSnapshotApiUrlAsync(string endpoint = "", CancellationToken cancellationToken = default)
+    {
+        var projectId = await GetProjectIdAsync(cancellationToken);
+        var baseUrl = $"{_remoteUrl.ApiBaseUrl}/projects/{projectId}/snapshots";
+        return string.IsNullOrEmpty(endpoint) ? baseUrl : $"{baseUrl}/{endpoint}";
     }
 
     /// <summary>
@@ -179,41 +220,6 @@ public class CloudApiClient : IDisposable
         return response ?? new List<ConfigurationHistoryEntry>();
     }
 
-    #endregion
-
-    #region Resource Sync API (V2 - File-Based)
-
-    /// <summary>
-    /// Pushes files to the cloud (V2 - file-based sync with incremental changes).
-    /// </summary>
-    public async Task<PushResponse> PushResourcesAsync(
-        PushRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        var url = $"{_remoteUrl.ProjectApiUrl}/sync/push";
-        var response = await PostAsync<PushResponse>(url, request, cancellationToken);
-        return response ?? throw new CloudApiException("Failed to push resources");
-    }
-
-    /// <summary>
-    /// Pulls files from the cloud (V2 - generates files from database).
-    /// </summary>
-    /// <param name="includeUnapproved">If true, include all translations regardless of workflow approval status.
-    /// If false (default), only include approved translations when project requires approval before export.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    public async Task<PullResponse> PullResourcesAsync(
-        bool includeUnapproved = false,
-        CancellationToken cancellationToken = default)
-    {
-        var url = $"{_remoteUrl.ProjectApiUrl}/sync/pull";
-        if (includeUnapproved)
-        {
-            url += "?includeUnapproved=true";
-        }
-        var response = await GetAsync<PullResponse>(url, cancellationToken);
-        return response ?? throw new CloudApiException("Failed to pull resources");
-    }
-
     /// <summary>
     /// Gets sync status from the cloud.
     /// </summary>
@@ -222,6 +228,119 @@ public class CloudApiClient : IDisposable
         var url = $"{_remoteUrl.ProjectApiUrl}/sync/status";
         var response = await GetAsync<SyncStatus>(url, cancellationToken);
         return response ?? throw new CloudApiException("Failed to retrieve sync status");
+    }
+
+    #endregion
+
+    #region Key-Level Sync API
+
+    /// <summary>
+    /// Pushes entry-level changes to the cloud with three-way merge support.
+    /// </summary>
+    public async Task<Models.KeySyncPushResponse> KeySyncPushAsync(
+        Models.KeySyncPushRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var url = await GetSyncApiUrlAsync("push", cancellationToken);
+        var response = await PostAsync<Models.KeySyncPushResponse>(url, request, cancellationToken);
+        return response ?? throw new CloudApiException("Failed to push changes");
+    }
+
+    /// <summary>
+    /// Pulls all entries from the cloud for key-level merge.
+    /// </summary>
+    /// <param name="since">Optional timestamp for delta sync (only entries modified after this time).</param>
+    /// <param name="limit">Optional limit for pagination.</param>
+    /// <param name="offset">Optional offset for pagination.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task<Models.KeySyncPullResponse> KeySyncPullAsync(
+        DateTime? since = null,
+        int? limit = null,
+        int? offset = null,
+        CancellationToken cancellationToken = default)
+    {
+        var url = await GetSyncApiUrlAsync("pull", cancellationToken);
+        var queryParams = new List<string>();
+
+        if (since.HasValue)
+        {
+            queryParams.Add($"since={since.Value:O}");
+        }
+        if (limit.HasValue)
+        {
+            queryParams.Add($"limit={limit.Value}");
+        }
+        if (offset.HasValue)
+        {
+            queryParams.Add($"offset={offset.Value}");
+        }
+
+        if (queryParams.Count > 0)
+        {
+            url += "?" + string.Join("&", queryParams);
+        }
+
+        var response = await GetAsync<Models.KeySyncPullResponse>(url, cancellationToken);
+        return response ?? throw new CloudApiException("Failed to pull entries");
+    }
+
+    /// <summary>
+    /// Resolves conflicts after a push operation.
+    /// </summary>
+    public async Task<Models.ConflictResolutionResponse> KeySyncResolveAsync(
+        Models.ConflictResolutionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var url = await GetSyncApiUrlAsync("resolve", cancellationToken);
+        var response = await PostAsync<Models.ConflictResolutionResponse>(url, request, cancellationToken);
+        return response ?? throw new CloudApiException("Failed to resolve conflicts");
+    }
+
+    /// <summary>
+    /// Gets the sync history for the current project.
+    /// </summary>
+    /// <param name="page">Page number (1-based).</param>
+    /// <param name="pageSize">Number of items per page.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task<Models.SyncHistoryListResponse> GetSyncHistoryAsync(
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var url = await GetSyncApiUrlAsync($"history?page={page}&pageSize={pageSize}", cancellationToken);
+        var response = await GetAsync<Models.SyncHistoryListResponse>(url, cancellationToken);
+        return response ?? throw new CloudApiException("Failed to get sync history");
+    }
+
+    /// <summary>
+    /// Gets detailed information about a specific history entry.
+    /// </summary>
+    /// <param name="historyId">The history entry ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task<Models.SyncHistoryDetailDto> GetSyncHistoryDetailAsync(
+        string historyId,
+        CancellationToken cancellationToken = default)
+    {
+        var url = await GetSyncApiUrlAsync($"history/{historyId}", cancellationToken);
+        var response = await GetAsync<Models.SyncHistoryDetailDto>(url, cancellationToken);
+        return response ?? throw new CloudApiException("Failed to get history details");
+    }
+
+    /// <summary>
+    /// Reverts the project to the state before a specific push.
+    /// </summary>
+    /// <param name="historyId">The history entry ID to revert.</param>
+    /// <param name="message">Optional message describing the revert.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task<Models.RevertResponse> RevertSyncHistoryAsync(
+        string historyId,
+        string? message = null,
+        CancellationToken cancellationToken = default)
+    {
+        var url = await GetSyncApiUrlAsync($"history/{historyId}/revert", cancellationToken);
+        var request = new Models.RevertRequest { Message = message };
+        var response = await PostAsync<Models.RevertResponse>(url, request, cancellationToken);
+        return response ?? throw new CloudApiException("Failed to revert changes");
     }
 
     #endregion
@@ -371,6 +490,92 @@ public class CloudApiClient : IDisposable
 
     #endregion
 
+    #region Snapshot API
+
+    /// <summary>
+    /// Lists all snapshots for the current project.
+    /// </summary>
+    public async Task<SnapshotListResponse> ListSnapshotsAsync(
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var baseUrl = await GetSnapshotApiUrlAsync(cancellationToken: cancellationToken);
+        var url = $"{baseUrl}?page={page}&pageSize={pageSize}";
+        var response = await GetAsync<SnapshotListResponse>(url, cancellationToken);
+        return response ?? new SnapshotListResponse();
+    }
+
+    /// <summary>
+    /// Gets details of a specific snapshot.
+    /// </summary>
+    public async Task<SnapshotDetail?> GetSnapshotAsync(
+        string snapshotId,
+        CancellationToken cancellationToken = default)
+    {
+        var url = await GetSnapshotApiUrlAsync(snapshotId, cancellationToken);
+        var response = await GetAsync<SnapshotDetail>(url, cancellationToken);
+        return response;
+    }
+
+    /// <summary>
+    /// Creates a new manual snapshot.
+    /// </summary>
+    public async Task<CloudSnapshot> CreateSnapshotAsync(
+        string? description = null,
+        CancellationToken cancellationToken = default)
+    {
+        var url = await GetSnapshotApiUrlAsync(cancellationToken: cancellationToken);
+        var request = new CreateSnapshotApiRequest { Description = description };
+        var response = await PostAsync<CloudSnapshot>(url, request, cancellationToken);
+        return response ?? throw new CloudApiException("Failed to create snapshot");
+    }
+
+    /// <summary>
+    /// Restores from a snapshot.
+    /// </summary>
+    public async Task<CloudSnapshot> RestoreSnapshotAsync(
+        string snapshotId,
+        bool createBackup = true,
+        string? message = null,
+        CancellationToken cancellationToken = default)
+    {
+        var url = await GetSnapshotApiUrlAsync($"{snapshotId}/restore", cancellationToken);
+        var request = new RestoreSnapshotApiRequest
+        {
+            CreateBackup = createBackup,
+            Message = message
+        };
+        var response = await PostAsync<CloudSnapshot>(url, request, cancellationToken);
+        return response ?? throw new CloudApiException("Failed to restore snapshot");
+    }
+
+    /// <summary>
+    /// Deletes a snapshot.
+    /// </summary>
+    public async Task DeleteSnapshotAsync(
+        string snapshotId,
+        CancellationToken cancellationToken = default)
+    {
+        var url = await GetSnapshotApiUrlAsync(snapshotId, cancellationToken);
+        await DeleteAsync(url, cancellationToken);
+    }
+
+    /// <summary>
+    /// Compares two snapshots.
+    /// </summary>
+    public async Task<SnapshotDiff?> DiffSnapshotsAsync(
+        string fromSnapshotId,
+        string toSnapshotId,
+        CancellationToken cancellationToken = default)
+    {
+        var url = await GetSnapshotApiUrlAsync($"{fromSnapshotId}/diff/{toSnapshotId}", cancellationToken);
+        var response = await GetAsync<SnapshotDiff>(url, cancellationToken);
+        return response;
+    }
+
+    #endregion
+
     #region HTTP Helpers
 
     private async Task<T?> GetAsync<T>(string url, CancellationToken cancellationToken)
@@ -432,6 +637,26 @@ public class CloudApiClient : IDisposable
             await EnsureSuccessAsync(response, cancellationToken);
             var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<T>>(_jsonOptions, cancellationToken);
             return apiResponse != null ? apiResponse.Data : default;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new CloudApiException($"HTTP request failed: {ex.Message}", ex);
+        }
+    }
+
+    private async Task DeleteAsync(string url, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _httpClient.DeleteAsync(url, cancellationToken);
+
+            // Try to refresh token and retry once on 401
+            if (!response.IsSuccessStatusCode && await ShouldRetryAfterTokenRefreshAsync(response, cancellationToken))
+            {
+                response = await _httpClient.DeleteAsync(url, cancellationToken);
+            }
+
+            await EnsureSuccessAsync(response, cancellationToken);
         }
         catch (HttpRequestException ex)
         {
@@ -730,6 +955,96 @@ public class CloudOrganization
 public class RefreshTokenRequest
 {
     public string RefreshToken { get; set; } = string.Empty;
+}
+
+#endregion
+
+#region Snapshot Models
+
+/// <summary>
+/// Represents a cloud snapshot.
+/// </summary>
+public class CloudSnapshot
+{
+    public int Id { get; set; }
+    public string SnapshotId { get; set; } = string.Empty;
+    public int ProjectId { get; set; }
+    public string? Description { get; set; }
+    public string SnapshotType { get; set; } = string.Empty;
+    public int FileCount { get; set; }
+    public int KeyCount { get; set; }
+    public int TranslationCount { get; set; }
+    public int? CreatedByUserId { get; set; }
+    public string? CreatedByUsername { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Snapshot details including file list.
+/// </summary>
+public class SnapshotDetail : CloudSnapshot
+{
+    public List<SnapshotFile> Files { get; set; } = new();
+}
+
+/// <summary>
+/// File within a snapshot.
+/// </summary>
+public class SnapshotFile
+{
+    public string Path { get; set; } = string.Empty;
+    public string LanguageCode { get; set; } = string.Empty;
+    public long Size { get; set; }
+}
+
+/// <summary>
+/// Response from listing snapshots (paginated).
+/// </summary>
+public class SnapshotListResponse
+{
+    public List<CloudSnapshot> Items { get; set; } = new();
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public int TotalCount { get; set; }
+}
+
+/// <summary>
+/// Request to create a snapshot.
+/// </summary>
+public class CreateSnapshotApiRequest
+{
+    public string? Description { get; set; }
+}
+
+/// <summary>
+/// Request to restore a snapshot.
+/// </summary>
+public class RestoreSnapshotApiRequest
+{
+    public bool CreateBackup { get; set; } = true;
+    public string? Message { get; set; }
+}
+
+/// <summary>
+/// Diff between two snapshots.
+/// </summary>
+public class SnapshotDiff
+{
+    public string FromSnapshotId { get; set; } = string.Empty;
+    public string ToSnapshotId { get; set; } = string.Empty;
+    public List<SnapshotDiffFile> Files { get; set; } = new();
+    public int KeysAdded { get; set; }
+    public int KeysRemoved { get; set; }
+    public int KeysModified { get; set; }
+}
+
+/// <summary>
+/// File difference in a snapshot comparison.
+/// </summary>
+public class SnapshotDiffFile
+{
+    public string Path { get; set; } = string.Empty;
+    public string ChangeType { get; set; } = string.Empty;
 }
 
 #endregion

@@ -440,14 +440,31 @@ public class CloneCommand : Command<CloneCommandSettings>
         AnsiConsole.MarkupLine("[blue]Pulling resources...[/]");
         AnsiConsole.WriteLine();
 
-        // Fetch resources from remote using V2 pull API
-        PullResponse? pullResponse = null;
+        // Load or create configuration
+        var config = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(targetDirectory, ct).GetAwaiter().GetResult()
+            ?? new Core.Configuration.ConfigurationModel();
+
+        // Get backend for the format
+        var backendFactory = new Core.Backends.ResourceBackendFactory();
+        Core.Abstractions.IResourceBackend backend;
+        try
+        {
+            backend = backendFactory.GetBackend(remoteProject.Format, config);
+        }
+        catch (NotSupportedException)
+        {
+            AnsiConsole.MarkupLine($"[red]✗ Unsupported format: {remoteProject.Format}[/]");
+            return 1;
+        }
+
+        // Fetch resources from remote using key-level sync API
+        KeySyncPullResponse? pullResponse = null;
         try
         {
             AnsiConsole.Status()
                 .Start("Fetching resources...", ctx =>
                 {
-                    pullResponse = apiClient.PullResourcesAsync(includeUnapproved: false, ct).GetAwaiter().GetResult();
+                    pullResponse = apiClient.KeySyncPullAsync(cancellationToken: ct).GetAwaiter().GetResult();
                 });
         }
         catch (CloudApiException ex)
@@ -456,46 +473,71 @@ public class CloneCommand : Command<CloneCommandSettings>
             return 1;
         }
 
-        if (pullResponse == null || pullResponse.Files.Count == 0)
+        if (pullResponse == null || pullResponse.Entries.Count == 0)
         {
             AnsiConsole.MarkupLine("[dim]No resources to pull (project is empty)[/]");
             DisplaySuccessMessage(targetDirectory, remoteUrl);
             return 0;
         }
 
-        // Write each resource file
-        var pullCount = 0;
-        foreach (var file in pullResponse.Files)
+        AnsiConsole.MarkupLine($"[dim]Found {pullResponse.Total} entries[/]");
+
+        // Convert entries to MergedEntry format for FileRegenerator
+        var merger = new KeyLevelMerger();
+        var mergeResult = merger.MergeForFirstPull(pullResponse.Entries);
+
+        if (mergeResult.ToWrite.Count == 0)
         {
-            var fileName = file.Path;
-            var filePath = System.IO.Path.Combine(targetDirectory, fileName);
-
-            try
-            {
-                // Ensure directory exists
-                var fileDir = System.IO.Path.GetDirectoryName(filePath);
-                if (!string.IsNullOrEmpty(fileDir) && !Directory.Exists(fileDir))
-                {
-                    Directory.CreateDirectory(fileDir);
-                }
-
-                File.WriteAllText(filePath, file.Content);
-                AnsiConsole.MarkupLine($"[green]✓[/] {fileName.EscapeMarkup()}");
-                pullCount++;
-            }
-            catch (Exception ex)
-            {
-                AnsiConsole.MarkupLine($"[red]✗[/] {fileName.EscapeMarkup()}: {ex.Message.EscapeMarkup()}");
-            }
+            AnsiConsole.MarkupLine("[dim]No resources to write[/]");
+            DisplaySuccessMessage(targetDirectory, remoteUrl);
+            return 0;
         }
 
-        // Pull lrm.json config if available from pull response
-        if (!string.IsNullOrWhiteSpace(pullResponse.Configuration))
+        // Get languages from the entries
+        var languages = mergeResult.ToWrite.Select(e => e.Lang).Distinct()
+            .Select(lang => new Core.Models.LanguageInfo
+            {
+                Code = lang,
+                Name = lang,
+                IsDefault = lang == remoteProject.DefaultLanguage
+            })
+            .ToList();
+
+        // Regenerate files
+        try
+        {
+            AnsiConsole.Status()
+                .Start("Writing resource files...", ctx =>
+                {
+                    var regenerator = new FileRegenerator(backend, targetDirectory);
+                    var regenResult = regenerator.RegenerateFilesAsync(mergeResult.ToWrite, languages, ct).GetAwaiter().GetResult();
+
+                    if (!regenResult.Success)
+                    {
+                        throw new Exception($"Failed to regenerate files: {regenResult.Error}");
+                    }
+
+                    foreach (var (_, finalPath) in regenResult.FilesToMove)
+                    {
+                        AnsiConsole.MarkupLine($"[green]✓[/] {System.IO.Path.GetFileName(finalPath).EscapeMarkup()}");
+                    }
+                });
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]✗ Failed to write files: {ex.Message.EscapeMarkup()}[/]");
+            return 1;
+        }
+
+        // Write config if available from pull response
+        if (pullResponse.Config != null)
         {
             try
             {
                 var configPath = System.IO.Path.Combine(targetDirectory, "lrm.json");
-                File.WriteAllText(configPath, pullResponse.Configuration);
+                var configMerger = new ConfigMerger();
+                var configJson = configMerger.BuildConfigJson(pullResponse.Config);
+                File.WriteAllText(configPath, configJson);
                 AnsiConsole.MarkupLine("[green]✓[/] lrm.json (config)");
             }
             catch (Exception ex)
@@ -504,14 +546,25 @@ public class CloneCommand : Command<CloneCommandSettings>
             }
         }
 
-        // Update sync state
+        // Update sync state with entry-level hashes
         try
         {
             var syncState = new SyncState
             {
+                Version = 2,
                 Timestamp = DateTime.UtcNow,
-                Files = pullResponse.Files.ToDictionary(f => f.Path, f => f.Hash ?? "")
+                Entries = new Dictionary<string, Dictionary<string, string>>()
             };
+
+            foreach (var entry in mergeResult.ToWrite)
+            {
+                if (!syncState.Entries.ContainsKey(entry.Key))
+                {
+                    syncState.Entries[entry.Key] = new Dictionary<string, string>();
+                }
+                syncState.Entries[entry.Key][entry.Lang] = entry.Hash;
+            }
+
             SyncStateManager.SaveAsync(targetDirectory, syncState, ct).GetAwaiter().GetResult();
         }
         catch
@@ -522,7 +575,7 @@ public class CloneCommand : Command<CloneCommandSettings>
         AnsiConsole.WriteLine();
         DisplaySuccessMessage(targetDirectory, remoteUrl);
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[dim]Pulled {pullCount} resource file(s)[/]");
+        AnsiConsole.MarkupLine($"[dim]Pulled {mergeResult.ToWrite.Count} entries across {languages.Count} language(s)[/]");
 
         return 0;
     }

@@ -5,7 +5,9 @@ using Minio.DataModel.Args;
 namespace LrmCloud.Api.Services;
 
 /// <summary>
-/// MinIO implementation of storage service for project files.
+/// MinIO implementation of storage service for snapshot files.
+/// Only stores dbstate.json for each snapshot - resource files are
+/// regenerated from database on demand.
 /// </summary>
 public class MinioStorageService : IStorageService
 {
@@ -23,40 +25,39 @@ public class MinioStorageService : IStorageService
         _logger = logger;
     }
 
-    public async Task UploadFileAsync(int projectId, string filePath, Stream content, string contentType = "application/octet-stream")
+    public async Task UploadSnapshotFileAsync(int projectId, string snapshotId, string fileName, Stream content)
     {
         try
         {
-            var objectName = GetObjectName(projectId, filePath);
+            var objectName = GetSnapshotObjectName(projectId, snapshotId, fileName);
 
             var putArgs = new PutObjectArgs()
                 .WithBucket(_config.Storage.Bucket)
                 .WithObject(objectName)
                 .WithStreamData(content)
                 .WithObjectSize(content.Length)
-                .WithContentType(contentType);
+                .WithContentType("application/json");
 
             await _minioClient.PutObjectAsync(putArgs);
 
-            _logger.LogInformation("Uploaded file {ObjectName} to bucket {Bucket}",
-                objectName, _config.Storage.Bucket);
+            _logger.LogDebug("Uploaded snapshot file {ObjectName}", objectName);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error uploading file {FilePath} for project {ProjectId}",
-                filePath, projectId);
+            _logger.LogError(ex, "Error uploading snapshot file {FileName} for project {ProjectId} snapshot {SnapshotId}",
+                fileName, projectId, snapshotId);
             throw;
         }
     }
 
-    public async Task<Stream?> DownloadFileAsync(int projectId, string filePath)
+    public async Task<Stream?> DownloadSnapshotFileAsync(int projectId, string snapshotId, string fileName)
     {
         try
         {
-            var objectName = GetObjectName(projectId, filePath);
+            var objectName = GetSnapshotObjectName(projectId, snapshotId, fileName);
 
             // Check if file exists first
-            if (!await FileExistsAsync(projectId, filePath))
+            if (!await SnapshotFileExistsAsync(projectId, snapshotId, fileName))
                 return null;
 
             var memoryStream = new MemoryStream();
@@ -68,134 +69,22 @@ public class MinioStorageService : IStorageService
 
             await _minioClient.GetObjectAsync(getArgs);
 
-            memoryStream.Position = 0; // Reset stream position for reading
+            memoryStream.Position = 0;
             return memoryStream;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error downloading file {FilePath} for project {ProjectId}",
-                filePath, projectId);
+            _logger.LogError(ex, "Error downloading snapshot file {FileName} for project {ProjectId} snapshot {SnapshotId}",
+                fileName, projectId, snapshotId);
             throw;
         }
     }
 
-    public async Task DeleteFileAsync(int projectId, string filePath)
+    public async Task<bool> SnapshotFileExistsAsync(int projectId, string snapshotId, string fileName)
     {
         try
         {
-            var objectName = GetObjectName(projectId, filePath);
-
-            var removeArgs = new RemoveObjectArgs()
-                .WithBucket(_config.Storage.Bucket)
-                .WithObject(objectName);
-
-            await _minioClient.RemoveObjectAsync(removeArgs);
-
-            _logger.LogInformation("Deleted file {ObjectName} from bucket {Bucket}",
-                objectName, _config.Storage.Bucket);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting file {FilePath} for project {ProjectId}",
-                filePath, projectId);
-            throw;
-        }
-    }
-
-    public async Task<List<string>> ListFilesAsync(int projectId, string prefix = "")
-    {
-        try
-        {
-            // For empty prefix, just use the project root
-            var objectPrefix = string.IsNullOrEmpty(prefix)
-                ? $"projects/{projectId}/"
-                : GetObjectName(projectId, prefix);
-            var files = new List<string>();
-
-            var listArgs = new ListObjectsArgs()
-                .WithBucket(_config.Storage.Bucket)
-                .WithPrefix(objectPrefix)
-                .WithRecursive(true);
-
-            var observable = _minioClient.ListObjectsEnumAsync(listArgs);
-
-            await foreach (var item in observable)
-            {
-                // Remove project prefix from object name
-                var relativePath = item.Key.Substring($"projects/{projectId}/".Length);
-                files.Add(relativePath);
-            }
-
-            return files;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error listing files for project {ProjectId} with prefix {Prefix}",
-                projectId, prefix);
-            throw;
-        }
-    }
-
-    public async Task DeleteProjectFilesAsync(int projectId)
-    {
-        try
-        {
-            var files = await ListFilesAsync(projectId);
-
-            foreach (var file in files)
-            {
-                await DeleteFileAsync(projectId, file);
-            }
-
-            _logger.LogInformation("Deleted all files for project {ProjectId}", projectId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting all files for project {ProjectId}", projectId);
-            throw;
-        }
-    }
-
-    public async Task CreateSnapshotAsync(int projectId, string syncId)
-    {
-        try
-        {
-            // List all files in current/
-            var currentFiles = await ListFilesAsync(projectId, "current/");
-
-            // Copy each file to snapshots/{syncId}/
-            foreach (var file in currentFiles)
-            {
-                var sourceObjectName = GetObjectName(projectId, file);
-                var destFileName = file.Replace("current/", $"snapshots/{syncId}/");
-                var destObjectName = GetObjectName(projectId, destFileName);
-
-                var copyArgs = new CopyObjectArgs()
-                    .WithBucket(_config.Storage.Bucket)
-                    .WithObject(destObjectName)
-                    .WithCopyObjectSource(new CopySourceObjectArgs()
-                        .WithBucket(_config.Storage.Bucket)
-                        .WithObject(sourceObjectName));
-
-                await _minioClient.CopyObjectAsync(copyArgs);
-            }
-
-            _logger.LogInformation("Created snapshot {SyncId} for project {ProjectId} with {FileCount} files",
-                syncId, projectId, currentFiles.Count);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating snapshot {SyncId} for project {ProjectId}",
-                syncId, projectId);
-            throw;
-        }
-    }
-
-    public async Task<bool> FileExistsAsync(int projectId, string filePath)
-    {
-        try
-        {
-            var objectName = GetObjectName(projectId, filePath);
+            var objectName = GetSnapshotObjectName(projectId, snapshotId, fileName);
 
             var statArgs = new StatObjectArgs()
                 .WithBucket(_config.Storage.Bucket)
@@ -204,120 +93,9 @@ public class MinioStorageService : IStorageService
             await _minioClient.StatObjectAsync(statArgs);
             return true;
         }
-        catch (Exception)
+        catch
         {
-            // StatObjectAsync throws exception if file doesn't exist
             return false;
-        }
-    }
-
-    /// <summary>
-    /// Constructs the full object name for MinIO storage.
-    /// Format: projects/{projectId}/{filePath}
-    /// Security: Validates against path traversal attacks.
-    /// </summary>
-    private static string GetObjectName(int projectId, string filePath)
-    {
-        if (string.IsNullOrWhiteSpace(filePath))
-        {
-            throw new ArgumentException("File path cannot be empty", nameof(filePath));
-        }
-
-        // Security: Decode URL-encoded characters to catch double-encoding attacks
-        // e.g., %252e%252e -> %2e%2e -> .. (path traversal attempt)
-        var decodedPath = Uri.UnescapeDataString(filePath);
-
-        // Keep decoding until no more changes (handles triple+ encoding)
-        while (decodedPath != filePath)
-        {
-            filePath = decodedPath;
-            decodedPath = Uri.UnescapeDataString(filePath);
-        }
-
-        // Normalize path separators (handle both Windows and Unix paths)
-        filePath = filePath.Replace('\\', '/');
-
-        // Remove leading slash if present
-        filePath = filePath.TrimStart('/');
-
-        // Build the full path
-        var fullPath = $"projects/{projectId}/{filePath}";
-
-        // Split into segments and validate each one
-        var segments = fullPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-
-        // Security: Check for path traversal in ALL segments
-        foreach (var segment in segments)
-        {
-            if (segment == ".." || segment == ".")
-            {
-                throw new ArgumentException("Invalid file path: path traversal not allowed", nameof(filePath));
-            }
-
-            // Check for null bytes or other suspicious characters
-            if (segment.Contains('\0'))
-            {
-                throw new ArgumentException("Invalid file path: null bytes not allowed", nameof(filePath));
-            }
-
-            // Check for URL-encoded sequences that shouldn't be in final path
-            if (segment.Contains('%'))
-            {
-                throw new ArgumentException("Invalid file path: encoded characters not allowed", nameof(filePath));
-            }
-        }
-
-        // Rebuild the clean path from validated segments
-        return string.Join("/", segments);
-    }
-
-    public async Task<List<string>> ListSnapshotFilesAsync(int projectId, string snapshotId)
-    {
-        return await ListFilesAsync(projectId, $"snapshots/{snapshotId}/");
-    }
-
-    public async Task<Stream?> DownloadSnapshotFileAsync(int projectId, string snapshotId, string fileName)
-    {
-        return await DownloadFileAsync(projectId, $"snapshots/{snapshotId}/{fileName}");
-    }
-
-    public async Task RestoreFromSnapshotAsync(int projectId, string snapshotId)
-    {
-        try
-        {
-            // First, delete all current files
-            var currentFiles = await ListFilesAsync(projectId, "current/");
-            foreach (var file in currentFiles)
-            {
-                await DeleteFileAsync(projectId, file);
-            }
-
-            // Then copy all files from snapshot to current
-            var snapshotFiles = await ListSnapshotFilesAsync(projectId, snapshotId);
-            foreach (var file in snapshotFiles)
-            {
-                var sourceObjectName = GetObjectName(projectId, file);
-                var destFileName = file.Replace($"snapshots/{snapshotId}/", "current/");
-                var destObjectName = GetObjectName(projectId, destFileName);
-
-                var copyArgs = new CopyObjectArgs()
-                    .WithBucket(_config.Storage.Bucket)
-                    .WithObject(destObjectName)
-                    .WithCopyObjectSource(new CopySourceObjectArgs()
-                        .WithBucket(_config.Storage.Bucket)
-                        .WithObject(sourceObjectName));
-
-                await _minioClient.CopyObjectAsync(copyArgs);
-            }
-
-            _logger.LogInformation("Restored snapshot {SnapshotId} for project {ProjectId} with {FileCount} files",
-                snapshotId, projectId, snapshotFiles.Count);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error restoring snapshot {SnapshotId} for project {ProjectId}",
-                snapshotId, projectId);
-            throw;
         }
     }
 
@@ -325,14 +103,20 @@ public class MinioStorageService : IStorageService
     {
         try
         {
-            var snapshotFiles = await ListSnapshotFilesAsync(projectId, snapshotId);
-            foreach (var file in snapshotFiles)
+            var prefix = $"projects/{projectId}/snapshots/{snapshotId}/";
+            var files = await ListFilesWithPrefixAsync(prefix);
+
+            foreach (var file in files)
             {
-                await DeleteFileAsync(projectId, file);
+                var removeArgs = new RemoveObjectArgs()
+                    .WithBucket(_config.Storage.Bucket)
+                    .WithObject(file);
+
+                await _minioClient.RemoveObjectAsync(removeArgs);
             }
 
-            _logger.LogInformation("Deleted snapshot {SnapshotId} for project {ProjectId} with {FileCount} files",
-                snapshotId, projectId, snapshotFiles.Count);
+            _logger.LogInformation("Deleted snapshot {SnapshotId} for project {ProjectId} ({FileCount} files)",
+                snapshotId, projectId, files.Count);
         }
         catch (Exception ex)
         {
@@ -342,30 +126,28 @@ public class MinioStorageService : IStorageService
         }
     }
 
-    public async Task<long> GetProjectStorageSizeAsync(int projectId)
+    public async Task DeleteProjectFilesAsync(int projectId)
     {
         try
         {
-            var objectPrefix = $"projects/{projectId}/";
-            long totalSize = 0;
+            var prefix = $"projects/{projectId}/";
+            var files = await ListFilesWithPrefixAsync(prefix);
 
-            var listArgs = new ListObjectsArgs()
-                .WithBucket(_config.Storage.Bucket)
-                .WithPrefix(objectPrefix)
-                .WithRecursive(true);
-
-            var observable = _minioClient.ListObjectsEnumAsync(listArgs);
-
-            await foreach (var item in observable)
+            foreach (var file in files)
             {
-                totalSize += (long)item.Size;
+                var removeArgs = new RemoveObjectArgs()
+                    .WithBucket(_config.Storage.Bucket)
+                    .WithObject(file);
+
+                await _minioClient.RemoveObjectAsync(removeArgs);
             }
 
-            return totalSize;
+            _logger.LogInformation("Deleted all files for project {ProjectId} ({FileCount} files)",
+                projectId, files.Count);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting storage size for project {ProjectId}", projectId);
+            _logger.LogError(ex, "Error deleting all files for project {ProjectId}", projectId);
             throw;
         }
     }
@@ -373,10 +155,79 @@ public class MinioStorageService : IStorageService
     public async Task<long> GetTotalStorageSizeAsync(IEnumerable<int> projectIds)
     {
         long totalSize = 0;
+
         foreach (var projectId in projectIds)
         {
-            totalSize += await GetProjectStorageSizeAsync(projectId);
+            try
+            {
+                var prefix = $"projects/{projectId}/";
+                var listArgs = new ListObjectsArgs()
+                    .WithBucket(_config.Storage.Bucket)
+                    .WithPrefix(prefix)
+                    .WithRecursive(true);
+
+                var observable = _minioClient.ListObjectsEnumAsync(listArgs);
+
+                await foreach (var item in observable)
+                {
+                    totalSize += (long)item.Size;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error getting storage size for project {ProjectId}", projectId);
+            }
         }
+
         return totalSize;
+    }
+
+    /// <summary>
+    /// Constructs the object name for a snapshot file.
+    /// Format: projects/{projectId}/snapshots/{snapshotId}/{fileName}
+    /// </summary>
+    private static string GetSnapshotObjectName(int projectId, string snapshotId, string fileName)
+    {
+        ValidatePathComponent(snapshotId, nameof(snapshotId));
+        ValidatePathComponent(fileName, nameof(fileName));
+
+        return $"projects/{projectId}/snapshots/{snapshotId}/{fileName}";
+    }
+
+    /// <summary>
+    /// Validates a path component to prevent path traversal attacks.
+    /// </summary>
+    private static void ValidatePathComponent(string value, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException("Value cannot be empty", paramName);
+
+        if (value.Contains("..") || value.Contains('/') || value.Contains('\\'))
+            throw new ArgumentException("Invalid path component", paramName);
+
+        if (value.Contains('\0') || value.Contains('%'))
+            throw new ArgumentException("Invalid characters in path", paramName);
+    }
+
+    /// <summary>
+    /// Lists all files with a given prefix.
+    /// </summary>
+    private async Task<List<string>> ListFilesWithPrefixAsync(string prefix)
+    {
+        var files = new List<string>();
+
+        var listArgs = new ListObjectsArgs()
+            .WithBucket(_config.Storage.Bucket)
+            .WithPrefix(prefix)
+            .WithRecursive(true);
+
+        var observable = _minioClient.ListObjectsEnumAsync(listArgs);
+
+        await foreach (var item in observable)
+        {
+            files.Add(item.Key);
+        }
+
+        return files;
     }
 }

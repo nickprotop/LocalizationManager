@@ -114,24 +114,14 @@ public interface IResourceService
     Task<List<ResourceDto>> GetResourcesAsync(int projectId, string? languageCode, int userId);
 
     // ============================================================
-    // CLI Sync Operations (File-Based)
+    // Batch Save with History
     // ============================================================
 
     /// <summary>
-    /// Pushes files to cloud with incremental changes.
-    /// Stores files to S3 and parses them to database using Core's backends.
+    /// Batch saves multiple changes with sync history recording.
+    /// Used by the Blazor web editor to save changes with audit trail.
     /// </summary>
-    Task<(bool Success, PushResponse? Response, string? ErrorMessage)> PushResourcesAsync(
-        int projectId, int userId, PushRequest request);
+    Task<BatchSaveResponse> BatchSaveWithHistoryAsync(
+        int projectId, int userId, BatchSaveRequest request);
 
-    /// <summary>
-    /// Pulls files from cloud - generates files from database.
-    /// Generates files from database using Core's backends.
-    /// </summary>
-    /// <param name="projectId">Project ID</param>
-    /// <param name="userId">User ID for permission check</param>
-    /// <param name="includeUnapproved">If true, include all translations regardless of workflow status.
-    /// If false (default), only include approved translations when workflow is enabled and requires approval.</param>
-    Task<(bool Success, PullResponse? Response, string? ErrorMessage)> PullResourcesAsync(
-        int projectId, int userId, bool includeUnapproved = false);
 }

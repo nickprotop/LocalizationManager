@@ -74,7 +74,10 @@ public class Snapshot
     public int TranslationCount { get; set; }
 
     /// <summary>
-    /// Type of snapshot: "push", "manual", "restore", "auto".
+    /// Type of snapshot: "manual", "restore", "pre-restore".
+    /// - "manual": User-initiated backup via UI or CLI
+    /// - "restore": Created when restoring another snapshot
+    /// - "pre-restore": Auto-created before a restore operation
     /// </summary>
     [Required]
     [MaxLength(20)]

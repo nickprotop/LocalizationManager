@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace LocalizationManager.Core.Configuration;
 
 /// <summary>
@@ -38,6 +40,7 @@ public class ConfigurationModel
     /// Used to specify which backend to use for resource file operations.
     /// If not set, auto-detects based on existing files in the resource path.
     /// </summary>
+    [JsonPropertyName("format")]
     public string? ResourceFormat { get; set; }
 
     /// <summary>

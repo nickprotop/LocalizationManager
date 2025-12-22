@@ -825,35 +825,97 @@
                 </div>
 
                 <h2 id="cli-sync">CLI Sync</h2>
-                <p>Sync your local resource files with LRM Cloud using the CLI.</p>
+                <p>Sync your local resource files with LRM Cloud using the CLI. The sync system is <strong>entry-based</strong>, not file-based like Git.</p>
+
+                <h3>How Sync Works</h3>
+                <p>LRM Cloud sync differs from Git in important ways:</p>
+                <table>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Git</th>
+                        <th>LRM Cloud</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Storage</strong></td>
+                        <td>Files with line diffs</td>
+                        <td>Database entries per translation</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Merge</strong></td>
+                        <td>3-way line merge</td>
+                        <td>File replacement (choose one)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Push</strong></td>
+                        <td>Commits with diffs</td>
+                        <td>Incremental (only changed files)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Pull</strong></td>
+                        <td>Fetch deltas</td>
+                        <td>Complete file snapshot</td>
+                    </tr>
+                </table>
+
+                <div class="info-box">
+                    <div class="info-box-title">Why Entry-Based?</div>
+                    <p>Files are parsed into individual translation entries on the server. This enables web editing, review workflows (pending → translated → reviewed → approved), translation memory, and filtered exports.</p>
+                </div>
 
                 <h3>Installation</h3>
                 <p>Download the CLI from <a href="https://github.com/nickprotop/LocalizationManager/releases" target="_blank">GitHub Releases</a> or install via package manager.</p>
 
+                <h3>Quick Start: Clone</h3>
+                <pre><code># Clone a cloud project (like git clone)
+lrm cloud clone https://lrm-cloud.com/@username/my-project
+
+# Clone into a specific directory
+lrm cloud clone https://lrm-cloud.com/org/project ./my-dir</code></pre>
+
                 <h3>Authentication</h3>
-                <pre><code># Log in to LRM Cloud
+                <pre><code># Interactive login (opens browser)
 lrm cloud login
 
-# This will open your browser for authentication</code></pre>
+# Or use API key (recommended for CI/CD)
+lrm cloud set-api-key lrm_your_api_key_here
+
+# Or via environment variable
+export LRM_CLOUD_API_KEY=lrm_your_api_key_here</code></pre>
 
                 <h3>Push & Pull</h3>
                 <pre><code># Push local changes to cloud
-lrm cloud push --project my-project
+lrm cloud push
+
+# Preview changes before pushing
+lrm cloud push --dry-run
 
 # Pull cloud changes to local
-lrm cloud pull --project my-project
+lrm cloud pull
 
-# Two-way sync (merge changes)
-lrm cloud sync --project my-project</code></pre>
+# Accept all remote changes (no prompts)
+lrm cloud pull --strategy remote</code></pre>
 
-                <h3>Project Configuration</h3>
-                <p>Add to your <code>lrm.json</code>:</p>
-                <pre><code>{
-  "cloud": {
-    "project": "my-project",
-    "autoSync": false
-  }
-}</code></pre>
+                <h3>Conflict Resolution</h3>
+                <p>When both local and remote have changed, you choose which version to keep:</p>
+                <ul>
+                    <li><code>--strategy local</code> - Keep local version</li>
+                    <li><code>--strategy remote</code> - Accept remote version (recommended for teams)</li>
+                    <li><code>--strategy prompt</code> - Choose per file (default)</li>
+                    <li><code>--strategy abort</code> - Stop if conflicts exist</li>
+                </ul>
+
+                <h3>Backup System</h3>
+                <p>LRM automatically creates backups before pull operations:</p>
+                <ul>
+                    <li>Stored in <code>.lrm/pull-backups/</code></li>
+                    <li>Keeps 10 most recent backups</li>
+                    <li>Restore manually: <code>unzip .lrm/pull-backups/backup.zip -d .</code></li>
+                </ul>
+
+                <div class="info-box">
+                    <div class="info-box-title">Full Documentation</div>
+                    <p>See the <a href="https://github.com/nickprotop/LocalizationManager/blob/main/docs/CLOUD_SYNC.md" target="_blank">Cloud Sync Guide</a> for complete CLI documentation.</p>
+                </div>
 
                 <h2 id="teams">Teams & Organizations</h2>
                 <p>Organizations allow team collaboration on localization projects (Team and Enterprise plans).</p>

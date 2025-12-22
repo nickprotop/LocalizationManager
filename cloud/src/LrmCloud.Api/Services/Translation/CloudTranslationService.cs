@@ -141,8 +141,13 @@ public class CloudTranslationService : ICloudTranslationService
 
             response.Provider = providerName;
 
-            // Get source language
+            // Get source language for translation API (the actual language code like "en")
             var sourceLanguage = request.SourceLanguage ?? project.DefaultLanguage;
+
+            // Get source language code for database lookup
+            // RESX/Android/iOS store default language translations with LanguageCode = ""
+            // JSON/i18next store with actual language code
+            var sourceLanguageDbCode = GetSourceLanguageDbCode(project, sourceLanguage);
 
             // Pre-fetch glossary entries for all target languages (only for AI providers)
             var glossaryContextByLang = new Dictionary<string, string>();
@@ -208,8 +213,10 @@ public class CloudTranslationService : ICloudTranslationService
                     }
                     else
                     {
+                        // Look up source translation using the database language code
+                        // (empty string for RESX/Android/iOS default language, actual code for JSON/i18next)
                         var sourceTranslation = key.Translations
-                            .FirstOrDefault(t => t.LanguageCode == sourceLanguage && t.PluralForm == pluralForm);
+                            .FirstOrDefault(t => t.LanguageCode == sourceLanguageDbCode && t.PluralForm == pluralForm);
                         sourceText = sourceTranslation?.Value;
                     }
 
@@ -1175,6 +1182,32 @@ public class CloudTranslationService : ICloudTranslationService
 
     private static bool IsAiProvider(string provider) =>
         provider is "openai" or "claude" or "azureopenai" or "ollama";
+
+    /// <summary>
+    /// Gets the language code used in database for the source language.
+    /// RESX/Android/iOS formats store default language translations with LanguageCode = "".
+    /// JSON/i18next formats store with actual language code (e.g., "en").
+    /// </summary>
+    private static string GetSourceLanguageDbCode(Project project, string sourceLanguage)
+    {
+        var format = project.Format?.ToLowerInvariant();
+
+        // JSON and i18next store actual language codes
+        if (format is "json" or "jsonlocalization" or "i18next")
+        {
+            return sourceLanguage;
+        }
+
+        // RESX, Android, iOS store default language as empty string
+        // If sourceLanguage matches project's default, use "" for DB lookup
+        if (string.Equals(sourceLanguage, project.DefaultLanguage, StringComparison.OrdinalIgnoreCase))
+        {
+            return "";
+        }
+
+        // Non-default language - use the actual code
+        return sourceLanguage;
+    }
 
     private static string? GetProviderDescription(string provider) => provider switch
     {

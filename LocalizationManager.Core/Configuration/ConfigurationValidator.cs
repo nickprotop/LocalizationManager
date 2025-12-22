@@ -56,7 +56,7 @@ public class ConfigurationValidator
         }
 
         var format = config.ResourceFormat.ToLowerInvariant();
-        var validFormats = new[] { "resx", "json", "android", "ios" };
+        var validFormats = new[] { "resx", "json", "jsonlocalization", "i18next", "android", "ios" };
         if (!validFormats.Contains(format))
         {
             result.AddError($"Invalid ResourceFormat: '{config.ResourceFormat}'. Must be one of: {string.Join(", ", validFormats)}.");

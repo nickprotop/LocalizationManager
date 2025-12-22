@@ -11,6 +11,8 @@ namespace LrmCloud.Api.Services;
 
 /// <summary>
 /// Service for managing project snapshots (point-in-time backups).
+/// Snapshots store database state (dbstate.json) in MinIO for restore capability.
+/// Resource files are NOT stored - they can be regenerated from the database.
 /// </summary>
 public class SnapshotService
 {
@@ -41,7 +43,7 @@ public class SnapshotService
 
     /// <summary>
     /// Creates a new snapshot of the current project state.
-    /// Includes both file storage and database state.
+    /// Stores database state as dbstate.json in MinIO.
     /// </summary>
     public async Task<Snapshot> CreateSnapshotAsync(
         int projectId,
@@ -76,15 +78,15 @@ public class SnapshotService
         var snapshotId = GenerateSnapshotId();
         var storagePath = $"snapshots/{snapshotId}/";
 
-        // Create snapshot in MinIO storage (files)
-        await _storageService.CreateSnapshotAsync(projectId, snapshotId);
-
-        // Get file count from storage
-        var files = await _storageService.ListSnapshotFilesAsync(projectId, snapshotId);
-
-        // Get database state and save as JSON in snapshot
+        // Create database state and save to MinIO
         var dbState = await CreateDbStateAsync(projectId, snapshotId);
         await SaveDbStateToSnapshotAsync(projectId, snapshotId, dbState);
+
+        // Get language count from translations
+        var languageCodes = dbState.Keys
+            .SelectMany(k => k.Translations.Select(t => t.LanguageCode))
+            .Distinct()
+            .ToList();
 
         // Create snapshot record
         var snapshot = new Snapshot
@@ -94,7 +96,7 @@ public class SnapshotService
             CreatedByUserId = userId,
             Description = description,
             StoragePath = storagePath,
-            FileCount = files.Count,
+            FileCount = languageCodes.Count, // Number of languages (conceptual files)
             KeyCount = dbState.Keys.Count,
             TranslationCount = dbState.Keys.Sum(k => k.Translations.Count),
             SnapshotType = snapshotType,
@@ -161,7 +163,7 @@ public class SnapshotService
         });
         var bytes = Encoding.UTF8.GetBytes(json);
         using var stream = new MemoryStream(bytes);
-        await _storageService.UploadFileAsync(projectId, $"snapshots/{snapshotId}/dbstate.json", stream, "application/json");
+        await _storageService.UploadSnapshotFileAsync(projectId, snapshotId, "dbstate.json", stream);
     }
 
     /// <summary>
@@ -221,7 +223,7 @@ public class SnapshotService
     }
 
     /// <summary>
-    /// Gets a snapshot with its file list.
+    /// Gets a snapshot with its details.
     /// </summary>
     public async Task<SnapshotDetailDto?> GetSnapshotAsync(int projectId, string snapshotId)
     {
@@ -232,17 +234,20 @@ public class SnapshotService
         if (snapshot == null)
             return null;
 
-        // Get files from storage
-        var storedFiles = await _storageService.ListSnapshotFilesAsync(projectId, snapshotId);
-        var files = storedFiles.Select(f =>
+        // Load dbstate to get language info
+        var dbState = await LoadDbStateFromSnapshotAsync(projectId, snapshotId);
+        var languages = dbState?.Keys
+            .SelectMany(k => k.Translations.Select(t => t.LanguageCode))
+            .Distinct()
+            .OrderBy(l => l)
+            .ToList() ?? new List<string>();
+
+        // Create file list from languages (conceptual - files can be regenerated)
+        var files = languages.Select(lang => new SnapshotFileDto
         {
-            var fileName = f.Replace($"snapshots/{snapshotId}/", "");
-            return new SnapshotFileDto
-            {
-                Path = fileName,
-                LanguageCode = ExtractLanguageCode(fileName),
-                Size = 0 // Size would require additional API call
-            };
+            Path = lang,
+            LanguageCode = lang,
+            Size = 0
         }).ToList();
 
         return new SnapshotDetailDto
@@ -264,7 +269,7 @@ public class SnapshotService
 
     /// <summary>
     /// Restores a project from a snapshot.
-    /// Restores both files and database state.
+    /// Restores database state from dbstate.json.
     /// </summary>
     public async Task<Snapshot?> RestoreSnapshotAsync(
         int projectId,
@@ -286,9 +291,6 @@ public class SnapshotService
                 $"Backup before restore to {snapshotId}");
         }
 
-        // Restore files from snapshot
-        await _storageService.RestoreFromSnapshotAsync(projectId, snapshotId);
-
         // Restore database state from snapshot
         var dbState = await LoadDbStateFromSnapshotAsync(projectId, snapshotId);
         if (dbState != null)
@@ -299,7 +301,8 @@ public class SnapshotService
         }
         else
         {
-            _logger.LogWarning("No database state found in snapshot {SnapshotId} - only files were restored", snapshotId);
+            _logger.LogWarning("No database state found in snapshot {SnapshotId}", snapshotId);
+            throw new InvalidOperationException($"Snapshot {snapshotId} has no database state");
         }
 
         _logger.LogInformation("Restored snapshot {SnapshotId} for project {ProjectId} by user {UserId}",
@@ -408,7 +411,7 @@ public class SnapshotService
     }
 
     /// <summary>
-    /// Compares two snapshots.
+    /// Compares two snapshots using their database states.
     /// </summary>
     public async Task<SnapshotDiffDto?> DiffSnapshotsAsync(
         int projectId,
@@ -424,45 +427,57 @@ public class SnapshotService
         if (fromSnapshot == null || toSnapshot == null)
             return null;
 
-        // Get files from both snapshots
-        var fromFiles = await _storageService.ListSnapshotFilesAsync(projectId, fromSnapshotId);
-        var toFiles = await _storageService.ListSnapshotFilesAsync(projectId, toSnapshotId);
+        // Load database states
+        var fromState = await LoadDbStateFromSnapshotAsync(projectId, fromSnapshotId);
+        var toState = await LoadDbStateFromSnapshotAsync(projectId, toSnapshotId);
 
-        var fromFileNames = fromFiles.Select(f => f.Replace($"snapshots/{fromSnapshotId}/", "")).ToHashSet();
-        var toFileNames = toFiles.Select(f => f.Replace($"snapshots/{toSnapshotId}/", "")).ToHashSet();
+        if (fromState == null || toState == null)
+            return null;
+
+        // Compare keys
+        var fromKeys = fromState.Keys.Select(k => k.KeyName).ToHashSet();
+        var toKeys = toState.Keys.Select(k => k.KeyName).ToHashSet();
+
+        var addedKeys = toKeys.Except(fromKeys).ToList();
+        var removedKeys = fromKeys.Except(toKeys).ToList();
+        var commonKeys = fromKeys.Intersect(toKeys).ToList();
+
+        // Count modified keys (same key name but different content)
+        var modifiedCount = 0;
+        foreach (var keyName in commonKeys)
+        {
+            var fromKey = fromState.Keys.First(k => k.KeyName == keyName);
+            var toKey = toState.Keys.First(k => k.KeyName == keyName);
+
+            // Compare translations
+            var fromTranslations = fromKey.Translations
+                .ToDictionary(t => t.LanguageCode, t => t.Value);
+            var toTranslations = toKey.Translations
+                .ToDictionary(t => t.LanguageCode, t => t.Value);
+
+            if (!fromTranslations.SequenceEqual(toTranslations))
+                modifiedCount++;
+        }
+
+        // Create conceptual file diff based on languages
+        var fromLanguages = fromState.Keys.SelectMany(k => k.Translations.Select(t => t.LanguageCode)).Distinct().ToHashSet();
+        var toLanguages = toState.Keys.SelectMany(k => k.Translations.Select(t => t.LanguageCode)).Distinct().ToHashSet();
 
         var diffFiles = new List<SnapshotDiffFileDto>();
 
-        // Added files (in toSnapshot but not in fromSnapshot)
-        foreach (var file in toFileNames.Except(fromFileNames))
+        foreach (var lang in toLanguages.Except(fromLanguages))
         {
-            diffFiles.Add(new SnapshotDiffFileDto
-            {
-                Path = file,
-                ChangeType = "added"
-            });
+            diffFiles.Add(new SnapshotDiffFileDto { Path = lang, ChangeType = "added" });
         }
 
-        // Removed files (in fromSnapshot but not in toSnapshot)
-        foreach (var file in fromFileNames.Except(toFileNames))
+        foreach (var lang in fromLanguages.Except(toLanguages))
         {
-            diffFiles.Add(new SnapshotDiffFileDto
-            {
-                Path = file,
-                ChangeType = "removed"
-            });
+            diffFiles.Add(new SnapshotDiffFileDto { Path = lang, ChangeType = "removed" });
         }
 
-        // Modified files (in both, need to compare content)
-        foreach (var file in fromFileNames.Intersect(toFileNames))
+        foreach (var lang in fromLanguages.Intersect(toLanguages))
         {
-            // For now, mark all common files as potentially modified
-            // Full content comparison would be expensive
-            diffFiles.Add(new SnapshotDiffFileDto
-            {
-                Path = file,
-                ChangeType = "modified"
-            });
+            diffFiles.Add(new SnapshotDiffFileDto { Path = lang, ChangeType = "modified" });
         }
 
         return new SnapshotDiffDto
@@ -470,11 +485,9 @@ public class SnapshotService
             FromSnapshotId = fromSnapshotId,
             ToSnapshotId = toSnapshotId,
             Files = diffFiles,
-            KeysAdded = toSnapshot.KeyCount - fromSnapshot.KeyCount > 0
-                ? toSnapshot.KeyCount - fromSnapshot.KeyCount : 0,
-            KeysRemoved = fromSnapshot.KeyCount - toSnapshot.KeyCount > 0
-                ? fromSnapshot.KeyCount - toSnapshot.KeyCount : 0,
-            KeysModified = 0 // Would require detailed comparison
+            KeysAdded = addedKeys.Count,
+            KeysRemoved = removedKeys.Count,
+            KeysModified = modifiedCount
         };
     }
 
@@ -558,20 +571,5 @@ public class SnapshotService
             LastSnapshotAt = latestSnapshotDate,
             LastChangeAt = latestChangeDate
         };
-    }
-
-    /// <summary>
-    /// Extracts language code from filename.
-    /// </summary>
-    private static string ExtractLanguageCode(string fileName)
-    {
-        // Handle patterns like: strings.json, strings.de.json, de.json
-        var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
-        var parts = nameWithoutExt.Split('.');
-
-        if (parts.Length > 1)
-            return parts[^1];
-
-        return parts[0];
     }
 }

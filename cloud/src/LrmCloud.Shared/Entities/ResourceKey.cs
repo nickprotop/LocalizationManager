@@ -36,6 +36,14 @@ public class ResourceKey
     public string? Comment { get; set; }
 
     /// <summary>
+    /// SHA256 hash of the key metadata (keyName + comment + isPlural).
+    /// Used for key-level change detection.
+    /// </summary>
+    [MaxLength(64)]
+    [Column("hash")]
+    public string? Hash { get; set; }
+
+    /// <summary>
     /// Version for optimistic locking.
     /// Incremented on each update.
     /// </summary>

@@ -2,12 +2,11 @@
 // Licensed under the MIT License
 
 using LocalizationManager.Core.Cloud;
+using LocalizationManager.Core.Cloud.Models;
 using LocalizationManager.Core.Configuration;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using System.ComponentModel;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace LocalizationManager.Commands.Cloud;
 
@@ -39,10 +38,15 @@ public class PushCommandSettings : BaseCommandSettings
     [Description("Push only resources, skip configuration")]
     [DefaultValue(false)]
     public bool ResourcesOnly { get; set; }
+
+    [CommandOption("-i|--interactive")]
+    [Description("Interactively resolve conflicts one by one")]
+    [DefaultValue(false)]
+    public bool Interactive { get; set; }
 }
 
 /// <summary>
-/// Command to push local changes (resources + lrm.json) to the cloud.
+/// Command to push local changes (resources + lrm.json) to the cloud using key-level sync.
 /// </summary>
 public class PushCommand : Command<PushCommandSettings>
 {
@@ -182,63 +186,242 @@ public class PushCommand : Command<PushCommandSettings>
                 return 1;
             }
 
-            // Collect items to push
-            var itemsToPush = new List<string>();
+            // Load sync state
+            var syncStateResult = SyncStateManager.LoadAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
+            var syncState = syncStateResult.State;
+
+            // Handle corrupted or legacy sync state
+            if (syncStateResult.WasCorrupted)
+            {
+                AnsiConsole.MarkupLine("[yellow]⚠ Sync state was corrupted - treating as first push[/]");
+                syncState = null;
+            }
+            else if (syncStateResult.NeedsMigration)
+            {
+                AnsiConsole.MarkupLine("[yellow]⚠ Upgrading from file-based sync to key-level sync[/]");
+                // Legacy sync state will be migrated after successful push
+            }
+
+            // Get backend for the format
+            var backendFactory = new Core.Backends.ResourceBackendFactory();
+            Core.Abstractions.IResourceBackend backend;
+            try
+            {
+                backend = backendFactory.GetBackend(remoteProject!.Format, config);
+            }
+            catch (NotSupportedException)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ Unsupported format: {remoteProject.Format}[/]");
+                return 1;
+            }
+
+            // Extract local entries
+            var extractor = new LocalEntryExtractor(backend);
+            var languages = backend.Discovery.DiscoverLanguages(projectDirectory);
+
+            List<LocalEntry> localEntries = new();
+            AnsiConsole.Status()
+                .Start("Reading local files...", ctx =>
+                {
+                    localEntries = extractor.ExtractEntriesAsync(languages, cancellationToken).GetAwaiter().GetResult();
+                });
+
+            AnsiConsole.MarkupLine($"[dim]Found {localEntries.Count} entries across {languages.Count()} language(s)[/]");
+
+            // Compute push changes using KeyLevelMerger
+            var merger = new KeyLevelMerger();
+            var pushChanges = merger.ComputePushChanges(localEntries, syncState);
+
+            // Handle config changes
+            ConfigChanges? configChanges = null;
             if (!settings.ResourcesOnly)
             {
-                itemsToPush.Add("Configuration (lrm.json)");
+                var configPath = Path.Combine(projectDirectory, "lrm.json");
+                if (File.Exists(configPath))
+                {
+                    var configMerger = new ConfigMerger();
+                    var configJson = File.ReadAllText(configPath);
+                    var localProps = configMerger.ExtractConfigProperties(configJson);
+                    configChanges = configMerger.ComputePushChanges(localProps, syncState);
+                }
             }
 
-            if (!settings.ConfigOnly)
+            // Show summary
+            var hasEntryChanges = pushChanges.Entries.Any() || pushChanges.Deletions.Count > 0;
+            var hasConfigChanges = configChanges?.HasChanges == true;
+
+            if (!hasEntryChanges && !hasConfigChanges)
             {
-                itemsToPush.Add("Resource files");
+                AnsiConsole.MarkupLine("[green]✓ Already up to date - nothing to push[/]");
+                return 0;
             }
 
-            // Show what will be pushed
-            AnsiConsole.MarkupLine("[blue]Items to push:[/]");
-            foreach (var item in itemsToPush)
+            AnsiConsole.MarkupLine("[blue]Changes to push:[/]");
+            var entryCount = pushChanges.Entries.Count();
+            if (!settings.ConfigOnly && entryCount > 0)
             {
-                AnsiConsole.MarkupLine($"  [dim]• {item}[/]");
+                AnsiConsole.MarkupLine($"  [green]+ {entryCount} entry change(s)[/]");
+            }
+            if (!settings.ConfigOnly && pushChanges.Deletions.Count > 0)
+            {
+                AnsiConsole.MarkupLine($"  [red]- {pushChanges.Deletions.Count} deletion(s)[/]");
+            }
+            if (hasConfigChanges)
+            {
+                AnsiConsole.MarkupLine($"  [blue]~ {configChanges!.Changes.Count} config change(s)[/]");
             }
             AnsiConsole.WriteLine();
 
             if (settings.DryRun)
             {
                 AnsiConsole.MarkupLine("[yellow]Dry run - no changes will be made[/]");
+                ShowDetailedChanges(pushChanges, configChanges, settings);
                 return 0;
             }
 
-            // Push configuration
-            if (!settings.ResourcesOnly)
+            // Build push request
+            var request = new KeySyncPushRequest
             {
-                AnsiConsole.Status()
-                    .Start("Pushing configuration...", ctx =>
-                    {
-                        PushConfiguration(projectDirectory, apiClient, settings.Force, cancellationToken);
-                    });
+                Message = settings.Message
+            };
 
-                AnsiConsole.MarkupLine("[green]✓ Configuration pushed successfully[/]");
-            }
-
-            // Push resources
             if (!settings.ConfigOnly)
             {
-                PushResponse? result = null;
-                AnsiConsole.Status()
-                    .Start("Pushing resources...", ctx =>
-                    {
-                        result = PushResources(projectDirectory, settings, apiClient, settings.Message, cancellationToken);
-                        ctx.Status($"Modified: {result.ModifiedCount}, Deleted: {result.DeletedCount}");
-                    });
+                request.Entries = pushChanges.Entries.ToList();
+                request.Deletions = pushChanges.Deletions;
+            }
 
-                if (result != null && (result.ModifiedCount > 0 || result.DeletedCount > 0))
+            if (!settings.ResourcesOnly && hasConfigChanges)
+            {
+                request.Config = configChanges;
+            }
+
+            // Push to server
+            KeySyncPushResponse? response = null;
+            AnsiConsole.Status()
+                .Start("Pushing changes...", ctx =>
                 {
-                    AnsiConsole.MarkupLine("[green]✓ Resources pushed successfully[/]");
+                    response = apiClient.KeySyncPushAsync(request, cancellationToken).GetAwaiter().GetResult();
+                });
+
+            // Handle conflicts
+            if (response!.Conflicts.Count > 0)
+            {
+                if (settings.Force)
+                {
+                    AnsiConsole.MarkupLine($"[yellow]⚠ {response.Conflicts.Count} conflict(s) - forcing local values[/]");
+
+                    // Resolve all conflicts as local
+                    var resolutionRequest = new ConflictResolutionRequest
+                    {
+                        Resolutions = response.Conflicts.Select(c => new ConflictResolution
+                        {
+                            Key = c.Key,
+                            Lang = c.Lang,
+                            TargetType = ResolutionTargetType.Entry,
+                            Resolution = ResolutionChoice.Local,
+                            EditedValue = c.LocalValue
+                        }).ToList()
+                    };
+
+                    ConflictResolutionResponse? resolveResponse = null;
+                    AnsiConsole.Status()
+                        .Start("Resolving conflicts...", ctx =>
+                        {
+                            resolveResponse = apiClient.KeySyncResolveAsync(resolutionRequest, cancellationToken).GetAwaiter().GetResult();
+                        });
+
+                    response.Applied += resolveResponse!.Applied;
+
+                    // Merge resolution hashes into response
+                    foreach (var (key, langHashes) in resolveResponse.NewHashes)
+                    {
+                        if (!response.NewEntryHashes.ContainsKey(key))
+                        {
+                            response.NewEntryHashes[key] = new Dictionary<string, string>();
+                        }
+                        foreach (var (lang, hash) in langHashes)
+                        {
+                            response.NewEntryHashes[key][lang] = hash;
+                        }
+                    }
+                }
+                else if (settings.Interactive)
+                {
+                    // Interactive conflict resolution
+                    var resolutions = ResolveConflictsInteractively(response.Conflicts, apiClient, cancellationToken);
+                    if (resolutions == null)
+                    {
+                        AnsiConsole.MarkupLine("[dim]Operation cancelled.[/]");
+                        return 1;
+                    }
+
+                    var resolutionRequest = new ConflictResolutionRequest { Resolutions = resolutions };
+
+                    ConflictResolutionResponse? resolveResponse = null;
+                    AnsiConsole.Status()
+                        .Start("Applying resolutions...", ctx =>
+                        {
+                            resolveResponse = apiClient.KeySyncResolveAsync(resolutionRequest, cancellationToken).GetAwaiter().GetResult();
+                        });
+
+                    response.Applied += resolveResponse!.Applied;
+
+                    // Merge resolution hashes into response
+                    foreach (var (key, langHashes) in resolveResponse.NewHashes)
+                    {
+                        if (!response.NewEntryHashes.ContainsKey(key))
+                        {
+                            response.NewEntryHashes[key] = new Dictionary<string, string>();
+                        }
+                        foreach (var (lang, hash) in langHashes)
+                        {
+                            response.NewEntryHashes[key][lang] = hash;
+                        }
+                    }
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]✗ {response.Conflicts.Count} conflict(s) detected[/]");
+                    AnsiConsole.WriteLine();
+
+                    foreach (var conflict in response.Conflicts)
+                    {
+                        AnsiConsole.MarkupLine($"  [yellow]• {conflict.Key}[/] ({conflict.Lang})");
+                        AnsiConsole.MarkupLine($"    Local:  \"{conflict.LocalValue?.EscapeMarkup() ?? "(deleted)"}\"");
+                        AnsiConsole.MarkupLine($"    Remote: \"{conflict.RemoteValue?.EscapeMarkup() ?? "(deleted)"}\"");
+                        if (conflict.RemoteUpdatedAt.HasValue)
+                        {
+                            AnsiConsole.MarkupLine($"    [dim]Remote updated: {conflict.RemoteUpdatedAt.Value:g}[/]");
+                        }
+                    }
+
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine("[dim]Use --interactive to resolve conflicts, --force to override all, or pull first to merge.[/]");
+                    return 1;
                 }
             }
 
+            // Update sync state with new hashes
+            var newSyncState = UpdateSyncState(syncState, response, localEntries, configChanges);
+            SyncStateManager.SaveAsync(projectDirectory, newSyncState, cancellationToken).GetAwaiter().GetResult();
+
+            // Show success
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("[green bold]✓ Push completed successfully![/]");
+
+            if (response.Applied > 0)
+            {
+                AnsiConsole.MarkupLine($"  [dim]Applied: {response.Applied} entries[/]");
+            }
+            if (response.Deleted > 0)
+            {
+                AnsiConsole.MarkupLine($"  [dim]Deleted: {response.Deleted} entries[/]");
+            }
+            if (response.ConfigApplied)
+            {
+                AnsiConsole.MarkupLine($"  [dim]Configuration updated[/]");
+            }
 
             return 0;
         }
@@ -270,167 +453,205 @@ public class PushCommand : Command<PushCommandSettings>
         }
     }
 
-    private void PushConfiguration(
-        string projectDirectory,
-        CloudApiClient apiClient,
-        bool force,
-        CancellationToken cancellationToken)
+    private void ShowDetailedChanges(PushChanges pushChanges, ConfigChanges? configChanges, PushCommandSettings settings)
     {
-        // Only push configuration if lrm.json exists locally
-        // This prevents overwriting the server's auto-generated config with empty values
-        var configPath = Path.Combine(projectDirectory, "lrm.json");
-        if (!File.Exists(configPath))
+        var entries = pushChanges.Entries.ToList();
+        if (!settings.ConfigOnly && entries.Count > 0)
         {
-            AnsiConsole.MarkupLine("[dim]No local lrm.json - skipping configuration push[/]");
-            return;
-        }
-
-        // Read raw config file content
-        var configJsonString = File.ReadAllText(configPath);
-
-        // Get current remote version if not forcing
-        string? baseVersion = null;
-        if (!force)
-        {
-            try
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[blue]Entry changes:[/]");
+            foreach (var entry in entries.Take(20))
             {
-                var remoteConfig = apiClient.GetConfigurationAsync(cancellationToken).GetAwaiter().GetResult();
-                baseVersion = remoteConfig.Version;
+                var status = entry.BaseHash == null ? "[green]+[/]" : "[yellow]~[/]";
+                AnsiConsole.MarkupLine($"  {status} {entry.Key.EscapeMarkup()} ({entry.Lang})");
             }
-            catch (CloudApiException ex) when (ex.StatusCode == 404)
+            if (entries.Count > 20)
             {
-                // No remote config exists yet, that's okay
+                AnsiConsole.MarkupLine($"  [dim]... and {entries.Count - 20} more[/]");
             }
         }
 
-        // Push configuration
-        apiClient.UpdateConfigurationAsync(configJsonString, baseVersion, cancellationToken).GetAwaiter().GetResult();
+        if (!settings.ConfigOnly && pushChanges.Deletions.Count > 0)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[red]Deletions:[/]");
+            foreach (var deletion in pushChanges.Deletions.Take(20))
+            {
+                AnsiConsole.MarkupLine($"  [red]-[/] {deletion.Key.EscapeMarkup()} ({deletion.Lang ?? "all languages"})");
+            }
+            if (pushChanges.Deletions.Count > 20)
+            {
+                AnsiConsole.MarkupLine($"  [dim]... and {pushChanges.Deletions.Count - 20} more[/]");
+            }
+        }
+
+        if (configChanges?.HasChanges == true)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[blue]Config changes:[/]");
+            foreach (var change in configChanges.Changes)
+            {
+                var status = change.BaseHash == null ? "[green]+[/]" : "[yellow]~[/]";
+                AnsiConsole.MarkupLine($"  {status} {change.Path.EscapeMarkup()}");
+            }
+        }
     }
 
-    private PushResponse PushResources(
-        string projectDirectory,
-        PushCommandSettings settings,
+    private SyncState UpdateSyncState(
+        SyncState? existing,
+        KeySyncPushResponse response,
+        List<LocalEntry> localEntries,
+        ConfigChanges? configChanges)
+    {
+        var newState = new SyncState
+        {
+            Version = 2,
+            Timestamp = DateTime.UtcNow,
+            Entries = existing?.Entries ?? new Dictionary<string, Dictionary<string, string>>(),
+            ConfigProperties = existing?.ConfigProperties ?? new Dictionary<string, string>()
+        };
+
+        // Update entry hashes from response
+        foreach (var (key, langHashes) in response.NewEntryHashes)
+        {
+            if (!newState.Entries.ContainsKey(key))
+            {
+                newState.Entries[key] = new Dictionary<string, string>();
+            }
+            foreach (var (lang, hash) in langHashes)
+            {
+                newState.Entries[key][lang] = hash;
+            }
+        }
+
+        // For entries that were pushed but not modified on server (hash unchanged),
+        // update with local hashes
+        foreach (var entry in localEntries)
+        {
+            if (!newState.Entries.ContainsKey(entry.Key))
+            {
+                newState.Entries[entry.Key] = new Dictionary<string, string>();
+            }
+            if (!newState.Entries[entry.Key].ContainsKey(entry.Lang))
+            {
+                newState.Entries[entry.Key][entry.Lang] = entry.Hash;
+            }
+        }
+
+        // Update config hashes
+        foreach (var (path, hash) in response.NewConfigHashes)
+        {
+            newState.ConfigProperties[path] = hash;
+        }
+
+        return newState;
+    }
+
+    private List<ConflictResolution>? ResolveConflictsInteractively(
+        List<EntryConflict> conflicts,
         CloudApiClient apiClient,
-        string? message,
         CancellationToken cancellationToken)
     {
-        // Load sync state (file hashes from last push)
-        var syncState = Core.Cloud.SyncStateManager.LoadAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
-        var lastPushFiles = syncState?.Files ?? new Dictionary<string, string>();
-
-        // Load configuration JSON (if exists)
-        var configPath = Path.Combine(projectDirectory, "lrm.json");
-        string? configJson = null;
-        string? configHash = null;
-
-        if (File.Exists(configPath))
-        {
-            configJson = File.ReadAllText(configPath);
-            configHash = ComputeHash(configJson);
-        }
-
-        // Check if configuration changed
-        bool configChanged = configHash != syncState?.ConfigHash;
-
-        // Discover current resource files
-        var languages = settings.DiscoverLanguages();
-        var currentFiles = new Dictionary<string, (string Path, string Content, string Hash)>();
-
-        foreach (var lang in languages)
-        {
-            var relativePath = GetResourcePath(lang, settings);
-            var content = File.ReadAllText(lang.FilePath);  // Read raw file content
-            var hash = ComputeHash(content);
-
-            currentFiles[relativePath] = (relativePath, content, hash);
-        }
-
-        // Detect changes
-        var modifiedFiles = new List<Core.Cloud.FileDto>();
-        var deletedFiles = new List<string>();
-
-        // Check for new/modified files
-        foreach (var (path, (filePath, content, hash)) in currentFiles)
-        {
-            if (!lastPushFiles.ContainsKey(path) || lastPushFiles[path] != hash)
-            {
-                modifiedFiles.Add(new Core.Cloud.FileDto
-                {
-                    Path = path,
-                    Content = content,
-                    Hash = hash
-                });
-            }
-        }
-
-        // Check for deleted files
-        foreach (var path in lastPushFiles.Keys)
-        {
-            if (!currentFiles.ContainsKey(path))
-            {
-                deletedFiles.Add(path);
-            }
-        }
-
-        // Early exit if no changes
-        if (modifiedFiles.Count == 0 && deletedFiles.Count == 0 && !configChanged)
-        {
-            AnsiConsole.MarkupLine("[yellow]No changes to push[/]");
-            return new PushResponse { Success = true, ModifiedCount = 0, DeletedCount = 0, Message = "No changes" };
-        }
-
-        // Show summary
-        if (modifiedFiles.Count > 0)
-            AnsiConsole.MarkupLine($"[green]Modified files: {modifiedFiles.Count}[/]");
-        if (deletedFiles.Count > 0)
-            AnsiConsole.MarkupLine($"[red]Deleted files: {deletedFiles.Count}[/]");
-        if (configChanged)
-            AnsiConsole.MarkupLine("[blue]Configuration changed[/]");
+        AnsiConsole.MarkupLine($"[yellow bold]Conflicts detected: {conflicts.Count}[/]");
         AnsiConsole.WriteLine();
 
-        // Create push request
-        var request = new Core.Cloud.PushRequest
+        // Offer batch resolution first
+        var batchChoice = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("How do you want to resolve conflicts?")
+                .AddChoices(new[]
+                {
+                    "Resolve each interactively",
+                    "Use local for all",
+                    "Use remote for all",
+                    "Abort"
+                }));
+
+        if (batchChoice == "Abort")
         {
-            Configuration = configChanged ? configJson : null,
-            ModifiedFiles = modifiedFiles,
-            DeletedFiles = deletedFiles,
-            Message = message
-        };
-
-        // Push to server
-        var response = apiClient.PushResourcesAsync(request, cancellationToken).GetAwaiter().GetResult();
-
-        // Update sync state
-        var newSyncState = new Core.Cloud.Models.SyncState
-        {
-            Timestamp = DateTime.UtcNow,
-            ConfigHash = configHash,
-            Files = currentFiles.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Hash)
-        };
-
-        Core.Cloud.SyncStateManager.SaveAsync(projectDirectory, newSyncState, cancellationToken).GetAwaiter().GetResult();
-
-        return response;
-    }
-
-    private string GetResourcePath(Core.Models.LanguageInfo language, PushCommandSettings settings)
-    {
-        // Get relative path from resource directory
-        var resourcePath = settings.GetResourcePath();
-        var fullPath = language.FilePath;
-
-        if (fullPath.StartsWith(resourcePath))
-        {
-            return fullPath.Substring(resourcePath.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return null;
         }
 
-        return Path.GetFileName(fullPath);
-    }
+        if (batchChoice == "Use local for all")
+        {
+            return conflicts.Select(c => new ConflictResolution
+            {
+                Key = c.Key,
+                Lang = c.Lang,
+                TargetType = ResolutionTargetType.Entry,
+                Resolution = ResolutionChoice.Local,
+                EditedValue = c.LocalValue
+            }).ToList();
+        }
 
-    private string ComputeHash(string content)
-    {
-        using var sha256 = SHA256.Create();
-        var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(content));
-        return Convert.ToHexString(hashBytes).ToLowerInvariant();
+        if (batchChoice == "Use remote for all")
+        {
+            return conflicts.Select(c => new ConflictResolution
+            {
+                Key = c.Key,
+                Lang = c.Lang,
+                TargetType = ResolutionTargetType.Entry,
+                Resolution = ResolutionChoice.Remote
+            }).ToList();
+        }
+
+        // Interactive resolution
+        var resolutions = new List<ConflictResolution>();
+
+        for (int i = 0; i < conflicts.Count; i++)
+        {
+            var conflict = conflicts[i];
+
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"[yellow]Conflict {i + 1}/{conflicts.Count}:[/] {conflict.Key.EscapeMarkup()} ({conflict.Lang})");
+            AnsiConsole.MarkupLine($"  [green]LOCAL:[/]  \"{conflict.LocalValue?.EscapeMarkup() ?? "(deleted)"}\"");
+            AnsiConsole.MarkupLine($"  [blue]REMOTE:[/] \"{conflict.RemoteValue?.EscapeMarkup() ?? "(deleted)"}\"");
+            if (conflict.RemoteUpdatedAt.HasValue)
+            {
+                AnsiConsole.MarkupLine($"  [dim]Remote updated: {conflict.RemoteUpdatedAt.Value:g}[/]");
+            }
+
+            var choice = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Resolution:")
+                    .AddChoices(new[]
+                    {
+                        "[L]ocal - Use local version",
+                        "[R]emote - Use remote version",
+                        "[E]dit - Enter custom value",
+                        "[S]kip - Abort entire push"
+                    }));
+
+            var resolution = new ConflictResolution
+            {
+                Key = conflict.Key,
+                Lang = conflict.Lang,
+                TargetType = ResolutionTargetType.Entry
+            };
+
+            if (choice.StartsWith("[L]"))
+            {
+                resolution.Resolution = ResolutionChoice.Local;
+                resolution.EditedValue = conflict.LocalValue;
+            }
+            else if (choice.StartsWith("[R]"))
+            {
+                resolution.Resolution = ResolutionChoice.Remote;
+            }
+            else if (choice.StartsWith("[E]"))
+            {
+                var editedValue = AnsiConsole.Ask<string>("Enter new value:");
+                resolution.Resolution = ResolutionChoice.Edit;
+                resolution.EditedValue = editedValue;
+            }
+            else
+            {
+                return null;
+            }
+
+            resolutions.Add(resolution);
+        }
+
+        return resolutions;
     }
 }

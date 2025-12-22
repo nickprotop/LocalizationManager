@@ -194,6 +194,11 @@ else
             View Snapshots
         </MudButton>
         <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.Restore"
+                   OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/history"))">
+            Sync History
+        </MudButton>
+        <MudButton Variant="Variant.Outlined"
                    StartIcon="@Icons.Material.Filled.Book"
                    OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/glossary"))">
             Glossary

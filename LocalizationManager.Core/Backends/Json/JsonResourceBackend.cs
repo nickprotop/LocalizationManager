@@ -35,7 +35,7 @@ public class JsonResourceBackend : IResourceBackend
     private readonly JsonFormatDetector _detector = new();
 
     /// <inheritdoc />
-    public string Name => "json";
+    public string Name => _config.I18nextCompatible ? "i18next" : "json";
 
     /// <inheritdoc />
     public IReadOnlyList<string> SupportedExtensions => new[] { ".json" };

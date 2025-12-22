@@ -5,6 +5,7 @@ The LRM CLI tool supports bidirectional synchronization with LRM Cloud, allowing
 ## Table of Contents
 
 - [Overview](#overview)
+- [How Sync Works](#how-sync-works)
 - [Quick Start: Clone](#quick-start-clone)
 - [Setup](#setup)
 - [Remote URL Configuration](#remote-url-configuration)
@@ -24,6 +25,83 @@ LRM Cloud sync provides:
 - **Conflict detection**: Automatically detect and resolve conflicts
 - **Backup system**: Automatic backups before pull operations
 - **Optimistic locking**: Version-based conflict detection for safe concurrent edits
+
+## How Sync Works
+
+LRM Cloud sync is **entry-based, not file-based** like Git. Understanding this distinction helps you work effectively with the sync system.
+
+### Entry-Based vs File-Based
+
+| Aspect | Git (File-Based) | LRM Cloud (Entry-Based) |
+|--------|------------------|-------------------------|
+| **Storage unit** | Files with line-level diffs | Individual translation entries |
+| **Merge strategy** | 3-way line-based merge | File replacement (no line merge) |
+| **Conflict resolution** | Automatic line merging | Choose local or remote version |
+| **Server storage** | Object database (blobs) | Database rows + file snapshots |
+
+### What Gets Synced
+
+**1. Configuration (`lrm.json`)**
+- Stored in cloud database with version tracking
+- Optimistic locking prevents concurrent modification conflicts
+
+**2. Resource Files**
+- Files are parsed into individual translation entries on the server
+- Each key/value pair becomes a database row with metadata
+- Enables web editing, review workflows, and translation memory
+
+**3. Sync State (Local)**
+- Stored in `.lrm/sync-state.json` (git-ignored)
+- Tracks SHA-256 hashes of files from last sync
+- Enables incremental change detection
+
+### Push Flow
+
+```
+Local files (.resx, .json, .xml, .strings)
+    ↓ Compare hashes with sync-state.json
+Only modified files sent to API
+    ↓ Server validates and stores
+Files parsed into database entries
+    ↓
+ResourceKey + Translation rows created/updated
+```
+
+**Push is incremental**: Only files that changed since last sync are uploaded.
+
+### Pull Flow
+
+```
+Server queries database entries
+    ↓ Filter by workflow status (if enabled)
+Generate files from entries
+    ↓
+Return complete file snapshot
+    ↓
+Client compares and writes changed files
+```
+
+**Pull returns everything**: Server generates all files from the database. The client compares hashes and only writes files that differ from local.
+
+### Why Entry-Based?
+
+This design enables features that file-based sync cannot:
+
+1. **Web Editor** - Edit individual translations without parsing files client-side
+2. **Review Workflow** - Each translation has status: pending → translated → reviewed → approved
+3. **Translation Memory** - Individual entries can be matched and reused
+4. **Statistics** - Query missing translations, coverage per language
+5. **Filtered Export** - Pull only approved translations for production
+
+### No Automatic Merging
+
+Unlike Git, LRM does **not** perform line-level merging. When conflicts occur:
+
+- You choose **local** or **remote** version for each file
+- There's no "merge commit" with combined changes
+- This is intentional: localization files are language-specific, so conflicts between files are rare
+
+For team workflows, use `--strategy remote` to always accept cloud changes, treating the cloud as the source of truth.
 
 ## Quick Start: Clone
 

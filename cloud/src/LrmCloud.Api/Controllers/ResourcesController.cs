@@ -334,4 +334,43 @@ public class ResourcesController : ApiControllerBase
 
         return Success($"Language '{languageCode}' removed successfully");
     }
+
+    // ============================================================
+    // Batch Save with History
+    // ============================================================
+
+    /// <summary>
+    /// Batch saves multiple changes with sync history recording.
+    /// Used by the Blazor web editor to save changes with audit trail.
+    /// </summary>
+    /// <param name="projectId">Project ID</param>
+    /// <param name="request">Batch save request with changes</param>
+    /// <returns>Batch save result with history ID</returns>
+    [HttpPost("batch-save")]
+    [ProducesResponseType(typeof(ApiResponse<BatchSaveResponse>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    public async Task<ActionResult<ApiResponse<BatchSaveResponse>>> BatchSave(
+        int projectId, [FromBody] BatchSaveRequest request)
+    {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+        try
+        {
+            var result = await _resourceService.BatchSaveWithHistoryAsync(projectId, userId, request);
+
+            if (result.Applied > 0)
+            {
+                _logger.LogInformation(
+                    "User {UserId} batch saved {Applied} changes to project {ProjectId}, history {HistoryId}",
+                    userId, result.Applied, projectId, result.HistoryId);
+            }
+
+            return Success(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Forbidden("BATCH_SAVE_FORBIDDEN", ex.Message);
+        }
+    }
 }

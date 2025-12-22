@@ -92,19 +92,12 @@ else
                                           ReadOnly="true"
                                           HelperText="Format cannot be changed after project creation" />
 
-                            <MudTextField @bind-Value="_model.DefaultLanguage"
+                            <MudTextField Value="@_model.DefaultLanguage"
                                           Label="Default Language"
                                           Variant="Variant.Outlined"
-                                          For="@(() => _model.DefaultLanguage)"
-                                          Disabled="_isSubmitting"
-                                          HelperText="e.g., en, en-US" />
-
-                            <MudTextField @bind-Value="_model.LocalizationPath"
-                                          Label="Localization Path"
-                                          Variant="Variant.Outlined"
-                                          For="@(() => _model.LocalizationPath)"
-                                          Disabled="_isSubmitting"
-                                          HelperText="Relative path to localization files" />
+                                          Disabled="true"
+                                          ReadOnly="true"
+                                          HelperText="Default language cannot be changed after project creation" />
 
                             <MudDivider Class="my-2" />
 

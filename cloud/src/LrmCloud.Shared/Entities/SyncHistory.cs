@@ -4,7 +4,8 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace LrmCloud.Shared.Entities;
 
 /// <summary>
-/// Sync history for tracking project synchronization events.
+/// Records every push operation for history viewing and revert capability.
+/// Stores the changes made (diffs) so operations can be undone.
 /// </summary>
 [Table("sync_history")]
 public class SyncHistory
@@ -13,6 +14,15 @@ public class SyncHistory
     [Column("id")]
     public int Id { get; set; }
 
+    /// <summary>
+    /// Short unique identifier for user-friendly references (e.g., "abc12345").
+    /// Used in CLI: lrm cloud log, lrm cloud revert abc12345
+    /// </summary>
+    [Required]
+    [MaxLength(8)]
+    [Column("history_id")]
+    public required string HistoryId { get; set; }
+
     [Column("project_id")]
     public int ProjectId { get; set; }
 
@@ -20,121 +30,123 @@ public class SyncHistory
     public Project? Project { get; set; }
 
     /// <summary>
-    /// Type of sync: "push", "pull", "webhook", "scheduled".
+    /// User who performed this operation.
+    /// </summary>
+    [Column("user_id")]
+    public int? UserId { get; set; }
+
+    [ForeignKey(nameof(UserId))]
+    public User? User { get; set; }
+
+    /// <summary>
+    /// Type of operation: "push", "revert".
     /// </summary>
     [Required]
-    [MaxLength(50)]
-    [Column("sync_type")]
-    public required string SyncType { get; set; }
-
-    /// <summary>
-    /// Direction: "to_cloud", "from_cloud", "bidirectional".
-    /// </summary>
     [MaxLength(20)]
-    [Column("direction")]
-    public string? Direction { get; set; }
-
-    [MaxLength(40)]
-    [Column("commit_sha")]
-    public string? CommitSha { get; set; }
-
-    [Column("pr_number")]
-    public int? PrNumber { get; set; }
-
-    [Column("pr_url")]
-    public string? PrUrl { get; set; }
-
-    [Column("keys_added")]
-    public int KeysAdded { get; set; }
-
-    [Column("keys_updated")]
-    public int KeysUpdated { get; set; }
-
-    [Column("keys_deleted")]
-    public int KeysDeleted { get; set; }
+    [Column("operation_type")]
+    public required string OperationType { get; set; }
 
     /// <summary>
-    /// Status: "pending", "in_progress", "completed", "failed".
-    /// </summary>
-    [MaxLength(50)]
-    [Column("status")]
-    public string? Status { get; set; }
-
-    [Column("error_message")]
-    public string? ErrorMessage { get; set; }
-
-    /// <summary>
-    /// User-provided commit message describing the changes.
+    /// User-provided message describing the changes (from --message flag).
     /// </summary>
     [MaxLength(500)]
     [Column("message")]
     public string? Message { get; set; }
 
     /// <summary>
-    /// Reference to the snapshot created for this sync event.
+    /// Number of entries added in this operation.
     /// </summary>
-    [MaxLength(8)]
-    [Column("snapshot_id")]
-    public string? SnapshotId { get; set; }
+    [Column("entries_added")]
+    public int EntriesAdded { get; set; }
+
+    /// <summary>
+    /// Number of entries modified in this operation.
+    /// </summary>
+    [Column("entries_modified")]
+    public int EntriesModified { get; set; }
+
+    /// <summary>
+    /// Number of entries deleted in this operation.
+    /// </summary>
+    [Column("entries_deleted")]
+    public int EntriesDeleted { get; set; }
+
+    /// <summary>
+    /// JSON containing the changes made in this operation.
+    /// Stores BEFORE state for modified/deleted entries to enable revert.
+    /// Format: { "changes": [{ "key", "lang", "changeType", "beforeValue", "beforeHash", "afterValue", "afterHash" }] }
+    /// </summary>
+    [Column("changes_json", TypeName = "jsonb")]
+    public string? ChangesJson { get; set; }
+
+    /// <summary>
+    /// If this was a revert operation, references the history entry that was reverted.
+    /// </summary>
+    [Column("reverted_from_id")]
+    public int? RevertedFromId { get; set; }
+
+    [ForeignKey(nameof(RevertedFromId))]
+    public SyncHistory? RevertedFrom { get; set; }
+
+    /// <summary>
+    /// Status: "completed", "reverted" (if this entry was later undone).
+    /// </summary>
+    [MaxLength(20)]
+    [Column("status")]
+    public string Status { get; set; } = "completed";
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 /// <summary>
-/// Sync conflict for tracking unresolved conflicts between local and remote.
+/// Represents a single change within a sync operation (for ChangesJson).
 /// </summary>
-[Table("sync_conflicts")]
-public class SyncConflict
+public class SyncChangeEntry
 {
-    [Key]
-    [Column("id")]
-    public int Id { get; set; }
-
-    [Column("project_id")]
-    public int ProjectId { get; set; }
-
-    [ForeignKey(nameof(ProjectId))]
-    public Project? Project { get; set; }
-
-    [Column("resource_key_id")]
-    public int? ResourceKeyId { get; set; }
-
-    [ForeignKey(nameof(ResourceKeyId))]
-    public ResourceKey? ResourceKey { get; set; }
-
-    [MaxLength(10)]
-    [Column("language_code")]
-    public string? LanguageCode { get; set; }
-
-    [Column("local_value")]
-    public string? LocalValue { get; set; }
-
-    [Column("remote_value")]
-    public string? RemoteValue { get; set; }
-
-    [Column("local_updated_at")]
-    public DateTime? LocalUpdatedAt { get; set; }
-
-    [Column("remote_updated_at")]
-    public DateTime? RemoteUpdatedAt { get; set; }
+    public required string Key { get; set; }
+    public required string Lang { get; set; }
 
     /// <summary>
-    /// Resolution: "local_wins", "remote_wins", "manual".
+    /// Type of change: "added", "modified", "deleted"
     /// </summary>
-    [MaxLength(50)]
-    [Column("resolution")]
-    public string? Resolution { get; set; }
+    public required string ChangeType { get; set; }
 
-    [Column("resolved_by")]
-    public int? ResolvedById { get; set; }
+    /// <summary>
+    /// Value before the change (null for additions).
+    /// </summary>
+    public string? BeforeValue { get; set; }
 
-    [ForeignKey(nameof(ResolvedById))]
-    public User? ResolvedBy { get; set; }
+    /// <summary>
+    /// Hash before the change (null for additions).
+    /// </summary>
+    public string? BeforeHash { get; set; }
 
-    [Column("resolved_at")]
-    public DateTime? ResolvedAt { get; set; }
+    /// <summary>
+    /// Value after the change (null for deletions).
+    /// </summary>
+    public string? AfterValue { get; set; }
 
-    [Column("created_at")]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    /// <summary>
+    /// Hash after the change (null for deletions).
+    /// </summary>
+    public string? AfterHash { get; set; }
+
+    /// <summary>
+    /// Comment before the change (for display in diff).
+    /// </summary>
+    public string? BeforeComment { get; set; }
+
+    /// <summary>
+    /// Comment after the change.
+    /// </summary>
+    public string? AfterComment { get; set; }
+}
+
+/// <summary>
+/// Container for changes JSON serialization.
+/// </summary>
+public class SyncChangesData
+{
+    public List<SyncChangeEntry> Changes { get; set; } = new();
 }

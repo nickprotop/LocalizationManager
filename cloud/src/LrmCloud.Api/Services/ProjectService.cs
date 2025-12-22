@@ -395,12 +395,9 @@ public class ProjectService : IProjectService
             }
 
             // Format is immutable after creation (removed format update logic)
+            // DefaultLanguage is immutable after creation - changes would corrupt translation data
 
-            if (!string.IsNullOrWhiteSpace(request.DefaultLanguage))
-            {
-                project.DefaultLanguage = request.DefaultLanguage;
-            }
-
+            // LocalizationPath can be changed - it only affects where CLI writes files
             if (!string.IsNullOrWhiteSpace(request.LocalizationPath))
             {
                 project.LocalizationPath = request.LocalizationPath;
@@ -659,17 +656,51 @@ public class ProjectService : IProjectService
         var keyCount = project.ResourceKeys.Count;
         var translationCount = project.ResourceKeys.Sum(k => k.Translations.Count);
 
-        // Calculate completion percentage
-        // For plural keys, each form (one, other, few, many, zero) is a separate translation
-        // So we count actual translation slots, not keys × languages
+        // Calculate completion percentage across ALL languages
+        // Expected = keys × languages (accounting for plural forms)
+        // Actual = translations with non-empty values
         double completionPercentage = 0;
-        if (translationCount > 0)
-        {
-            var translatedCount = project.ResourceKeys
-                .SelectMany(k => k.Translations)
-                .Count(t => !string.IsNullOrWhiteSpace(t.Value));
 
-            completionPercentage = Math.Round((double)translatedCount / translationCount * 100, 2);
+        // Get all unique languages for this project
+        var languages = project.ResourceKeys
+            .SelectMany(k => k.Translations)
+            .Select(t => t.LanguageCode)
+            .Distinct()
+            .ToList();
+
+        var languageCount = languages.Count;
+
+        if (languageCount > 0 && keyCount > 0)
+        {
+            int expectedTranslations = 0;
+            int actualTranslations = 0;
+
+            foreach (var key in project.ResourceKeys)
+            {
+                if (key.IsPlural)
+                {
+                    // For plural keys, count the plural forms used
+                    var pluralForms = key.Translations
+                        .Select(t => t.PluralForm)
+                        .Where(f => !string.IsNullOrEmpty(f))
+                        .Distinct()
+                        .Count();
+                    // At minimum expect 2 forms (one, other)
+                    pluralForms = Math.Max(pluralForms, 2);
+
+                    expectedTranslations += languageCount * pluralForms;
+                }
+                else
+                {
+                    expectedTranslations += languageCount;
+                }
+
+                actualTranslations += key.Translations.Count(t => !string.IsNullOrWhiteSpace(t.Value));
+            }
+
+            completionPercentage = expectedTranslations > 0
+                ? Math.Round((double)actualTranslations / expectedTranslations * 100, 2)
+                : 0;
         }
 
         return new ProjectDto
@@ -832,14 +863,14 @@ public class ProjectService : IProjectService
 
         // Get last push (sync from CLI)
         var lastPush = await _db.SyncHistory
-            .Where(s => s.ProjectId == projectId && s.Direction == "push")
+            .Where(s => s.ProjectId == projectId && s.OperationType == "push")
             .OrderByDescending(s => s.CreatedAt)
             .Select(s => s.CreatedAt)
             .FirstOrDefaultAsync();
 
-        // Get last pull (sync to CLI)
+        // Get last activity (any sync operation)
         var lastPull = await _db.SyncHistory
-            .Where(s => s.ProjectId == projectId && s.Direction == "pull")
+            .Where(s => s.ProjectId == projectId)
             .OrderByDescending(s => s.CreatedAt)
             .Select(s => s.CreatedAt)
             .FirstOrDefaultAsync();
