@@ -59,7 +59,7 @@ _lrm_completions() {
     local web_opts="--path -p --source-path --port --bind-address --no-open-browser --enable-https --cert-path --cert-password --help -h"
 
     # Cloud subcommands and options
-    local cloud_opts="init clone login logout status push pull set-token set-api-key remote --help -h"
+    local cloud_opts="init clone login logout status push pull log revert snapshot set-token set-api-key remote --help -h"
     local cloud_init_opts="--path -p --name -n --organization --yes -y --help -h"
     local cloud_clone_opts="--email --password --api-key --no-pull --force --help -h"
     local cloud_login_opts="--path -p --email --password --help -h"
@@ -67,6 +67,11 @@ _lrm_completions() {
     local cloud_status_opts="--path -p --format --account --help -h"
     local cloud_push_opts="--path -p --message -m --dry-run --force --config-only --resources-only --help -h"
     local cloud_pull_opts="--path -p --dry-run --force --no-backup --strategy --config-only --resources-only --help -h"
+    local cloud_log_opts="--path -p --format -f --number -n --page --oneline --help -h"
+    local cloud_revert_opts="--path -p --format -f --message -m --yes -y --dry-run --help -h"
+    local cloud_snapshot_opts="list create show restore delete diff --help -h"
+    local cloud_snapshot_list_opts="--path -p --format -f --page --page-size --help -h"
+    local cloud_snapshot_create_opts="--path -p --format -f --help -h"
     local cloud_set_token_opts="--path -p --expires --help -h"
     local cloud_set_api_key_opts="--path -p --remove --help -h"
     local cloud_remote_opts="set get unset --help -h"
@@ -449,6 +454,55 @@ _lrm_completions() {
                         else
                             # API key argument
                             COMPREPLY=()
+                        fi
+                        ;;
+                    log)
+                        if [[ "${cur}" == -* ]]; then
+                            COMPREPLY=( $(compgen -W "${cloud_log_opts}" -- "${cur}") )
+                        else
+                            # History ID argument
+                            COMPREPLY=()
+                        fi
+                        ;;
+                    revert)
+                        if [[ "${cur}" == -* ]]; then
+                            COMPREPLY=( $(compgen -W "${cloud_revert_opts}" -- "${cur}") )
+                        else
+                            # History ID argument
+                            COMPREPLY=()
+                        fi
+                        ;;
+                    snapshot)
+                        # Check for third level subcommand
+                        local snapshot_subcommand=""
+                        for ((j=i+1; j<COMP_CWORD; j++)); do
+                            if [[ "${COMP_WORDS[j]}" != -* ]]; then
+                                snapshot_subcommand="${COMP_WORDS[j]}"
+                                break
+                            fi
+                        done
+                        if [[ -z "${snapshot_subcommand}" ]]; then
+                            COMPREPLY=( $(compgen -W "${cloud_snapshot_opts}" -- "${cur}") )
+                        else
+                            case "${snapshot_subcommand}" in
+                                list)
+                                    COMPREPLY=( $(compgen -W "${cloud_snapshot_list_opts}" -- "${cur}") )
+                                    ;;
+                                create)
+                                    COMPREPLY=( $(compgen -W "${cloud_snapshot_create_opts}" -- "${cur}") )
+                                    ;;
+                                show|restore|delete)
+                                    # Snapshot ID argument
+                                    COMPREPLY=()
+                                    ;;
+                                diff)
+                                    # From/To snapshot ID arguments
+                                    COMPREPLY=()
+                                    ;;
+                                *)
+                                    COMPREPLY=()
+                                    ;;
+                            esac
                         fi
                         ;;
                     remote)

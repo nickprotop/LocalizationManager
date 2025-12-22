@@ -15,6 +15,10 @@ The LRM CLI tool supports bidirectional synchronization with LRM Cloud, allowing
 - [Backup System](#backup-system)
 - [Configuration Sync](#configuration-sync)
 - [Advanced Usage](#advanced-usage)
+- [Log Command](#log-command)
+- [Revert Command](#revert-command)
+- [Snapshot Command](#snapshot-command)
+- [API Reference](#api-reference)
 
 ## Overview
 
@@ -538,25 +542,215 @@ A: Yes, use `--no-backup`, but not recommended:
 lrm cloud pull --no-backup
 ```
 
+## Log Command
+
+View the sync history for your project, showing all push and revert operations.
+
+### Basic Usage
+
+```bash
+# Show recent sync history (default: 10 entries)
+lrm cloud log
+
+# Show more entries
+lrm cloud log -n 20
+
+# Compact one-line format
+lrm cloud log --oneline
+
+# View details of a specific history entry
+lrm cloud log abc12345
+
+# JSON output for automation
+lrm cloud log --format json
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `[HISTORY_ID]` | Optional history ID to show details for a specific push |
+| `-n, --number <COUNT>` | Number of entries to show (default: 10) |
+| `--page <PAGE>` | Page number for pagination (default: 1) |
+| `--oneline` | Show compact one-line format |
+| `-f, --format <FORMAT>` | Output format: table (default), json, simple |
+
+### Example Output
+
+```
+Sync History
+┌──────────┬─────────────────────┬───────────┬─────────┬──────────┬─────────────────────┐
+│ ID       │ Date                │ Operation │ Added   │ Modified │ Message             │
+├──────────┼─────────────────────┼───────────┼─────────┼──────────┼─────────────────────┤
+│ abc12345 │ 2024-01-15 10:30:22 │ push      │ 5       │ 12       │ Added translations  │
+│ def67890 │ 2024-01-14 16:45:10 │ push      │ 0       │ 3        │ Fixed typos         │
+│ ghi11213 │ 2024-01-14 09:15:00 │ revert    │ 0       │ 0        │ Revert: abc12345    │
+└──────────┴─────────────────────┴───────────┴─────────┴──────────┴─────────────────────┘
+```
+
+## Revert Command
+
+Undo a previous push by reverting to the state before that push.
+
+### Basic Usage
+
+```bash
+# Revert a specific push
+lrm cloud revert abc12345
+
+# Revert with a message explaining why
+lrm cloud revert abc12345 -m "Rolling back broken translations"
+
+# Preview what would be reverted (dry run)
+lrm cloud revert abc12345 --dry-run
+
+# Skip confirmation prompt
+lrm cloud revert abc12345 -y
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `<HISTORY_ID>` | The history entry ID to revert (required) |
+| `-m, --message <MESSAGE>` | Message describing why the revert was done |
+| `-y, --yes` | Skip confirmation prompt |
+| `--dry-run` | Show what would be reverted without actually reverting |
+| `-f, --format <FORMAT>` | Output format: table (default), json, simple |
+
+### Workflow
+
+1. Use `lrm cloud log` to find the history ID of the push you want to undo
+2. Run `lrm cloud revert <HISTORY_ID> --dry-run` to preview changes
+3. If satisfied, run `lrm cloud revert <HISTORY_ID>` to perform the revert
+4. The revert creates a new history entry (visible in `lrm cloud log`)
+
+## Snapshot Command
+
+Create and manage point-in-time snapshots of your project. Snapshots are like named bookmarks in your project's history that you can restore to at any time.
+
+### Subcommands
+
+#### snapshot list
+
+List all snapshots for the project:
+
+```bash
+lrm cloud snapshot list
+lrm cloud snapshot list --page 2
+lrm cloud snapshot list --format json
+```
+
+**Options:**
+- `--page <PAGE>` - Page number (default: 1)
+- `--page-size <SIZE>` - Items per page (default: 20)
+- `-f, --format <FORMAT>` - Output format: table (default), json, simple
+
+#### snapshot create
+
+Create a new snapshot of the current project state:
+
+```bash
+# Create snapshot with auto-generated name
+lrm cloud snapshot create
+
+# Create snapshot with description
+lrm cloud snapshot create "Before major refactor"
+```
+
+**Options:**
+- `[message]` - Optional description for the snapshot
+
+#### snapshot show
+
+View details of a specific snapshot:
+
+```bash
+lrm cloud snapshot show <snapshot-id>
+```
+
+#### snapshot restore
+
+Restore the project to a previous snapshot:
+
+```bash
+lrm cloud snapshot restore <snapshot-id>
+```
+
+**Warning:** This will overwrite your current project state with the snapshot's state.
+
+#### snapshot delete
+
+Delete a snapshot:
+
+```bash
+lrm cloud snapshot delete <snapshot-id>
+```
+
+#### snapshot diff
+
+Compare two snapshots to see what changed:
+
+```bash
+lrm cloud snapshot diff <from-snapshot-id> <to-snapshot-id>
+```
+
+### When to Use Snapshots vs History
+
+| Feature | Sync History (`log`/`revert`) | Snapshots |
+|---------|------------------------------|-----------|
+| Created | Automatically on each push | Manually by user |
+| Purpose | Track all changes | Mark important milestones |
+| Restore | Undo specific pushes | Restore entire project state |
+| Retention | May be pruned over time | Kept until deleted |
+
+**Use Snapshots for:**
+- Before major refactoring
+- Release versions (v1.0, v2.0)
+- Before experimental changes
+- Milestone backups
+
+**Use History/Revert for:**
+- Undoing recent mistakes
+- Reviewing what changed
+- Debugging sync issues
+
 ## API Reference
 
 ### Remote Commands
 
-- `lrm remote set <url>` - Set remote URL
-- `lrm remote get` - Show current remote URL
-- `lrm remote unset` - Remove remote configuration
+- `lrm cloud remote set <url>` - Set remote URL
+- `lrm cloud remote get` - Show current remote URL
+- `lrm cloud remote unset` - Remove remote configuration
 
 ### Cloud Commands
 
+**Project Setup:**
 - `lrm cloud clone <url> [path]` - Clone existing project (login + link + pull)
 - `lrm cloud init [url]` - Connect to cloud project (interactive or direct URL)
+
+**Authentication:**
 - `lrm cloud login [host]` - Authenticate via email/password
 - `lrm cloud logout` - Clear stored tokens
+- `lrm cloud set-token [token]` - Set authentication token manually
+- `lrm cloud set-api-key [key]` - Store a CLI API key for authentication
+
+**Sync Operations:**
 - `lrm cloud push [options]` - Push local changes to cloud
 - `lrm cloud pull [options]` - Pull remote changes from cloud
 - `lrm cloud status` - Show sync status or account info
-- `lrm cloud set-token [token]` - Set authentication token manually
-- `lrm cloud set-api-key [key]` - Store a CLI API key for authentication
+
+**History & Recovery:**
+- `lrm cloud log [history_id]` - Show sync history
+- `lrm cloud revert <history_id>` - Revert a previous push
+
+**Snapshots:**
+- `lrm cloud snapshot list` - List all snapshots
+- `lrm cloud snapshot create [message]` - Create a new snapshot
+- `lrm cloud snapshot show <id>` - View snapshot details
+- `lrm cloud snapshot restore <id>` - Restore to a snapshot
+- `lrm cloud snapshot delete <id>` - Delete a snapshot
+- `lrm cloud snapshot diff <from> <to>` - Compare two snapshots
 
 ### Options
 
@@ -567,6 +761,17 @@ lrm cloud pull --no-backup
 - `--strategy <strategy>` - Resolution strategy (pull only)
 - `--config-only` - Sync configuration only
 - `--resources-only` - Sync resources only
+- `-m, --message <MESSAGE>` - Commit message (push only)
+
+**Log Options:**
+- `-n, --number <COUNT>` - Number of entries to show (default: 10)
+- `--page <PAGE>` - Page number for pagination
+- `--oneline` - Compact one-line format
+
+**Revert Options:**
+- `-m, --message <MESSAGE>` - Message describing the revert
+- `-y, --yes` - Skip confirmation prompt
+- `--dry-run` - Preview without reverting
 
 **set-api-key Options:**
 - `[key]` - API key to store (will prompt if not provided)

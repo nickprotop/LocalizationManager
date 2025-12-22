@@ -546,6 +546,9 @@ _lrm() {
                         'status:Show cloud sync status or account info'
                         'push:Push local changes to cloud'
                         'pull:Pull remote changes from cloud'
+                        'log:Show sync history (push/revert operations)'
+                        'revert:Revert a previous push (undo changes)'
+                        'snapshot:Snapshot management for point-in-time backups'
                         'set-token:Manually set an authentication token'
                         'set-api-key:Store a CLI API key for cloud authentication'
                         'remote:Remote URL configuration'
@@ -633,6 +636,89 @@ _lrm() {
                                         '1:API key' \
                                         '--remove[Remove stored API key]' \
                                         $global_opts
+                                    ;;
+                                log)
+                                    _arguments \
+                                        '1:history ID' \
+                                        '(-n --number)'{-n,--number}'[Number of entries to show]:count:(10 20 50 100)' \
+                                        '--page[Page number]:page' \
+                                        '--oneline[Show compact one-line format]' \
+                                        '(-f --format)'{-f,--format}'[Output format]:format:->formats' \
+                                        $global_opts
+                                    case $state in
+                                        formats)
+                                            _describe -t formats 'output formats' format_opts
+                                            ;;
+                                    esac
+                                    ;;
+                                revert)
+                                    _arguments \
+                                        '1:history ID' \
+                                        '(-m --message)'{-m,--message}'[Message describing the revert]:message' \
+                                        '(-y --yes)'{-y,--yes}'[Skip confirmation prompt]' \
+                                        '--dry-run[Preview without reverting]' \
+                                        '(-f --format)'{-f,--format}'[Output format]:format:->formats' \
+                                        $global_opts
+                                    case $state in
+                                        formats)
+                                            _describe -t formats 'output formats' format_opts
+                                            ;;
+                                    esac
+                                    ;;
+                                snapshot)
+                                    local -a snapshot_subcommands
+                                    snapshot_subcommands=(
+                                        'list:List all snapshots'
+                                        'create:Create a new snapshot'
+                                        'show:Show snapshot details'
+                                        'restore:Restore to a snapshot'
+                                        'delete:Delete a snapshot'
+                                        'diff:Compare two snapshots'
+                                    )
+
+                                    _arguments -C \
+                                        '1: :->snapshot_subcommand' \
+                                        '*:: :->snapshot_subargs' \
+                                        && return 0
+
+                                    case $state in
+                                        snapshot_subcommand)
+                                            _describe -t snapshot-subcommands 'snapshot subcommands' snapshot_subcommands
+                                            ;;
+                                        snapshot_subargs)
+                                            case $words[1] in
+                                                list)
+                                                    _arguments \
+                                                        '--page[Page number]:page' \
+                                                        '--page-size[Items per page]:size:(10 20 50)' \
+                                                        '(-f --format)'{-f,--format}'[Output format]:format:->formats' \
+                                                        $global_opts
+                                                    ;;
+                                                create)
+                                                    _arguments \
+                                                        '1:snapshot description' \
+                                                        '(-f --format)'{-f,--format}'[Output format]:format:->formats' \
+                                                        $global_opts
+                                                    ;;
+                                                show|restore|delete)
+                                                    _arguments \
+                                                        '1:snapshot ID' \
+                                                        $global_opts
+                                                    ;;
+                                                diff)
+                                                    _arguments \
+                                                        '1:from snapshot ID' \
+                                                        '2:to snapshot ID' \
+                                                        $global_opts
+                                                    ;;
+                                            esac
+                                            case $state in
+                                                formats)
+                                                    _describe -t formats 'output formats' format_opts
+                                                    ;;
+                                            esac
+                                            ;;
+                                    esac
                                     ;;
                                 remote)
                                     local -a remote_subcommands

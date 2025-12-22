@@ -118,12 +118,45 @@ ls .lrm/pull-backups/
 unzip .lrm/pull-backups/pull-backup-YYYYMMDD-HHMMSS.zip -d .
 ```
 
+## View History & Undo Changes
+
+```bash
+# View sync history
+lrm cloud log
+
+# View more history entries
+lrm cloud log -n 20
+
+# Undo a specific push (use history ID from log)
+lrm cloud revert abc12345
+
+# Preview what would be reverted
+lrm cloud revert abc12345 --dry-run
+```
+
+## Snapshots (Bookmarks)
+
+Create named snapshots for important milestones:
+
+```bash
+# Create a snapshot before major changes
+lrm cloud snapshot create "Before v2.0 release"
+
+# List all snapshots
+lrm cloud snapshot list
+
+# Restore to a previous snapshot
+lrm cloud snapshot restore <snapshot-id>
+```
+
 ## Tips
 
 - Always `pull` before `push` to avoid conflicts
 - Use `--dry-run` to preview changes
 - Backups are your safety net - they're enabled by default
 - Configuration changes sync automatically with resources
+- Use `lrm cloud log` to review recent changes
+- Create snapshots before major refactoring
 
 ## Need Help?
 

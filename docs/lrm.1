@@ -440,6 +440,15 @@ Subcommands:
 .B pull
 - Pull remote changes from cloud
 .IP \(bu 2
+.B log \fI[HISTORY_ID]\fR
+- Show sync history (push/revert operations)
+.IP \(bu 2
+.B revert \fIHISTORY_ID\fR
+- Revert a previous push (undo changes)
+.IP \(bu 2
+.B snapshot
+- Snapshot management (list, create, show, restore, delete, diff)
+.IP \(bu 2
 .B set-token \fI[TOKEN]\fR
 - Manually set an authentication token
 .IP \(bu 2
@@ -551,6 +560,106 @@ Token expiration date/time (ISO 8601 format)
 .PP
 All credentials are stored in .lrm/cloud.json (git-ignored).
 Priority: environment variable (LRM_CLOUD_API_KEY) > stored key > JWT token
+.SS cloud log
+Show sync history (push/revert operations).
+.PP
+.B lrm cloud log
+[\fIHISTORY_ID\fR]
+[\fB\-n\fR|\fB\-\-number\fR \fICOUNT\fR]
+[\fB\-\-page\fR \fIPAGE\fR]
+[\fB\-\-oneline\fR]
+[\fB\-f\fR|\fB\-\-format\fR \fIFORMAT\fR]
+.TP
+.I HISTORY_ID
+Optional history ID to show details for a specific push
+.TP
+.BR \-n ", " \-\-number " " \fICOUNT\fR
+Number of entries to show (default: 10)
+.TP
+.BR \-\-page " " \fIPAGE\fR
+Page number for pagination (default: 1)
+.TP
+.BR \-\-oneline
+Show compact one-line format
+.PP
+Examples:
+.TP
+View recent sync history:
+.B lrm cloud log
+.TP
+View more entries:
+.B lrm cloud log -n 20
+.TP
+View specific push details:
+.B lrm cloud log abc12345
+.SS cloud revert
+Revert a previous push (undo changes).
+.PP
+.B lrm cloud revert
+\fIHISTORY_ID\fR
+[\fB\-m\fR|\fB\-\-message\fR \fIMESSAGE\fR]
+[\fB\-y\fR|\fB\-\-yes\fR]
+[\fB\-\-dry\-run\fR]
+[\fB\-f\fR|\fB\-\-format\fR \fIFORMAT\fR]
+.TP
+.I HISTORY_ID
+The history entry ID to revert (required)
+.TP
+.BR \-m ", " \-\-message " " \fIMESSAGE\fR
+Message describing why the revert was done
+.TP
+.BR \-y ", " \-\-yes
+Skip confirmation prompt
+.TP
+.BR \-\-dry\-run
+Show what would be reverted without actually reverting
+.PP
+Examples:
+.TP
+Revert a push:
+.B lrm cloud revert abc12345
+.TP
+Revert with message:
+.B lrm cloud revert abc12345 -m "Rolling back broken translations"
+.TP
+Preview revert:
+.B lrm cloud revert abc12345 --dry-run
+.SS cloud snapshot
+Snapshot management commands for point-in-time backups.
+.PP
+.B lrm cloud snapshot
+\fISUBCOMMAND\fR
+.PP
+Subcommands:
+.IP \(bu 2
+.B list
+- List all snapshots for the project
+.IP \(bu 2
+.B create \fI[MESSAGE]\fR
+- Create a new snapshot of the current project state
+.IP \(bu 2
+.B show \fISNAPSHOT_ID\fR
+- Show details of a specific snapshot
+.IP \(bu 2
+.B restore \fISNAPSHOT_ID\fR
+- Restore the project to a previous snapshot
+.IP \(bu 2
+.B delete \fISNAPSHOT_ID\fR
+- Delete a snapshot
+.IP \(bu 2
+.B diff \fIFROM_ID\fR \fITO_ID\fR
+- Compare two snapshots
+.PP
+Examples:
+.TP
+List snapshots:
+.B lrm cloud snapshot list
+.TP
+Create a snapshot:
+.B lrm cloud snapshot create "Before major refactor"
+.TP
+Restore to a snapshot:
+.B lrm cloud snapshot restore abc12345
 .SS chain
 Execute multiple LRM commands sequentially in a single invocation.
 .PP

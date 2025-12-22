@@ -912,6 +912,34 @@ lrm cloud pull --strategy remote</code></pre>
                     <li>Restore manually: <code>unzip .lrm/pull-backups/backup.zip -d .</code></li>
                 </ul>
 
+                <h3>History & Undo</h3>
+                <p>View sync history and undo previous pushes:</p>
+                <pre><code># View sync history
+lrm cloud log
+
+# View more history entries
+lrm cloud log -n 20
+
+# Undo a specific push
+lrm cloud revert abc12345
+
+# Preview what would be reverted
+lrm cloud revert abc12345 --dry-run</code></pre>
+
+                <h3>Snapshots</h3>
+                <p>Create named snapshots for important milestones (like Git tags):</p>
+                <pre><code># Create a snapshot before major changes
+lrm cloud snapshot create "Before v2.0 release"
+
+# List all snapshots
+lrm cloud snapshot list
+
+# Restore to a previous snapshot
+lrm cloud snapshot restore &lt;snapshot-id&gt;
+
+# Compare two snapshots
+lrm cloud snapshot diff &lt;from-id&gt; &lt;to-id&gt;</code></pre>
+
                 <div class="info-box">
                     <div class="info-box-title">Full Documentation</div>
                     <p>See the <a href="https://github.com/nickprotop/LocalizationManager/blob/main/docs/CLOUD_SYNC.md" target="_blank">Cloud Sync Guide</a> for complete CLI documentation.</p>
