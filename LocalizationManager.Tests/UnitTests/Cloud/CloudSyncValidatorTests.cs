@@ -74,7 +74,7 @@ public class CloudSyncValidatorTests : IDisposable
     }
 
     [Fact]
-    public void ValidateForPush_DifferentDefaultLanguage_ReturnsWarning()
+    public void ValidateForPush_DifferentDefaultLanguage_ReturnsError()
     {
         // Arrange
         var localConfig = new ConfigurationModel { ResourceFormat = "resx", DefaultLanguageCode = "en" };
@@ -85,8 +85,8 @@ public class CloudSyncValidatorTests : IDisposable
         var result = _validator.ValidateForPush(localConfig, remoteProject);
 
         // Assert
-        Assert.True(result.CanSync); // Warning doesn't block
-        Assert.Contains(result.Warnings, w => w.Contains("Default language mismatch"));
+        Assert.False(result.CanSync); // DefaultLanguage mismatch blocks sync - would corrupt data
+        Assert.Contains(result.Errors, e => e.Contains("Default language mismatch"));
     }
 
     [Fact]
@@ -216,7 +216,7 @@ public class CloudSyncValidatorTests : IDisposable
     }
 
     [Fact]
-    public void ValidateForPull_DifferentDefaultLanguage_ReturnsWarningButCanSync()
+    public void ValidateForPull_DifferentDefaultLanguage_ReturnsErrorAndCannotSync()
     {
         // Arrange
         var localConfig = new ConfigurationModel { ResourceFormat = "resx", DefaultLanguageCode = "en" };
@@ -226,8 +226,8 @@ public class CloudSyncValidatorTests : IDisposable
         var result = _validator.ValidateForPull(localConfig, remoteProject);
 
         // Assert
-        Assert.True(result.CanSync);
-        Assert.Contains(result.Warnings, w => w.Contains("Default language mismatch"));
+        Assert.False(result.CanSync); // DefaultLanguage mismatch blocks sync - would corrupt data
+        Assert.Contains(result.Errors, e => e.Contains("Default language mismatch"));
     }
 
     #endregion
