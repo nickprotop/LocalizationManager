@@ -495,15 +495,15 @@ public class CloudApiClient : IDisposable
     /// <summary>
     /// Lists all snapshots for the current project.
     /// </summary>
-    public async Task<SnapshotListResponse> ListSnapshotsAsync(
+    public async Task<List<CloudSnapshot>> ListSnapshotsAsync(
         int page = 1,
         int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
         var baseUrl = await GetSnapshotApiUrlAsync(cancellationToken: cancellationToken);
         var url = $"{baseUrl}?page={page}&pageSize={pageSize}";
-        var response = await GetAsync<SnapshotListResponse>(url, cancellationToken);
-        return response ?? new SnapshotListResponse();
+        var response = await GetAsync<List<CloudSnapshot>>(url, cancellationToken);
+        return response ?? new List<CloudSnapshot>();
     }
 
     /// <summary>
@@ -721,9 +721,13 @@ internal class ApiResponse<T>
 /// <summary>
 /// Metadata for API responses.
 /// </summary>
-internal class ApiMeta
+public class ApiMeta
 {
     public DateTime Timestamp { get; set; }
+    public int? Page { get; set; }
+    public int? PageSize { get; set; }
+    public int? TotalCount { get; set; }
+    public int? TotalPages { get; set; }
 }
 
 #region Models
@@ -999,14 +1003,20 @@ public class SnapshotFile
 
 /// <summary>
 /// Response from listing snapshots (paginated).
+/// Matches ApiResponse&lt;List&lt;T&gt;&gt; from the API.
 /// </summary>
 public class SnapshotListResponse
 {
-    public List<CloudSnapshot> Items { get; set; } = new();
-    public int Page { get; set; }
-    public int PageSize { get; set; }
-    public int TotalCount { get; set; }
+    public List<CloudSnapshot> Data { get; set; } = new();
+    public ApiMeta? Meta { get; set; }
+
+    // Convenience properties for backward compatibility
+    public List<CloudSnapshot> Items => Data;
+    public int Page => Meta?.Page ?? 1;
+    public int PageSize => Meta?.PageSize ?? 20;
+    public int TotalCount => Meta?.TotalCount ?? 0;
 }
+
 
 /// <summary>
 /// Request to create a snapshot.

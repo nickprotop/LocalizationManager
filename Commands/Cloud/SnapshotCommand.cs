@@ -169,9 +169,9 @@ public class ListSnapshotsCommand : AsyncCommand<ListSnapshotsSettings>
         }
     }
 
-    private void DisplayListTable(SnapshotListResponse response)
+    private void DisplayListTable(List<CloudSnapshot> snapshots)
     {
-        if (response.Items.Count == 0)
+        if (snapshots.Count == 0)
         {
             AnsiConsole.MarkupLine("[yellow]No snapshots found.[/]");
             AnsiConsole.WriteLine();
@@ -179,7 +179,7 @@ public class ListSnapshotsCommand : AsyncCommand<ListSnapshotsSettings>
             return;
         }
 
-        AnsiConsole.MarkupLine($"[blue bold]Snapshots[/] (Page {response.Page}, {response.Items.Count} of {response.TotalCount})");
+        AnsiConsole.MarkupLine($"[blue bold]Snapshots[/] ({snapshots.Count} found)");
         AnsiConsole.WriteLine();
 
         var table = new Table();
@@ -191,7 +191,7 @@ public class ListSnapshotsCommand : AsyncCommand<ListSnapshotsSettings>
         table.AddColumn("Created");
         table.AddColumn("By");
 
-        foreach (var snapshot in response.Items)
+        foreach (var snapshot in snapshots)
         {
             var typeColor = snapshot.SnapshotType switch
             {
@@ -215,21 +215,20 @@ public class ListSnapshotsCommand : AsyncCommand<ListSnapshotsSettings>
         AnsiConsole.Write(table);
     }
 
-    private void DisplayListSimple(SnapshotListResponse response)
+    private void DisplayListSimple(List<CloudSnapshot> snapshots)
     {
-        Console.WriteLine($"Total: {response.TotalCount}");
-        Console.WriteLine($"Page: {response.Page}/{(response.TotalCount + response.PageSize - 1) / response.PageSize}");
+        Console.WriteLine($"Total: {snapshots.Count}");
         Console.WriteLine();
 
-        foreach (var snapshot in response.Items)
+        foreach (var snapshot in snapshots)
         {
             Console.WriteLine($"{snapshot.SnapshotId}\t{snapshot.SnapshotType}\t{snapshot.KeyCount} keys\t{snapshot.CreatedAt:yyyy-MM-dd HH:mm}\t{snapshot.Description ?? ""}");
         }
     }
 
-    private void DisplayListJson(SnapshotListResponse response)
+    private void DisplayListJson(List<CloudSnapshot> snapshots)
     {
-        Console.WriteLine(OutputFormatter.FormatJson(response));
+        Console.WriteLine(OutputFormatter.FormatJson(snapshots));
     }
 
     private static string FormatDateTime(DateTime dateTime)
