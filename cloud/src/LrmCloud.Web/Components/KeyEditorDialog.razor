@@ -63,7 +63,7 @@
         </Helper>
     </RadzenFormField>
 
-    @* Translations Section *@
+    @* Translations Section Header *@
     <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
         <RadzenText TextStyle="TextStyle.H6">Translations</RadzenText>
         <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
@@ -84,158 +84,108 @@
         </RadzenStack>
     </RadzenStack>
 
-    @* Translations Table *@
-    <RadzenCard Style="padding: 0; overflow-x: auto;">
-        <table class="rz-data-grid" style="width: 100%; table-layout: fixed;">
-            <thead>
-                <tr>
-                    <th style="width: 70px;">Lang</th>
-                    @if (Row.IsPlural)
-                    {
-                        @foreach (var form in GetActivePluralForms())
+    @* Translations DataGrid *@
+    <RadzenDataGrid @ref="_grid" TItem="EditableTranslationRow"
+                    Data="@_editableRows"
+                    Density="Density.Compact"
+                    AllowSorting="false"
+                    AllowPaging="false"
+                    Style="max-height: 400px; overflow-y: auto;">
+        <Columns>
+            @* Language Column *@
+            <RadzenDataGridColumn TItem="EditableTranslationRow" Title="Lang" Width="70px" Frozen="true">
+                <Template Context="row">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem" AlignItems="Radzen.AlignItems.Center">
+                        <RadzenText TextStyle="TextStyle.Body2" Style="font-weight: 600;">@row.LanguageCode.ToUpperInvariant()</RadzenText>
+                        @if (row.IsDefault)
                         {
-                            <th style="width: auto;">
-                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0">
-                                    <span>@form</span>
-                                    @if (form != PluralForms.Other)
-                                    {
-                                        <RadzenButton Icon="close" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
-                                                      ButtonStyle="ButtonStyle.Danger" Click="@(() => RemovePluralForm(form))" />
-                                    }
-                                </RadzenStack>
-                            </th>
+                            <RadzenIcon Icon="star" Style="font-size: 0.9rem; color: var(--rz-warning);" />
                         }
-                    }
-                    else
-                    {
-                        <th style="width: auto;">Value</th>
-                    }
-                    <th style="width: 50px; text-align: center;">TM</th>
-                    <th style="width: 50px; text-align: center;">Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var lang in Languages)
-                {
-                    var isDefault = lang == DefaultLanguage;
-                    var langStatus = GetLanguageStatus(lang);
+                    </RadzenStack>
+                </Template>
+            </RadzenDataGridColumn>
 
-                    <tr>
-                        <td>
-                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem" AlignItems="Radzen.AlignItems.Center">
-                                <RadzenText TextStyle="TextStyle.Body2" Style="font-weight: 500;">@lang.ToUpperInvariant()</RadzenText>
-                                @if (isDefault)
-                                {
-                                    <RadzenIcon Icon="star" Style="font-size: 1rem; color: var(--rz-warning);" />
-                                }
-                            </RadzenStack>
-                        </td>
-
-                        @if (Row.IsPlural)
-                        {
-                            @foreach (var pluralForm in GetActivePluralForms())
+            @* Plural Form Column (only for plural keys) *@
+            @if (Row.IsPlural)
+            {
+                <RadzenDataGridColumn TItem="EditableTranslationRow" Title="Form" Width="75px">
+                    <Template Context="row">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">@row.PluralForm</RadzenText>
+                            @if (row.PluralForm != PluralForms.Other && row.IsDefault)
                             {
-                                var pf = pluralForm;
-                                var key = TranslationGridRow.GetKey(lang, pf);
-                                var cell = Row.Translations.GetValueOrDefault(key);
-                                var isDirty = cell?.IsDirty ?? false;
-                                var tmMatch = _tmSuggestions.GetValueOrDefault(key);
-
-                                <td style="@(isDirty ? "background-color: var(--rz-warning-lighter);" : "")">
-                                    <RadzenStack Gap="0.25rem">
-                                        @if (tmMatch != null)
-                                        {
-                                            <RadzenCard Style="background-color: var(--rz-success-lighter); padding: 0.5rem;">
-                                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
-                                                    <RadzenText TextStyle="TextStyle.Caption" Style="font-style: italic; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">
-                                                        "@tmMatch.TranslatedText"
-                                                    </RadzenText>
-                                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0">
-                                                        <RadzenButton Icon="check" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
-                                                                      ButtonStyle="ButtonStyle.Success" Click="@(() => ApplyTmSuggestion(key, tmMatch))" />
-                                                        <RadzenButton Icon="close" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
-                                                                      Click="@(() => DismissTmSuggestion(key))" />
-                                                    </RadzenStack>
-                                                </RadzenStack>
-                                            </RadzenCard>
-                                        }
-                                        @if (cell != null)
-                                        {
-                                            <RadzenTextArea Value="@cell.Value" Change="@(args => OnValueChanged(cell, args))"
-                                                            Rows="2" Placeholder="@GetPluralPlaceholder(pf, isDefault)" Style="width: 100%;" />
-                                        }
-                                    </RadzenStack>
-                                </td>
+                                <RadzenButton Icon="close" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                              ButtonStyle="ButtonStyle.Danger" Click="@(() => RemovePluralForm(row.PluralForm!))" />
                             }
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            }
+
+            @* Value Column *@
+            <RadzenDataGridColumn TItem="EditableTranslationRow" Title="Value">
+                <Template Context="row">
+                    <RadzenStack Gap="0.25rem" Style="@(row.IsDirty ? "background-color: var(--rz-warning-lighter); padding: 4px; border-radius: 4px;" : "")">
+                        @if (row.TmSuggestion != null)
+                        {
+                            <RadzenCard Style="background-color: var(--rz-success-lighter); padding: 0.5rem;">
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start" Gap="0.5rem">
+                                    <RadzenText TextStyle="TextStyle.Caption" Style="font-style: italic; word-break: break-word;">
+                                        "@row.TmSuggestion.TranslatedText"
+                                    </RadzenText>
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0" Style="flex-shrink: 0;">
+                                        <RadzenButton Icon="check" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                                      ButtonStyle="ButtonStyle.Success" Click="@(() => ApplyTmSuggestion(row))" />
+                                        <RadzenButton Icon="close" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                                      Click="@(() => DismissTmSuggestion(row))" />
+                                    </RadzenStack>
+                                </RadzenStack>
+                            </RadzenCard>
+                        }
+                        <RadzenTextArea @bind-Value="row.Value" Rows="2"
+                                        Placeholder="@GetPlaceholder(row)" Style="width: 100%;"
+                                        Change="@(() => OnRowValueChanged(row))" />
+                    </RadzenStack>
+                </Template>
+            </RadzenDataGridColumn>
+
+            @* TM Column *@
+            <RadzenDataGridColumn TItem="EditableTranslationRow" Title="TM" Width="50px" TextAlign="TextAlign.Center">
+                <Template Context="row">
+                    @if (!row.IsDefault)
+                    {
+                        @if (row.TmSuggestion != null)
+                        {
+                            <RadzenIcon Icon="memory" Style="font-size: 1rem; color: var(--rz-success);" />
                         }
                         else
                         {
-                            var cell = Row.Translations.GetValueOrDefault(lang);
-                            var isDirty = cell?.IsDirty ?? false;
-                            var tmMatch = _tmSuggestions.GetValueOrDefault(lang);
-
-                            <td style="@(isDirty ? "background-color: var(--rz-warning-lighter);" : "")">
-                                <RadzenStack Gap="0.25rem">
-                                    @if (tmMatch != null)
-                                    {
-                                        <RadzenCard Style="background-color: var(--rz-success-lighter); padding: 0.5rem;">
-                                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
-                                                <RadzenText TextStyle="TextStyle.Caption" Style="font-style: italic; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
-                                                    "@tmMatch.TranslatedText"
-                                                </RadzenText>
-                                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0">
-                                                    <RadzenButton Icon="check" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
-                                                                  ButtonStyle="ButtonStyle.Success" Click="@(() => ApplyTmSuggestion(lang, tmMatch))" />
-                                                    <RadzenButton Icon="close" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
-                                                                  Click="@(() => DismissTmSuggestion(lang))" />
-                                                </RadzenStack>
-                                            </RadzenStack>
-                                        </RadzenCard>
-                                    }
-                                    @if (cell != null)
-                                    {
-                                        <RadzenTextArea Value="@cell.Value" Change="@(args => OnValueChanged(cell, args))"
-                                                        Rows="2" Placeholder="@(isDefault ? "Enter source text" : "Enter translation")" Style="width: 100%;" />
-                                    }
-                                </RadzenStack>
-                            </td>
+                            <RadzenButton Icon="memory" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                          Click="@(() => CheckTmForRow(row))" Disabled="@(!HasSourceTextForRow(row))" />
                         }
+                    }
+                </Template>
+            </RadzenDataGridColumn>
 
-                        <td style="text-align: center;">
-                            @if (!isDefault)
-                            {
-                                var hasTm = HasTmForLanguage(lang);
-                                @if (hasTm)
-                                {
-                                    <RadzenIcon Icon="memory" Style="font-size: 1rem; color: var(--rz-success);" />
-                                }
-                                else
-                                {
-                                    <RadzenButton Icon="memory" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
-                                                  Click="@(() => CheckTmForLanguage(lang))" Disabled="@(!HasAnySourceText())" />
-                                }
-                            }
-                        </td>
-
-                        <td style="text-align: center;">
-                            @switch (langStatus)
-                            {
-                                case TranslationStatus.Complete:
-                                    <RadzenIcon Icon="check_circle" Style="font-size: 1rem; color: var(--rz-success);" />
-                                    break;
-                                case TranslationStatus.Partial:
-                                    <RadzenIcon Icon="warning" Style="font-size: 1rem; color: var(--rz-warning);" />
-                                    break;
-                                case TranslationStatus.Missing:
-                                    <RadzenIcon Icon="error" Style="font-size: 1rem; color: var(--rz-danger);" />
-                                    break;
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </RadzenCard>
+            @* Status Column *@
+            <RadzenDataGridColumn TItem="EditableTranslationRow" Width="50px" TextAlign="TextAlign.Center">
+                <Template Context="row">
+                    @if (row.IsDefault)
+                    {
+                        <RadzenIcon Icon="edit" Style="font-size: 1rem; color: var(--rz-text-secondary-color);" />
+                    }
+                    else if (!string.IsNullOrEmpty(row.Value))
+                    {
+                        <RadzenIcon Icon="check_circle" Style="font-size: 1rem; color: var(--rz-success);" />
+                    }
+                    else
+                    {
+                        <RadzenIcon Icon="error" Style="font-size: 1rem; color: var(--rz-danger);" />
+                    }
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
 
     @if (HasChanges)
     {
@@ -271,6 +221,8 @@
     [Parameter]
     public EventCallback<TranslationGridRow> OnTranslate { get; set; }
 
+    private RadzenDataGrid<EditableTranslationRow>? _grid;
+    private List<EditableTranslationRow> _editableRows = new();
     private bool _isSaving;
     private bool _isTranslating;
     private bool _showConversionConfirm;
@@ -278,15 +230,110 @@
     private bool _displayIsPlural;
     private string? _selectedPluralForm;
     private HashSet<string> _activePluralForms = new();
-    private Dictionary<string, TmMatchDto> _tmSuggestions = new();
 
     protected override void OnParametersSet()
     {
         _displayIsPlural = Row.IsPlural;
         RefreshActivePluralForms();
+        BuildEditableRows();
     }
 
-    private bool HasChanges => Row.Translations.Values.Any(t => t.IsDirty) || Row.IsKeyMetadataDirty;
+    private bool HasChanges => _editableRows.Any(r => r.IsDirty) || Row.IsKeyMetadataDirty;
+
+    #region Editable Row Model
+
+    private class EditableTranslationRow
+    {
+        public string LanguageCode { get; set; } = "";
+        public string? PluralForm { get; set; }
+        public string? Value { get; set; }
+        public string? OriginalValue { get; set; }
+        public bool IsDefault { get; set; }
+        public bool IsDirty => Value != OriginalValue;
+        public TmMatchDto? TmSuggestion { get; set; }
+        public TranslationCell? SourceCell { get; set; }
+    }
+
+    private void BuildEditableRows()
+    {
+        _editableRows.Clear();
+
+        foreach (var lang in Languages)
+        {
+            var isDefault = lang == DefaultLanguage;
+
+            if (Row.IsPlural)
+            {
+                foreach (var pluralForm in GetActivePluralForms())
+                {
+                    var key = TranslationGridRow.GetKey(lang, pluralForm);
+                    var cell = Row.Translations.GetValueOrDefault(key);
+
+                    _editableRows.Add(new EditableTranslationRow
+                    {
+                        LanguageCode = lang,
+                        PluralForm = pluralForm,
+                        Value = cell?.Value,
+                        OriginalValue = cell?.OriginalValue,
+                        IsDefault = isDefault,
+                        SourceCell = cell
+                    });
+                }
+            }
+            else
+            {
+                var cell = Row.Translations.GetValueOrDefault(lang);
+
+                _editableRows.Add(new EditableTranslationRow
+                {
+                    LanguageCode = lang,
+                    PluralForm = null,
+                    Value = cell?.Value,
+                    OriginalValue = cell?.OriginalValue,
+                    IsDefault = isDefault,
+                    SourceCell = cell
+                });
+            }
+        }
+    }
+
+    private void SyncRowsBackToTranslations()
+    {
+        foreach (var editRow in _editableRows)
+        {
+            if (editRow.SourceCell != null)
+            {
+                editRow.SourceCell.Value = editRow.Value;
+                editRow.SourceCell.IsDirty = editRow.IsDirty;
+            }
+        }
+    }
+
+    private void OnRowValueChanged(EditableTranslationRow row)
+    {
+        if (row.SourceCell != null)
+        {
+            row.SourceCell.Value = row.Value;
+            row.SourceCell.IsDirty = row.IsDirty;
+        }
+        StateHasChanged();
+    }
+
+    private string GetPlaceholder(EditableTranslationRow row)
+    {
+        if (row.IsDefault)
+        {
+            if (Row.IsPlural && row.PluralForm != null)
+                return GetPluralPlaceholder(row.PluralForm, true);
+            return "Enter source text";
+        }
+
+        if (Row.IsPlural && row.PluralForm != null)
+            return GetPluralPlaceholder(row.PluralForm, false);
+        return "Enter translation";
+    }
+
+    #endregion
 
     #region Plural Form Management
 
@@ -341,6 +388,7 @@
                 };
             }
         }
+        BuildEditableRows();
         NotificationService.Notify(NotificationSeverity.Info, "Added", $"Added '{pluralForm}' plural form");
     }
 
@@ -362,6 +410,7 @@
                 cell.IsDirty = true;
             }
         }
+        BuildEditableRows();
         NotificationService.Notify(NotificationSeverity.Info, "Removed", $"Removed '{pluralForm}' plural form");
     }
 
@@ -473,18 +522,13 @@
         }
 
         Row.IsPlural = _pendingIsPlural;
+        BuildEditableRows();
         NotificationService.Notify(NotificationSeverity.Success, "Converted", $"Converted to {(_pendingIsPlural ? "plural" : "single")} key");
     }
 
     #endregion
 
     #region Value Changes
-
-    private void OnValueChanged(TranslationCell cell, string? value)
-    {
-        cell.Value = value;
-        cell.IsDirty = cell.Value != cell.OriginalValue;
-    }
 
     private void OnCommentChanged(string? value)
     {
@@ -520,36 +564,21 @@
         return !string.IsNullOrEmpty(Row.Translations.GetValueOrDefault(DefaultLanguage)?.Value);
     }
 
-    private bool HasTmForLanguage(string lang)
+    private bool HasSourceTextForRow(EditableTranslationRow row)
     {
-        if (Row.IsPlural)
-            return GetActivePluralForms().Any(pf => _tmSuggestions.ContainsKey(TranslationGridRow.GetKey(lang, pf)));
-        return _tmSuggestions.ContainsKey(lang);
+        return !string.IsNullOrEmpty(GetSourceText(row.PluralForm));
     }
 
-    private async Task CheckTmForLanguage(string targetLanguage)
+    private async Task CheckTmForRow(EditableTranslationRow row)
     {
-        if (Row.IsPlural)
-        {
-            foreach (var pf in GetActivePluralForms())
-                await CheckTmForLanguageAndForm(targetLanguage, pf);
-        }
-        else
-        {
-            await CheckTmForLanguageAndForm(targetLanguage, null);
-        }
-    }
-
-    private async Task CheckTmForLanguageAndForm(string targetLanguage, string? pluralForm)
-    {
-        var sourceText = GetSourceText(pluralForm);
+        var sourceText = GetSourceText(row.PluralForm);
         if (string.IsNullOrEmpty(sourceText)) return;
 
         var request = new TmLookupRequest
         {
             SourceText = sourceText,
             SourceLanguage = DefaultLanguage,
-            TargetLanguage = targetLanguage,
+            TargetLanguage = row.LanguageCode,
             MinMatchPercent = 70,
             MaxResults = 1
         };
@@ -558,9 +587,7 @@
 
         if (result.IsSuccess && result.Data?.Matches.Any() == true)
         {
-            var match = result.Data.Matches.First();
-            var key = string.IsNullOrEmpty(pluralForm) ? targetLanguage : TranslationGridRow.GetKey(targetLanguage, pluralForm);
-            _tmSuggestions[key] = match;
+            row.TmSuggestion = result.Data.Matches.First();
         }
 
         StateHasChanged();
@@ -570,53 +597,25 @@
     {
         var foundCount = 0;
 
-        foreach (var lang in Languages.Where(l => l != DefaultLanguage))
+        foreach (var row in _editableRows.Where(r => !r.IsDefault))
         {
-            if (Row.IsPlural)
+            var sourceText = GetSourceText(row.PluralForm);
+            if (string.IsNullOrEmpty(sourceText)) continue;
+
+            var request = new TmLookupRequest
             {
-                foreach (var pf in GetActivePluralForms())
-                {
-                    var sourceText = GetSourceText(pf);
-                    if (string.IsNullOrEmpty(sourceText)) continue;
+                SourceText = sourceText,
+                SourceLanguage = DefaultLanguage,
+                TargetLanguage = row.LanguageCode,
+                MinMatchPercent = 70,
+                MaxResults = 1
+            };
 
-                    var request = new TmLookupRequest
-                    {
-                        SourceText = sourceText,
-                        SourceLanguage = DefaultLanguage,
-                        TargetLanguage = lang,
-                        MinMatchPercent = 70,
-                        MaxResults = 1
-                    };
-
-                    var result = await TmService.LookupAsync(request);
-                    if (result.IsSuccess && result.Data?.Matches.Any() == true)
-                    {
-                        var key = TranslationGridRow.GetKey(lang, pf);
-                        _tmSuggestions[key] = result.Data.Matches.First();
-                        foundCount++;
-                    }
-                }
-            }
-            else
+            var result = await TmService.LookupAsync(request);
+            if (result.IsSuccess && result.Data?.Matches.Any() == true)
             {
-                var sourceText = GetSourceText();
-                if (string.IsNullOrEmpty(sourceText)) continue;
-
-                var request = new TmLookupRequest
-                {
-                    SourceText = sourceText,
-                    SourceLanguage = DefaultLanguage,
-                    TargetLanguage = lang,
-                    MinMatchPercent = 70,
-                    MaxResults = 1
-                };
-
-                var result = await TmService.LookupAsync(request);
-                if (result.IsSuccess && result.Data?.Matches.Any() == true)
-                {
-                    _tmSuggestions[lang] = result.Data.Matches.First();
-                    foundCount++;
-                }
+                row.TmSuggestion = result.Data.Matches.First();
+                foundCount++;
             }
         }
 
@@ -628,60 +627,23 @@
         StateHasChanged();
     }
 
-    private void ApplyTmSuggestion(string key, TmMatchDto suggestion)
+    private void ApplyTmSuggestion(EditableTranslationRow row)
     {
-        if (Row.Translations.TryGetValue(key, out var cell))
+        if (row.TmSuggestion != null)
         {
-            cell.Value = suggestion.TranslatedText;
-            cell.IsDirty = true;
-            _ = TmService.IncrementUseCountAsync(suggestion.Id);
+            row.Value = row.TmSuggestion.TranslatedText;
+            OnRowValueChanged(row);
+            _ = TmService.IncrementUseCountAsync(row.TmSuggestion.Id);
             NotificationService.Notify(NotificationSeverity.Success, "Applied", "TM suggestion applied");
+            row.TmSuggestion = null;
         }
-
-        _tmSuggestions.Remove(key);
         StateHasChanged();
     }
 
-    private void DismissTmSuggestion(string key)
+    private void DismissTmSuggestion(EditableTranslationRow row)
     {
-        _tmSuggestions.Remove(key);
+        row.TmSuggestion = null;
         StateHasChanged();
-    }
-
-    #endregion
-
-    #region Status Helpers
-
-    private TranslationStatus GetLanguageStatus(string lang)
-    {
-        if (lang == DefaultLanguage) return TranslationStatus.Complete;
-
-        if (Row.IsPlural)
-        {
-            var forms = GetActivePluralForms().ToList();
-            var hasAny = forms.Any(pf =>
-            {
-                var key = TranslationGridRow.GetKey(lang, pf);
-                var cell = Row.Translations.GetValueOrDefault(key);
-                return !string.IsNullOrEmpty(cell?.Value);
-            });
-
-            var hasAll = forms.All(pf =>
-            {
-                var key = TranslationGridRow.GetKey(lang, pf);
-                var cell = Row.Translations.GetValueOrDefault(key);
-                return !string.IsNullOrEmpty(cell?.Value);
-            });
-
-            if (hasAll) return TranslationStatus.Complete;
-            if (hasAny) return TranslationStatus.Partial;
-            return TranslationStatus.Missing;
-        }
-        else
-        {
-            var cell = Row.Translations.GetValueOrDefault(lang);
-            return string.IsNullOrEmpty(cell?.Value) ? TranslationStatus.Missing : TranslationStatus.Complete;
-        }
     }
 
     #endregion
@@ -697,7 +659,9 @@
 
         try
         {
+            SyncRowsBackToTranslations();
             await OnTranslate.InvokeAsync(Row);
+            BuildEditableRows(); // Refresh after translation
         }
         finally
         {
@@ -714,6 +678,7 @@
     private void Save()
     {
         _isSaving = true;
+        SyncRowsBackToTranslations();
         DialogService.Close(Row);
     }
 

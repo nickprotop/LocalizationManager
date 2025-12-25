@@ -64,7 +64,9 @@
                     }
                     else
                     {
-                        <RadzenText TextStyle="TextStyle.Body2" Style="word-break: break-word;">@TruncateText(row.Value, 80)</RadzenText>
+                        <div style="word-break: break-word; max-height: 120px; overflow-y: auto;">
+                            <RadzenText TextStyle="TextStyle.Body2">@row.Value</RadzenText>
+                        </div>
                     }
                 </Template>
             </RadzenDataGridColumn>
