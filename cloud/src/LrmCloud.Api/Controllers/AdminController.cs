@@ -368,4 +368,45 @@ public class AdminController : ApiControllerBase
         var org = await _adminService.GetOrganizationAsync(id);
         return Success(org!);
     }
+
+    // ===== Communications Endpoints =====
+
+    /// <summary>
+    /// Get count of potential email recipients based on filters.
+    /// </summary>
+    [HttpGet("email/recipient-count")]
+    [ProducesResponseType(typeof(ApiResponse<int>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<int>>> GetEmailRecipientCount(
+        [FromQuery] AdminEmailRecipientType recipientType,
+        [FromQuery] string? planFilter,
+        [FromQuery] bool? emailVerifiedFilter)
+    {
+        var count = await _adminService.GetEmailRecipientCountAsync(recipientType, planFilter, emailVerifiedFilter);
+        return Success(count);
+    }
+
+    /// <summary>
+    /// Send email to users.
+    /// </summary>
+    [HttpPost("email/send")]
+    [ProducesResponseType(typeof(ApiResponse<AdminSendEmailResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ApiResponse<AdminSendEmailResultDto>>> SendEmail([FromBody] AdminSendEmailDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Subject))
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, "Subject is required");
+
+        if (string.IsNullOrWhiteSpace(dto.HtmlBody))
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, "Message body is required");
+
+        if (dto.RecipientType == AdminEmailRecipientType.SingleUser && !dto.UserId.HasValue)
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, "User ID is required for single user emails");
+
+        var result = await _adminService.SendEmailAsync(dto);
+
+        if (!result.Success)
+            return BadRequest(ErrorCodes.VAL_INVALID_INPUT, result.Error ?? "Failed to send email");
+
+        return Success(result);
+    }
 }

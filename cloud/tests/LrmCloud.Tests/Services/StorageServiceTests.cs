@@ -71,15 +71,16 @@ public class StorageServiceTests
     }
 
     // ============================================================
-    // Upload Tests
+    // Upload Snapshot File Tests
     // ============================================================
 
     [Fact]
-    public async Task UploadFileAsync_CallsMinioWithCorrectBucket()
+    public async Task UploadSnapshotFileAsync_CallsMinioWithCorrectBucket()
     {
         // Arrange
         var projectId = 1;
-        var filePath = "current/en.json";
+        var snapshotId = "snap-20250101-120000";
+        var fileName = "dbstate.json";
         var content = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("{\"hello\":\"world\"}"));
 
         _mockMinioClient
@@ -87,7 +88,7 @@ public class StorageServiceTests
             .ReturnsAsync(It.IsAny<Minio.DataModel.Response.PutObjectResponse>());
 
         // Act
-        await _storageService.UploadFileAsync(projectId, filePath, content, "application/json");
+        await _storageService.UploadSnapshotFileAsync(projectId, snapshotId, fileName, content);
 
         // Assert
         _mockMinioClient.Verify(
@@ -96,11 +97,12 @@ public class StorageServiceTests
     }
 
     [Fact]
-    public async Task UploadFileAsync_HandlesExceptionGracefully()
+    public async Task UploadSnapshotFileAsync_HandlesExceptionGracefully()
     {
         // Arrange
         var projectId = 1;
-        var filePath = "current/en.json";
+        var snapshotId = "snap-20250101-120000";
+        var fileName = "dbstate.json";
         var content = new MemoryStream();
 
         _mockMinioClient
@@ -109,19 +111,20 @@ public class StorageServiceTests
 
         // Act & Assert
         await Assert.ThrowsAsync<Exception>(async () =>
-            await _storageService.UploadFileAsync(projectId, filePath, content));
+            await _storageService.UploadSnapshotFileAsync(projectId, snapshotId, fileName, content));
     }
 
     // ============================================================
-    // Download Tests
+    // Download Snapshot File Tests
     // ============================================================
 
     [Fact]
-    public async Task DownloadFileAsync_WhenFileNotFound_ReturnsNull()
+    public async Task DownloadSnapshotFileAsync_WhenFileNotFound_ReturnsNull()
     {
         // Arrange
         var projectId = 1;
-        var filePath = "current/en.json";
+        var snapshotId = "snap-20250101-120000";
+        var fileName = "dbstate.json";
 
         // Setup StatObjectAsync to throw exception (file doesn't exist)
         _mockMinioClient
@@ -129,64 +132,66 @@ public class StorageServiceTests
             .ThrowsAsync(new Exception("Object not found"));
 
         // Act
-        var result = await _storageService.DownloadFileAsync(projectId, filePath);
+        var result = await _storageService.DownloadSnapshotFileAsync(projectId, snapshotId, fileName);
 
         // Assert
         Assert.Null(result);
     }
 
     // ============================================================
-    // Delete Tests
+    // Snapshot File Exists Tests
     // ============================================================
 
     [Fact]
-    public async Task DeleteFileAsync_CallsMinioRemove()
+    public async Task SnapshotFileExistsAsync_WhenFileExists_ReturnsTrue()
     {
         // Arrange
         var projectId = 1;
-        var filePath = "current/en.json";
+        var snapshotId = "snap-20250101-120000";
+        var fileName = "dbstate.json";
 
         _mockMinioClient
-            .Setup(c => c.RemoveObjectAsync(It.IsAny<RemoveObjectArgs>(), default))
-            .Returns(Task.CompletedTask);
+            .Setup(c => c.StatObjectAsync(It.IsAny<StatObjectArgs>(), default))
+            .ReturnsAsync(It.IsAny<Minio.DataModel.ObjectStat>());
 
         // Act
-        await _storageService.DeleteFileAsync(projectId, filePath);
+        var result = await _storageService.SnapshotFileExistsAsync(projectId, snapshotId, fileName);
 
         // Assert
-        _mockMinioClient.Verify(
-            c => c.RemoveObjectAsync(It.IsAny<RemoveObjectArgs>(), default),
-            Times.Once);
+        Assert.True(result);
     }
 
     [Fact]
-    public async Task DeleteFileAsync_HandlesExceptionGracefully()
+    public async Task SnapshotFileExistsAsync_WhenFileNotFound_ReturnsFalse()
     {
         // Arrange
         var projectId = 1;
-        var filePath = "current/en.json";
+        var snapshotId = "snap-20250101-120000";
+        var fileName = "dbstate.json";
 
         _mockMinioClient
-            .Setup(c => c.RemoveObjectAsync(It.IsAny<RemoveObjectArgs>(), default))
-            .ThrowsAsync(new Exception("MinIO error"));
+            .Setup(c => c.StatObjectAsync(It.IsAny<StatObjectArgs>(), default))
+            .ThrowsAsync(new Exception("Object not found"));
 
-        // Act & Assert
-        await Assert.ThrowsAsync<Exception>(async () =>
-            await _storageService.DeleteFileAsync(projectId, filePath));
+        // Act
+        var result = await _storageService.SnapshotFileExistsAsync(projectId, snapshotId, fileName);
+
+        // Assert
+        Assert.False(result);
     }
 
     // ============================================================
-    // List Files Tests
+    // Delete Snapshot Tests
     // ============================================================
 
     [Fact]
-    public async Task ListFilesAsync_CallsMinioWithCorrectPrefix()
+    public async Task DeleteSnapshotAsync_CallsMinioListAndRemove()
     {
         // Arrange
         var projectId = 1;
-        var prefix = "current/";
+        var snapshotId = "snap-20250101-120000";
 
-        // Create an empty async enumerable
+        // Empty list - no files to delete
         var emptyItems = GetEmptyAsyncEnumerable();
 
         _mockMinioClient
@@ -194,53 +199,12 @@ public class StorageServiceTests
             .Returns(emptyItems);
 
         // Act
-        var result = await _storageService.ListFilesAsync(projectId, prefix);
+        await _storageService.DeleteSnapshotAsync(projectId, snapshotId);
 
         // Assert
-        Assert.Empty(result);
         _mockMinioClient.Verify(
             c => c.ListObjectsEnumAsync(It.IsAny<ListObjectsArgs>(), default),
             Times.Once);
-    }
-
-    // ============================================================
-    // File Exists Tests
-    // ============================================================
-
-    [Fact]
-    public async Task FileExistsAsync_WhenFileExists_ReturnsTrue()
-    {
-        // Arrange
-        var projectId = 1;
-        var filePath = "current/en.json";
-
-        _mockMinioClient
-            .Setup(c => c.StatObjectAsync(It.IsAny<StatObjectArgs>(), default))
-            .ReturnsAsync(It.IsAny<Minio.DataModel.ObjectStat>());
-
-        // Act
-        var result = await _storageService.FileExistsAsync(projectId, filePath);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public async Task FileExistsAsync_WhenFileNotFound_ReturnsFalse()
-    {
-        // Arrange
-        var projectId = 1;
-        var filePath = "current/en.json";
-
-        _mockMinioClient
-            .Setup(c => c.StatObjectAsync(It.IsAny<StatObjectArgs>(), default))
-            .ThrowsAsync(new Exception("Object not found"));
-
-        // Act
-        var result = await _storageService.FileExistsAsync(projectId, filePath);
-
-        // Assert
-        Assert.False(result);
     }
 
     // ============================================================
@@ -270,17 +234,16 @@ public class StorageServiceTests
     }
 
     // ============================================================
-    // Create Snapshot Tests
+    // Get Total Storage Size Tests
     // ============================================================
 
     [Fact]
-    public async Task CreateSnapshotAsync_CallsListAndCopy()
+    public async Task GetTotalStorageSizeAsync_WithNoFiles_ReturnsZero()
     {
         // Arrange
-        var projectId = 1;
-        var syncId = "sync-20250101-120000";
+        var projectIds = new List<int> { 1, 2, 3 };
 
-        // Empty list - no files to snapshot
+        // Empty list - no files
         var emptyItems = GetEmptyAsyncEnumerable();
 
         _mockMinioClient
@@ -288,12 +251,23 @@ public class StorageServiceTests
             .Returns(emptyItems);
 
         // Act
-        await _storageService.CreateSnapshotAsync(projectId, syncId);
+        var result = await _storageService.GetTotalStorageSizeAsync(projectIds);
 
         // Assert
-        _mockMinioClient.Verify(
-            c => c.ListObjectsEnumAsync(It.IsAny<ListObjectsArgs>(), default),
-            Times.Once);
+        Assert.Equal(0, result);
+    }
+
+    [Fact]
+    public async Task GetTotalStorageSizeAsync_WithEmptyProjectList_ReturnsZero()
+    {
+        // Arrange
+        var projectIds = new List<int>();
+
+        // Act
+        var result = await _storageService.GetTotalStorageSizeAsync(projectIds);
+
+        // Assert
+        Assert.Equal(0, result);
     }
 
     // ============================================================

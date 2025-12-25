@@ -1,0 +1,280 @@
+@page "/admin/communications"
+@using LrmCloud.Shared.DTOs.Admin
+@using LrmCloud.Web.Services
+@inject AdminService AdminService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+@attribute [Authorize]
+
+<PageTitle>Communications - LRM Cloud Admin</PageTitle>
+
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+    <RadzenStack Gap="0">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="mail" />
+            <RadzenText TextStyle="TextStyle.H4">Communications</RadzenText>
+        </RadzenStack>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+            Send emails to users.
+        </RadzenText>
+    </RadzenStack>
+</RadzenStack>
+
+<RadzenCard>
+    <RadzenStack Gap="1.5rem">
+        @* Recipient Type Selection *@
+        <RadzenFormField Text="Recipients" Variant="Radzen.Variant.Outlined">
+            <ChildContent>
+                <RadzenRadioButtonList @bind-Value="_recipientType" TValue="AdminEmailRecipientType" Change="@OnRecipientTypeChanged">
+                    <Items>
+                        <RadzenRadioButtonListItem Text="Single User" Value="AdminEmailRecipientType.SingleUser" />
+                        <RadzenRadioButtonListItem Text="Filtered Users" Value="AdminEmailRecipientType.FilteredUsers" />
+                        <RadzenRadioButtonListItem Text="All Users" Value="AdminEmailRecipientType.AllUsers" />
+                    </Items>
+                </RadzenRadioButtonList>
+            </ChildContent>
+        </RadzenFormField>
+
+        @* Recipient Selection Based on Type *@
+        @if (_recipientType == AdminEmailRecipientType.SingleUser)
+        {
+            <RadzenFormField Text="Select User" Variant="Radzen.Variant.Outlined">
+                <ChildContent>
+                    <RadzenDropDown @bind-Value="_selectedUserId"
+                                    Data="@_users"
+                                    TextProperty="DisplayText"
+                                    ValueProperty="Id"
+                                    AllowFiltering="true"
+                                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                    Placeholder="Search for a user..."
+                                    Style="width: 100%;"
+                                    Change="@UpdateRecipientCount" />
+                </ChildContent>
+            </RadzenFormField>
+        }
+        else if (_recipientType == AdminEmailRecipientType.FilteredUsers)
+        {
+            <RadzenRow Gap="1rem">
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Plan" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenDropDown @bind-Value="_planFilter"
+                                            Data="@_plans"
+                                            AllowClear="true"
+                                            Placeholder="All plans"
+                                            Style="width: 100%;"
+                                            Change="@UpdateRecipientCount" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Email Verified" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenDropDown @bind-Value="_emailVerifiedFilter"
+                                            Data="@_verifiedOptions"
+                                            TextProperty="Text"
+                                            ValueProperty="Value"
+                                            AllowClear="true"
+                                            Placeholder="Any status"
+                                            Style="width: 100%;"
+                                            Change="@UpdateRecipientCount" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+        }
+        else if (_recipientType == AdminEmailRecipientType.AllUsers)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">
+                This will send an email to ALL registered users. Use with caution.
+            </RadzenAlert>
+        }
+
+        @* Recipient Count Preview *@
+        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Variant="Radzen.Variant.Flat">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="people" />
+                <RadzenText TextStyle="TextStyle.Body1">
+                    @if (_isLoadingCount)
+                    {
+                        <span>Calculating recipients...</span>
+                    }
+                    else
+                    {
+                        <strong>@_recipientCount</strong> <span>user(s) will receive this email</span>
+                    }
+                </RadzenText>
+            </RadzenStack>
+        </RadzenAlert>
+
+        <hr />
+
+        @* Email Content *@
+        <RadzenFormField Text="Subject" Variant="Radzen.Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="_subject" Placeholder="Enter email subject..." Style="width: 100%;" />
+            </ChildContent>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Message (HTML supported)" Variant="Radzen.Variant.Outlined">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="_htmlBody" Rows="10" Placeholder="Enter email message..." Style="width: 100%;" />
+            </ChildContent>
+        </RadzenFormField>
+
+        @* Send Button *@
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+            <RadzenButton Text="Send Email"
+                          Icon="send"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Disabled="@(!CanSend)"
+                          IsBusy="@_isSending"
+                          Click="@SendEmailAsync" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenCard>
+
+@code {
+    private AdminEmailRecipientType _recipientType = AdminEmailRecipientType.SingleUser;
+    private int? _selectedUserId;
+    private string? _planFilter;
+    private bool? _emailVerifiedFilter;
+    private string _subject = "";
+    private string _htmlBody = "";
+
+    private int _recipientCount;
+    private bool _isLoadingCount;
+    private bool _isSending;
+
+    private List<UserOption> _users = new();
+    private readonly List<string> _plans = new() { "free", "team", "enterprise" };
+    private readonly List<VerifiedOption> _verifiedOptions = new()
+    {
+        new VerifiedOption { Text = "Verified only", Value = true },
+        new VerifiedOption { Text = "Unverified only", Value = false }
+    };
+
+    private bool CanSend => !_isSending &&
+                            !string.IsNullOrWhiteSpace(_subject) &&
+                            !string.IsNullOrWhiteSpace(_htmlBody) &&
+                            _recipientCount > 0 &&
+                            (_recipientType != AdminEmailRecipientType.SingleUser || _selectedUserId.HasValue);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsersAsync();
+        await UpdateRecipientCount();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        var (users, _) = await AdminService.GetUsersAsync(pageSize: 500);
+        if (users != null)
+        {
+            _users = users.Select(u => new UserOption
+            {
+                Id = u.Id,
+                DisplayText = $"{u.Email} ({u.Username})"
+            }).ToList();
+        }
+    }
+
+    private async Task OnRecipientTypeChanged()
+    {
+        _selectedUserId = null;
+        _planFilter = null;
+        _emailVerifiedFilter = null;
+        await UpdateRecipientCount();
+    }
+
+    private async Task UpdateRecipientCount()
+    {
+        _isLoadingCount = true;
+        StateHasChanged();
+
+        try
+        {
+            if (_recipientType == AdminEmailRecipientType.SingleUser)
+            {
+                _recipientCount = _selectedUserId.HasValue ? 1 : 0;
+            }
+            else
+            {
+                _recipientCount = await AdminService.GetEmailRecipientCountAsync(
+                    _recipientType,
+                    _planFilter,
+                    _emailVerifiedFilter);
+            }
+        }
+        finally
+        {
+            _isLoadingCount = false;
+        }
+    }
+
+    private async Task SendEmailAsync()
+    {
+        if (!CanSend) return;
+
+        // Confirm for bulk sends
+        if (_recipientCount > 1)
+        {
+            var confirmed = await DialogService.Confirm(
+                $"Are you sure you want to send this email to {_recipientCount} users?",
+                "Confirm Send",
+                new ConfirmOptions
+                {
+                    OkButtonText = "Send",
+                    CancelButtonText = "Cancel"
+                });
+
+            if (confirmed != true) return;
+        }
+
+        _isSending = true;
+
+        try
+        {
+            var dto = new AdminSendEmailDto
+            {
+                RecipientType = _recipientType,
+                UserId = _selectedUserId,
+                PlanFilter = _planFilter,
+                EmailVerifiedFilter = _emailVerifiedFilter,
+                Subject = _subject,
+                HtmlBody = _htmlBody
+            };
+
+            var (success, error, count) = await AdminService.SendEmailAsync(dto);
+
+            if (success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Email Sent", $"Successfully sent email to {count} user(s).");
+
+                // Clear form
+                _subject = "";
+                _htmlBody = "";
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Send Failed", error ?? "Failed to send email.");
+            }
+        }
+        finally
+        {
+            _isSending = false;
+        }
+    }
+
+    private class UserOption
+    {
+        public int Id { get; set; }
+        public string DisplayText { get; set; } = "";
+    }
+
+    private class VerifiedOption
+    {
+        public string Text { get; set; } = "";
+        public bool Value { get; set; }
+    }
+}

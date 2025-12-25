@@ -431,4 +431,55 @@ public class AdminService
             return (false, ex.Message, null);
         }
     }
+
+    // ===== Communications Methods =====
+
+    public async Task<int> GetEmailRecipientCountAsync(
+        AdminEmailRecipientType recipientType,
+        string? planFilter = null,
+        bool? emailVerifiedFilter = null)
+    {
+        try
+        {
+            var query = $"admin/email/recipient-count?recipientType={recipientType}";
+            if (!string.IsNullOrWhiteSpace(planFilter))
+                query += $"&planFilter={Uri.EscapeDataString(planFilter)}";
+            if (emailVerifiedFilter.HasValue)
+                query += $"&emailVerifiedFilter={emailVerifiedFilter.Value}";
+
+            var response = await _httpClient.GetAsync(query);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<int>>();
+                return result?.Data ?? 0;
+            }
+        }
+        catch
+        {
+            // Ignore errors
+        }
+        return 0;
+    }
+
+    public async Task<(bool Success, string? Error, int RecipientCount)> SendEmailAsync(AdminSendEmailDto dto)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("admin/email/send", dto);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<AdminSendEmailResultDto>>();
+                return (result?.Data?.Success ?? false, result?.Data?.Error, result?.Data?.RecipientCount ?? 0);
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                return (false, error, 0);
+            }
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message, 0);
+        }
+    }
 }

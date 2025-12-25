@@ -19,6 +19,7 @@ public class AdminService : IAdminService
     private readonly CloudConfiguration _config;
     private readonly IDistributedCache _cache;
     private readonly IMinioClient _minio;
+    private readonly IMailService _mailService;
     private readonly ILogger<AdminService> _logger;
     private static readonly DateTime _startTime = DateTime.UtcNow;
 
@@ -27,12 +28,14 @@ public class AdminService : IAdminService
         CloudConfiguration config,
         IDistributedCache cache,
         IMinioClient minio,
+        IMailService mailService,
         ILogger<AdminService> logger)
     {
         _db = db;
         _config = config;
         _cache = cache;
         _minio = minio;
+        _mailService = mailService;
         _logger = logger;
     }
 
@@ -1131,5 +1134,111 @@ public class AdminService : IAdminService
             orgId, previousOwnerId, request.NewOwnerId);
 
         return (true, null);
+    }
+
+    // ===== Communications Methods =====
+
+    public async Task<int> GetEmailRecipientCountAsync(AdminEmailRecipientType recipientType, string? planFilter, bool? emailVerifiedFilter)
+    {
+        return recipientType switch
+        {
+            AdminEmailRecipientType.SingleUser => 1,
+            AdminEmailRecipientType.FilteredUsers => await GetFilteredUserCountAsync(planFilter, emailVerifiedFilter),
+            AdminEmailRecipientType.AllUsers => await _db.Users.CountAsync(u => u.DeletedAt == null && u.Email != null),
+            _ => 0
+        };
+    }
+
+    private async Task<int> GetFilteredUserCountAsync(string? planFilter, bool? emailVerifiedFilter)
+    {
+        var query = _db.Users.Where(u => u.DeletedAt == null && u.Email != null);
+
+        if (!string.IsNullOrWhiteSpace(planFilter))
+            query = query.Where(u => u.Plan == planFilter.ToLowerInvariant());
+
+        if (emailVerifiedFilter.HasValue)
+            query = query.Where(u => u.EmailVerified == emailVerifiedFilter.Value);
+
+        return await query.CountAsync();
+    }
+
+    public async Task<AdminSendEmailResultDto> SendEmailAsync(AdminSendEmailDto dto)
+    {
+        try
+        {
+            var recipients = await GetRecipientsAsync(dto);
+
+            if (recipients.Count == 0)
+            {
+                return new AdminSendEmailResultDto
+                {
+                    Success = false,
+                    RecipientCount = 0,
+                    Error = "No recipients found matching the criteria"
+                };
+            }
+
+            // Send emails (fire and forget - no tracking)
+            var sendTasks = recipients.Select(email =>
+                _mailService.SendEmailAsync(email, dto.Subject, dto.HtmlBody));
+
+            await Task.WhenAll(sendTasks);
+
+            _logger.LogInformation("Admin sent email to {RecipientCount} recipients. Subject: {Subject}",
+                recipients.Count, dto.Subject);
+
+            return new AdminSendEmailResultDto
+            {
+                Success = true,
+                RecipientCount = recipients.Count
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send admin email. Subject: {Subject}", dto.Subject);
+            return new AdminSendEmailResultDto
+            {
+                Success = false,
+                RecipientCount = 0,
+                Error = ex.Message
+            };
+        }
+    }
+
+    private async Task<List<string>> GetRecipientsAsync(AdminSendEmailDto dto)
+    {
+        switch (dto.RecipientType)
+        {
+            case AdminEmailRecipientType.SingleUser:
+                if (!dto.UserId.HasValue)
+                    return new List<string>();
+
+                var user = await _db.Users
+                    .Where(u => u.Id == dto.UserId.Value && u.DeletedAt == null && u.Email != null)
+                    .Select(u => u.Email)
+                    .FirstOrDefaultAsync();
+
+                return user != null ? new List<string> { user } : new List<string>();
+
+            case AdminEmailRecipientType.FilteredUsers:
+                var filteredQuery = _db.Users.Where(u => u.DeletedAt == null && u.Email != null);
+
+                if (!string.IsNullOrWhiteSpace(dto.PlanFilter))
+                    filteredQuery = filteredQuery.Where(u => u.Plan == dto.PlanFilter.ToLowerInvariant());
+
+                if (dto.EmailVerifiedFilter.HasValue)
+                    filteredQuery = filteredQuery.Where(u => u.EmailVerified == dto.EmailVerifiedFilter.Value);
+
+                return await filteredQuery.Select(u => u.Email!).ToListAsync();
+
+            case AdminEmailRecipientType.AllUsers:
+                return await _db.Users
+                    .Where(u => u.DeletedAt == null && u.Email != null)
+                    .Select(u => u.Email!)
+                    .ToListAsync();
+
+            default:
+                return new List<string>();
+        }
     }
 }

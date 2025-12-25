@@ -107,4 +107,16 @@ public interface IAdminService
     /// Transfer organization ownership.
     /// </summary>
     Task<(bool Success, string? ErrorMessage)> TransferOrganizationOwnershipAsync(int orgId, AdminTransferOwnershipRequest request);
+
+    // ===== Communications Methods =====
+
+    /// <summary>
+    /// Get count of email recipients based on filters.
+    /// </summary>
+    Task<int> GetEmailRecipientCountAsync(AdminEmailRecipientType recipientType, string? planFilter, bool? emailVerifiedFilter);
+
+    /// <summary>
+    /// Send email to users.
+    /// </summary>
+    Task<AdminSendEmailResultDto> SendEmailAsync(AdminSendEmailDto dto);
 }
