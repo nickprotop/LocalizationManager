@@ -20,7 +20,7 @@
 @if (_isLoading)
 {
     <RadzenStack Gap="1rem">
-        <div style="background: var(--rz-base-300); width: 300px; height: 40px; border-radius: 4px;"></div>
+        <div style="background: var(--rz-base-light); width: 300px; height: 40px; border-radius: 4px;"></div>
         <RadzenRow Gap="1rem">
             @for (int i = 0; i < 3; i++)
             {
@@ -116,7 +116,7 @@ else
 
         <RadzenRow Gap="1rem">
             <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-                <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                <RadzenCard Style="border: 1px solid var(--rz-base);">
                     <RadzenStack Gap="0.5rem">
                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">LRM TRANSLATION</RadzenText>
                         <RadzenText TextStyle="TextStyle.H5">@UiHelpers.FormatNumber(_usageStats?.LrmCharsUsed ?? 0)</RadzenText>
@@ -130,7 +130,7 @@ else
                 </RadzenCard>
             </RadzenColumn>
             <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-                <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                <RadzenCard Style="border: 1px solid var(--rz-base);">
                     <RadzenStack Gap="0.5rem">
                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">BYOK PROVIDERS</RadzenText>
                         <RadzenText TextStyle="TextStyle.H5">@UiHelpers.FormatNumber(_usageStats?.OtherCharsUsed ?? 0)</RadzenText>
@@ -144,7 +144,7 @@ else
                 </RadzenCard>
             </RadzenColumn>
             <RadzenColumn Size="12" SizeSM="6" SizeMD="2">
-                <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                <RadzenCard Style="border: 1px solid var(--rz-base);">
                     <RadzenStack Gap="0.5rem">
                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">PROJECTS</RadzenText>
                         <RadzenText TextStyle="TextStyle.H5">@(_usageStats?.ProjectCount ?? 0)</RadzenText>
@@ -153,7 +153,7 @@ else
                 </RadzenCard>
             </RadzenColumn>
             <RadzenColumn Size="12" SizeSM="6" SizeMD="2">
-                <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                <RadzenCard Style="border: 1px solid var(--rz-base);">
                     <RadzenStack Gap="0.5rem">
                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">TEAM MEMBERS</RadzenText>
                         <RadzenText TextStyle="TextStyle.H5">@(_usageStats?.MemberCount ?? 0) / @(_usageStats?.MaxMembers == int.MaxValue ? "∞" : _usageStats?.MaxMembers.ToString() ?? "0")</RadzenText>
@@ -162,7 +162,7 @@ else
                 </RadzenCard>
             </RadzenColumn>
             <RadzenColumn Size="12" SizeSM="6" SizeMD="2">
-                <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                <RadzenCard Style="border: 1px solid var(--rz-base);">
                     <RadzenStack Gap="0.5rem">
                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">BILLING CYCLE</RadzenText>
                         <RadzenText TextStyle="TextStyle.H5">@(_usageStats?.DaysRemaining ?? 0) days</RadzenText>
@@ -221,7 +221,7 @@ else
         <div style="overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse;">
                 <thead>
-                    <tr style="border-bottom: 1px solid var(--rz-base-400);">
+                    <tr style="border-bottom: 1px solid var(--rz-base);">
                         <th style="text-align: left; padding: 0.75rem;">Feature</th>
                         <th style="text-align: center; padding: 0.75rem;">
                             <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
@@ -253,49 +253,49 @@ else
                     </tr>
                 </thead>
                 <tbody>
-                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                    <tr style="border-bottom: 1px solid var(--rz-base-light);">
                         <td style="padding: 0.75rem;">Team Members</td>
                         <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="close" Style="color: var(--rz-text-secondary-color);" /></td>
                         <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Team.MaxTeamMembers ?? 10)</td>
                         <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxTeamMembers ?? int.MaxValue)</td>
                     </tr>
-                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                    <tr style="border-bottom: 1px solid var(--rz-base-light);">
                         <td style="padding: 0.75rem;">LRM Translation/month</td>
                         <td style="text-align: center; padding: 0.75rem;">@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Free.TranslationChars ?? 5000)</td>
                         <td style="text-align: center; padding: 0.75rem;">@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Team.TranslationChars ?? 50000)</td>
                         <td style="text-align: center; padding: 0.75rem;">@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Enterprise.TranslationChars ?? 500000)</td>
                     </tr>
-                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                    <tr style="border-bottom: 1px solid var(--rz-base-light);">
                         <td style="padding: 0.75rem;">Other Providers/month</td>
                         <td style="text-align: center; padding: 0.75rem;">@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Free.OtherChars ?? 25000)</td>
                         <td style="text-align: center; padding: 0.75rem;">@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Team.OtherChars ?? 250000)</td>
                         <td style="text-align: center; padding: 0.75rem;">@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Enterprise.OtherChars ?? 2500000)</td>
                     </tr>
-                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                    <tr style="border-bottom: 1px solid var(--rz-base-light);">
                         <td style="padding: 0.75rem;">Projects</td>
                         <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Free.MaxProjects ?? 3)</td>
                         <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Team.MaxProjects ?? int.MaxValue)</td>
                         <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxProjects ?? int.MaxValue)</td>
                     </tr>
-                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                    <tr style="border-bottom: 1px solid var(--rz-base-light);">
                         <td style="padding: 0.75rem;">API Keys (BYOK)</td>
                         <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Free.MaxApiKeys ?? 3)</td>
                         <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Team.MaxApiKeys ?? 10)</td>
                         <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxApiKeys ?? int.MaxValue)</td>
                     </tr>
-                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                    <tr style="border-bottom: 1px solid var(--rz-base-light);">
                         <td style="padding: 0.75rem;">API Access</td>
                         <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="check" Style="color: var(--rz-success);" /></td>
                         <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="check" Style="color: var(--rz-success);" /></td>
                         <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="check" Style="color: var(--rz-success);" /></td>
                     </tr>
-                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                    <tr style="border-bottom: 1px solid var(--rz-base-light);">
                         <td style="padding: 0.75rem;">Priority Support</td>
                         <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="close" Style="color: var(--rz-text-secondary-color);" /></td>
                         <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="check" Style="color: var(--rz-success);" /></td>
                         <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="check" Style="color: var(--rz-success);" /></td>
                     </tr>
-                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                    <tr style="border-bottom: 1px solid var(--rz-base-light);">
                         <td style="padding: 0.75rem;">SSO/SAML</td>
                         <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="close" Style="color: var(--rz-text-secondary-color);" /></td>
                         <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="close" Style="color: var(--rz-text-secondary-color);" /></td>

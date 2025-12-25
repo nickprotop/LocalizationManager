@@ -18,13 +18,13 @@
 
     <RadzenRow Gap="0.5rem">
         <RadzenColumn Size="3">
-            <RadzenCard Style="text-align: center; background: rgba(76, 175, 80, 0.15);">
+            <RadzenCard Style="text-align: center; background: var(--rz-success-lighter);">
                 <RadzenText TextStyle="TextStyle.H5" Style="color: var(--rz-success);">@Result.TranslatedCount</RadzenText>
                 <RadzenText TextStyle="TextStyle.Caption">Translated</RadzenText>
             </RadzenCard>
         </RadzenColumn>
         <RadzenColumn Size="3">
-            <RadzenCard Style="text-align: center; background: rgba(76, 175, 80, 0.1);">
+            <RadzenCard Style="text-align: center; background: var(--rz-success-lighter);">
                 <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.Center" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
                     <RadzenIcon Icon="memory" Style="font-size: 1rem; color: var(--rz-success);" />
                     <RadzenText TextStyle="TextStyle.H5" Style="color: var(--rz-success);">@TmCount</RadzenText>
@@ -33,13 +33,13 @@
             </RadzenCard>
         </RadzenColumn>
         <RadzenColumn Size="3">
-            <RadzenCard Style="text-align: center; background: rgba(255, 193, 7, 0.15);">
+            <RadzenCard Style="text-align: center; background: var(--rz-warning-lighter);">
                 <RadzenText TextStyle="TextStyle.H5" Style="color: var(--rz-warning);">@Result.SkippedCount</RadzenText>
                 <RadzenText TextStyle="TextStyle.Caption">Skipped</RadzenText>
             </RadzenCard>
         </RadzenColumn>
         <RadzenColumn Size="3">
-            <RadzenCard Style="text-align: center; background: rgba(244, 67, 54, 0.15);">
+            <RadzenCard Style="text-align: center; background: var(--rz-danger-lighter);">
                 <RadzenText TextStyle="TextStyle.H5" Style="color: var(--rz-danger);">@Result.FailedCount</RadzenText>
                 <RadzenText TextStyle="TextStyle.Caption">Failed</RadzenText>
             </RadzenCard>

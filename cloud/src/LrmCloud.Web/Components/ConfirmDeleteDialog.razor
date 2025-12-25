@@ -5,7 +5,7 @@
 
     @if (_items.Any())
     {
-        <RadzenCard Style="max-height: 200px; overflow-y: auto; background: var(--rz-base-200);">
+        <RadzenCard Style="max-height: 200px; overflow-y: auto; background: var(--rz-base-lighter);">
             @foreach (var item in _items.Take(10))
             {
                 <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" Style="padding: 0.25rem 0;">

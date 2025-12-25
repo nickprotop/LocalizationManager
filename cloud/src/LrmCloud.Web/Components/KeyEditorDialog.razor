@@ -141,11 +141,11 @@
                                 var isDirty = cell?.IsDirty ?? false;
                                 var tmMatch = _tmSuggestions.GetValueOrDefault(key);
 
-                                <td style="@(isDirty ? "background-color: rgba(255, 193, 7, 0.1);" : "")">
+                                <td style="@(isDirty ? "background-color: var(--rz-warning-lighter);" : "")">
                                     <RadzenStack Gap="0.25rem">
                                         @if (tmMatch != null)
                                         {
-                                            <RadzenCard Style="background-color: rgba(76, 175, 80, 0.1); padding: 0.5rem;">
+                                            <RadzenCard Style="background-color: var(--rz-success-lighter); padding: 0.5rem;">
                                                 <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
                                                     <RadzenText TextStyle="TextStyle.Caption" Style="font-style: italic; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">
                                                         "@tmMatch.TranslatedText"
@@ -174,11 +174,11 @@
                             var isDirty = cell?.IsDirty ?? false;
                             var tmMatch = _tmSuggestions.GetValueOrDefault(lang);
 
-                            <td style="@(isDirty ? "background-color: rgba(255, 193, 7, 0.1);" : "")">
+                            <td style="@(isDirty ? "background-color: var(--rz-warning-lighter);" : "")">
                                 <RadzenStack Gap="0.25rem">
                                     @if (tmMatch != null)
                                     {
-                                        <RadzenCard Style="background-color: rgba(76, 175, 80, 0.1); padding: 0.5rem;">
+                                        <RadzenCard Style="background-color: var(--rz-success-lighter); padding: 0.5rem;">
                                             <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
                                                 <RadzenText TextStyle="TextStyle.Caption" Style="font-style: italic; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
                                                     "@tmMatch.TranslatedText"

@@ -262,7 +262,7 @@ else
                                 @foreach (var provider in _translationProviders)
                                 {
                                     <RadzenColumn Size="12" SizeMD="6">
-                                        <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                                        <RadzenCard Style="border: 1px solid var(--rz-base);">
                                             <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
                                                 <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
                                                     <RadzenIcon Icon="@GetProviderIcon(provider.Name)" />
@@ -324,7 +324,7 @@ else
                         </RadzenAlert>
 
                         @* Enable/Disable Workflow *@
-                        <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                        <RadzenCard Style="border: 1px solid var(--rz-base);">
                             <RadzenStack Gap="0.5rem">
                                 <RadzenText TextStyle="TextStyle.Subtitle1">Workflow Settings</RadzenText>
                                 <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
@@ -362,7 +362,7 @@ else
                         @* Status Statistics *@
                         @if (_workflowSettings.ReviewWorkflowEnabled && _workflowSettings.Stats != null)
                         {
-                            <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                            <RadzenCard Style="border: 1px solid var(--rz-base);">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-mb-3">Translation Status Overview</RadzenText>
                                 <RadzenRow>
                                     <RadzenColumn Size="6" SizeSM="3">
@@ -396,7 +396,7 @@ else
                         @* Reviewers Management *@
                         @if (_workflowSettings.ReviewWorkflowEnabled)
                         {
-                            <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                            <RadzenCard Style="border: 1px solid var(--rz-base);">
                                 <RadzenStack Gap="1rem">
                                     <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
                                         <RadzenText TextStyle="TextStyle.Subtitle1">Project Reviewers</RadzenText>
