@@ -658,7 +658,7 @@ else
                 { "SupportsPluralKeys", SupportsPluralKeys },
                 { "OnTranslate", EventCallback.Factory.Create<TranslationGridRow>(this, TranslateKeyInDialog) }
             },
-            new Radzen.DialogOptions { Width = "1000px", Height = "90vh" });
+            new Radzen.DialogOptions { Width = "95%", Height = "90vh", Style = "max-width: 1400px;" });
 
         if (result is TranslationGridRow editedRow)
         {

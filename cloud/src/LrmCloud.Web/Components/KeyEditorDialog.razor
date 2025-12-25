@@ -6,7 +6,7 @@
 @inject Radzen.DialogService DialogService
 @inject IJSRuntime JS
 
-<RadzenStack Gap="1rem">
+<RadzenStack Gap="1rem" Style="height: calc(90vh - 100px); display: flex; flex-direction: column;">
     @* Key Type Toggle *@
     @if (SupportsPluralKeys)
     {
@@ -90,7 +90,7 @@
                     Density="Density.Compact"
                     AllowSorting="false"
                     AllowPaging="false"
-                    Style="max-height: 400px; overflow-y: auto;">
+                    Style="flex: 1; min-height: 200px; overflow-y: auto;">
         <Columns>
             @* Language Column *@
             <RadzenDataGridColumn TItem="EditableTranslationRow" Title="Lang" Width="70px" Frozen="true">
@@ -361,16 +361,16 @@
     private IEnumerable<string> GetAvailablePluralForms() =>
         PluralForms.All.Where(pf => !_activePluralForms.Contains(pf));
 
-    private void OnPluralFormSelected(object value)
+    private async Task OnPluralFormSelected(object value)
     {
         if (value is string form && !string.IsNullOrEmpty(form))
         {
-            AddPluralForm(form);
+            await AddPluralForm(form);
             _selectedPluralForm = null;
         }
     }
 
-    private void AddPluralForm(string pluralForm)
+    private async Task AddPluralForm(string pluralForm)
     {
         _activePluralForms.Add(pluralForm);
         foreach (var lang in Languages)
@@ -389,10 +389,11 @@
             }
         }
         BuildEditableRows();
+        if (_grid != null) await _grid.Reload();
         NotificationService.Notify(NotificationSeverity.Info, "Added", $"Added '{pluralForm}' plural form");
     }
 
-    private void RemovePluralForm(string pluralForm)
+    private async Task RemovePluralForm(string pluralForm)
     {
         if (pluralForm == PluralForms.Other)
         {
@@ -411,6 +412,7 @@
             }
         }
         BuildEditableRows();
+        if (_grid != null) await _grid.Reload();
         NotificationService.Notify(NotificationSeverity.Info, "Removed", $"Removed '{pluralForm}' plural form");
     }
 
@@ -449,7 +451,7 @@
         _displayIsPlural = Row.IsPlural;
     }
 
-    private void ConfirmConversion()
+    private async Task ConfirmConversion()
     {
         _showConversionConfirm = false;
 
@@ -523,6 +525,7 @@
 
         Row.IsPlural = _pendingIsPlural;
         BuildEditableRows();
+        if (_grid != null) await _grid.Reload();
         NotificationService.Notify(NotificationSeverity.Success, "Converted", $"Converted to {(_pendingIsPlural ? "plural" : "single")} key");
     }
 
@@ -661,7 +664,8 @@
         {
             SyncRowsBackToTranslations();
             await OnTranslate.InvokeAsync(Row);
-            BuildEditableRows(); // Refresh after translation
+            BuildEditableRows();
+            if (_grid != null) await _grid.Reload();
         }
         finally
         {
