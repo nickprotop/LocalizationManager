@@ -127,9 +127,15 @@
         }
     }
 
-    private void OnRadzenThemeChanged()
+    private async void OnRadzenThemeChanged()
     {
-        InvokeAsync(StateHasChanged);
+        // Sync the theme change to our persistence layer
+        var currentRadzenTheme = RadzenThemeService.Theme;
+        if (!string.IsNullOrEmpty(currentRadzenTheme) && currentRadzenTheme != ThemeService.CurrentTheme)
+        {
+            await ThemeService.SetThemeAsync(currentRadzenTheme);
+        }
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task OnThemeDropdownChanged(object value)
