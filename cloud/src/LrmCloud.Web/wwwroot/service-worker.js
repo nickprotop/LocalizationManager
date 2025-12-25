@@ -72,6 +72,11 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Skip invalid CSS requests (Radzen theme loader with undefined theme)
+    if (url.pathname.includes('/-') || url.pathname.includes('/-.')) {
+        return;
+    }
+
     // Skip API requests - always go to network
     if (url.pathname.startsWith('/api/') || url.pathname.includes('/api/')) {
         event.respondWith(
