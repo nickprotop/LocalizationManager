@@ -1,5 +1,6 @@
 @* Global error boundary component - catches and displays unhandled errors gracefully *@
 @inherits ErrorBoundary
+@implements IDisposable
 @inject NotificationService NotificationService
 @inject ILogger<GlobalErrorBoundary> Logger
 
@@ -60,12 +61,22 @@ else
     [Inject]
     private NavigationManager Navigation { get; set; } = null!;
 
-#if DEBUG
     protected override void OnInitialized()
     {
+        Navigation.LocationChanged += OnLocationChanged;
+#if DEBUG
         ShowDetails = true;
-    }
 #endif
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (CurrentException != null)
+        {
+            Recover();
+            StateHasChanged();
+        }
+    }
 
     protected override Task OnErrorAsync(Exception exception)
     {
@@ -76,6 +87,12 @@ else
 
     private void NavigateHome()
     {
-        Navigation.NavigateTo("/app");
+        Recover();
+        Navigation.NavigateTo("");
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
     }
 }
