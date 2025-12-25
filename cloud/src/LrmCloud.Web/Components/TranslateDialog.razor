@@ -2,6 +2,7 @@
 @using LrmCloud.Shared.DTOs.TranslationMemory
 @using LrmCloud.Shared.DTOs.Glossary
 @using LrmCloud.Web.Services
+@using System.Globalization
 @inject TranslationService TranslationService
 @inject TranslationMemoryService TmService
 @inject GlossaryService GlossaryService
@@ -99,6 +100,9 @@
             <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Large" />
             <RadzenText TextStyle="TextStyle.H6">Translating...</RadzenText>
             <RadzenText class="rz-color-secondary">
+                To @string.Join(", ", _selectedLanguages.Select(GetLanguageDisplayName))
+            </RadzenText>
+            <RadzenText class="rz-color-secondary">
                 @RemainingToTranslate translations via @_selectedProvider
             </RadzenText>
             @if (_translationResult != null)
@@ -136,10 +140,26 @@
                     </RadzenAlert>
                 }
 
-                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
-                    Translate @(_keysToTranslate.Count > 0 ? $"{_keysToTranslate.Count} selected keys" : "all keys")
-                    to the selected languages.
-                </RadzenText>
+                <RadzenStack Gap="0.25rem">
+                    <RadzenText TextStyle="TextStyle.Subtitle1">
+                        Translate @(_keysToTranslate.Count > 0 ? $"{_keysToTranslate.Count} keys" : "all keys")
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                        From: <strong>@GetLanguageDisplayName(SourceLanguage)</strong> (@SourceLanguage.ToUpperInvariant())
+                    </RadzenText>
+                    @if (_selectedLanguages.Any())
+                    {
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                            To: @string.Join(", ", _selectedLanguages.Select(GetLanguageDisplayName))
+                        </RadzenText>
+                    }
+                    @if (EstimatedCharacters > 0)
+                    {
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            ~@EstimatedCharacters.ToString("N0") characters
+                        </RadzenText>
+                    }
+                </RadzenStack>
 
                 <RadzenFormField Text="Translation Provider" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
                     <ChildContent>
@@ -150,11 +170,15 @@
                                 <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
                                     <RadzenIcon Icon="@GetProviderIcon(provider.Name)" Style="font-size: 1rem;" />
                                     <span>@provider.DisplayName</span>
-                                    @if (!provider.RequiresApiKey)
+                                    @if (provider.IsManagedProvider)
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Managed" />
+                                    }
+                                    else if (!provider.RequiresApiKey)
                                     {
                                         <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Free" />
                                     }
-                                    @if (provider.ApiKeySource != null)
+                                    @if (provider.ApiKeySource != null && !provider.IsManagedProvider)
                                     {
                                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">(@provider.ApiKeySource)</RadzenText>
                                     }
@@ -165,16 +189,19 @@
                 </RadzenFormField>
 
                 <RadzenText TextStyle="TextStyle.Subtitle2">Target Languages</RadzenText>
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                <RadzenStack Gap="0.5rem">
                     @foreach (var lang in AvailableLanguages.Where(l => l != SourceLanguage))
                     {
                         var langCode = lang;
                         var isSelected = _selectedLanguages.Contains(langCode);
-                        <RadzenButton Text="@langCode.ToUpperInvariant()"
-                                      ButtonStyle="@(isSelected ? ButtonStyle.Primary : ButtonStyle.Light)"
-                                      Variant="@(isSelected ? Radzen.Variant.Filled : Radzen.Variant.Outlined)"
-                                      Size="ButtonSize.Small"
-                                      Click="@(() => ToggleLanguage(langCode))" />
+                        var displayName = GetLanguageDisplayName(langCode);
+                        var labelText = displayName != langCode.ToUpperInvariant()
+                            ? $"{displayName} ({langCode.ToUpperInvariant()})"
+                            : langCode.ToUpperInvariant();
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                            <RadzenCheckBox TValue="bool" Value="@isSelected" Change="@(v => ToggleLanguage(langCode))" />
+                            <RadzenText TextStyle="TextStyle.Body2">@labelText</RadzenText>
+                        </RadzenStack>
                     }
                 </RadzenStack>
 
@@ -308,6 +335,12 @@
 
     [Parameter]
     public Dictionary<string, KeyTranslationMetadata>? KeyMetadata { get; set; }
+
+    /// <summary>
+    /// If true, translations are saved directly to database. If false, results are returned to caller.
+    /// </summary>
+    [Parameter]
+    public bool SaveToDatabase { get; set; } = false;
 
     private enum DialogStep { Config, TmPreview, Translating, Results }
     private DialogStep _currentStep = DialogStep.Config;
@@ -559,7 +592,7 @@
                 OnlyMissing = _onlyMissing,
                 Overwrite = _overwrite,
                 Context = _context,
-                SaveToDatabase = false,
+                SaveToDatabase = SaveToDatabase,
                 SourceTexts = SourceTexts,
                 KeyMetadata = KeyMetadata,
                 TranslationMemory = new TmOptions
@@ -627,7 +660,7 @@
                 OnlyMissing = _onlyMissing,
                 Overwrite = _overwrite,
                 Context = _context,
-                SaveToDatabase = false,
+                SaveToDatabase = SaveToDatabase,
                 SourceTexts = SourceTexts,
                 KeyMetadata = KeyMetadata,
                 TranslationMemory = new TmOptions
@@ -700,5 +733,33 @@
         public required string TargetLanguage { get; set; }
         public required TmMatchDto Match { get; set; }
         public bool? IsAccepted { get; set; } = true;
+    }
+
+    private int EstimatedCharacters => SourceTexts?
+        .Where(kv => _keysToTranslate.Count == 0 || _keysToTranslate.Contains(kv.Key))
+        .Sum(kv => (kv.Value?.Length ?? 0) * _selectedLanguages.Count) ?? 0;
+
+    private static string GetLanguageDisplayName(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            return code;
+
+        try
+        {
+            var culture = new CultureInfo(code);
+            var name = culture.EnglishName;
+
+            // Check for invalid/unknown cultures
+            if (string.IsNullOrEmpty(name) || name.StartsWith("Unknown", StringComparison.OrdinalIgnoreCase))
+                return code.ToUpperInvariant();
+
+            // Get first word (e.g., "French" from "French (France)")
+            var firstWord = name.Split(' ')[0];
+            return string.IsNullOrEmpty(firstWord) ? code.ToUpperInvariant() : firstWord;
+        }
+        catch
+        {
+            return code.ToUpperInvariant();
+        }
     }
 }
