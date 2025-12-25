@@ -226,11 +226,11 @@ else
 
     private string _projectName = "";
 
-    private List<(string Value, string Text)> _scopeOptions = new()
+    private List<SelectOption> _scopeOptions = new()
     {
-        ("all", "All"),
-        ("project", "Project Only"),
-        ("organization", "Organization Only")
+        new("all", "All"),
+        new("project", "Project Only"),
+        new("organization", "Organization Only")
     };
 
     private List<GlossaryTermDto> FilteredTerms => _glossary?.Terms
@@ -244,12 +244,12 @@ else
                     t.Translations.ContainsKey(_languageFilter))
         .ToList() ?? new();
 
-    private List<(string Value, string Text)> GetLanguageOptions()
+    private List<SelectOption> GetLanguageOptions()
     {
-        var options = new List<(string Value, string Text)> { ("", "All Languages") };
+        var options = new List<SelectOption> { new("", "All Languages") };
         if (_glossary != null)
         {
-            options.AddRange(_glossary.Languages.Select(l => (l, l.ToUpperInvariant())));
+            options.AddRange(_glossary.Languages.Select(l => new SelectOption(l, l.ToUpperInvariant())));
         }
         return options;
     }
@@ -489,4 +489,6 @@ else
             return text;
         return text[..maxLength] + "...";
     }
+
+    private record SelectOption(string Value, string Text);
 }
