@@ -1,0 +1,170 @@
+@page "/about"
+@attribute [Authorize]
+@inject LrmCloud.Web.Services.GitHubService GitHubService
+@inject IJSRuntime JS
+
+<PageTitle>About - @AppConstants.AppName</PageTitle>
+
+<RadzenBreadCrumb>
+    <RadzenBreadCrumbItem Path="support" Text="Help & Support" />
+    <RadzenBreadCrumbItem Text="About" />
+</RadzenBreadCrumb>
+
+<RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="2rem" Style="padding: 2rem 0;">
+    <RadzenCard Style="max-width: 600px; width: 100%; text-align: center;">
+        <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+            <RadzenIcon Icon="translate" Style="font-size: 4rem; color: var(--rz-primary);" />
+
+            <RadzenText TextStyle="TextStyle.H3">@AppConstants.AppName</RadzenText>
+
+            @if (_isLoading)
+            {
+                <RadzenSkeleton Style="height: 24px; width: 100px;" />
+            }
+            else
+            {
+                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"v{_version}")" />
+            }
+
+            <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary" TextAlign="TextAlign.Center">
+                @AppConstants.AppDescription
+            </RadzenText>
+
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" TextAlign="TextAlign.Center">
+                @AppConstants.AppTagline
+            </RadzenText>
+        </RadzenStack>
+    </RadzenCard>
+
+    <RadzenRow Gap="1rem" JustifyContent="JustifyContent.Center" Style="max-width: 600px; width: 100%;">
+        <RadzenColumn Size="12" SizeSM="6">
+            <RadzenCard Style="height: 100%;">
+                <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="code" Style="font-size: 2rem; color: var(--rz-secondary);" />
+                    <RadzenText TextStyle="TextStyle.Subtitle1">Source Code</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" TextAlign="TextAlign.Center">
+                        View the source code on GitHub
+                    </RadzenText>
+                    <RadzenButton Variant="Radzen.Variant.Text" Icon="open_in_new" Text="GitHub"
+                                  Click="@(() => OpenInNewTab(AppConstants.GitHubUrl))" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+
+        <RadzenColumn Size="12" SizeSM="6">
+            <RadzenCard Style="height: 100%;">
+                <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="menu_book" Style="font-size: 2rem; color: var(--rz-info);" />
+                    <RadzenText TextStyle="TextStyle.Subtitle1">Documentation</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" TextAlign="TextAlign.Center">
+                        Learn how to use LRM Cloud
+                    </RadzenText>
+                    <RadzenButton Variant="Radzen.Variant.Text" Icon="open_in_new" Text="Docs"
+                                  Click="@(() => OpenInNewTab(AppConstants.DocsBaseUrl))" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+
+        <RadzenColumn Size="12" SizeSM="6">
+            <RadzenCard Style="height: 100%;">
+                <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="history" Style="font-size: 2rem; color: var(--rz-warning);" />
+                    <RadzenText TextStyle="TextStyle.Subtitle1">Changelog</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" TextAlign="TextAlign.Center">
+                        See what's new in this version
+                    </RadzenText>
+                    <RadzenLink Path="changelog" Text="View Changelog" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+
+        <RadzenColumn Size="12" SizeSM="6">
+            <RadzenCard Style="height: 100%;">
+                <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="help_outline" Style="font-size: 2rem; color: var(--rz-success);" />
+                    <RadzenText TextStyle="TextStyle.Subtitle1">Support</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" TextAlign="TextAlign.Center">
+                        Get help or report issues
+                    </RadzenText>
+                    <RadzenLink Path="support" Text="Get Support" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenCard Style="max-width: 600px; width: 100%;">
+        <RadzenStack Gap="0.5rem">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">License</RadzenText>
+                <RadzenButton Variant="Radzen.Variant.Text" Text="@AppConstants.License" Size="ButtonSize.Small"
+                              Click="@(() => OpenInNewTab(AppConstants.LicenseUrl))" />
+            </RadzenStack>
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Version</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2">@(_version ?? "...")</RadzenText>
+            </RadzenStack>
+            @if (!string.IsNullOrEmpty(_uiVersion))
+            {
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">UI Build</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2">@_uiVersion</RadzenText>
+                </RadzenStack>
+            }
+            <hr style="margin: 0.5rem 0;" />
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" TextAlign="TextAlign.Center">
+                @($"\u00a9 {AppConstants.Copyright}. All rights reserved.")
+            </RadzenText>
+        </RadzenStack>
+    </RadzenCard>
+
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.Center">
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="favorite" Text="Sponsor"
+                      Click="@(() => OpenInNewTab(AppConstants.SponsorUrl))" />
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="star" Text="Star on GitHub"
+                      Click="@(() => OpenInNewTab(AppConstants.GitHubUrl))" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    private string? _version;
+    private string? _uiVersion;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _version = await GitHubService.GetLatestVersionAsync();
+        }
+        catch
+        {
+            _version = "unknown";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _uiVersion = await JS.InvokeAsync<string?>("lrmVersion.getUiVersion");
+                StateHasChanged();
+            }
+            catch
+            {
+                // JS not available
+            }
+        }
+    }
+
+    private async Task OpenInNewTab(string url)
+    {
+        await JS.InvokeVoidAsync("lrmLinks.openInNewTab", url);
+    }
+}

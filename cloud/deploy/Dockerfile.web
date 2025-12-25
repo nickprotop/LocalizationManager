@@ -41,9 +41,11 @@ RUN apk add --no-cache curl
 # Copy Blazor WASM published output to nginx html directory
 COPY --from=build /app/publish/wwwroot /usr/share/nginx/html
 
-# Replace service worker version placeholder with build timestamp
-# This ensures every deploy gets a unique version for cache busting
-RUN sed -i "s/__BUILD_VERSION__/$(date -u +%Y%m%d%H%M%S)/" /usr/share/nginx/html/service-worker.js
+# Replace version placeholder with build timestamp for cache busting
+# This ensures every deploy gets unique URLs for critical assets
+RUN BUILD_VERSION=$(date -u +%Y%m%d%H%M%S) && \
+    sed -i "s/__BUILD_VERSION__/$BUILD_VERSION/g" /usr/share/nginx/html/service-worker.js && \
+    sed -i "s/__BUILD_VERSION__/$BUILD_VERSION/g" /usr/share/nginx/html/index.html
 
 # Fix permissions for all files (nginx needs read access)
 RUN chmod -R 644 /usr/share/nginx/html/* 2>/dev/null || true && \

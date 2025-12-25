@@ -16,6 +16,14 @@ builder.Services.AddRadzenComponents();
 // Theme service (persistent theme selection)
 builder.Services.AddScoped<LrmThemeService>();
 
+// GitHub service (for changelog/releases) - uses separate HttpClient
+builder.Services.AddScoped(sp =>
+{
+    var httpClient = new HttpClient();
+    var logger = sp.GetRequiredService<ILogger<GitHubService>>();
+    return new GitHubService(httpClient, logger);
+});
+
 // Local storage for token persistence
 builder.Services.AddBlazoredLocalStorage();
 

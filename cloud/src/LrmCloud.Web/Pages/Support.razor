@@ -1,0 +1,244 @@
+@page "/support"
+@attribute [Authorize]
+@inject IJSRuntime JS
+
+<PageTitle>Help & Support - @AppConstants.AppName</PageTitle>
+
+<RadzenStack Gap="1.5rem">
+    <RadzenText TextStyle="TextStyle.H4">Help & Support</RadzenText>
+
+    <RadzenRow Gap="1rem">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard Style="height: 100%;">
+                <RadzenStack Gap="1rem">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="bug_report" Style="font-size: 1.5rem; color: var(--rz-danger);" />
+                        <RadzenText TextStyle="TextStyle.H6">Report a Bug</RadzenText>
+                    </RadzenStack>
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                        Found something wrong? Help us fix it by reporting the issue on GitHub.
+                    </RadzenText>
+                    <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Danger"
+                                  Icon="open_in_new" Text="Open Issue"
+                                  Click="@(() => OpenInNewTab(AppConstants.GitHubNewIssueUrl))" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard Style="height: 100%;">
+                <RadzenStack Gap="1rem">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="lightbulb" Style="font-size: 1.5rem; color: var(--rz-warning);" />
+                        <RadzenText TextStyle="TextStyle.H6">Request a Feature</RadzenText>
+                    </RadzenStack>
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                        Have an idea for improvement? Share it with us on GitHub Discussions.
+                    </RadzenText>
+                    <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Warning"
+                                  Icon="open_in_new" Text="Start Discussion"
+                                  Click="@(() => OpenInNewTab(AppConstants.GitHubNewDiscussionUrl))" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-4">Documentation</RadzenText>
+    <RadzenRow Gap="1rem">
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard class="clickable-card" @onclick="@(() => OpenInNewTab(AppConstants.DocsGettingStartedUrl))">
+                <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="rocket_launch" Style="font-size: 2rem; color: var(--rz-primary);" />
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Getting Started</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" TextAlign="TextAlign.Center">
+                        Quick start guide and overview
+                    </RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard class="clickable-card" @onclick="@(() => OpenInNewTab(AppConstants.DocsCliUrl))">
+                <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="terminal" Style="font-size: 2rem; color: var(--rz-secondary);" />
+                    <RadzenText TextStyle="TextStyle.Subtitle2">CLI Reference</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" TextAlign="TextAlign.Center">
+                        Command line tool documentation
+                    </RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard class="clickable-card" @onclick="@(() => OpenInNewTab(AppConstants.DocsCloudSyncUrl))">
+                <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="cloud_sync" Style="font-size: 2rem; color: var(--rz-success);" />
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Cloud Sync</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" TextAlign="TextAlign.Center">
+                        Sync CLI with cloud
+                    </RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard class="clickable-card" @onclick="@(() => OpenInNewTab(AppConstants.DocsTranslationUrl))">
+                <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="translate" Style="font-size: 2rem; color: var(--rz-info);" />
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Translation</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" TextAlign="TextAlign.Center">
+                        Translation providers & options
+                    </RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-4">Community</RadzenText>
+    <RadzenRow Gap="1rem">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard Style="height: 100%;">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                    <RadzenIcon Icon="forum" Style="font-size: 2.5rem; color: var(--rz-primary);" />
+                    <RadzenStack Gap="0.25rem" Style="flex: 1;">
+                        <RadzenText TextStyle="TextStyle.Subtitle1">GitHub Discussions</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                            Ask questions, share ideas, and connect with other users
+                        </RadzenText>
+                    </RadzenStack>
+                    <RadzenButton Variant="Radzen.Variant.Text" Icon="open_in_new"
+                                  Click="@(() => OpenInNewTab(AppConstants.GitHubDiscussionsUrl))" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard Style="height: 100%;">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                    <RadzenIcon Icon="favorite" Style="font-size: 2.5rem; color: var(--rz-danger);" />
+                    <RadzenStack Gap="0.25rem" Style="flex: 1;">
+                        <RadzenText TextStyle="TextStyle.Subtitle1">Support Development</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                            Help us keep improving LRM Cloud
+                        </RadzenText>
+                    </RadzenStack>
+                    <RadzenButton Variant="Radzen.Variant.Text" Icon="open_in_new"
+                                  Click="@(() => OpenInNewTab(AppConstants.SponsorUrl))" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-4">More Resources</RadzenText>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="history" Text="Changelog"
+                      Click="@(() => Navigation.NavigateTo("changelog"))" />
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="info" Text="About"
+                      Click="@(() => Navigation.NavigateTo("about"))" />
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="code" Text="GitHub"
+                      Click="@(() => OpenInNewTab(AppConstants.GitHubUrl))" />
+    </RadzenStack>
+
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-4">Frequently Asked Questions</RadzenText>
+    <RadzenCard>
+        <RadzenAccordion>
+            <Items>
+                <RadzenAccordionItem Text="How do I connect the CLI to LRM Cloud?" Icon="terminal">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            1. Generate an API key in Settings > CLI API Keys
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            2. Run <code>lrm cloud login</code> and paste your API key
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            3. Use <code>lrm cloud push</code> and <code>lrm cloud pull</code> to sync
+                        </RadzenText>
+                        <RadzenLink Path="@AppConstants.DocsCloudSyncUrl" Target="_blank" Text="Learn more" />
+                    </RadzenStack>
+                </RadzenAccordionItem>
+
+                <RadzenAccordionItem Text="How do I set up translation providers?" Icon="translate">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            1. Go to Settings > Translation Providers
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            2. Add your API keys for Google, DeepL, OpenAI, or other providers
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            3. Use the "Translate" feature in the editor to translate keys
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenAccordionItem>
+
+                <RadzenAccordionItem Text="How do I invite team members?" Icon="group_add">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            1. Create or join an Organization
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            2. Go to Organization > Members
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            3. Click "Invite Member" and enter their email address
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenAccordionItem>
+
+                <RadzenAccordionItem Text="What file formats are supported?" Icon="description">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            LRM supports multiple localization formats:
+                        </RadzenText>
+                        <ul style="margin: 0; padding-left: 1.5rem;">
+                            <li>.resx (ASP.NET)</li>
+                            <li>JSON (generic and i18next)</li>
+                            <li>Android strings.xml</li>
+                            <li>iOS .strings and .stringsdict</li>
+                        </ul>
+                    </RadzenStack>
+                </RadzenAccordionItem>
+
+                <RadzenAccordionItem Text="How do I export my translations?" Icon="download">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            You can export translations in multiple ways:
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            - Use the CLI: <code>lrm cloud pull --project your-project</code>
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            - Export from project settings in the web UI
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            - Download snapshots from the Snapshots page
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenAccordionItem>
+            </Items>
+        </RadzenAccordion>
+    </RadzenCard>
+</RadzenStack>
+
+<style>
+    .clickable-card {
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .clickable-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+</style>
+
+@code {
+    [Inject]
+    private NavigationManager Navigation { get; set; } = null!;
+
+    private async Task OpenInNewTab(string url)
+    {
+        await JS.InvokeVoidAsync("lrmLinks.openInNewTab", url);
+    }
+}

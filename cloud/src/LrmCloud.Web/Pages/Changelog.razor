@@ -1,0 +1,173 @@
+@page "/changelog"
+@attribute [Authorize]
+@inject LrmCloud.Web.Services.GitHubService GitHubService
+@inject IJSRuntime JS
+
+<PageTitle>Changelog - @AppConstants.AppName</PageTitle>
+
+<RadzenBreadCrumb>
+    <RadzenBreadCrumbItem Path="support" Text="Help & Support" />
+    <RadzenBreadCrumbItem Text="Changelog" />
+</RadzenBreadCrumb>
+
+<RadzenStack Gap="1rem" class="rz-mt-4">
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+        <RadzenText TextStyle="TextStyle.H4">Changelog</RadzenText>
+        <RadzenButton Variant="Radzen.Variant.Text" Icon="open_in_new" Text="View on GitHub"
+                      Click="@(() => OpenInNewTab(AppConstants.GitHubReleasesUrl))" Size="ButtonSize.Small" />
+    </RadzenStack>
+
+    @if (_isLoading)
+    {
+        <RadzenStack Gap="1rem">
+            @for (var i = 0; i < 3; i++)
+            {
+                <RadzenCard>
+                    <RadzenSkeleton Style="height: 24px; width: 200px; margin-bottom: 0.5rem;" />
+                    <RadzenSkeleton Style="height: 16px; width: 100%; margin-bottom: 0.25rem;" />
+                    <RadzenSkeleton Style="height: 16px; width: 80%;" />
+                </RadzenCard>
+            }
+        </RadzenStack>
+    }
+    else if (_error != null)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                <span>@_error</span>
+                <RadzenButton Variant="Radzen.Variant.Text" Text="View on GitHub" Size="ButtonSize.Small"
+                              Click="@(() => OpenInNewTab(AppConstants.GitHubReleasesUrl))" />
+            </RadzenStack>
+        </RadzenAlert>
+    }
+    else if (!_releases.Any())
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info" AllowClose="false">
+            No releases found. Check back later!
+        </RadzenAlert>
+    }
+    else
+    {
+        <RadzenStack Gap="1rem">
+            @foreach (var release in _releases)
+            {
+                var isLatest = release == _releases.First();
+
+                <RadzenCard class="@(isLatest ? "latest-release" : "")">
+                    <RadzenStack Gap="0.75rem">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                <RadzenText TextStyle="TextStyle.H6" Style="margin: 0;">
+                                    @(string.IsNullOrEmpty(release.Name) ? $"v{release.Version}" : release.Name)
+                                </RadzenText>
+                                @if (isLatest)
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Latest" />
+                                }
+                                @if (release.Prerelease)
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Pre-release" />
+                                }
+                            </RadzenStack>
+                            @if (release.PublishedAt != DateTime.MinValue)
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                    @release.PublishedAt.ToString("MMMM d, yyyy")
+                                </RadzenText>
+                            }
+                        </RadzenStack>
+
+                        @{
+                            var changes = release.GetChangeItems();
+                        }
+                        @if (changes.Any())
+                        {
+                            <ul style="margin: 0; padding-left: 1.5rem;">
+                                @foreach (var change in changes.Take(10))
+                                {
+                                    <li>
+                                        <RadzenText TextStyle="TextStyle.Body2">@change</RadzenText>
+                                    </li>
+                                }
+                                @if (changes.Count > 10)
+                                {
+                                    <li class="rz-color-secondary">
+                                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                                            ... and @(changes.Count - 10) more
+                                        </RadzenText>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(release.Body))
+                        {
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                                @(release.Body.Length > 300 ? release.Body[..300] + "..." : release.Body)
+                            </RadzenText>
+                        }
+                        else
+                        {
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                                No release notes available.
+                            </RadzenText>
+                        }
+
+                        <RadzenButton Variant="Radzen.Variant.Text" Icon="open_in_new" Text="View Release" Size="ButtonSize.Small"
+                                      Click="@(() => OpenInNewTab(release.HtmlUrl))" />
+                    </RadzenStack>
+                </RadzenCard>
+            }
+        </RadzenStack>
+    }
+
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.Center" class="rz-mt-4">
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="open_in_new" Text="View Full Changelog on GitHub"
+                      Click="@(() => OpenInNewTab(AppConstants.GitHubReleasesUrl))" />
+    </RadzenStack>
+</RadzenStack>
+
+<style>
+    .latest-release {
+        border-left: 4px solid var(--rz-success);
+    }
+</style>
+
+@code {
+    private List<GitHubRelease> _releases = new();
+    private bool _isLoading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReleasesAsync();
+    }
+
+    private async Task LoadReleasesAsync()
+    {
+        _isLoading = true;
+        _error = null;
+
+        try
+        {
+            _releases = await GitHubService.GetReleasesAsync(5);
+
+            if (!_releases.Any())
+            {
+                _error = "Unable to load releases.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load releases: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OpenInNewTab(string url)
+    {
+        await JS.InvokeVoidAsync("lrmLinks.openInNewTab", url);
+    }
+}

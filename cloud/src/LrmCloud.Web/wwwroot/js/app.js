@@ -274,3 +274,30 @@ window.lrmServiceWorker = {
         }
     }
 };
+
+// =============================================================================
+// Version Info
+// =============================================================================
+window.lrmVersion = {
+    getUiVersion: function() {
+        // Get version from meta tag (set by Docker build)
+        const meta = document.querySelector('meta[name="build-version"]');
+        if (meta) {
+            const version = meta.getAttribute('content');
+            // Return null if still placeholder (development mode)
+            if (version && version !== '__BUILD_' + 'VERSION__') {
+                return version;
+            }
+        }
+        return null;
+    }
+};
+
+// =============================================================================
+// External Links
+// =============================================================================
+window.lrmLinks = {
+    openInNewTab: function(url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
+};

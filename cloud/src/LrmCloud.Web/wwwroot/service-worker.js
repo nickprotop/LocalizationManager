@@ -49,6 +49,14 @@ self.addEventListener('activate', (event) => {
     );
 });
 
+// External URLs that should bypass service worker entirely
+const EXTERNAL_BYPASS = [
+    'raw.githubusercontent.com',
+    'api.github.com',
+    'fonts.googleapis.com',
+    'fonts.gstatic.com'
+];
+
 // Fetch event - serve from cache, fall back to network
 self.addEventListener('fetch', (event) => {
     const { request } = event;
@@ -56,6 +64,11 @@ self.addEventListener('fetch', (event) => {
 
     // Skip non-GET requests
     if (request.method !== 'GET') {
+        return;
+    }
+
+    // Skip external URLs - let browser handle them directly
+    if (EXTERNAL_BYPASS.some(domain => url.hostname.includes(domain))) {
         return;
     }
 

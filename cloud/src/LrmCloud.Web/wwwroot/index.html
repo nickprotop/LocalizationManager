@@ -9,6 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="LRM Cloud" />
+    <meta name="build-version" content="__BUILD_VERSION__" />
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
         script-src 'self' 'unsafe-inline' 'unsafe-eval';
@@ -28,8 +29,8 @@
     <!-- Google Fonts for Radzen -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-    <!-- App CSS -->
-    <link rel="stylesheet" href="css/app.css" />
+    <!-- App CSS (versioned for cache busting) -->
+    <link rel="stylesheet" href="css/app.css?v=__BUILD_VERSION__" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="apple-touch-icon" href="icon-192.png" />
 </head>
@@ -55,8 +56,8 @@
     <!-- Radzen JS -->
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
 
-    <!-- App JS -->
-    <script src="js/app.js"></script>
+    <!-- App JS (versioned for cache busting) -->
+    <script src="js/app.js?v=__BUILD_VERSION__"></script>
 
     <script src="_framework/blazor.webassembly.js"></script>
 
