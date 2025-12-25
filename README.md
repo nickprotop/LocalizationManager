@@ -43,7 +43,7 @@ ext install nickprotop.localization-manager
 
 ![LRM Cloud Dashboard](assets/cloud-dashboard.png)
 
-**👉 [Try LRM Cloud Free →](https://lrm-cloud.com)**
+**👉 [Try LRM Cloud Free →](https://lrm-cloud.com)** | **[Documentation →](docs/CLOUD.md)**
 
 Cloud platform for team-based localization management with web dashboard and CLI sync.
 
