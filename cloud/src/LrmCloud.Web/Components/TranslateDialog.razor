@@ -6,360 +6,291 @@
 @inject TranslationMemoryService TmService
 @inject GlossaryService GlossaryService
 @inject LimitsService LimitsService
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 @inject IJSRuntime JSRuntime
 
-<MudDialog>
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Translate" />
-            <MudText Typo="Typo.h6">Translate Keys</MudText>
-            @if (_currentStep == DialogStep.TmPreview)
+<RadzenStack Gap="1rem">
+    @if (_isLoadingProviders)
+    {
+        <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem" Style="padding: 2rem;">
+            <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" />
+            <RadzenText>Loading providers...</RadzenText>
+        </RadzenStack>
+    }
+    else if (_currentStep == DialogStep.TmPreview)
+    {
+        @* TM Preview Step *@
+        <RadzenStack Gap="1rem">
+            @if (_isCheckingTm)
             {
-                <MudChip T="string" Size="Size.Small" Color="Color.Success">TM Preview</MudChip>
+                <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem" Style="padding: 1rem;">
+                    <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" />
+                    <RadzenText>Checking Translation Memory...</RadzenText>
+                </RadzenStack>
             }
-        </MudStack>
-    </TitleContent>
+            else
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                    Found <strong>@_tmMatches.Count</strong> TM matches.
+                    Accept matches to use them (free), or skip to translate via provider.
+                </RadzenAlert>
 
-    <DialogContent>
-        @if (_isLoadingProviders)
-        {
-            <MudStack AlignItems="AlignItems.Center" Class="py-8">
-                <MudProgressCircular Indeterminate="true" />
-                <MudText>Loading providers...</MudText>
-            </MudStack>
-        }
-        else if (_currentStep == DialogStep.TmPreview)
-        {
-            @* TM Preview Step *@
-            <MudStack Spacing="3">
-                @if (_isCheckingTm)
+                @if (_tmMatches.Any())
                 {
-                    <MudStack AlignItems="AlignItems.Center" Class="py-4">
-                        <MudProgressCircular Indeterminate="true" />
-                        <MudText>Checking Translation Memory...</MudText>
-                    </MudStack>
-                }
-                else
-                {
-                    <MudAlert Severity="Severity.Info" Dense="true">
-                        Found <strong>@_tmMatches.Count</strong> TM matches.
-                        Accept matches to use them (free), or skip to translate via provider.
-                    </MudAlert>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small"
+                                      Icon="check_circle" Text="@($"Accept All ({_tmMatches.Count(m => m.Value.IsAccepted ?? true)})")"
+                                      Click="AcceptAllTmMatches" />
+                        <RadzenButton Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                      Icon="cancel" Text="Reject All" Click="RejectAllTmMatches" />
+                    </RadzenStack>
 
-                    @if (_tmMatches.Any())
-                    {
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-2">
-                            <MudButton Variant="Variant.Text"
-                                       Color="Color.Success"
-                                       Size="Size.Small"
-                                       StartIcon="@Icons.Material.Filled.CheckCircle"
-                                       OnClick="AcceptAllTmMatches">
-                                Accept All (@_tmMatches.Count(m => m.Value.IsAccepted == null || m.Value.IsAccepted == true))
-                            </MudButton>
-                            <MudButton Variant="Variant.Text"
-                                       Color="Color.Default"
-                                       Size="Size.Small"
-                                       StartIcon="@Icons.Material.Filled.Cancel"
-                                       OnClick="RejectAllTmMatches">
-                                Reject All
-                            </MudButton>
-                        </MudStack>
-
-                        <MudPaper Outlined="true" Class="pa-0" Style="max-height: 400px; overflow-y: auto;">
-                            <MudList T="string" Dense="true">
-                                @foreach (var match in _tmMatches)
-                                {
-                                    var key = match.Key;
-                                    var tmMatch = match.Value;
-                                    var isAccepted = tmMatch.IsAccepted ?? true; // Default to accepted
-
-                                    <MudListItem>
-                                        <MudStack Spacing="1">
-                                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                                                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                                                    <MudCheckBox T="bool"
-                                                                 Value="@isAccepted"
-                                                                 ValueChanged="@(v => ToggleTmMatch(key, v))"
-                                                                 Color="Color.Success"
-                                                                 Size="Size.Small" />
-                                                    <MudText Typo="Typo.body2">
-                                                        <strong>@tmMatch.KeyName</strong>
-                                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-1">
-                                                            → @tmMatch.TargetLanguage.ToUpperInvariant()
-                                                        </MudText>
-                                                    </MudText>
-                                                </MudStack>
-                                                <MudChip T="string"
-                                                         Size="Size.Small"
-                                                         Color="@(tmMatch.Match.MatchPercent == 100 ? Color.Success : Color.Warning)">
-                                                    @tmMatch.Match.MatchPercent%
-                                                </MudChip>
-                                            </MudStack>
-
-                                            <MudStack Class="ml-8" Spacing="0">
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                    Source: "@tmMatch.Match.SourceText"
-                                                </MudText>
-                                                <MudText Typo="Typo.caption" Color="@(isAccepted ? Color.Success : Color.Default)">
-                                                    Translation: "@tmMatch.Match.TranslatedText"
-                                                </MudText>
-                                            </MudStack>
-                                        </MudStack>
-                                    </MudListItem>
-                                    <MudDivider />
-                                }
-                            </MudList>
-                        </MudPaper>
-                    }
-
-                    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-2">
-                        <MudText Typo="Typo.body2">
-                            <MudIcon Icon="@Icons.Material.Filled.Memory" Size="Size.Small" Color="Color.Success" Class="mr-1" />
-                            <strong>@AcceptedTmCount</strong> from TM (free)
-                        </MudText>
-                        <MudText Typo="Typo.body2">
-                            <MudIcon Icon="@Icons.Material.Filled.Translate" Size="Size.Small" Color="Color.Primary" Class="mr-1" />
-                            <strong>@RemainingToTranslate</strong> via provider
-                        </MudText>
-                    </MudStack>
-                }
-            </MudStack>
-        }
-        else if (_isTranslating)
-        {
-            <MudStack AlignItems="AlignItems.Center" Spacing="4" Class="py-8">
-                <MudProgressCircular Indeterminate="true" Size="Size.Large" />
-                <MudText Typo="Typo.h6">Translating...</MudText>
-                <MudText Color="Color.Secondary">
-                    @RemainingToTranslate translations via @_selectedProvider
-                </MudText>
-                @if (_translationResult != null)
-                {
-                    <MudText Color="Color.Info">
-                        @_translationResult.TranslatedCount translated, @_translationResult.FailedCount failed
-                    </MudText>
-                }
-            </MudStack>
-        }
-        else if (_translationResult != null)
-        {
-            <TranslationResultSummary Result="_translationResult" OnClose="CloseResult" />
-        }
-        else
-        {
-            @* Configuration Step *@
-            <MudStack Spacing="4">
-                @if (!_providers.Any())
-                {
-                    <MudAlert Severity="Severity.Warning">
-                        No translation providers configured. Please add an API key in Settings.
-                    </MudAlert>
-                }
-                else
-                {
-                    @if (_usageWarning != null)
-                    {
-                        <MudAlert Severity="@(_usageBlocked ? Severity.Error : Severity.Warning)" Dense="true">
-                            @_usageWarning
-                            @if (_usageBlocked)
-                            {
-                                <MudLink Href="settings" Class="ml-2">Upgrade Plan</MudLink>
-                            }
-                        </MudAlert>
-                    }
-
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">
-                        Translate @(_keysToTranslate.Count > 0 ? $"{_keysToTranslate.Count} selected keys" : "all keys")
-                        to the selected languages.
-                    </MudText>
-
-                    <MudSelect T="string"
-                               @bind-Value="_selectedProvider"
-                               Label="Translation Provider"
-                               Variant="Variant.Outlined"
-                               AnchorOrigin="Origin.BottomCenter">
-                        @foreach (var provider in _providers.Where(p => p.IsConfigured))
+                    <RadzenCard Style="max-height: 400px; overflow-y: auto; padding: 0;">
+                        @foreach (var match in _tmMatches)
                         {
-                            <MudSelectItem Value="@provider.Name">
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                    <MudIcon Icon="@GetProviderIcon(provider.Name)" Size="Size.Small" />
+                            var key = match.Key;
+                            var tmMatch = match.Value;
+                            var isAccepted = tmMatch.IsAccepted ?? true;
+
+                            <RadzenStack Gap="0.5rem" Style="padding: 0.5rem; border-bottom: 1px solid var(--rz-base-300);">
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" AlignItems="Radzen.AlignItems.Center">
+                                        <RadzenCheckBox TValue="bool" Value="@isAccepted"
+                                                        Change="@(v => ToggleTmMatch(key, v))" />
+                                        <RadzenText TextStyle="TextStyle.Body2">
+                                            <strong>@tmMatch.KeyName</strong>
+                                            <span class="rz-color-secondary"> → @tmMatch.TargetLanguage.ToUpperInvariant()</span>
+                                        </RadzenText>
+                                    </RadzenStack>
+                                    <RadzenBadge BadgeStyle="@(tmMatch.Match.MatchPercent == 100 ? BadgeStyle.Success : BadgeStyle.Warning)"
+                                                 Text="@($"{tmMatch.Match.MatchPercent}%")" />
+                                </RadzenStack>
+
+                                <RadzenStack Gap="0" Style="margin-left: 2rem;">
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        Source: "@tmMatch.Match.SourceText"
+                                    </RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" Style="@(isAccepted ? "color: var(--rz-success);" : "")">
+                                        Translation: "@tmMatch.Match.TranslatedText"
+                                    </RadzenText>
+                                </RadzenStack>
+                            </RadzenStack>
+                        }
+                    </RadzenCard>
+                }
+
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenText TextStyle="TextStyle.Body2">
+                        <RadzenIcon Icon="memory" Style="font-size: 1rem; color: var(--rz-success);" />
+                        <strong>@AcceptedTmCount</strong> from TM (free)
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2">
+                        <RadzenIcon Icon="translate" Style="font-size: 1rem; color: var(--rz-primary);" />
+                        <strong>@RemainingToTranslate</strong> via provider
+                    </RadzenText>
+                </RadzenStack>
+            }
+        </RadzenStack>
+    }
+    else if (_isTranslating)
+    {
+        <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem" Style="padding: 2rem;">
+            <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Large" />
+            <RadzenText TextStyle="TextStyle.H6">Translating...</RadzenText>
+            <RadzenText class="rz-color-secondary">
+                @RemainingToTranslate translations via @_selectedProvider
+            </RadzenText>
+            @if (_translationResult != null)
+            {
+                <RadzenText Style="color: var(--rz-info);">
+                    @_translationResult.TranslatedCount translated, @_translationResult.FailedCount failed
+                </RadzenText>
+            }
+        </RadzenStack>
+    }
+    else if (_translationResult != null)
+    {
+        <TranslationResultSummary Result="_translationResult" OnClose="CloseResult" />
+    }
+    else
+    {
+        @* Configuration Step *@
+        <RadzenStack Gap="1rem">
+            @if (!_providers.Any())
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">
+                    No translation providers configured. Please add an API key in Settings.
+                </RadzenAlert>
+            }
+            else
+            {
+                @if (_usageWarning != null)
+                {
+                    <RadzenAlert AlertStyle="@(_usageBlocked ? AlertStyle.Danger : AlertStyle.Warning)" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                        @_usageWarning
+                        @if (_usageBlocked)
+                        {
+                            <a href="settings" style="margin-left: 0.5rem;">Upgrade Plan</a>
+                        }
+                    </RadzenAlert>
+                }
+
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                    Translate @(_keysToTranslate.Count > 0 ? $"{_keysToTranslate.Count} selected keys" : "all keys")
+                    to the selected languages.
+                </RadzenText>
+
+                <RadzenFormField Text="Translation Provider" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="_selectedProvider" Style="width: 100%;"
+                                        Data="@_providers.Where(p => p.IsConfigured)"
+                                        TextProperty="DisplayName" ValueProperty="Name">
+                            <Template Context="provider">
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                    <RadzenIcon Icon="@GetProviderIcon(provider.Name)" Style="font-size: 1rem;" />
                                     <span>@provider.DisplayName</span>
                                     @if (!provider.RequiresApiKey)
                                     {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Success">Free</MudChip>
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Free" />
                                     }
                                     @if (provider.ApiKeySource != null)
                                     {
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">(@provider.ApiKeySource)</MudText>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">(@provider.ApiKeySource)</RadzenText>
                                     }
-                                </MudStack>
-                            </MudSelectItem>
-                        }
-                    </MudSelect>
+                                </RadzenStack>
+                            </Template>
+                        </RadzenDropDown>
+                    </ChildContent>
+                </RadzenFormField>
 
-                    <MudText Typo="Typo.subtitle2">Target Languages</MudText>
-                    <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
-                        @foreach (var lang in AvailableLanguages.Where(l => l != SourceLanguage))
-                        {
-                            var langCode = lang;
-                            var isSelected = _selectedLanguages.Contains(langCode);
-                            <MudChip T="string"
-                                     Color="@(isSelected ? Color.Primary : Color.Default)"
-                                     Variant="@(isSelected ? Variant.Filled : Variant.Outlined)"
-                                     OnClick="@(() => ToggleLanguage(langCode))">
-                                @langCode.ToUpperInvariant()
-                            </MudChip>
-                        }
-                    </MudStack>
-
-                    @if (!_selectedLanguages.Any())
+                <RadzenText TextStyle="TextStyle.Subtitle2">Target Languages</RadzenText>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                    @foreach (var lang in AvailableLanguages.Where(l => l != SourceLanguage))
                     {
-                        <MudAlert Severity="Severity.Info" Dense="true">
-                            Select at least one target language
-                        </MudAlert>
+                        var langCode = lang;
+                        var isSelected = _selectedLanguages.Contains(langCode);
+                        <RadzenButton Text="@langCode.ToUpperInvariant()"
+                                      ButtonStyle="@(isSelected ? ButtonStyle.Primary : ButtonStyle.Light)"
+                                      Variant="@(isSelected ? Radzen.Variant.Filled : Radzen.Variant.Outlined)"
+                                      Size="ButtonSize.Small"
+                                      Click="@(() => ToggleLanguage(langCode))" />
                     }
+                </RadzenStack>
 
-                    <MudDivider />
-
-                    <MudSwitch T="bool" @bind-Value="_onlyMissing" Color="Color.Primary">
-                        Only translate missing translations
-                    </MudSwitch>
-
-                    <MudSwitch T="bool" @bind-Value="_overwrite" Color="Color.Warning" Disabled="@_onlyMissing">
-                        Overwrite existing translations
-                    </MudSwitch>
-
-                    <MudTextField T="string"
-                                  @bind-Value="_context"
-                                  Label="Context (optional)"
-                                  Placeholder="Provide context for better AI translations..."
-                                  Variant="Variant.Outlined"
-                                  Lines="2"
-                                  HelperText="Context helps AI providers produce more accurate translations" />
-
-                    <MudExpansionPanels Elevation="0" Class="mt-2">
-                        <MudExpansionPanel Text="Translation Memory Options" Dense="true" IsInitiallyExpanded="false">
-                            <MudStack Spacing="2">
-                                <MudSwitch T="bool" @bind-Value="_useTm" Color="Color.Primary">
-                                    <MudText Typo="Typo.body2">Use Translation Memory</MudText>
-                                </MudSwitch>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-10" Style="margin-top: -8px;">
-                                    Check TM for existing translations before calling the provider
-                                </MudText>
-
-                                <MudSwitch T="bool" @bind-Value="_storeInTm" Color="Color.Primary">
-                                    <MudText Typo="Typo.body2">Store translations in TM</MudText>
-                                </MudSwitch>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-10" Style="margin-top: -8px;">
-                                    Save new translations to TM for future reuse
-                                </MudText>
-
-                                <MudSlider T="int" @bind-Value="_minMatchPercent"
-                                           Min="70" Max="100" Step="5"
-                                           Color="Color.Primary"
-                                           Disabled="@(!_useTm)">
-                                    <MudText Typo="Typo.body2">
-                                        Minimum match: @_minMatchPercent%
-                                        @if (_minMatchPercent == 100)
-                                        {
-                                            <span class="ml-1">(exact only)</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="ml-1">(fuzzy)</span>
-                                        }
-                                    </MudText>
-                                </MudSlider>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2" Style="margin-top: -8px;">
-                                    Lower values allow fuzzy matches (similar but not exact)
-                                </MudText>
-                            </MudStack>
-                        </MudExpansionPanel>
-                    </MudExpansionPanels>
-
-                    @* Glossary Preview *@
-                    @if (_glossaryTerms.Any())
-                    {
-                        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                <MudIcon Icon="@Icons.Material.Filled.Book" Size="Size.Small" />
-                                <span><strong>@_glossaryTerms.Count</strong> glossary terms will be applied automatically</span>
-                            </MudStack>
-                            @if (_glossaryTerms.Count <= 5)
-                            {
-                                <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-2">
-                                    @foreach (var term in _glossaryTerms.Take(5))
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
-                                            @term.SourceTerm
-                                        </MudChip>
-                                    }
-                                </MudStack>
-                            }
-                        </MudAlert>
-                    }
+                @if (!_selectedLanguages.Any())
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                        Select at least one target language
+                    </RadzenAlert>
                 }
-            </MudStack>
-        }
-    </DialogContent>
 
-    <DialogActions>
+                <hr />
+
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    <RadzenSwitch @bind-Value="_onlyMissing" />
+                    <RadzenText TextStyle="TextStyle.Body2">Only translate missing translations</RadzenText>
+                </RadzenStack>
+
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    <RadzenSwitch @bind-Value="_overwrite" Disabled="@_onlyMissing" />
+                    <RadzenText TextStyle="TextStyle.Body2">Overwrite existing translations</RadzenText>
+                </RadzenStack>
+
+                <RadzenFormField Text="Context (optional)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextArea @bind-Value="_context" Rows="2" Style="width: 100%;"
+                                        Placeholder="Provide context for better AI translations..." />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Context helps AI providers produce more accurate translations</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+
+                <details>
+                    <summary style="cursor: pointer; font-weight: 500;">Translation Memory Options</summary>
+                    <RadzenStack Gap="0.75rem" Style="margin-top: 0.5rem;">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                            <RadzenSwitch @bind-Value="_useTm" />
+                            <RadzenText TextStyle="TextStyle.Body2">Use Translation Memory</RadzenText>
+                        </RadzenStack>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" Style="margin-left: 2.5rem;">
+                            Check TM for existing translations before calling the provider
+                        </RadzenText>
+
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                            <RadzenSwitch @bind-Value="_storeInTm" />
+                            <RadzenText TextStyle="TextStyle.Body2">Store translations in TM</RadzenText>
+                        </RadzenStack>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" Style="margin-left: 2.5rem;">
+                            Save new translations to TM for future reuse
+                        </RadzenText>
+
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Body2">
+                                Minimum match: @_minMatchPercent%
+                                @if (_minMatchPercent == 100) { <span>(exact only)</span> }
+                                else { <span>(fuzzy)</span> }
+                            </RadzenText>
+                            <RadzenSlider @bind-Value="_minMatchPercent" Min="70" Max="100" Step="5"
+                                          Disabled="@(!_useTm)" Style="width: 100%;" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Lower values allow fuzzy matches (similar but not exact)
+                            </RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                </details>
+
+                @* Glossary Preview *@
+                @if (_glossaryTerms.Any())
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                        <strong>@_glossaryTerms.Count</strong> glossary terms will be applied automatically
+                        @if (_glossaryTerms.Count <= 5)
+                        {
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap" Style="margin-top: 0.5rem;">
+                                @foreach (var term in _glossaryTerms.Take(5))
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@term.SourceTerm" />
+                                }
+                            </RadzenStack>
+                        }
+                    </RadzenAlert>
+                }
+            }
+        </RadzenStack>
+    }
+
+    @* Dialog Actions *@
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
         @if (_translationResult != null)
         {
-            <MudButton OnClick="CloseResult">Translate More</MudButton>
-            <MudButton Color="Color.Primary" OnClick="@ApplyAndClose">
-                Apply to Editor
-            </MudButton>
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Translate More" Click="CloseResult" />
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Apply to Editor" Click="ApplyAndClose" />
         }
         else if (_currentStep == DialogStep.TmPreview)
         {
-            <MudButton OnClick="BackToConfig">Back</MudButton>
-            <MudButton Color="Color.Primary"
-                       Variant="Variant.Filled"
-                       OnClick="ProceedWithTranslation"
-                       Disabled="@_isCheckingTm">
-                @if (RemainingToTranslate > 0)
-                {
-                    <span>Translate @RemainingToTranslate Remaining</span>
-                }
-                else
-                {
-                    <span>Apply TM Matches</span>
-                }
-            </MudButton>
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Back" Click="BackToConfig" />
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Disabled="@_isCheckingTm"
+                          Text="@(RemainingToTranslate > 0 ? $"Translate {RemainingToTranslate} Remaining" : "Apply TM Matches")"
+                          Click="ProceedWithTranslation" />
         }
         else
         {
-            <MudButton OnClick="Cancel">Cancel</MudButton>
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="Cancel" />
             @if (_useTm)
             {
-                <MudButton Color="Color.Success"
-                           Variant="Variant.Outlined"
-                           Disabled="@(!CanTranslate)"
-                           OnClick="CheckTmFirst"
-                           StartIcon="@Icons.Material.Filled.Memory">
-                    Check TM First
-                </MudButton>
+                <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Success"
+                              Disabled="@(!CanTranslate)" Icon="memory" Text="Check TM First"
+                              Click="CheckTmFirst" />
             }
-            <MudButton Color="Color.Primary"
-                       Variant="Variant.Filled"
-                       Disabled="@(!CanTranslate)"
-                       OnClick="StartTranslation">
-                @if (_isTranslating)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                }
-                Translate All
-            </MudButton>
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Disabled="@(!CanTranslate)"
+                          Text="Translate All" IsBusy="@_isTranslating" Click="StartTranslation" />
         }
-    </DialogActions>
-</MudDialog>
+    </RadzenStack>
+</RadzenStack>
 
 @code {
-    [CascadingParameter]
-    private IMudDialogInstance MudDialog { get; set; } = null!;
-
     [Parameter]
     public int ProjectId { get; set; }
 
@@ -372,17 +303,9 @@
     [Parameter]
     public List<string> KeysToTranslate { get; set; } = new();
 
-    /// <summary>
-    /// Optional source texts for each key. When provided, these are used instead of database values.
-    /// This allows translating unsaved edits from the UI.
-    /// </summary>
     [Parameter]
     public Dictionary<string, string>? SourceTexts { get; set; }
 
-    /// <summary>
-    /// Optional metadata about keys being translated. When provided, overrides database values
-    /// for key properties like IsPlural. This allows translating keys with unsaved UI changes.
-    /// </summary>
     [Parameter]
     public Dictionary<string, KeyTranslationMetadata>? KeyMetadata { get; set; }
 
@@ -403,25 +326,19 @@
     private string? _usageWarning;
     private bool _usageBlocked;
 
-    // Translation Memory options
     private bool _useTm = true;
     private bool _storeInTm = true;
     private int _minMatchPercent = 100;
 
-    // TM Preview data
     private Dictionary<string, TmPreviewMatch> _tmMatches = new();
     private List<TranslationResultDto> _acceptedTmResults = new();
-
-    // Glossary data
     private List<GlossaryTermDto> _glossaryTerms = new();
 
     private const string ProviderStorageKey = "lrm_translate_provider";
 
-    private bool CanTranslate => !_isLoadingProviders &&
-                                  !_isTranslating &&
+    private bool CanTranslate => !_isLoadingProviders && !_isTranslating &&
                                   !string.IsNullOrEmpty(_selectedProvider) &&
-                                  _selectedLanguages.Any() &&
-                                  !_usageBlocked;
+                                  _selectedLanguages.Any() && !_usageBlocked;
 
     private int AcceptedTmCount => _tmMatches.Count(m => m.Value.IsAccepted ?? true);
     private int RemainingToTranslate => (_keysToTranslate.Count * _selectedLanguages.Count) - AcceptedTmCount;
@@ -429,12 +346,7 @@
     protected override async Task OnInitializedAsync()
     {
         _keysToTranslate = KeysToTranslate;
-
-        // Pre-select all non-source languages
-        _selectedLanguages = AvailableLanguages
-            .Where(l => l != SourceLanguage)
-            .ToHashSet();
-
+        _selectedLanguages = AvailableLanguages.Where(l => l != SourceLanguage).ToHashSet();
         await Task.WhenAll(LoadProvidersAsync(), CheckUsageLimitsAsync(), LoadGlossaryAsync());
     }
 
@@ -455,16 +367,12 @@
             var response = await GlossaryService.GetProjectGlossaryAsync(ProjectId, includeInherited: true);
             if (response?.Terms != null)
             {
-                // Filter to terms that match source language
                 _glossaryTerms = response.Terms
                     .Where(t => t.SourceLanguage.Equals(SourceLanguage, StringComparison.OrdinalIgnoreCase))
                     .ToList();
             }
         }
-        catch
-        {
-            // Glossary is optional - don't fail translation if we can't load it
-        }
+        catch { }
     }
 
     private async Task LoadProvidersAsync()
@@ -474,31 +382,19 @@
         {
             _providers = await TranslationService.GetProvidersAsync(ProjectId);
 
-            // Try to restore previously selected provider from localStorage
             string? savedProvider = null;
-            try
-            {
-                savedProvider = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", ProviderStorageKey);
-            }
-            catch
-            {
-                // localStorage may not be available (SSR prerender)
-            }
+            try { savedProvider = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", ProviderStorageKey); }
+            catch { }
 
-            // Use saved provider if it's still configured, otherwise fall back to first configured
             var configuredProviders = _providers.Where(p => p.IsConfigured).ToList();
             if (!string.IsNullOrEmpty(savedProvider) && configuredProviders.Any(p => p.Name == savedProvider))
-            {
                 _selectedProvider = savedProvider;
-            }
             else
-            {
                 _selectedProvider = configuredProviders.FirstOrDefault()?.Name;
-            }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load providers: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load providers: {ex.Message}");
         }
         finally
         {
@@ -508,15 +404,10 @@
 
     private void ToggleLanguage(string lang)
     {
-        if (_selectedLanguages.Contains(lang))
-            _selectedLanguages.Remove(lang);
-        else
-            _selectedLanguages.Add(lang);
+        if (_selectedLanguages.Contains(lang)) _selectedLanguages.Remove(lang);
+        else _selectedLanguages.Add(lang);
     }
 
-    /// <summary>
-    /// Step 1: Check TM for all keys/languages before translating
-    /// </summary>
     private async Task CheckTmFirst()
     {
         _currentStep = DialogStep.TmPreview;
@@ -525,20 +416,13 @@
 
         try
         {
-            // Check TM for each key and target language
             foreach (var keyName in _keysToTranslate)
             {
-                // Get source text for this key
                 string? sourceText = null;
                 if (SourceTexts?.TryGetValue(keyName, out var provided) == true)
-                {
                     sourceText = provided;
-                }
 
-                if (string.IsNullOrEmpty(sourceText))
-                {
-                    continue; // Skip keys without source text
-                }
+                if (string.IsNullOrEmpty(sourceText)) continue;
 
                 foreach (var targetLang in _selectedLanguages)
                 {
@@ -552,7 +436,6 @@
                     };
 
                     var result = await TmService.LookupAsync(request);
-
                     if (result.IsSuccess && result.Data?.Matches.Any() == true)
                     {
                         var match = result.Data.Matches.First();
@@ -562,24 +445,20 @@
                             KeyName = keyName,
                             TargetLanguage = targetLang,
                             Match = match,
-                            IsAccepted = true // Default to accepted
+                            IsAccepted = true
                         };
                     }
                 }
             }
 
             if (_tmMatches.Any())
-            {
-                Snackbar.Add($"Found {_tmMatches.Count} TM matches", Severity.Success);
-            }
+                NotificationService.Notify(NotificationSeverity.Success, "TM", $"Found {_tmMatches.Count} TM matches");
             else
-            {
-                Snackbar.Add("No TM matches found", Severity.Info);
-            }
+                NotificationService.Notify(NotificationSeverity.Info, "TM", "No TM matches found");
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"TM check failed: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"TM check failed: {ex.Message}");
         }
         finally
         {
@@ -590,25 +469,17 @@
     private void ToggleTmMatch(string key, bool accepted)
     {
         if (_tmMatches.TryGetValue(key, out var match))
-        {
             match.IsAccepted = accepted;
-        }
     }
 
     private void AcceptAllTmMatches()
     {
-        foreach (var match in _tmMatches.Values)
-        {
-            match.IsAccepted = true;
-        }
+        foreach (var match in _tmMatches.Values) match.IsAccepted = true;
     }
 
     private void RejectAllTmMatches()
     {
-        foreach (var match in _tmMatches.Values)
-        {
-            match.IsAccepted = false;
-        }
+        foreach (var match in _tmMatches.Values) match.IsAccepted = false;
     }
 
     private void BackToConfig()
@@ -617,12 +488,8 @@
         _tmMatches.Clear();
     }
 
-    /// <summary>
-    /// Step 2: Proceed with translation after TM preview
-    /// </summary>
     private async Task ProceedWithTranslation()
     {
-        // Build list of accepted TM results
         _acceptedTmResults.Clear();
         foreach (var (key, match) in _tmMatches.Where(m => m.Value.IsAccepted == true))
         {
@@ -635,12 +502,9 @@
                 Success = true,
                 FromTm = true
             });
-
-            // Increment TM use count (fire and forget)
             _ = TmService.IncrementUseCountAsync(match.Match.Id);
         }
 
-        // Build list of keys/languages that still need translation
         var keysNeedingTranslation = new HashSet<string>();
         var languagesNeedingTranslation = new Dictionary<string, HashSet<string>>();
 
@@ -655,15 +519,12 @@
                 {
                     keysNeedingTranslation.Add(keyName);
                     if (!languagesNeedingTranslation.ContainsKey(keyName))
-                    {
                         languagesNeedingTranslation[keyName] = new HashSet<string>();
-                    }
                     languagesNeedingTranslation[keyName].Add(targetLang);
                 }
             }
         }
 
-        // If everything was covered by TM, just return the TM results
         if (!keysNeedingTranslation.Any())
         {
             _translationResult = new TranslateResponseDto
@@ -678,23 +539,15 @@
             return;
         }
 
-        // Translate remaining via provider
         _isTranslating = true;
         _currentStep = DialogStep.Translating;
 
         try
         {
-            // Save selected provider to localStorage for next time
             if (!string.IsNullOrEmpty(_selectedProvider))
             {
-                try
-                {
-                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", ProviderStorageKey, _selectedProvider);
-                }
-                catch
-                {
-                    // Ignore localStorage errors
-                }
+                try { await JSRuntime.InvokeVoidAsync("localStorage.setItem", ProviderStorageKey, _selectedProvider); }
+                catch { }
             }
 
             var request = new TranslateRequestDto
@@ -711,38 +564,36 @@
                 KeyMetadata = KeyMetadata,
                 TranslationMemory = new TmOptions
                 {
-                    UseTm = false, // Don't check TM again - we already did
+                    UseTm = false,
                     StoreInTm = _storeInTm,
                     MinMatchPercent = _minMatchPercent
                 }
             };
 
             _translationResult = await TranslationService.TranslateKeysAsync(ProjectId, request);
-
-            // Merge TM results with provider results
             _translationResult.Results.AddRange(_acceptedTmResults);
             _translationResult.TranslatedCount += _acceptedTmResults.Count;
             _translationResult.TmCount += _acceptedTmResults.Count;
 
             if (_translationResult.Success)
             {
-                Snackbar.Add($"Translated {_translationResult.TranslatedCount} keys successfully", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Translated {_translationResult.TranslatedCount} keys");
                 LimitsService.InvalidateCache();
                 await CheckUsageLimitsAsync();
             }
             else if (_translationResult.Errors.Any())
             {
-                Snackbar.Add(_translationResult.Errors.First(), Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", _translationResult.Errors.First());
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Translation failed: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Translation failed: {ex.Message}");
             _translationResult = new TranslateResponseDto
             {
-                Success = _acceptedTmResults.Count > 0, // Partial success if we have TM results
+                Success = _acceptedTmResults.Count > 0,
                 Errors = [ex.Message],
-                Results = _acceptedTmResults, // Still include TM results
+                Results = _acceptedTmResults,
                 TranslatedCount = _acceptedTmResults.Count,
                 TmCount = _acceptedTmResults.Count
             };
@@ -754,9 +605,6 @@
         }
     }
 
-    /// <summary>
-    /// Direct translation without TM preview (original flow)
-    /// </summary>
     private async Task StartTranslation()
     {
         _isTranslating = true;
@@ -764,17 +612,10 @@
 
         try
         {
-            // Save selected provider to localStorage for next time
             if (!string.IsNullOrEmpty(_selectedProvider))
             {
-                try
-                {
-                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", ProviderStorageKey, _selectedProvider);
-                }
-                catch
-                {
-                    // Ignore localStorage errors
-                }
+                try { await JSRuntime.InvokeVoidAsync("localStorage.setItem", ProviderStorageKey, _selectedProvider); }
+                catch { }
             }
 
             var request = new TranslateRequestDto
@@ -786,9 +627,9 @@
                 OnlyMissing = _onlyMissing,
                 Overwrite = _overwrite,
                 Context = _context,
-                SaveToDatabase = false,  // Return translations for UI preview, don't save yet
-                SourceTexts = SourceTexts,  // Pass current UI values if provided
-                KeyMetadata = KeyMetadata,  // Pass key metadata (e.g., IsPlural) for unsaved UI changes
+                SaveToDatabase = false,
+                SourceTexts = SourceTexts,
+                KeyMetadata = KeyMetadata,
                 TranslationMemory = new TmOptions
                 {
                     UseTm = _useTm,
@@ -801,24 +642,19 @@
 
             if (_translationResult.Success)
             {
-                Snackbar.Add($"Translated {_translationResult.TranslatedCount} keys successfully", Severity.Success);
-                // Refresh usage limits
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Translated {_translationResult.TranslatedCount} keys");
                 LimitsService.InvalidateCache();
                 await CheckUsageLimitsAsync();
             }
             else if (_translationResult.Errors.Any())
             {
-                Snackbar.Add(_translationResult.Errors.First(), Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", _translationResult.Errors.First());
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Translation failed: {ex.Message}", Severity.Error);
-            _translationResult = new TranslateResponseDto
-            {
-                Success = false,
-                Errors = [ex.Message]
-            };
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Translation failed: {ex.Message}");
+            _translationResult = new TranslateResponseDto { Success = false, Errors = [ex.Message] };
         }
         finally
         {
@@ -836,32 +672,28 @@
 
     private void ApplyAndClose()
     {
-        // Return the translation result to the parent so it can update the UI
-        MudDialog.Close(DialogResult.Ok(_translationResult));
+        DialogService.Close(_translationResult);
     }
 
     private void Cancel()
     {
-        MudDialog.Cancel();
+        DialogService.Close(null);
     }
 
     private static string GetProviderIcon(string provider) => provider switch
     {
-        "google" => Icons.Custom.Brands.Google,
-        "deepl" => Icons.Material.Filled.Language,
-        "openai" => Icons.Material.Filled.Psychology,
-        "claude" => Icons.Material.Filled.AutoAwesome,
-        "azuretranslator" or "azureopenai" => Icons.Custom.Brands.Microsoft,
-        "lingva" => Icons.Material.Filled.Public,
-        "mymemory" => Icons.Material.Filled.Memory,
-        "ollama" => Icons.Material.Filled.Computer,
-        "libretranslate" => Icons.Material.Filled.Code,
-        _ => Icons.Material.Filled.Translate
+        "google" => "language",
+        "deepl" => "language",
+        "openai" => "psychology",
+        "claude" => "auto_awesome",
+        "azuretranslator" or "azureopenai" => "cloud",
+        "lingva" => "public",
+        "mymemory" => "memory",
+        "ollama" => "computer",
+        "libretranslate" => "code",
+        _ => "translate"
     };
 
-    /// <summary>
-    /// Holds a TM match during the preview step
-    /// </summary>
     private class TmPreviewMatch
     {
         public required string KeyName { get; set; }

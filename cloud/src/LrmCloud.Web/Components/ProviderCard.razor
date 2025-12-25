@@ -1,107 +1,72 @@
 @using LrmCloud.Shared.DTOs.Translation
 
-<MudCard Elevation="1" Class="provider-card">
-    <MudCardContent>
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
-            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                <MudIcon Icon="@GetProviderIcon(Provider.Name)" Size="Size.Medium" />
-                <MudStack Spacing="0">
-                    <MudText Typo="Typo.subtitle1">@Provider.DisplayName</MudText>
+<RadzenCard Style="height: 100%; border: 1px solid var(--rz-base-400);">
+    <RadzenStack Gap="0.5rem">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="@GetProviderIcon(Provider.Name)" />
+                <RadzenStack Gap="0">
+                    <RadzenText TextStyle="TextStyle.Subtitle1">@Provider.DisplayName</RadzenText>
                     @if (Provider.IsManagedProvider)
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">
-                            Managed
-                        </MudChip>
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Managed" Variant="Radzen.Variant.Filled" />
                     }
                     else if (!Provider.RequiresApiKey)
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">
-                            Free
-                        </MudChip>
+                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Free" Variant="Radzen.Variant.Outlined" />
                     }
                     else if (Provider.IsAiProvider)
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
-                            AI
-                        </MudChip>
+                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="AI" Variant="Radzen.Variant.Outlined" />
                     }
-                </MudStack>
-            </MudStack>
+                </RadzenStack>
+            </RadzenStack>
 
             @if (Provider.IsConfigured)
             {
-                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                <RadzenIcon Icon="check_circle" Style="color: var(--rz-success); font-size: 1.25rem;" />
             }
-        </MudStack>
+        </RadzenStack>
 
         @if (!string.IsNullOrEmpty(Provider.Description))
         {
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
                 @Provider.Description
-            </MudText>
+            </RadzenText>
         }
 
         @if (Provider.IsConfigured && Provider.ApiKeySource != null)
         {
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                 Key from: @Provider.ApiKeySource
-            </MudText>
+            </RadzenText>
         }
-    </MudCardContent>
 
-    <MudCardActions>
-        @if (Provider.RequiresApiKey)
-        {
-            @if (Provider.IsConfigured)
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" class="rz-mt-2">
+            @if (Provider.RequiresApiKey)
             {
-                <MudButton Size="Size.Small"
-                           Color="Color.Primary"
-                           Variant="Variant.Text"
-                           OnClick="@(() => OnConfigure.InvokeAsync(Provider))">
-                    Configure
-                </MudButton>
-                <MudButton Size="Size.Small"
-                           Color="Color.Error"
-                           Variant="Variant.Text"
-                           OnClick="@(() => OnRemove.InvokeAsync(Provider))">
-                    Remove
-                </MudButton>
+                @if (Provider.IsConfigured)
+                {
+                    <RadzenButton Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Variant="Radzen.Variant.Text"
+                                  Text="Configure" Click="@(() => OnConfigure.InvokeAsync(Provider))" />
+                    <RadzenButton Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Radzen.Variant.Text"
+                                  Text="Remove" Click="@(() => OnRemove.InvokeAsync(Provider))" />
+                }
+                else
+                {
+                    <RadzenButton Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Variant="Radzen.Variant.Filled"
+                                  Text="Configure" Click="@(() => OnConfigure.InvokeAsync(Provider))" />
+                }
             }
             else
             {
-                <MudButton Size="Size.Small"
-                           Color="Color.Primary"
-                           Variant="Variant.Filled"
-                           OnClick="@(() => OnConfigure.InvokeAsync(Provider))">
-                    Configure
-                </MudButton>
+                <RadzenButton Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Variant="Radzen.Variant.Text"
+                              Text="Configure" Click="@(() => OnConfigure.InvokeAsync(Provider))" />
+                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Ready to Use" Variant="Radzen.Variant.Text" />
             }
-        }
-        else
-        {
-            @* Free providers - show configure button for optional settings *@
-            <MudButton Size="Size.Small"
-                       Color="Color.Primary"
-                       Variant="Variant.Text"
-                       OnClick="@(() => OnConfigure.InvokeAsync(Provider))">
-                Configure
-            </MudButton>
-            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text">
-                Ready to Use
-            </MudChip>
-        }
-    </MudCardActions>
-</MudCard>
-
-<style>
-    .provider-card {
-        transition: box-shadow 0.2s ease;
-    }
-
-    .provider-card:hover {
-        box-shadow: var(--mud-elevation-4);
-    }
-</style>
+        </RadzenStack>
+    </RadzenStack>
+</RadzenCard>
 
 @code {
     [Parameter, EditorRequired]
@@ -115,16 +80,16 @@
 
     private static string GetProviderIcon(string provider) => provider switch
     {
-        "lrm" => Icons.Material.Filled.Star,
-        "google" => Icons.Custom.Brands.Google,
-        "deepl" => Icons.Material.Filled.Language,
-        "openai" => Icons.Material.Filled.Psychology,
-        "claude" => Icons.Material.Filled.AutoAwesome,
-        "azuretranslator" or "azureopenai" => Icons.Custom.Brands.Microsoft,
-        "lingva" => Icons.Material.Filled.Public,
-        "mymemory" => Icons.Material.Filled.Memory,
-        "ollama" => Icons.Material.Filled.Computer,
-        "libretranslate" => Icons.Material.Filled.Code,
-        _ => Icons.Material.Filled.Translate
+        "lrm" => "star",
+        "google" => "g_translate",
+        "deepl" => "translate",
+        "openai" => "psychology",
+        "claude" => "auto_awesome",
+        "azuretranslator" or "azureopenai" => "cloud",
+        "lingva" => "public",
+        "mymemory" => "memory",
+        "ollama" => "computer",
+        "libretranslate" => "code",
+        _ => "translate"
     };
 }

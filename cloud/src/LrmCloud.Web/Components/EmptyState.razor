@@ -1,36 +1,30 @@
 @* Reusable empty state component for consistent empty/zero-data states *@
 
-<MudPaper Class="@($"pa-8 {Class}")" Elevation="@Elevation">
-    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="3">
-        <MudIcon Icon="@Icon" Size="Size.Large" Color="@IconColor" Style="font-size: 4rem; opacity: 0.5;" />
-        <MudText Typo="Typo.h6" Color="Color.Secondary">@Title</MudText>
+<RadzenCard class="@Class">
+    <RadzenStack AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.Center" Gap="0.75rem" class="rz-py-8">
+        <RadzenIcon Icon="@Icon" Style="font-size: 4rem; opacity: 0.5; color: var(--rz-text-secondary-color);" />
+        <RadzenText TextStyle="TextStyle.H6" class="rz-color-secondary">@Title</RadzenText>
         @if (!string.IsNullOrEmpty(Description))
         {
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center" Style="max-width: 400px;">
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="text-align: center; max-width: 400px;">
                 @Description
-            </MudText>
+            </RadzenText>
         }
         @if (ShowAction)
         {
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       StartIcon="@ActionIcon"
-                       OnClick="@OnActionClick"
-                       Href="@ActionHref"
-                       Class="mt-2">
-                @ActionText
-            </MudButton>
+            <RadzenButton Variant="Radzen.Variant.Filled" Icon="@ActionIcon" Text="@ActionText" Click="@OnActionClick" class="rz-mt-2" />
+        }
+        @if (!string.IsNullOrEmpty(ActionHref))
+        {
+            <RadzenLink Path="@ActionHref" Text="@ActionText" class="rz-mt-2" />
         }
         @ChildContent
-    </MudStack>
-</MudPaper>
+    </RadzenStack>
+</RadzenCard>
 
 @code {
     [Parameter]
-    public string Icon { get; set; } = Icons.Material.Filled.Inbox;
-
-    [Parameter]
-    public Color IconColor { get; set; } = Color.Secondary;
+    public string Icon { get; set; } = "inbox";
 
     [Parameter]
     public string Title { get; set; } = "No items found";
@@ -45,7 +39,7 @@
     public string ActionText { get; set; } = "Create";
 
     [Parameter]
-    public string ActionIcon { get; set; } = Icons.Material.Filled.Add;
+    public string ActionIcon { get; set; } = "add";
 
     [Parameter]
     public EventCallback OnActionClick { get; set; }

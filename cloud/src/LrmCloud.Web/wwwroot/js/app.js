@@ -220,8 +220,10 @@ window.lrmServiceWorker = {
             this.registration = await navigator.serviceWorker.register('/app/service-worker.js');
             console.log('[SW] Registered, scope:', this.registration.scope);
 
-            // Check for waiting worker on page load
-            if (this.registration.waiting) {
+            // Only check for waiting worker if there's already an active controller
+            // This prevents showing the banner on first visit or when there's no real update
+            if (this.registration.waiting && navigator.serviceWorker.controller) {
+                console.log('[SW] Update waiting - notify user');
                 this.notifyUpdateAvailable();
             }
 
@@ -230,7 +232,9 @@ window.lrmServiceWorker = {
                 const newWorker = this.registration.installing;
                 if (newWorker) {
                     newWorker.addEventListener('statechange', () => {
+                        // Only notify if there's a controlling worker (meaning this is an update, not first install)
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            console.log('[SW] New version installed - notify user');
                             this.notifyUpdateAvailable();
                         }
                     });
@@ -242,8 +246,10 @@ window.lrmServiceWorker = {
                 window.location.reload();
             });
 
-            // Check for updates periodically (every 60 seconds)
-            setInterval(() => this.registration?.update(), 60000);
+            // Check for updates periodically (every 60 seconds) - only in production
+            if (!window.location.hostname.includes('localhost')) {
+                setInterval(() => this.registration?.update(), 60000);
+            }
 
         } catch (error) {
             console.error('[SW] Registration failed:', error);

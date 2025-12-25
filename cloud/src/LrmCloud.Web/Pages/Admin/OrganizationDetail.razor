@@ -1,266 +1,209 @@
 @page "/admin/organizations/{Id:int}"
 @using LrmCloud.Shared.DTOs.Admin
 @using LrmCloud.Web.Services
+@using LrmCloud.Web.Helpers
 @inject AdminService AdminService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
-@inject IDialogService DialogService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 @attribute [Authorize]
 
 <PageTitle>@(_org?.Name ?? "Organization") - LRM Cloud Admin</PageTitle>
 
 @* Back Button *@
-<MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ArrowBack"
-           OnClick="@(() => Navigation.NavigateTo("admin/organizations"))" Class="mb-2">
-    Back to Organizations
-</MudButton>
+<RadzenButton Variant="Radzen.Variant.Text" Icon="arrow_back" Text="Back to Organizations"
+              Click="@(() => Navigation.NavigateTo("admin/organizations"))" class="rz-mb-2" />
 
 @if (_isLoading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
 }
 else if (_org == null)
 {
-    <MudAlert Severity="Severity.Error">Organization not found.</MudAlert>
+    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">Organization not found.</RadzenAlert>
 }
 else
 {
     @* Header *@
-    <MudPaper Class="pa-4 mb-4" Elevation="2">
-        <div class="d-flex justify-space-between align-center">
-            <div class="d-flex align-center">
-                <MudAvatar Size="Size.Large" Class="mr-4" Color="Color.Primary">
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                <div style="width: 64px; height: 64px; border-radius: 50%; background: var(--rz-primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold;">
                     @_org.Name[0].ToString().ToUpper()
-                </MudAvatar>
-                <div>
-                    <MudText Typo="Typo.h5">@_org.Name</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">@_org.Slug</MudText>
+                </div>
+                <RadzenStack Gap="0">
+                    <RadzenText TextStyle="TextStyle.H5">@_org.Name</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">@_org.Slug</RadzenText>
                     @if (!string.IsNullOrEmpty(_org.Description))
                     {
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">@_org.Description</MudText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-1">@_org.Description</RadzenText>
                     }
-                </div>
-            </div>
-            <div class="d-flex gap-2">
-                <MudChip T="string" Color="@GetPlanColor(_org.Plan)" Size="Size.Medium">@_org.Plan.ToUpper()</MudChip>
-            </div>
-        </div>
-    </MudPaper>
+                </RadzenStack>
+            </RadzenStack>
+            <RadzenBadge BadgeStyle="@GetPlanBadgeStyle(_org.Plan)" Text="@_org.Plan.ToUpper()" />
+        </RadzenStack>
+    </RadzenCard>
 
     @* Stats Cards *@
-    <MudGrid Class="mb-4">
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Members</MudText>
-                <MudText Typo="Typo.h4">@_org.MemberCount</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Projects</MudText>
-                <MudText Typo="Typo.h4">@_org.ProjectCount</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Translation Usage</MudText>
-                <MudText Typo="Typo.h4">@FormatNumber(_org.TranslationCharsUsed)</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">of @FormatNumber(_org.TranslationCharsLimit)</MudText>
-                <MudProgressLinear Value="@GetUsagePercent()" Color="@GetUsageColor()" Class="mt-2" />
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Created</MudText>
-                <MudText Typo="Typo.h6">@_org.CreatedAt.ToString("MMM d, yyyy")</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Updated: @_org.UpdatedAt.ToString("MMM d, yyyy")</MudText>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+    <RadzenRow Gap="1rem" class="rz-mb-4">
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Members</RadzenText>
+                <RadzenText TextStyle="TextStyle.H4">@_org.MemberCount</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Projects</RadzenText>
+                <RadzenText TextStyle="TextStyle.H4">@_org.ProjectCount</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Translation Usage</RadzenText>
+                <RadzenText TextStyle="TextStyle.H4">@FormatNumber(_org.TranslationCharsUsed)</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">of @FormatNumber(_org.TranslationCharsLimit)</RadzenText>
+                <RadzenProgressBar Value="@GetUsagePercent()" ProgressBarStyle="@GetUsageProgressStyle()"
+                                   ShowValue="false" Style="height: 6px;" class="rz-mt-2" />
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Created</RadzenText>
+                <RadzenText TextStyle="TextStyle.H6">@_org.CreatedAt.ToString("MMM d, yyyy")</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Updated: @_org.UpdatedAt.ToString("MMM d, yyyy")</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
 
     @* Tabs *@
-    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
-        @* Overview Tab *@
-        <MudTabPanel Text="Overview" Icon="@Icons.Material.Filled.Info">
-            <MudGrid>
-                <MudItem xs="12" md="6">
-                    <MudCard Elevation="0">
-                        <MudCardHeader>
-                            <CardHeaderContent>
-                                <MudText Typo="Typo.h6">Organization Details</MudText>
-                            </CardHeaderContent>
-                        </MudCardHeader>
-                        <MudCardContent>
-                            <MudSimpleTable Dense="true">
-                                <tbody>
-                                    <tr><td><strong>ID</strong></td><td>@_org.Id</td></tr>
-                                    <tr><td><strong>Name</strong></td><td>@_org.Name</td></tr>
-                                    <tr><td><strong>Slug</strong></td><td>@_org.Slug</td></tr>
-                                    <tr><td><strong>Plan</strong></td><td>@_org.Plan</td></tr>
-                                    <tr><td><strong>Owner</strong></td><td>@(_org.OwnerEmail ?? "N/A")</td></tr>
-                                    <tr><td><strong>Payment Provider</strong></td><td>@(_org.PaymentProvider ?? "None")</td></tr>
-                                    <tr><td><strong>Customer ID</strong></td><td>@(_org.PaymentCustomerId ?? "N/A")</td></tr>
-                                </tbody>
-                            </MudSimpleTable>
-                        </MudCardContent>
-                    </MudCard>
-                </MudItem>
-                <MudItem xs="12" md="6">
-                    <MudCard Elevation="0">
-                        <MudCardHeader>
-                            <CardHeaderContent>
-                                <MudText Typo="Typo.h6">Admin Actions</MudText>
-                            </CardHeaderContent>
-                        </MudCardHeader>
-                        <MudCardContent>
-                            <div class="d-flex flex-column gap-2">
-                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"
-                                           OnClick="ShowEditDialog">Edit Organization</MudButton>
-                                <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.RestartAlt"
-                                           OnClick="ResetUsageAsync">Reset Usage</MudButton>
-                                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.SwapHoriz"
-                                           OnClick="ShowTransferOwnershipDialog">Transfer Ownership</MudButton>
-                            </div>
-                        </MudCardContent>
-                    </MudCard>
-                </MudItem>
-            </MudGrid>
-        </MudTabPanel>
+    <RadzenTabs @bind-SelectedIndex="_selectedTab" RenderMode="TabRenderMode.Client">
+        <Tabs>
+            @* Overview Tab *@
+            <RadzenTabsItem Text="Overview" Icon="info">
+                <RadzenRow Gap="1rem" class="rz-p-4">
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenCard>
+                            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">Organization Details</RadzenText>
+                            <RadzenDataGrid TItem="KeyValuePair<string, string>" Data="@GetOrgDetails()" Density="Density.Compact"
+                                            AllowSorting="false" AllowPaging="false">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="KeyValuePair<string, string>" Property="Key" Title="Field" Width="150px">
+                                        <Template Context="kv"><strong>@kv.Key</strong></Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="KeyValuePair<string, string>" Property="Value" Title="Value" />
+                                </Columns>
+                            </RadzenDataGrid>
+                        </RadzenCard>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenCard>
+                            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">Admin Actions</RadzenText>
+                            <RadzenStack Gap="0.5rem">
+                                <RadzenButton Variant="Radzen.Variant.Outlined" Icon="edit"
+                                              Text="Edit Organization" Click="ShowEditDialog" Style="width: 100%;" />
+                                <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Warning" Icon="restart_alt"
+                                              Text="Reset Usage" Click="ResetUsageAsync" Style="width: 100%;" />
+                                <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Secondary" Icon="swap_horiz"
+                                              Text="Transfer Ownership" Click="ShowTransferOwnershipDialog" Style="width: 100%;" />
+                            </RadzenStack>
+                        </RadzenCard>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenTabsItem>
 
-        @* Members Tab *@
-        <MudTabPanel Text="Members" Icon="@Icons.Material.Filled.People" BadgeData="@_org.MemberCount" BadgeColor="Color.Primary">
-            <MudTable Items="@_org.Members" Dense="true" Hover="true">
-                <HeaderContent>
-                    <MudTh>User</MudTh>
-                    <MudTh>Role</MudTh>
-                    <MudTh>Joined</MudTh>
-                    <MudTh>Actions</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="User">
-                        <div class="d-flex align-center">
-                            <MudAvatar Size="Size.Small" Class="mr-2">
-                                @if (!string.IsNullOrEmpty(context.AvatarUrl))
-                                {
-                                    <MudImage Src="@context.AvatarUrl" />
-                                }
-                                else
-                                {
-                                    @context.Email[0].ToString().ToUpper()
-                                }
-                            </MudAvatar>
-                            <div>
-                                <MudText Typo="Typo.body2">
-                                    @(context.DisplayName ?? context.Username)
-                                    @if (context.IsOwner)
-                                    {
-                                        <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Warning" Class="ml-1" />
-                                    }
-                                </MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Email</MudText>
-                            </div>
-                        </div>
-                    </MudTd>
-                    <MudTd DataLabel="Role">
-                        <MudChip T="string" Size="Size.Small" Color="@GetRoleColor(context.Role)">@context.Role.ToUpper()</MudChip>
-                    </MudTd>
-                    <MudTd DataLabel="Joined">
-                        <MudText Typo="Typo.body2">@context.JoinedAt.ToString("MMM d, yyyy")</MudText>
-                    </MudTd>
-                    <MudTd DataLabel="Actions">
-                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
-                                       OnClick="@(() => Navigation.NavigateTo($"admin/users/{context.UserId}"))" />
-                    </MudTd>
-                </RowTemplate>
-            </MudTable>
-        </MudTabPanel>
+            @* Members Tab *@
+            <RadzenTabsItem Text="@($"Members ({_org.MemberCount})")" Icon="people">
+                <div class="rz-p-4">
+                    <RadzenDataGrid TItem="AdminOrgMemberDto" Data="@_org.Members" Density="Density.Compact" AllowSorting="false">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="AdminOrgMemberDto" Title="User">
+                                <Template Context="member">
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                        @if (!string.IsNullOrEmpty(member.AvatarUrl))
+                                        {
+                                            <RadzenImage Path="@member.AvatarUrl" Style="width: 32px; height: 32px; border-radius: 50%;" />
+                                        }
+                                        else
+                                        {
+                                            <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--rz-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                                                @member.Email[0].ToString().ToUpper()
+                                            </div>
+                                        }
+                                        <RadzenStack Gap="0">
+                                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                                <RadzenText TextStyle="TextStyle.Body2">@(member.DisplayName ?? member.Username)</RadzenText>
+                                                @if (member.IsOwner)
+                                                {
+                                                    <RadzenIcon Icon="star" Style="font-size: 1rem; color: var(--rz-warning);" />
+                                                }
+                                            </RadzenStack>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@member.Email</RadzenText>
+                                        </RadzenStack>
+                                    </RadzenStack>
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="AdminOrgMemberDto" Title="Role" Width="120px">
+                                <Template Context="member">
+                                    <RadzenBadge BadgeStyle="@GetRoleBadgeStyle(member.Role)" Text="@member.Role.ToUpper()" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="AdminOrgMemberDto" Title="Joined" Width="120px">
+                                <Template Context="member">
+                                    <RadzenText TextStyle="TextStyle.Body2">@member.JoinedAt.ToString("MMM d, yyyy")</RadzenText>
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="AdminOrgMemberDto" Title="Actions" Width="80px" TextAlign="TextAlign.Center">
+                                <Template Context="member">
+                                    <RadzenButton Icon="visibility" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                                  Click="@(() => Navigation.NavigateTo($"admin/users/{member.UserId}"))" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </div>
+            </RadzenTabsItem>
 
-        @* Projects Tab *@
-        <MudTabPanel Text="Projects" Icon="@Icons.Material.Filled.Folder" BadgeData="@_org.ProjectCount" BadgeColor="Color.Info">
-            @if (_org.Projects.Count == 0)
-            {
-                <MudAlert Severity="Severity.Info">No projects in this organization.</MudAlert>
-            }
-            else
-            {
-                <MudTable Items="@_org.Projects" Dense="true" Hover="true">
-                    <HeaderContent>
-                        <MudTh>Project</MudTh>
-                        <MudTh>Created</MudTh>
-                        <MudTh>Updated</MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="Project">
-                            <div>
-                                <MudText Typo="Typo.body2">@context.Name</MudText>
-                                @if (!string.IsNullOrEmpty(context.Description))
-                                {
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Description</MudText>
-                                }
-                            </div>
-                        </MudTd>
-                        <MudTd DataLabel="Created">
-                            <MudText Typo="Typo.body2">@context.CreatedAt.ToString("MMM d, yyyy")</MudText>
-                        </MudTd>
-                        <MudTd DataLabel="Updated">
-                            <MudText Typo="Typo.body2">@context.UpdatedAt.ToString("MMM d, yyyy")</MudText>
-                        </MudTd>
-                    </RowTemplate>
-                </MudTable>
-            }
-        </MudTabPanel>
-    </MudTabs>
+            @* Projects Tab *@
+            <RadzenTabsItem Text="@($"Projects ({_org.ProjectCount})")" Icon="folder">
+                <div class="rz-p-4">
+                    @if (_org.Projects.Count == 0)
+                    {
+                        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">No projects in this organization.</RadzenAlert>
+                    }
+                    else
+                    {
+                        <RadzenDataGrid TItem="AdminOrgProjectDto" Data="@_org.Projects" Density="Density.Compact" AllowSorting="false">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="AdminOrgProjectDto" Title="Project">
+                                    <Template Context="project">
+                                        <RadzenStack Gap="0">
+                                            <RadzenText TextStyle="TextStyle.Body2">@project.Name</RadzenText>
+                                            @if (!string.IsNullOrEmpty(project.Description))
+                                            {
+                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@project.Description</RadzenText>
+                                            }
+                                        </RadzenStack>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="AdminOrgProjectDto" Title="Created" Width="120px">
+                                    <Template Context="project">
+                                        <RadzenText TextStyle="TextStyle.Body2">@project.CreatedAt.ToString("MMM d, yyyy")</RadzenText>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="AdminOrgProjectDto" Title="Updated" Width="120px">
+                                    <Template Context="project">
+                                        <RadzenText TextStyle="TextStyle.Body2">@project.UpdatedAt.ToString("MMM d, yyyy")</RadzenText>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
+                    }
+                </div>
+            </RadzenTabsItem>
+        </Tabs>
+    </RadzenTabs>
 }
-
-@* Edit Organization Dialog *@
-<MudDialog @bind-Visible="_showEditDialog">
-    <DialogContent>
-        <MudText Typo="Typo.h6" Class="mb-4">Edit Organization</MudText>
-        <MudTextField @bind-Value="_editName" Label="Name" Variant="Variant.Outlined" Class="mb-3" />
-        <MudSelect T="string" @bind-Value="_editPlan" Label="Plan" Variant="Variant.Outlined" Class="mb-3">
-            <MudSelectItem Value="@("team")">Team</MudSelectItem>
-            <MudSelectItem Value="@("enterprise")">Enterprise</MudSelectItem>
-        </MudSelect>
-        <MudNumericField T="int" @bind-Value="_editCharsLimit" Label="Translation Chars Limit" Variant="Variant.Outlined" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _showEditDialog = false)">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveEditAsync" Disabled="@_isSaving">
-            @if (_isSaving)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Save
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-@* Transfer Ownership Dialog *@
-<MudDialog @bind-Visible="_showTransferDialog">
-    <DialogContent>
-        <MudText Typo="Typo.h6" Class="mb-4">Transfer Ownership</MudText>
-        <MudText Typo="Typo.body2" Class="mb-4">Select a member to become the new owner:</MudText>
-        <MudSelect T="int?" @bind-Value="_selectedNewOwnerId" Label="New Owner" Variant="Variant.Outlined">
-            @if (_org != null)
-            {
-                @foreach (var member in _org.Members.Where(m => !m.IsOwner))
-                {
-                    <MudSelectItem Value="@((int?)member.UserId)">@member.Email (@member.Role)</MudSelectItem>
-                }
-            }
-        </MudSelect>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _showTransferDialog = false)">Cancel</MudButton>
-        <MudButton Color="Color.Warning" Variant="Variant.Filled" OnClick="TransferOwnershipAsync" Disabled="@(_selectedNewOwnerId == null || _isSaving)">
-            @if (_isSaving)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Transfer
-        </MudButton>
-    </DialogActions>
-</MudDialog>
 
 @code {
     [Parameter]
@@ -269,15 +212,14 @@ else
     private bool _isLoading = true;
     private bool _isSaving = false;
     private AdminOrganizationDetailDto? _org;
+    private int _selectedTab;
 
     // Edit dialog state
-    private bool _showEditDialog = false;
     private string? _editName;
     private string? _editPlan;
     private int _editCharsLimit;
 
     // Transfer dialog state
-    private bool _showTransferDialog = false;
     private int? _selectedNewOwnerId;
 
     protected override async Task OnInitializedAsync()
@@ -298,18 +240,33 @@ else
         }
     }
 
-    private static Color GetPlanColor(string plan) => plan.ToLower() switch
+    private List<KeyValuePair<string, string>> GetOrgDetails()
     {
-        "enterprise" => Color.Success,
-        "team" => Color.Primary,
-        _ => Color.Default
+        if (_org == null) return new();
+        return new List<KeyValuePair<string, string>>
+        {
+            new("ID", _org.Id.ToString()),
+            new("Name", _org.Name),
+            new("Slug", _org.Slug),
+            new("Plan", _org.Plan),
+            new("Owner", _org.OwnerEmail ?? "N/A"),
+            new("Payment Provider", _org.PaymentProvider ?? "None"),
+            new("Customer ID", _org.PaymentCustomerId ?? "N/A")
+        };
+    }
+
+    private static BadgeStyle GetPlanBadgeStyle(string plan) => plan.ToLower() switch
+    {
+        "enterprise" => BadgeStyle.Success,
+        "team" => BadgeStyle.Primary,
+        _ => BadgeStyle.Light
     };
 
-    private static Color GetRoleColor(string role) => role.ToLower() switch
+    private static BadgeStyle GetRoleBadgeStyle(string role) => role.ToLower() switch
     {
-        "owner" => Color.Warning,
-        "admin" => Color.Primary,
-        _ => Color.Default
+        "owner" => BadgeStyle.Warning,
+        "admin" => BadgeStyle.Primary,
+        _ => BadgeStyle.Light
     };
 
     private double GetUsagePercent()
@@ -318,24 +275,53 @@ else
         return Math.Min(100, (double)_org.TranslationCharsUsed / _org.TranslationCharsLimit * 100);
     }
 
-    private Color GetUsageColor()
+    private ProgressBarStyle GetUsageProgressStyle()
     {
         var percent = GetUsagePercent();
-        if (percent >= 90) return Color.Error;
-        if (percent >= 75) return Color.Warning;
-        return Color.Success;
+        if (percent >= 90) return ProgressBarStyle.Danger;
+        if (percent >= 75) return ProgressBarStyle.Warning;
+        return ProgressBarStyle.Success;
     }
 
     private static string FormatNumber(int num) => num.ToString("N0");
 
     // Edit dialog methods
-    private void ShowEditDialog()
+    private async Task ShowEditDialog()
     {
         if (_org == null) return;
         _editName = _org.Name;
         _editPlan = _org.Plan;
         _editCharsLimit = _org.TranslationCharsLimit;
-        _showEditDialog = true;
+
+        var result = await DialogService.OpenAsync("Edit Organization", ds =>
+            @<RadzenStack Gap="1rem">
+                <RadzenFormField Text="Name" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_editName" Style="width: 100%;" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Plan" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="_editPlan" Style="width: 100%;"
+                                        Data="@(new[] { "team", "enterprise" })" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Translation Chars Limit" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="_editCharsLimit" Style="width: 100%;" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                    <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@(() => ds.Close(false))" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Save" Click="@(() => ds.Close(true))" />
+                </RadzenStack>
+            </RadzenStack>,
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result is true)
+        {
+            await SaveEditAsync();
+        }
     }
 
     private async Task SaveEditAsync()
@@ -356,12 +342,11 @@ else
             if (success && updatedOrg != null)
             {
                 _org = updatedOrg;
-                _showEditDialog = false;
-                Snackbar.Add("Organization updated successfully", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Organization updated successfully");
             }
             else
             {
-                Snackbar.Add($"Error: {error}", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", error);
             }
         }
         finally
@@ -372,10 +357,10 @@ else
 
     private async Task ResetUsageAsync()
     {
-        var confirmed = await DialogService.ShowMessageBox(
-            "Reset Usage",
+        var confirmed = await DialogService.Confirm(
             $"Are you sure you want to reset the translation usage for {_org?.Name}?",
-            yesText: "Reset", cancelText: "Cancel");
+            "Reset Usage",
+            new ConfirmOptions { OkButtonText = "Reset", CancelButtonText = "Cancel" });
 
         if (confirmed != true || _org == null) return;
 
@@ -387,11 +372,11 @@ else
             if (success && updatedOrg != null)
             {
                 _org = updatedOrg;
-                Snackbar.Add("Usage reset successfully", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Usage reset successfully");
             }
             else
             {
-                Snackbar.Add($"Error: {error}", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", error);
             }
         }
         finally
@@ -400,11 +385,40 @@ else
         }
     }
 
-    // Transfer ownership methods
-    private void ShowTransferOwnershipDialog()
+    private async Task ShowTransferOwnershipDialog()
     {
+        if (_org == null) return;
         _selectedNewOwnerId = null;
-        _showTransferDialog = true;
+
+        var nonOwnerMembers = _org.Members.Where(m => !m.IsOwner).ToList();
+        if (!nonOwnerMembers.Any())
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Warning", "No other members to transfer ownership to");
+            return;
+        }
+
+        var result = await DialogService.OpenAsync("Transfer Ownership", ds =>
+            @<RadzenStack Gap="1rem">
+                <RadzenText>Select a member to become the new owner:</RadzenText>
+                <RadzenFormField Text="New Owner" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="_selectedNewOwnerId" Style="width: 100%;"
+                                        Data="@nonOwnerMembers"
+                                        TextProperty="Email" ValueProperty="UserId" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                    <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@(() => ds.Close(false))" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Warning" Text="Transfer"
+                                  Click="@(() => ds.Close(true))" Disabled="@(_selectedNewOwnerId == null)" />
+                </RadzenStack>
+            </RadzenStack>,
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result is true && _selectedNewOwnerId.HasValue)
+        {
+            await TransferOwnershipAsync();
+        }
     }
 
     private async Task TransferOwnershipAsync()
@@ -418,12 +432,11 @@ else
             if (success && updatedOrg != null)
             {
                 _org = updatedOrg;
-                _showTransferDialog = false;
-                Snackbar.Add("Ownership transferred successfully", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Ownership transferred successfully");
             }
             else
             {
-                Snackbar.Add($"Error: {error}", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", error);
             }
         }
         finally

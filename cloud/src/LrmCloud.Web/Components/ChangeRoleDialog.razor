@@ -1,0 +1,104 @@
+@using LrmCloud.Shared.Constants
+@using LrmCloud.Shared.DTOs.Organizations
+@inject OrganizationService OrganizationService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<RadzenStack Gap="1rem">
+    <RadzenText>
+        Change role for <strong>@(Member.DisplayName ?? Member.Email)</strong>
+    </RadzenText>
+
+    <RadzenFormField Text="Role" Variant="Radzen.Variant.Outlined">
+        <ChildContent>
+            <RadzenDropDown @bind-Value="_newRole"
+                            Data="@_roles"
+                            TextProperty="Text"
+                            ValueProperty="Value"
+                            Disabled="@_isSubmitting"
+                            Style="width: 100%;" />
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@GetRoleDescription(_newRole)</RadzenText>
+        </Helper>
+    </RadzenFormField>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
+            @_errorMessage
+        </RadzenAlert>
+    }
+
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+        <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" Disabled="@_isSubmitting" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Update Role" Click="@ChangeRole" Disabled="@(_isSubmitting || _newRole == Member.Role)" IsBusy="@_isSubmitting" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public int OrganizationId { get; set; }
+
+    [Parameter]
+    public OrganizationMemberDto Member { get; set; } = null!;
+
+    private string _newRole = OrganizationRole.Member;
+    private bool _isSubmitting;
+    private string? _errorMessage;
+
+    private readonly List<object> _roles = new()
+    {
+        new { Text = "Admin", Value = OrganizationRole.Admin },
+        new { Text = "Member", Value = OrganizationRole.Member },
+        new { Text = "Viewer", Value = OrganizationRole.Viewer }
+    };
+
+    protected override void OnInitialized()
+    {
+        _newRole = Member.Role;
+    }
+
+    private async Task ChangeRole()
+    {
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var (success, error) = await OrganizationService.UpdateMemberRoleAsync(
+                OrganizationId, Member.UserId, _newRole);
+
+            if (success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Role updated successfully");
+                DialogService.Close(_newRole);
+            }
+            else
+            {
+                _errorMessage = error ?? "Failed to update role";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(null);
+    }
+
+    private static string GetRoleDescription(string role) => role switch
+    {
+        OrganizationRole.Admin => "Can manage members, projects, and settings",
+        OrganizationRole.Member => "Can view and edit projects",
+        OrganizationRole.Viewer => "Read-only access to projects",
+        _ => ""
+    };
+}

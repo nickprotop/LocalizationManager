@@ -1,74 +1,68 @@
 @inject ResourceService ResourceService
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 
-<MudDialog @bind-Visible="_visible" Options="_dialogOptions">
-    <TitleContent>
-        <MudText Typo="Typo.h6">
-            <MudIcon Icon="@Icons.Material.Filled.Add" Class="mr-2" />
-            Add New Key
-        </MudText>
-    </TitleContent>
-    <DialogContent>
-        <EditForm Model="_model" OnValidSubmit="HandleSubmit">
-            <DataAnnotationsValidator />
-            <MudStack Spacing="3">
-                <MudTextField @bind-Value="_model.KeyName"
-                              Label="Key Name"
-                              Variant="Variant.Outlined"
-                              For="@(() => _model.KeyName)"
-                              Disabled="_isSubmitting"
-                              Required="true"
-                              HelperText="e.g., WelcomeMessage, Error.NotFound, Button.Save" />
+<RadzenStack Gap="1rem">
+    <RadzenTemplateForm TItem="CreateResourceKeyRequest" Data="_model" Submit="HandleSubmit">
+        <RadzenStack Gap="1rem">
+            <RadzenFormField Text="Key Name" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="_model.KeyName" Placeholder="e.g., WelcomeMessage, Error.NotFound, Button.Save"
+                                   Disabled="@_isSubmitting" Style="width: 100%;" Name="KeyName" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">e.g., WelcomeMessage, Error.NotFound, Button.Save</RadzenText>
+                </Helper>
+            </RadzenFormField>
 
-                <MudTextField @bind-Value="_model.Comment"
-                              Label="Comment (optional)"
-                              Variant="Variant.Outlined"
-                              Lines="2"
-                              For="@(() => _model.Comment)"
-                              Disabled="_isSubmitting"
-                              HelperText="Description to help translators" />
+            <RadzenFormField Text="Comment (optional)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenTextArea @bind-Value="_model.Comment" Placeholder="Description to help translators"
+                                    Rows="2" Disabled="@_isSubmitting" Style="width: 100%;" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Description to help translators</RadzenText>
+                </Helper>
+            </RadzenFormField>
 
-                <MudSwitch @bind-Value="_model.IsPlural"
-                           Label="Plural key"
-                           Color="Color.Primary"
-                           Disabled="_isSubmitting" />
+            <RadzenSwitch @bind-Value="_model.IsPlural" Disabled="@_isSubmitting">
+                <Template>
+                    <RadzenText>Plural key</RadzenText>
+                </Template>
+            </RadzenSwitch>
 
-                @if (_model.IsPlural)
-                {
-                    <MudAlert Severity="Severity.Info" Dense="true">
-                        Plural keys support different forms for quantities (zero, one, few, many, other).
-                    </MudAlert>
-                }
-
-                <MudTextField @bind-Value="_defaultValue"
-                              Label="Default Value"
-                              Variant="Variant.Outlined"
-                              Lines="2"
-                              Disabled="_isSubmitting"
-                              HelperText="Value for the default language" />
-
-                @if (!string.IsNullOrEmpty(_errorMessage))
-                {
-                    <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
-                }
-            </MudStack>
-        </EditForm>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="Close" Disabled="_isSubmitting">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="HandleSubmit" Disabled="_isSubmitting">
-            @if (_isSubmitting)
+            @if (_model.IsPlural)
             {
-                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                <MudText Class="ms-2">Creating...</MudText>
+                <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                    Plural keys support different forms for quantities (zero, one, few, many, other).
+                </RadzenAlert>
             }
-            else
+
+            <RadzenFormField Text="Default Value" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenTextArea @bind-Value="_defaultValue" Placeholder="Value for the default language"
+                                    Rows="2" Disabled="@_isSubmitting" Style="width: 100%;" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Value for the default language</RadzenText>
+                </Helper>
+            </RadzenFormField>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
             {
-                <MudText>Add Key</MudText>
+                <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                    @_errorMessage
+                </RadzenAlert>
             }
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+        </RadzenStack>
+    </RadzenTemplateForm>
+
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+        <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Close" Disabled="@_isSubmitting" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="@(_isSubmitting ? "Creating..." : "Add Key")"
+                      Click="@HandleSubmit" Disabled="@_isSubmitting" IsBusy="@_isSubmitting" />
+    </RadzenStack>
+</RadzenStack>
 
 @code {
     [Parameter]
@@ -77,31 +71,14 @@
     [Parameter]
     public EventCallback<ResourceKeyDto> OnKeyAdded { get; set; }
 
-    private bool _visible;
     private bool _isSubmitting;
     private string? _errorMessage;
     private string _defaultValue = string.Empty;
     private CreateResourceKeyRequest _model = new() { KeyName = "" };
 
-    private readonly DialogOptions _dialogOptions = new()
-    {
-        MaxWidth = MaxWidth.Small,
-        FullWidth = true,
-        CloseOnEscapeKey = true
-    };
-
-    public void Open()
-    {
-        _model = new CreateResourceKeyRequest { KeyName = "" };
-        _defaultValue = string.Empty;
-        _errorMessage = null;
-        _visible = true;
-        StateHasChanged();
-    }
-
     private void Close()
     {
-        _visible = false;
+        DialogService.Close(null);
     }
 
     private async Task HandleSubmit()
@@ -127,9 +104,9 @@
 
             if (result.IsSuccess && result.Data != null)
             {
-                Snackbar.Add($"Key '{result.Data.KeyName}' created successfully!", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Key '{result.Data.KeyName}' created successfully!");
                 await OnKeyAdded.InvokeAsync(result.Data);
-                Close();
+                DialogService.Close(result.Data);
             }
             else
             {

@@ -1,137 +1,126 @@
 @inject ProjectService ProjectService
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 
-<MudDialog @bind-Visible="_visible" Options="_dialogOptions">
-    <TitleContent>
-        <MudText Typo="Typo.h6">
-            <MudIcon Icon="@Icons.Material.Filled.Add" Class="mr-2" />
-            Create New Project
-        </MudText>
-    </TitleContent>
-    <DialogContent>
-        <EditForm Model="_model" OnValidSubmit="HandleSubmit">
-            <DataAnnotationsValidator />
-            <MudStack Spacing="3">
-                <MudTextField @bind-Value="_model.Slug"
-                              Label="Project ID"
-                              Variant="Variant.Outlined"
-                              For="@(() => _model.Slug)"
-                              Disabled="_isSubmitting"
-                              Required="true"
-                              HelperText="URL-friendly ID (lowercase, no spaces, e.g., my-project)" />
+<RadzenStack Gap="1rem">
+    <RadzenTemplateForm TItem="CreateProjectRequest" Data="_model" Submit="HandleSubmit">
+        <RadzenStack Gap="1rem">
+            <RadzenFormField Text="Project ID" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="_model.Slug" Placeholder="my-project"
+                                   Disabled="@_isSubmitting" Style="width: 100%;" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">URL-friendly ID (lowercase, no spaces, e.g., my-project)</RadzenText>
+                </Helper>
+            </RadzenFormField>
 
-                <MudTextField @bind-Value="_model.Name"
-                              Label="Display Name"
-                              Variant="Variant.Outlined"
-                              For="@(() => _model.Name)"
-                              Disabled="_isSubmitting"
-                              Required="true"
-                              HelperText="Human-readable name for display" />
+            <RadzenFormField Text="Display Name" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="_model.Name" Placeholder="My Project"
+                                   Disabled="@_isSubmitting" Style="width: 100%;" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Human-readable name for display</RadzenText>
+                </Helper>
+            </RadzenFormField>
 
-                <MudTextField @bind-Value="_model.Description"
-                              Label="Description"
-                              Variant="Variant.Outlined"
-                              Lines="2"
-                              For="@(() => _model.Description)"
-                              Disabled="_isSubmitting" />
+            <RadzenFormField Text="Description" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenTextArea @bind-Value="_model.Description" Rows="2"
+                                    Disabled="@_isSubmitting" Style="width: 100%;" />
+                </ChildContent>
+            </RadzenFormField>
 
-                <MudSelect @bind-Value="_model.Format"
-                           Label="Format"
-                           Variant="Variant.Outlined"
-                           For="@(() => _model.Format)"
-                           Disabled="_isSubmitting"
-                           Required="true">
-                    <MudSelectItem Value="@("resx")">.resx (C#/.NET)</MudSelectItem>
-                    <MudSelectItem Value="@("json")">JSON Localization</MudSelectItem>
-                    <MudSelectItem Value="@("i18next")">i18next (JS/React)</MudSelectItem>
-                    <MudSelectItem Value="@("android")">Android strings.xml</MudSelectItem>
-                    <MudSelectItem Value="@("ios")">iOS .strings/.stringsdict</MudSelectItem>
-                </MudSelect>
+            <RadzenFormField Text="Format" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenDropDown @bind-Value="_model.Format" Style="width: 100%;"
+                                    Data="@_formatOptions" TextProperty="Text" ValueProperty="Value"
+                                    Disabled="@_isSubmitting" />
+                </ChildContent>
+            </RadzenFormField>
 
-                <MudTextField @bind-Value="_model.DefaultLanguage"
-                              Label="Default Language"
-                              Variant="Variant.Outlined"
-                              For="@(() => _model.DefaultLanguage)"
-                              Disabled="_isSubmitting"
-                              HelperText="e.g., en, en-US" />
+            <RadzenFormField Text="Default Language" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="_model.DefaultLanguage" Placeholder="en"
+                                   Disabled="@_isSubmitting" Style="width: 100%;" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">e.g., en, en-US</RadzenText>
+                </Helper>
+            </RadzenFormField>
 
-                <MudTextField @bind-Value="_model.LocalizationPath"
-                              Label="Localization Path"
-                              Variant="Variant.Outlined"
-                              For="@(() => _model.LocalizationPath)"
-                              Disabled="_isSubmitting"
-                              HelperText="Relative path to localization files" />
+            <RadzenFormField Text="Localization Path" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="_model.LocalizationPath" Placeholder="."
+                                   Disabled="@_isSubmitting" Style="width: 100%;" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Relative path to localization files</RadzenText>
+                </Helper>
+            </RadzenFormField>
 
-                <MudExpansionPanels Class="mt-2">
-                    <MudExpansionPanel Text="GitHub Integration (Optional)">
-                        <MudStack Spacing="3">
-                            <MudTextField @bind-Value="_model.GitHubRepo"
-                                          Label="GitHub Repository"
-                                          Variant="Variant.Outlined"
-                                          For="@(() => _model.GitHubRepo)"
-                                          Disabled="_isSubmitting"
-                                          HelperText="e.g., owner/repo" />
+            <details>
+                <summary style="cursor: pointer; font-weight: 500; margin-bottom: 0.5rem;">GitHub Integration (Optional)</summary>
+                <RadzenStack Gap="1rem" Style="margin-top: 0.5rem;">
+                    <RadzenFormField Text="GitHub Repository" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_model.GitHubRepo" Placeholder="owner/repo"
+                                           Disabled="@_isSubmitting" Style="width: 100%;" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">e.g., owner/repo</RadzenText>
+                        </Helper>
+                    </RadzenFormField>
 
-                            <MudTextField @bind-Value="_model.GitHubDefaultBranch"
-                                          Label="Default Branch"
-                                          Variant="Variant.Outlined"
-                                          For="@(() => _model.GitHubDefaultBranch)"
-                                          Disabled="_isSubmitting"
-                                          HelperText="e.g., main" />
-                        </MudStack>
-                    </MudExpansionPanel>
-                </MudExpansionPanels>
+                    <RadzenFormField Text="Default Branch" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_model.GitHubDefaultBranch" Placeholder="main"
+                                           Disabled="@_isSubmitting" Style="width: 100%;" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">e.g., main</RadzenText>
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenStack>
+            </details>
 
-                @if (!string.IsNullOrEmpty(_errorMessage))
-                {
-                    <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
-                }
-            </MudStack>
-        </EditForm>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="Close" Disabled="_isSubmitting">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="HandleSubmit" Disabled="_isSubmitting">
-            @if (_isSubmitting)
+            @if (!string.IsNullOrEmpty(_errorMessage))
             {
-                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                <MudText Class="ms-2">Creating...</MudText>
+                <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                    @_errorMessage
+                </RadzenAlert>
             }
-            else
-            {
-                <MudText>Create Project</MudText>
-            }
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+        </RadzenStack>
+    </RadzenTemplateForm>
+
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+        <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Close" Disabled="@_isSubmitting" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="@(_isSubmitting ? "Creating..." : "Create Project")"
+                      Click="@HandleSubmit" Disabled="@_isSubmitting" IsBusy="@_isSubmitting" />
+    </RadzenStack>
+</RadzenStack>
 
 @code {
     [Parameter]
     public EventCallback<ProjectDto> OnProjectCreated { get; set; }
 
-    private bool _visible;
     private bool _isSubmitting;
     private string? _errorMessage;
-    private CreateProjectRequest _model = new() { Slug = "", Name = "", Format = "resx" };
+    private CreateProjectRequest _model = new() { Slug = "", Name = "", Format = "resx", DefaultLanguage = "en", LocalizationPath = "." };
 
-    private readonly DialogOptions _dialogOptions = new()
+    private readonly List<object> _formatOptions = new()
     {
-        MaxWidth = MaxWidth.Small,
-        FullWidth = true,
-        CloseOnEscapeKey = true
+        new { Value = "resx", Text = ".resx (C#/.NET)" },
+        new { Value = "json", Text = "JSON Localization" },
+        new { Value = "i18next", Text = "i18next (JS/React)" },
+        new { Value = "android", Text = "Android strings.xml" },
+        new { Value = "ios", Text = "iOS .strings/.stringsdict" }
     };
-
-    public void Open()
-    {
-        _model = new CreateProjectRequest { Slug = "", Name = "", Format = "resx", DefaultLanguage = "en", LocalizationPath = "." };
-        _errorMessage = null;
-        _visible = true;
-        StateHasChanged();
-    }
 
     private void Close()
     {
-        _visible = false;
+        DialogService.Close(null);
     }
 
     private async Task HandleSubmit()
@@ -145,9 +134,9 @@
 
             if (result.IsSuccess && result.Data != null)
             {
-                Snackbar.Add($"Project '{result.Data.Name}' created successfully!", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Project '{result.Data.Name}' created successfully!");
                 await OnProjectCreated.InvokeAsync(result.Data);
-                Close();
+                DialogService.Close(result.Data);
             }
             else
             {

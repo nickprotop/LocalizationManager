@@ -1,0 +1,201 @@
+@using LrmCloud.Shared.DTOs.Glossary
+@inject GlossaryService GlossaryService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<RadzenTemplateForm TItem="object" Data="@(new object())" Submit="@SaveTerm">
+    <RadzenStack Gap="1rem">
+        <RadzenFormField Text="Source Term" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="_sourceTerm" Name="SourceTerm" Style="width: 100%;" Placeholder="Enter the source term" />
+            </ChildContent>
+            <Helper>
+                <RadzenRequiredValidator Component="SourceTerm" Text="Source term is required" />
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Source Language" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+            <ChildContent>
+                <RadzenDropDown @bind-Value="_sourceLanguage" Data="@AvailableLanguages" Name="SourceLanguage" Style="width: 100%;" Placeholder="Select source language">
+                    <Template Context="lang">
+                        @lang.ToUpperInvariant()
+                    </Template>
+                </RadzenDropDown>
+            </ChildContent>
+            <Helper>
+                <RadzenRequiredValidator Component="SourceLanguage" Text="Source language is required" />
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Description (optional)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="_description" Rows="2" Style="width: 100%;" Placeholder="Context or notes about this term" />
+            </ChildContent>
+        </RadzenFormField>
+
+        <hr />
+
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+            <RadzenText TextStyle="TextStyle.Subtitle2">Translations</RadzenText>
+            <RadzenButton Variant="Radzen.Variant.Text" Icon="add" Text="Add Translation" Click="@AddTranslation" Size="ButtonSize.Small" />
+        </RadzenStack>
+
+        @if (_translations.Count == 0)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                Add at least one translation for this term.
+            </RadzenAlert>
+        }
+        else
+        {
+            @foreach (var translation in _translations)
+            {
+                <RadzenCard Variant="Radzen.Variant.Text" Style="border: 1px solid var(--rz-base-400);">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                            <RadzenDropDown @bind-Value="translation.Language" Data="@GetAvailableTranslationLanguages(translation.Language)" Style="width: 120px;">
+                                <Template Context="lang">
+                                    @lang.ToUpperInvariant()
+                                </Template>
+                            </RadzenDropDown>
+                            <RadzenButton Icon="delete" Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Click="@(() => RemoveTranslation(translation))" />
+                        </RadzenStack>
+                        <RadzenTextBox @bind-Value="translation.Value" Placeholder="Translation..." Style="width: 100%;" />
+                    </RadzenStack>
+                </RadzenCard>
+            }
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
+                @_errorMessage
+            </RadzenAlert>
+        }
+
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" Disabled="@_saving" />
+            <RadzenButton ButtonType="Radzen.ButtonType.Submit" ButtonStyle="ButtonStyle.Primary" Text="@(_isEditing ? "Update Term" : "Add Term")" Disabled="@_saving" IsBusy="@_saving" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter]
+    public int OrganizationId { get; set; }
+
+    [Parameter]
+    public List<string> AvailableLanguages { get; set; } = new();
+
+    [Parameter]
+    public GlossaryTermDto? EditingTerm { get; set; }
+
+    private bool _isEditing => EditingTerm != null;
+    private string _sourceTerm = "";
+    private string _sourceLanguage = "en";
+    private string? _description;
+    private List<TranslationEntry> _translations = new();
+    private bool _saving;
+    private string? _errorMessage;
+
+    private class TranslationEntry
+    {
+        public string Language { get; set; } = "";
+        public string Value { get; set; } = "";
+    }
+
+    protected override void OnInitialized()
+    {
+        if (EditingTerm != null)
+        {
+            _sourceTerm = EditingTerm.SourceTerm;
+            _sourceLanguage = EditingTerm.SourceLanguage;
+            _description = EditingTerm.Description;
+            _translations = EditingTerm.Translations
+                .Select(kv => new TranslationEntry { Language = kv.Key, Value = kv.Value })
+                .ToList();
+        }
+        else if (AvailableLanguages.Count > 0)
+        {
+            _sourceLanguage = AvailableLanguages.FirstOrDefault() ?? "en";
+        }
+    }
+
+    private List<string> GetAvailableTranslationLanguages(string? current)
+    {
+        var usedLanguages = _translations.Select(t => t.Language).Where(l => l != current).ToHashSet();
+        return AvailableLanguages.Where(l => l != _sourceLanguage && !usedLanguages.Contains(l)).ToList();
+    }
+
+    private void AddTranslation()
+    {
+        var availableLanguages = GetAvailableTranslationLanguages(null);
+        if (availableLanguages.Count > 0)
+        {
+            _translations.Add(new TranslationEntry { Language = availableLanguages.First(), Value = "" });
+        }
+    }
+
+    private void RemoveTranslation(TranslationEntry entry)
+    {
+        _translations.Remove(entry);
+    }
+
+    private async Task SaveTerm()
+    {
+        if (string.IsNullOrWhiteSpace(_sourceTerm) || string.IsNullOrWhiteSpace(_sourceLanguage))
+            return;
+
+        _saving = true;
+        _errorMessage = null;
+
+        try
+        {
+            var translations = _translations
+                .Where(t => !string.IsNullOrWhiteSpace(t.Language) && !string.IsNullOrWhiteSpace(t.Value))
+                .ToDictionary(t => t.Language, t => t.Value);
+
+            if (_isEditing)
+            {
+                var request = new UpdateGlossaryTermRequest
+                {
+                    SourceTerm = _sourceTerm,
+                    SourceLanguage = _sourceLanguage,
+                    Description = _description,
+                    Translations = translations
+                };
+
+                await GlossaryService.UpdateOrganizationTermAsync(OrganizationId, EditingTerm!.Id, request);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Glossary term updated");
+            }
+            else
+            {
+                var request = new CreateGlossaryTermRequest
+                {
+                    SourceTerm = _sourceTerm,
+                    SourceLanguage = _sourceLanguage,
+                    Description = _description,
+                    Translations = translations
+                };
+
+                await GlossaryService.CreateOrganizationTermAsync(OrganizationId, request);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Glossary term added");
+            }
+
+            DialogService.Close(true);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(false);
+    }
+}

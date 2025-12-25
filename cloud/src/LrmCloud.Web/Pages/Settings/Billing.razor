@@ -7,377 +7,261 @@
 @inject UsageService UsageService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 @attribute [Authorize]
 
 <PageTitle>Billing - LRM Cloud</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-2">
-    <MudIcon Icon="@Icons.Material.Filled.CreditCard" Class="mr-2" Style="vertical-align: middle;" />
-    Billing & Subscription
-</MudText>
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+    <RadzenIcon Icon="credit_card" />
+    <RadzenText TextStyle="TextStyle.H4">Billing & Subscription</RadzenText>
+</RadzenStack>
+<RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-4">
     Manage your subscription, view usage, and upgrade your plan.
-</MudText>
+</RadzenText>
 
 @if (_isLoading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="height: 4px;" />
 }
 else
 {
-    <MudGrid>
+    <RadzenRow Gap="1rem">
         @* Current Subscription Card *@
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="2">
-                <div class="d-flex justify-space-between align-center mb-3">
-                    <MudText Typo="Typo.h6">
-                        <MudIcon Icon="@Icons.Material.Filled.CardMembership" Class="mr-2" Style="vertical-align: middle;" />
-                        Current Plan
-                    </MudText>
-                    <MudChip T="string" Size="Size.Medium" Color="@UiHelpers.GetPlanColor(_subscription?.Plan ?? "free")">
-                        @((_subscription?.Plan ?? "Free").ToUpperInvariant())
-                    </MudChip>
-                </div>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-4">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-3">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="card_membership" />
+                        <RadzenText TextStyle="TextStyle.H6">Current Plan</RadzenText>
+                    </RadzenStack>
+                    <RadzenBadge BadgeStyle="@UiHelpers.GetPlanBadgeStyle(_subscription?.Plan ?? "free")" Text="@((_subscription?.Plan ?? "Free").ToUpperInvariant())" />
+                </RadzenStack>
 
-                <MudDivider Class="mb-3" />
+                <hr class="rz-mb-3" />
 
                 @if (_subscription?.BillingEnabled == true)
                 {
-                    <MudList T="string" Dense="true">
-                        <MudListItem>
-                            <div class="d-flex justify-space-between w-100">
-                                <MudText>Status</MudText>
-                                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_subscription.Status)">
-                                    @GetStatusText(_subscription.Status)
-                                </MudChip>
-                            </div>
-                        </MudListItem>
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                            <RadzenText>Status</RadzenText>
+                            <RadzenBadge BadgeStyle="@GetStatusBadgeStyle(_subscription.Status)" Text="@GetStatusText(_subscription.Status)" />
+                        </RadzenStack>
                         @if (_subscription.CurrentPeriodEnd.HasValue)
                         {
-                            <MudListItem>
-                                <div class="d-flex justify-space-between w-100">
-                                    <MudText>@(_subscription.CancelAtPeriodEnd ? "Access Until" : "Next Billing")</MudText>
-                                    <MudText Color="Color.Secondary">@_subscription.CurrentPeriodEnd.Value.ToString("MMM d, yyyy")</MudText>
-                                </div>
-                            </MudListItem>
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                                <RadzenText>@(_subscription.CancelAtPeriodEnd ? "Access Until" : "Next Billing")</RadzenText>
+                                <RadzenText class="rz-color-secondary">@_subscription.CurrentPeriodEnd.Value.ToString("MMM d, yyyy")</RadzenText>
+                            </RadzenStack>
                         }
                         @if (_subscription.Status?.ToLower() == "incomplete")
                         {
-                            <MudListItem>
-                                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
-                                    Your payment is pending. Please complete the payment to activate your subscription.
-                                </MudAlert>
-                            </MudListItem>
+                            <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false" class="rz-mt-2">
+                                Your payment is pending. Please complete the payment to activate your subscription.
+                            </RadzenAlert>
                         }
                         else if (_subscription.CancelAtPeriodEnd)
                         {
-                            <MudListItem>
-                                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
-                                    Your subscription will cancel at the end of the billing period.
-                                </MudAlert>
-                            </MudListItem>
+                            <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false" class="rz-mt-2">
+                                Your subscription will cancel at the end of the billing period.
+                            </RadzenAlert>
                         }
-                    </MudList>
+                    </RadzenStack>
 
-                    <MudStack Row="true" Class="mt-4" Spacing="2">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" class="rz-mt-4">
                         @if (_subscription.Plan.ToLower() == "free")
                         {
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Filled.Upgrade"
-                                       OnClick="@(() => ShowUpgradeDialog("team"))">
-                                Upgrade to Team
-                            </MudButton>
+                            <RadzenButton ButtonStyle="ButtonStyle.Primary" Icon="upgrade" Text="Upgrade to Team" Click="@(() => ShowUpgradeDialog("team"))" />
                         }
                         else if (_subscription.Plan.ToLower() == "team")
                         {
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Filled.Upgrade"
-                                       OnClick="@(() => ShowUpgradeDialog("enterprise"))">
-                                Upgrade to Enterprise
-                            </MudButton>
+                            <RadzenButton ButtonStyle="ButtonStyle.Primary" Icon="upgrade" Text="Upgrade to Enterprise" Click="@(() => ShowUpgradeDialog("enterprise"))" />
                         }
 
                         @if (!string.IsNullOrEmpty(_subscription.PaymentSubscriptionId))
                         {
                             @if (_subscription.PaymentProvider == "paypal")
                             {
-                                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                                           StartIcon="@Icons.Material.Filled.OpenInNew"
-                                           Href="https://www.paypal.com/myaccount/autopay" Target="_blank">
-                                    Manage on PayPal
-                                </MudButton>
+                                <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary" Icon="open_in_new" Text="Manage on PayPal">
+                                    <a href="https://www.paypal.com/myaccount/autopay" target="_blank" style="display: contents; color: inherit; text-decoration: none;"></a>
+                                </RadzenButton>
                             }
                             else
                             {
-                                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                                           StartIcon="@Icons.Material.Filled.Settings"
-                                           OnClick="@OpenPortal">
-                                    Manage Subscription
-                                </MudButton>
+                                <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary" Icon="settings" Text="Manage Subscription" Click="@OpenPortal" />
                             }
                         }
-                    </MudStack>
+                    </RadzenStack>
 
                     @if (_subscription.CancelAtPeriodEnd && !string.IsNullOrEmpty(_subscription.PaymentSubscriptionId))
                     {
-                        <MudButton Variant="Variant.Text" Color="Color.Success" Class="mt-2"
-                                   StartIcon="@Icons.Material.Filled.Refresh"
-                                   OnClick="@ReactivateSubscription">
-                            Reactivate Subscription
-                        </MudButton>
+                        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Success" Icon="refresh" Text="Reactivate Subscription" Click="@ReactivateSubscription" class="rz-mt-2" />
                     }
                     else if (!_subscription.CancelAtPeriodEnd && !string.IsNullOrEmpty(_subscription.PaymentSubscriptionId))
                     {
-                        <MudButton Variant="Variant.Text" Color="Color.Error" Class="mt-2"
-                                   StartIcon="@Icons.Material.Filled.Cancel"
-                                   OnClick="@ShowCancelDialog">
-                            Cancel Subscription
-                        </MudButton>
+                        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Danger" Icon="cancel" Text="Cancel Subscription" Click="@ShowCancelDialog" class="rz-mt-2" />
                     }
                 }
                 else
                 {
-                    <MudAlert Severity="Severity.Info" Class="mb-3">
+                    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" class="rz-mb-3">
                         Billing is not yet enabled for this instance.
-                    </MudAlert>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    </RadzenAlert>
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
                         You're currently on the Free plan. Contact your administrator to enable billing.
-                    </MudText>
+                    </RadzenText>
                 }
-            </MudPaper>
-        </MudItem>
+            </RadzenCard>
+        </RadzenColumn>
 
         @* Usage Summary Card *@
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-3">
-                    <MudIcon Icon="@Icons.Material.Filled.BarChart" Class="mr-2" Style="vertical-align: middle;" />
-                    This Month's Usage
-                </MudText>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-4">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-3">
+                    <RadzenIcon Icon="bar_chart" />
+                    <RadzenText TextStyle="TextStyle.H6">This Month's Usage</RadzenText>
+                </RadzenStack>
 
-                <MudDivider Class="mb-3" />
+                <hr class="rz-mb-3" />
 
                 @if (_stats != null)
                 {
-                    <MudStack Spacing="3">
-                        <div>
-                            <div class="d-flex justify-space-between mb-1">
-                                <MudText Typo="Typo.body2">LRM Translation</MudText>
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    <RadzenStack Gap="1rem">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                                <RadzenText TextStyle="TextStyle.Body2">LRM Translation</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
                                     @_stats.TranslationCharsUsed.ToString("N0") / @_stats.TranslationCharsLimit.ToString("N0")
-                                </MudText>
-                            </div>
-                            <MudProgressLinear Value="@_stats.TranslationUsagePercent"
-                                               Color="@UiHelpers.GetUsageColor(_stats.TranslationUsagePercent)"
-                                               Rounded="true" />
-                        </div>
+                                </RadzenText>
+                            </RadzenStack>
+                            <RadzenProgressBar Value="@_stats.TranslationUsagePercent" ProgressBarStyle="@UiHelpers.GetUsageProgressBarStyle(_stats.TranslationUsagePercent)" ShowValue="false" Style="height: 8px;" />
+                        </RadzenStack>
 
-                        <div>
-                            <div class="d-flex justify-space-between mb-1">
-                                <MudText Typo="Typo.body2">BYOK Providers</MudText>
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                                <RadzenText TextStyle="TextStyle.Body2">BYOK Providers</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
                                     @_stats.OtherCharsUsed.ToString("N0") / @_stats.OtherCharsLimit.ToString("N0")
-                                </MudText>
-                            </div>
-                            <MudProgressLinear Value="@_stats.OtherUsagePercent"
-                                               Color="@UiHelpers.GetUsageColor(_stats.OtherUsagePercent)"
-                                               Rounded="true" />
-                        </div>
-                    </MudStack>
+                                </RadzenText>
+                            </RadzenStack>
+                            <RadzenProgressBar Value="@_stats.OtherUsagePercent" ProgressBarStyle="@UiHelpers.GetUsageProgressBarStyle(_stats.OtherUsagePercent)" ShowValue="false" Style="height: 8px;" />
+                        </RadzenStack>
+                    </RadzenStack>
 
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" Class="mt-3"
-                               Href="settings/usage" FullWidth="true">
-                        View Full Usage Dashboard
-                    </MudButton>
+                    <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Primary" Text="View Full Usage Dashboard" Click="@(() => Navigation.NavigateTo("settings/usage"))" class="rz-mt-3" Style="width: 100%;" />
                 }
                 else
                 {
-                    <MudText Color="Color.Secondary">Unable to load usage statistics.</MudText>
+                    <RadzenText class="rz-color-secondary">Unable to load usage statistics.</RadzenText>
                 }
-            </MudPaper>
-        </MudItem>
+            </RadzenCard>
+        </RadzenColumn>
 
         @* Payment Method Card *@
         @if (_paymentMethod != null)
         {
-            <MudItem xs="12" md="6">
-                <MudPaper Class="pa-4" Elevation="2">
-                    <div class="d-flex justify-space-between align-center mb-3">
-                        <MudText Typo="Typo.h6">
-                            <MudIcon Icon="@Icons.Material.Filled.Payment" Class="mr-2" Style="vertical-align: middle;" />
-                            Payment Method
-                        </MudText>
-                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary"
-                                   OnClick="@UpdatePaymentMethod" Disabled="@_isProcessing">
-                            Update
-                        </MudButton>
-                    </div>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenCard class="rz-p-4">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-3">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="payment" />
+                            <RadzenText TextStyle="TextStyle.H6">Payment Method</RadzenText>
+                        </RadzenStack>
+                        <RadzenButton Variant="Radzen.Variant.Outlined" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Text="Update" Click="@UpdatePaymentMethod" Disabled="@_isProcessing" />
+                    </RadzenStack>
 
-                    <MudDivider Class="mb-3" />
+                    <hr class="rz-mb-3" />
 
-                    <div class="d-flex align-center">
-                        <MudIcon Icon="@GetPaymentMethodIcon(_paymentMethod.Type)" Size="Size.Large" Class="mr-3" />
-                        <div>
-                            <MudText Typo="Typo.body1">@_paymentMethod.DisplayString</MudText>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
+                        <RadzenIcon Icon="@GetPaymentMethodIcon(_paymentMethod.Type)" Style="font-size: 2rem;" />
+                        <RadzenStack Gap="0">
+                            <RadzenText>@_paymentMethod.DisplayString</RadzenText>
                             @if (_paymentMethod.Type == "card" && _paymentMethod.CardExpMonth.HasValue)
                             {
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                     Expires @_paymentMethod.CardExpMonth/@_paymentMethod.CardExpYear
-                                </MudText>
+                                </RadzenText>
                             }
-                        </div>
-                    </div>
-                </MudPaper>
-            </MudItem>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
         }
 
         @* Invoice History Card *@
         @if (_invoices.Count > 0)
         {
-            <MudItem xs="12" md="@(_paymentMethod != null ? 6 : 12)">
-                <MudPaper Class="pa-4" Elevation="2">
-                    <MudText Typo="Typo.h6" Class="mb-3">
-                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" Style="vertical-align: middle;" />
-                        Recent Invoices
-                    </MudText>
+            <RadzenColumn Size="12" SizeMD="@(_paymentMethod != null ? 6 : 12)">
+                <RadzenCard class="rz-p-4">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-3">
+                        <RadzenIcon Icon="receipt" />
+                        <RadzenText TextStyle="TextStyle.H6">Recent Invoices</RadzenText>
+                    </RadzenStack>
 
-                    <MudDivider Class="mb-3" />
+                    <hr class="rz-mb-3" />
 
-                    <MudSimpleTable Dense="true" Hover="true">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Invoice</th>
-                                <th class="text-right">Amount</th>
-                                <th class="text-center">Status</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var invoice in _invoices)
-                            {
-                                <tr>
-                                    <td>@invoice.CreatedAt.ToString("MMM d, yyyy")</td>
-                                    <td>@(invoice.InvoiceNumber ?? invoice.InvoiceId[..Math.Min(8, invoice.InvoiceId.Length)])</td>
-                                    <td class="text-right">@FormatAmount(invoice.AmountTotal, invoice.Currency)</td>
-                                    <td class="text-center">
-                                        <MudChip T="string" Size="Size.Small" Color="@GetInvoiceStatusColor(invoice.Status)">
-                                            @(char.ToUpper(invoice.Status[0]) + invoice.Status[1..])
-                                        </MudChip>
-                                    </td>
-                                    <td>
-                                        <MudStack Row="true" Spacing="1">
-                                            @if (!string.IsNullOrEmpty(invoice.PdfUrl))
-                                            {
-                                                <MudIconButton Icon="@Icons.Material.Filled.Download"
-                                                               Size="Size.Small"
-                                                               Href="@invoice.PdfUrl" Target="_blank"
-                                                               Title="Download PDF" />
-                                            }
-                                            @if (!string.IsNullOrEmpty(invoice.HostedUrl))
-                                            {
-                                                <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
-                                                               Size="Size.Small"
-                                                               Href="@invoice.HostedUrl" Target="_blank"
-                                                               Title="View Invoice" />
-                                            }
-                                        </MudStack>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </MudSimpleTable>
-                </MudPaper>
-            </MudItem>
+                    <RadzenDataGrid TItem="InvoiceDto" Data="@_invoices" Density="Density.Compact" AllowSorting="false" AllowPaging="false">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="InvoiceDto" Property="CreatedAt" Title="Date">
+                                <Template Context="invoice">
+                                    @invoice.CreatedAt.ToString("MMM d, yyyy")
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="InvoiceDto" Property="InvoiceNumber" Title="Invoice">
+                                <Template Context="invoice">
+                                    @(invoice.InvoiceNumber ?? invoice.InvoiceId[..Math.Min(8, invoice.InvoiceId.Length)])
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="InvoiceDto" Title="Amount" TextAlign="TextAlign.Right">
+                                <Template Context="invoice">
+                                    @FormatAmount(invoice.AmountTotal, invoice.Currency)
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="InvoiceDto" Property="Status" Title="Status" TextAlign="TextAlign.Center">
+                                <Template Context="invoice">
+                                    <RadzenBadge BadgeStyle="@GetInvoiceStatusBadgeStyle(invoice.Status)" Text="@(char.ToUpper(invoice.Status[0]) + invoice.Status[1..])" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="InvoiceDto" Title="" Width="80px">
+                                <Template Context="invoice">
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem">
+                                        @if (!string.IsNullOrEmpty(invoice.PdfUrl))
+                                        {
+                                            <a href="@invoice.PdfUrl" target="_blank"><RadzenButton Icon="download" Variant="Radzen.Variant.Text" Size="ButtonSize.Small" /></a>
+                                        }
+                                        @if (!string.IsNullOrEmpty(invoice.HostedUrl))
+                                        {
+                                            <a href="@invoice.HostedUrl" target="_blank"><RadzenButton Icon="open_in_new" Variant="Radzen.Variant.Text" Size="ButtonSize.Small" /></a>
+                                        }
+                                    </RadzenStack>
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenCard>
+            </RadzenColumn>
         }
 
         @* Plan Comparison *@
-        <MudItem xs="12">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-3">
-                    <MudIcon Icon="@Icons.Material.Filled.Compare" Class="mr-2" Style="vertical-align: middle;" />
-                    Compare Plans
-                </MudText>
+        <RadzenColumn Size="12">
+            <RadzenCard class="rz-p-4">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-3">
+                    <RadzenIcon Icon="compare" />
+                    <RadzenText TextStyle="TextStyle.H6">Compare Plans</RadzenText>
+                </RadzenStack>
 
-                <MudDivider Class="mb-3" />
+                <hr class="rz-mb-3" />
 
                 <PlanComparisonTable
                     Limits="@_subscription?.PlanLimits"
                     CurrentPlan="@_subscription?.Plan"
                     ShowUpgradeButtons="@(_subscription?.BillingEnabled == true)"
                     OnUpgradeClick="@ShowUpgradeDialog" />
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
 }
-
-@* Upgrade Dialog *@
-<MudDialog @bind-Visible="_upgradeDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Upgrade" Color="Color.Primary" />
-            <MudText Typo="Typo.h6">Upgrade to @(_selectedPlan?.ToUpperInvariant())</MudText>
-        </MudStack>
-    </TitleContent>
-    <DialogContent>
-        <MudText Typo="Typo.body1" Class="mb-3">
-            You'll be redirected to our secure payment page to complete your subscription.
-        </MudText>
-        <MudAlert Severity="Severity.Info" Class="mb-3">
-            @if (_selectedPlan == "team")
-            {
-                var team = _subscription?.PlanLimits?.Team;
-                <MudText>Team plan: $@((team?.Price ?? 9).ToString("0"))/month with @FormatChars(team?.TranslationChars ?? 50000) LRM translation characters and @FormatLimit(team?.MaxTeamMembers ?? 10) team members.</MudText>
-            }
-            else if (_selectedPlan == "enterprise")
-            {
-                var enterprise = _subscription?.PlanLimits?.Enterprise;
-                <MudText>Enterprise plan: $@((enterprise?.Price ?? 29).ToString("0"))/month with @FormatChars(enterprise?.TranslationChars ?? 500000) LRM translation characters and unlimited team members.</MudText>
-            }
-        </MudAlert>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CloseUpgradeDialog">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   OnClick="@StartCheckout" Disabled="@_isProcessing">
-            @if (_isProcessing)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Proceed to Payment
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-@* Cancel Dialog *@
-<MudDialog @bind-Visible="_cancelDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" />
-            <MudText Typo="Typo.h6">Cancel Subscription?</MudText>
-        </MudStack>
-    </TitleContent>
-    <DialogContent>
-        <MudAlert Severity="Severity.Warning" Class="mb-3">
-            Your subscription will remain active until the end of your current billing period.
-        </MudAlert>
-        <MudText Typo="Typo.body1">
-            After cancellation, you'll be downgraded to the Free plan with reduced limits.
-        </MudText>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CloseCancelDialog">Keep Subscription</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Error"
-                   OnClick="@CancelSubscription" Disabled="@_isProcessing">
-            @if (_isProcessing)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Cancel Subscription
-        </MudButton>
-    </DialogActions>
-</MudDialog>
 
 @code {
     private SubscriptionDto? _subscription;
@@ -386,9 +270,6 @@ else
     private List<InvoiceDto> _invoices = new();
     private bool _isLoading = true;
     private bool _isProcessing;
-    private bool _upgradeDialogVisible;
-    private bool _cancelDialogVisible;
-    private string? _selectedPlan;
 
     protected override async Task OnInitializedAsync()
     {
@@ -414,7 +295,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load billing data: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load billing data: {ex.Message}");
         }
         finally
         {
@@ -422,59 +303,34 @@ else
         }
     }
 
-    private void ShowUpgradeDialog(string plan)
+    private async Task ShowUpgradeDialog(string plan)
     {
-        _selectedPlan = plan;
-        _upgradeDialogVisible = true;
-    }
-
-    private void CloseUpgradeDialog()
-    {
-        _upgradeDialogVisible = false;
-        _selectedPlan = null;
-    }
-
-    private void ShowCancelDialog()
-    {
-        _cancelDialogVisible = true;
-    }
-
-    private void CloseCancelDialog()
-    {
-        _cancelDialogVisible = false;
-    }
-
-    private async Task StartCheckout()
-    {
-        if (string.IsNullOrEmpty(_selectedPlan)) return;
-
-        _isProcessing = true;
-        try
-        {
-            var baseUrl = Navigation.BaseUri.TrimEnd('/');
-            var result = await BillingService.CreateCheckoutAsync(
-                _selectedPlan,
-                $"{baseUrl}/settings/billing?success=true",
-                $"{baseUrl}/settings/billing?canceled=true"
-            );
-
-            if (result?.SessionUrl != null)
+        var result = await DialogService.OpenAsync<UpgradePlanDialog>(
+            $"Upgrade to {plan.ToUpperInvariant()}",
+            new Dictionary<string, object>
             {
-                await JS.InvokeVoidAsync("open", result.SessionUrl, "_self");
-            }
-            else
-            {
-                Snackbar.Add("Failed to create checkout session", Severity.Error);
-            }
-        }
-        catch (Exception ex)
+                { "OrganizationId", 0 },
+                { "SelectedPlan", plan },
+                { "Subscription", _subscription! }
+            },
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result == true)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            await LoadDataAsync();
         }
-        finally
+    }
+
+    private async Task ShowCancelDialog()
+    {
+        var confirmed = await DialogService.Confirm(
+            "Your subscription will remain active until the end of your current billing period. After cancellation, you'll be downgraded to the Free plan with reduced limits.",
+            "Cancel Subscription?",
+            new ConfirmOptions { OkButtonText = "Cancel Subscription", CancelButtonText = "Keep Subscription" });
+
+        if (confirmed == true)
         {
-            _isProcessing = false;
-            CloseUpgradeDialog();
+            await CancelSubscription();
         }
     }
 
@@ -492,12 +348,12 @@ else
             }
             else
             {
-                Snackbar.Add("Failed to open billing portal", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to open billing portal");
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
         finally
         {
@@ -513,22 +369,21 @@ else
             var success = await BillingService.CancelSubscriptionAsync();
             if (success)
             {
-                Snackbar.Add("Subscription will be canceled at the end of your billing period", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Subscription will be canceled at the end of your billing period");
                 await LoadDataAsync();
             }
             else
             {
-                Snackbar.Add("Failed to cancel subscription", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to cancel subscription");
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
         finally
         {
             _isProcessing = false;
-            CloseCancelDialog();
         }
     }
 
@@ -540,17 +395,17 @@ else
             var success = await BillingService.ReactivateSubscriptionAsync();
             if (success)
             {
-                Snackbar.Add("Subscription reactivated successfully", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Subscription reactivated successfully");
                 await LoadDataAsync();
             }
             else
             {
-                Snackbar.Add("Failed to reactivate subscription", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to reactivate subscription");
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
         finally
         {
@@ -571,12 +426,12 @@ else
             }
             else
             {
-                Snackbar.Add("Failed to get payment update URL", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to get payment update URL");
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
         finally
         {
@@ -584,13 +439,13 @@ else
         }
     }
 
-    private static Color GetStatusColor(string? status) => status?.ToLower() switch
+    private static BadgeStyle GetStatusBadgeStyle(string? status) => status?.ToLower() switch
     {
-        "active" => Color.Success,
-        "past_due" => Color.Warning,
-        "canceled" => Color.Error,
-        "incomplete" => Color.Warning,
-        _ => Color.Default
+        "active" => BadgeStyle.Success,
+        "past_due" => BadgeStyle.Warning,
+        "canceled" => BadgeStyle.Danger,
+        "incomplete" => BadgeStyle.Warning,
+        _ => BadgeStyle.Light
     };
 
     private static string GetStatusText(string? status) => status?.ToLower() switch
@@ -601,15 +456,6 @@ else
         "incomplete" => "Incomplete",
         "none" => "No Subscription",
         _ => status ?? "Unknown"
-    };
-
-    private static string FormatChars(long chars) => chars.ToString("N0");
-
-    private static string FormatLimit(int limit) => limit switch
-    {
-        0 => "-",
-        int.MaxValue => "Unlimited",
-        _ => limit.ToString("N0")
     };
 
     private static string FormatAmount(long amountCents, string currency)
@@ -626,18 +472,18 @@ else
 
     private static string GetPaymentMethodIcon(string? type) => type?.ToLowerInvariant() switch
     {
-        "card" => Icons.Material.Filled.CreditCard,
-        "paypal" => Icons.Material.Filled.Payment,
-        "bank_account" => Icons.Material.Filled.AccountBalance,
-        _ => Icons.Material.Filled.Wallet
+        "card" => "credit_card",
+        "paypal" => "payment",
+        "bank_account" => "account_balance",
+        _ => "wallet"
     };
 
-    private static Color GetInvoiceStatusColor(string? status) => status?.ToLowerInvariant() switch
+    private static BadgeStyle GetInvoiceStatusBadgeStyle(string? status) => status?.ToLowerInvariant() switch
     {
-        "paid" => Color.Success,
-        "open" => Color.Warning,
-        "void" => Color.Default,
-        "uncollectible" => Color.Error,
-        _ => Color.Info
+        "paid" => BadgeStyle.Success,
+        "open" => BadgeStyle.Warning,
+        "void" => BadgeStyle.Light,
+        "uncollectible" => BadgeStyle.Danger,
+        _ => BadgeStyle.Info
     };
 }

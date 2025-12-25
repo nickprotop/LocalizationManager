@@ -70,7 +70,7 @@ html {
 }
 
 .loading-progress circle:last-child {
-    stroke: #594ae2; /* MudBlazor primary color */
+    stroke: var(--rz-primary, #594ae2);
     stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
     transition: stroke-dasharray 0.05s ease-in-out;
 }
@@ -103,36 +103,33 @@ html {
 
 /* Touch-friendly tap targets on mobile */
 @media (max-width: 599px) {
-    .mud-button {
+    .rz-button {
         min-height: 44px;
         min-width: 44px;
     }
 
-    .mud-icon-button {
-        min-height: 44px;
-        min-width: 44px;
-    }
-
-    /* Larger form inputs on mobile */
-    .mud-input {
-        font-size: 16px !important; /* Prevent iOS zoom on focus */
+    /* Larger form inputs on mobile - prevent iOS zoom on focus */
+    .rz-textbox,
+    .rz-textarea,
+    .rz-dropdown {
+        font-size: 16px !important;
     }
 
     /* Full-width dialogs on mobile */
-    .mud-dialog {
+    .rz-dialog {
         margin: 8px !important;
         max-height: calc(100vh - 16px) !important;
     }
 
     /* Adjust card padding on mobile */
-    .mud-card-content {
+    .rz-card {
         padding: 12px !important;
     }
 }
 
 /* Tablet adjustments */
 @media (min-width: 600px) and (max-width: 959px) {
-    .mud-dialog {
+    .rz-dialog {
         margin: 24px !important;
     }
 }
@@ -159,12 +156,14 @@ html {
     background: rgba(0, 0, 0, 0.3);
 }
 
-/* Dark mode scrollbar */
-.mud-theme-dark ::-webkit-scrollbar-thumb {
+/* Dark theme scrollbar - Radzen dark themes end with -dark or are named 'dark' */
+[data-rz-theme*="-dark"] ::-webkit-scrollbar-thumb,
+[data-rz-theme="dark"] ::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.2);
 }
 
-.mud-theme-dark ::-webkit-scrollbar-thumb:hover {
+[data-rz-theme*="-dark"] ::-webkit-scrollbar-thumb:hover,
+[data-rz-theme="dark"] ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.3);
 }
 
@@ -172,12 +171,8 @@ html {
    Translation Grid Styles
    ============================================================================= */
 
-.translation-grid .mud-table-cell {
+.translation-grid .rz-cell {
     vertical-align: top;
-}
-
-.translation-grid .mud-input-root-outlined {
-    background: transparent;
 }
 
 /* Missing translation indicator */
@@ -185,7 +180,9 @@ html {
     background-color: rgba(244, 67, 54, 0.08);
 }
 
-.mud-theme-dark .translation-cell-missing {
+/* Dark theme missing translation */
+[data-rz-theme*="-dark"] .translation-cell-missing,
+[data-rz-theme="dark"] .translation-cell-missing {
     background-color: rgba(244, 67, 54, 0.15);
 }
 
@@ -238,14 +235,14 @@ html {
    ============================================================================= */
 
 @media print {
-    .mud-appbar,
-    .mud-drawer,
+    .rz-header,
+    .rz-sidebar,
     .offline-banner,
-    .mud-snackbar-provider {
+    .rz-notification {
         display: none !important;
     }
 
-    .mud-main-content {
+    .rz-body {
         margin: 0 !important;
         padding: 0 !important;
     }
@@ -260,7 +257,7 @@ html {
     z-index: 9999;
     padding: 12px 20px;
     border-radius: 8px;
-    border-left: 4px solid var(--mud-palette-info);
+    border-left: 4px solid var(--rz-info);
 }
 
 /* =============================================================================
@@ -279,4 +276,20 @@ html {
     font-family: 'text-security-disc', sans-serif !important;
     /* Fallback for WebKit browsers */
     -webkit-text-security: disc;
+}
+
+/* =============================================================================
+   Radzen Profile Menu Fixes
+   ============================================================================= */
+
+/* Profile menu dropdown - ensure enough width for theme dropdown */
+.rz-profile-menu .rz-navigation-menu,
+ul.rz-profile-menu > li > ul.rz-navigation-menu {
+    min-width: 200px !important;
+    width: max-content !important;
+}
+
+/* Fix nested dropdown inside profile menu - ensure popup renders above */
+.rz-dropdown-popup {
+    z-index: 10001 !important;
 }

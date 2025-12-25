@@ -1,0 +1,131 @@
+@using LrmCloud.Shared.DTOs.Auth
+@using LrmCloud.Shared.DTOs.Projects
+@inject CliApiKeyService ApiKeyService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<RadzenTemplateForm TItem="object" Data="@(new object())" Submit="@CreateKey">
+    <RadzenStack Gap="1rem">
+        <RadzenFormField Text="Key Name" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="_newKeyName" Name="KeyName" Placeholder="e.g., My Laptop" Style="width: 100%;" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">A friendly name to identify this key</RadzenText>
+                <RadzenRequiredValidator Component="KeyName" Text="Name is required" />
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Scopes" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+            <ChildContent>
+                <RadzenDropDown @bind-Value="_newKeyScopes" Data="@_scopeOptions" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Permissions for this key</RadzenText>
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Project (Optional)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+            <ChildContent>
+                <RadzenDropDown @bind-Value="_newKeyProjectId" Data="@GetProjectOptions()" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" AllowClear="true" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Limit key to a specific project</RadzenText>
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Expiration" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+            <ChildContent>
+                <RadzenDropDown @bind-Value="_newKeyExpiresInDays" Data="@_expirationOptions" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" />
+            </ChildContent>
+        </RadzenFormField>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
+                @_errorMessage
+            </RadzenAlert>
+        }
+
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" Disabled="@_creating" />
+            <RadzenButton ButtonType="Radzen.ButtonType.Submit" ButtonStyle="ButtonStyle.Primary" Text="Create Key" Disabled="@_creating" IsBusy="@_creating" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter]
+    public List<ProjectDto> Projects { get; set; } = new();
+
+    private string _newKeyName = "";
+    private string _newKeyScopes = "read,write";
+    private int? _newKeyProjectId;
+    private int? _newKeyExpiresInDays;
+    private bool _creating;
+    private string? _errorMessage;
+
+    private readonly List<object> _scopeOptions = new()
+    {
+        new { Text = "Read & Write", Value = "read,write" },
+        new { Text = "Read Only", Value = "read" }
+    };
+
+    private readonly List<object> _expirationOptions = new()
+    {
+        new { Text = "Never expires", Value = (int?)null },
+        new { Text = "30 days", Value = (int?)30 },
+        new { Text = "90 days", Value = (int?)90 },
+        new { Text = "1 year", Value = (int?)365 }
+    };
+
+    private List<object> GetProjectOptions()
+    {
+        var options = new List<object> { new { Text = "All Projects", Value = (int?)null } };
+        options.AddRange(Projects.Select(p => new { Text = p.Name, Value = (int?)p.Id } as object));
+        return options;
+    }
+
+    private async Task CreateKey()
+    {
+        if (string.IsNullOrWhiteSpace(_newKeyName)) return;
+
+        _creating = true;
+        _errorMessage = null;
+
+        try
+        {
+            var request = new CreateCliApiKeyRequest
+            {
+                Name = _newKeyName,
+                Scopes = _newKeyScopes,
+                ProjectId = _newKeyProjectId,
+                ExpiresInDays = _newKeyExpiresInDays
+            };
+
+            var result = await ApiKeyService.CreateKeyAsync(request);
+
+            if (result.IsSuccess && result.ApiKey != null)
+            {
+                DialogService.Close(result.ApiKey);
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage ?? "Failed to create API key";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(null);
+    }
+}

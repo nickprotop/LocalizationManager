@@ -1,0 +1,84 @@
+@using LrmCloud.Shared.DTOs.Organizations
+@inject OrganizationService OrganizationService
+@inject Radzen.DialogService DialogService
+
+<RadzenTemplateForm TItem="CreateOrganizationRequest" Data="@_request" Submit="@HandleSubmit">
+    <RadzenStack Gap="1rem">
+        <RadzenFormField Text="Organization Name" Variant="Radzen.Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="_request.Name" Name="Name" MaxLength="255" Disabled="@_isSubmitting" Style="width: 100%;" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">The display name for your organization</RadzenText>
+                <RadzenRequiredValidator Component="Name" Text="Organization name is required" />
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenFormField Text="URL Slug (optional)" Variant="Radzen.Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="_request.Slug" Name="Slug" MaxLength="255" Disabled="@_isSubmitting" Style="width: 100%;" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Auto-generated from name if left empty. Use lowercase letters, numbers, and hyphens.</RadzenText>
+                <RadzenRegexValidator Component="Slug" Pattern="^$|^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$" Text="Slug must contain only lowercase letters, numbers, and hyphens" />
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Description (optional)" Variant="Radzen.Variant.Outlined">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="_request.Description" Name="Description" MaxLength="1000" Rows="3" Disabled="@_isSubmitting" Style="width: 100%;" />
+            </ChildContent>
+        </RadzenFormField>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
+                @_errorMessage
+            </RadzenAlert>
+        }
+
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" Disabled="@_isSubmitting" />
+            <RadzenButton ButtonType="Radzen.ButtonType.Submit" ButtonStyle="ButtonStyle.Primary" Text="Create" IsBusy="@_isSubmitting" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    private CreateOrganizationRequest _request = new() { Name = "" };
+    private bool _isSubmitting;
+    private string? _errorMessage;
+
+    private async Task HandleSubmit()
+    {
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var (success, org, error) = await OrganizationService.CreateOrganizationAsync(_request);
+
+            if (success && org != null)
+            {
+                DialogService.Close(org);
+            }
+            else
+            {
+                _errorMessage = error ?? "Failed to create organization";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(null);
+    }
+}

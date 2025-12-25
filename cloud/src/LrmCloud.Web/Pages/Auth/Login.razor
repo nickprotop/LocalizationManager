@@ -5,87 +5,79 @@
 
 <PageTitle>Login - LRM Cloud</PageTitle>
 
-<MudPaper Class="pa-8" Elevation="3" Style="max-width: 400px; margin: auto;">
-    <MudStack Spacing="4">
-        <div style="text-align: center;">
-            <MudIcon Icon="@Icons.Material.Filled.Language" Size="Size.Large" Color="Color.Primary" />
-            <MudText Typo="Typo.h4" Class="mt-2">LRM Cloud</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Sign in to your account</MudText>
-        </div>
+<RadzenStack Gap="1rem">
+    <div style="text-align: center;">
+        <RadzenIcon Icon="language" Style="font-size: 3rem; color: var(--rz-primary);" />
+        <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">LRM Cloud</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Sign in to your account</RadzenText>
+    </div>
 
-        @if (!string.IsNullOrEmpty(_errorMessage))
-        {
-            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">@_errorMessage</MudAlert>
-        }
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
+            @_errorMessage
+        </RadzenAlert>
+    }
 
-        <EditForm Model="_model" OnValidSubmit="HandleLogin">
-            <DataAnnotationsValidator />
+    <RadzenTemplateForm TItem="LoginRequest" Data="@_model" Submit="@HandleLogin">
+        <RadzenStack Gap="1rem">
+            <RadzenFormField Text="Email" Variant="Radzen.Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="_model.Email" Name="Email" autocomplete="username" Disabled="@_isLoading" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="Email" Text="Email is required" />
+                    <RadzenEmailValidator Component="Email" Text="Invalid email format" />
+                </Helper>
+            </RadzenFormField>
 
-            <MudTextField @bind-Value="_model.Email"
-                          Label="Email"
-                          Variant="Variant.Outlined"
-                          InputType="InputType.Email"
-                          For="@(() => _model.Email)"
-                          Disabled="_isLoading"
-                          UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "username" } })" />
+            <RadzenFormField Text="Password" Variant="Radzen.Variant.Outlined">
+                <ChildContent>
+                    <RadzenPassword @bind-Value="_model.Password" Name="Password" autocomplete="current-password" Disabled="@_isLoading" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="Password" Text="Password is required" />
+                </Helper>
+            </RadzenFormField>
 
-            <MudTextField @bind-Value="_model.Password"
-                          Label="Password"
-                          Variant="Variant.Outlined"
-                          InputType="@(_showPassword ? InputType.Text : InputType.Password)"
-                          Adornment="Adornment.End"
-                          AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
-                          OnAdornmentClick="@(() => _showPassword = !_showPassword)"
-                          For="@(() => _model.Password)"
-                          Disabled="_isLoading"
-                          UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "current-password" } })" />
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                <RadzenLink Path="forgot-password" Text="Forgot password?" />
+            </RadzenStack>
 
-            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                <MudLink Href="forgot-password" Typo="Typo.body2">Forgot password?</MudLink>
-            </MudStack>
-
-            <MudButton ButtonType="ButtonType.Submit"
-                       Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       FullWidth="true"
-                       Disabled="_isLoading"
-                       Class="mt-4">
+            <RadzenButton ButtonType="Radzen.ButtonType.Submit" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Large" class="rz-w-100" Disabled="@_isLoading">
                 @if (_isLoading)
                 {
-                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                    <MudText Class="ms-2">Signing in...</MudText>
+                    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.ExtraSmall" class="rz-me-2" />
+                    <span>Signing in...</span>
                 }
                 else
                 {
-                    <MudText>Sign In</MudText>
+                    <span>Sign In</span>
                 }
-            </MudButton>
-        </EditForm>
+            </RadzenButton>
+        </RadzenStack>
+    </RadzenTemplateForm>
 
-        <MudStack Row="true" AlignItems="AlignItems.Center" Class="my-2">
-            <MudDivider />
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="px-2">or</MudText>
-            <MudDivider />
-        </MudStack>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+        <hr style="flex: 1;" />
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">or</RadzenText>
+        <hr style="flex: 1;" />
+    </RadzenStack>
 
-        <MudButton Variant="Variant.Outlined"
-                   StartIcon="@Icons.Custom.Brands.GitHub"
-                   FullWidth="true"
-                   Href="/api/auth/github"
-                   Disabled="_isLoading">
-            Continue with GitHub
-        </MudButton>
+    <RadzenButton Variant="Radzen.Variant.Outlined" Size="ButtonSize.Large" class="rz-w-100" Icon="login" Disabled="@_isLoading">
+        <a href="/api/auth/github" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.5rem;">
+            <RadzenIcon Icon="code" /> Continue with GitHub
+        </a>
+    </RadzenButton>
 
-        <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-4">
-            Don't have an account? <MudLink Href="register">Sign up</MudLink>
-        </MudText>
-    </MudStack>
-</MudPaper>
+    <RadzenText TextStyle="TextStyle.Body2" Style="text-align: center;" class="rz-mt-4">
+        Don't have an account? <RadzenLink Path="register" Text="Sign up" />
+    </RadzenText>
+</RadzenStack>
 
 @code {
     private readonly LoginRequest _model = new();
     private bool _isLoading;
-    private bool _showPassword;
     private string? _errorMessage;
 
     [Parameter]
@@ -94,7 +86,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // If user is already authenticated, redirect to home or return URL
         if (await AuthService.IsAuthenticatedAsync())
         {
             Navigation.NavigateTo(ReturnUrl ?? "", forceLoad: false);
@@ -112,8 +103,6 @@
 
             if (result.IsSuccess)
             {
-                // Use empty string to navigate to app root (relative to base href /app/)
-                // forceLoad ensures auth state is refreshed
                 Navigation.NavigateTo(ReturnUrl ?? "", forceLoad: true);
             }
             else

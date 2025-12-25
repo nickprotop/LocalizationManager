@@ -1,334 +1,241 @@
 @using LrmCloud.Web.Models
-@using MudBlazor
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
 
-<MudDataGrid @ref="_dataGrid"
-             T="TranslationGridRow"
-             ServerData="@ServerDataFunc"
-             Dense="true"
-             Hover="true"
-             Bordered="true"
-             Striped="true"
-             FixedHeader="true"
-             Height="calc(100vh - 300px)"
-             RowClick="@OnRowClick"
-             SelectedItemsChanged="@OnSelectedItemsChanged"
-             MultiSelection="true"
-             SelectOnRowClick="false"
-             ReadOnly="false"
-             EditMode="DataGridEditMode.Cell"
-             EditTrigger="DataGridEditTrigger.OnRowClick"
-             CommittedItemChanges="@OnCellCommitted"
-             Class="translation-grid">
+@* Toolbar *@
+<RadzenCard class="rz-mb-2 rz-p-2">
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+        <RadzenFormField Variant="Radzen.Variant.Outlined" Style="width: 250px;">
+            <Start>
+                <RadzenIcon Icon="search" />
+            </Start>
+            <ChildContent>
+                <RadzenTextBox @bind-Value="_searchText" Placeholder="Search keys..." Change="@OnSearchChanged" />
+            </ChildContent>
+        </RadzenFormField>
 
-    <ToolBarContent>
-        <MudTextField T="string"
-                      Value="@_searchText"
-                      ValueChanged="@OnSearchChanged"
-                      Placeholder="Search keys..."
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      IconSize="Size.Small"
-                      Immediate="true"
-                      DebounceInterval="500"
-                      Class="mt-0"
-                      Style="max-width: 300px;" />
-
-        <MudSelect T="TranslationStatus?" @bind-Value="_statusFilter"
-                   Label="Status"
-                   Variant="Variant.Outlined"
-                   Dense="true"
-                   Margin="Margin.Dense"
-                   Class="ml-4"
-                   Style="max-width: 150px;">
-            <MudSelectItem T="TranslationStatus?" Value="@((TranslationStatus?)null)">All</MudSelectItem>
-            <MudSelectItem T="TranslationStatus?" Value="@TranslationStatus.Complete">Complete</MudSelectItem>
-            <MudSelectItem T="TranslationStatus?" Value="@TranslationStatus.Partial">Partial</MudSelectItem>
-            <MudSelectItem T="TranslationStatus?" Value="@TranslationStatus.Missing">Missing</MudSelectItem>
-        </MudSelect>
+        <RadzenFormField Text="Status" Variant="Radzen.Variant.Outlined" Style="width: 150px;">
+            <ChildContent>
+                <RadzenDropDown TValue="TranslationStatus?" @bind-Value="_statusFilter" Change="@OnStatusFilterChanged"
+                                Data="@_statusOptions" TextProperty="Text" ValueProperty="Value"
+                                AllowClear="true" Placeholder="All" Style="width: 100%;" />
+            </ChildContent>
+        </RadzenFormField>
 
         @if (WorkflowEnabled)
         {
-            <MudSelect T="string?" @bind-Value="_workflowStatusFilter"
-                       Label="Workflow"
-                       Variant="Variant.Outlined"
-                       Dense="true"
-                       Margin="Margin.Dense"
-                       Class="ml-2"
-                       Style="max-width: 150px;">
-                <MudSelectItem T="string?" Value="@((string?)null)">All States</MudSelectItem>
-                <MudSelectItem T="string?" Value="@("pending")">Pending</MudSelectItem>
-                <MudSelectItem T="string?" Value="@("translated")">Translated</MudSelectItem>
-                <MudSelectItem T="string?" Value="@("reviewed")">Reviewed</MudSelectItem>
-                <MudSelectItem T="string?" Value="@("approved")">Approved</MudSelectItem>
-            </MudSelect>
+            <RadzenFormField Text="Workflow" Variant="Radzen.Variant.Outlined" Style="width: 150px;">
+                <ChildContent>
+                    <RadzenDropDown TValue="string?" @bind-Value="_workflowStatusFilter" Change="@OnWorkflowFilterChanged"
+                                    Data="@_workflowOptions" TextProperty="Text" ValueProperty="Value"
+                                    AllowClear="true" Placeholder="All States" Style="width: 100%;" />
+                </ChildContent>
+            </RadzenFormField>
         }
 
-        <MudMenu Icon="@Icons.Material.Filled.ViewColumn"
-                 Label="Columns"
-                 Variant="Variant.Outlined"
-                 Dense="true"
-                 Class="ml-4"
-                 AnchorOrigin="Origin.BottomLeft">
-            @foreach (var lang in Languages)
-            {
-                var langCode = lang;
-                var isVisible = !_hiddenLanguages.Contains(langCode);
-                <MudMenuItem OnClick="@(() => ToggleLanguageVisibility(langCode))">
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudCheckBox T="bool" Value="@isVisible" Size="Size.Small" ReadOnly="true" />
-                        <MudText>@langCode.ToUpperInvariant()</MudText>
-                        @if (langCode == DefaultLanguage)
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">(default)</MudText>
-                        }
-                    </MudStack>
-                </MudMenuItem>
-            }
-        </MudMenu>
+        <RadzenSplitButton Text="Columns" Icon="view_column" Variant="Radzen.Variant.Outlined" Size="ButtonSize.Small"
+                           Click="@(args => { })" Style="margin-top: auto;">
+            <ChildContent>
+                @foreach (var lang in Languages)
+                {
+                    var langCode = lang;
+                    var isVisible = !_hiddenLanguages.Contains(langCode);
+                    <RadzenSplitButtonItem Text="@GetLanguageLabel(langCode)" Value="@langCode"
+                                           Icon="@(isVisible ? "check_box" : "check_box_outline_blank")" />
+                }
+            </ChildContent>
+        </RadzenSplitButton>
 
-        <MudSpacer />
+        <div style="flex-grow: 1;"></div>
 
-        @if (SelectedItems.Any())
+        @if (_selectedItems.Any())
         {
-            <MudChip T="string" Color="Color.Primary" Size="Size.Small" Class="mr-2">
-                @SelectedItems.Count() selected
-            </MudChip>
-            <MudButton Variant="Variant.Outlined"
-                       Color="Color.Primary"
-                       Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Translate"
-                       OnClick="@OnTranslateSelected"
-                       Class="mr-2">
-                Translate
-            </MudButton>
+            <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="@($"{_selectedItems.Count} selected")" class="rz-mr-2" />
+            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                          Icon="translate" Text="Translate" Click="@OnTranslateSelected" class="rz-mr-1" />
             @if (WorkflowEnabled && CanReview)
             {
-                <MudButton Variant="Variant.Outlined"
-                           Color="Color.Info"
-                           Size="Size.Small"
-                           StartIcon="@Icons.Material.Filled.RateReview"
-                           OnClick="@OnReviewSelected"
-                           Class="mr-2">
-                    Review
-                </MudButton>
+                <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
+                              Icon="rate_review" Text="Review" Click="@OnReviewSelected" class="rz-mr-1" />
             }
             @if (WorkflowEnabled && CanApprove)
             {
-                <MudButton Variant="Variant.Outlined"
-                           Color="Color.Success"
-                           Size="Size.Small"
-                           StartIcon="@Icons.Material.Filled.CheckCircle"
-                           OnClick="@OnApproveSelected"
-                           Class="mr-2">
-                    Approve
-                </MudButton>
+                <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small"
+                              Icon="check_circle" Text="Approve" Click="@OnApproveSelected" class="rz-mr-1" />
             }
-            <MudButton Variant="Variant.Outlined"
-                       Color="Color.Error"
-                       Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Delete"
-                       OnClick="@OnDeleteSelected">
-                Delete
-            </MudButton>
+            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small"
+                          Icon="delete" Text="Delete" Click="@OnDeleteSelected" />
         }
         else
         {
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="@OnAddKey">
-                Add Key
-            </MudButton>
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                          Icon="add" Text="Add Key" Click="@OnAddKey" />
         }
-    </ToolBarContent>
+    </RadzenStack>
+</RadzenCard>
 
-    <Columns>
-        <SelectColumn T="TranslationGridRow" ShowInFooter="false" />
+@* Data Grid *@
+<RadzenDataGrid @ref="_dataGrid"
+                TItem="TranslationGridRow"
+                Data="@_data"
+                Count="@_count"
+                LoadData="@LoadData"
+                IsLoading="@_isLoading"
+                AllowFiltering="false"
+                AllowSorting="true"
+                AllowPaging="true"
+                PageSize="50"
+                PagerHorizontalAlign="HorizontalAlign.Right"
+                ShowPagingSummary="true"
+                PagingSummaryFormat="Showing {0} to {1} of {2} items"
+                Density="Density.Compact"
+                SelectionMode="DataGridSelectionMode.Multiple"
+                AllowRowSelectOnRowClick="false"
+                RowClick="@OnRowClick"
+                @bind-Value="_selectedItems"
+                EditMode="Radzen.DataGridEditMode.Single"
+                Style="height: calc(100vh - 320px);"
+                RowStyle="cursor: pointer;">
 
-        <PropertyColumn Property="x => x.Status" Title="" Sortable="false" Filterable="false" CellStyle="width: 40px;">
-            <CellTemplate>
-                @switch (context.Item.Status)
-                {
-                    case TranslationStatus.Complete:
-                        <MudTooltip Text="All translations complete">
-                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
-                        </MudTooltip>
-                        break;
-                    case TranslationStatus.Partial:
-                        <MudTooltip Text="Some translations missing">
-                            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small" />
-                        </MudTooltip>
-                        break;
-                    case TranslationStatus.Missing:
-                        <MudTooltip Text="No translations">
-                            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small" />
-                        </MudTooltip>
-                        break;
-                }
-            </CellTemplate>
-        </PropertyColumn>
-
-        <PropertyColumn Property="x => x.KeyName" Title="Key" StickyLeft="true">
-            <CellTemplate>
-                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                    <MudText Typo="Typo.body2">@context.Item.KeyName</MudText>
-                    @if (context.Item.IsPlural)
-                    {
-                        <MudTooltip Text="Plural key">
-                            <MudChip T="string" Size="Size.Small" Color="Color.Info">P</MudChip>
-                        </MudTooltip>
-                    }
-                    @if (!string.IsNullOrEmpty(context.Item.Comment))
-                    {
-                        <MudTooltip Text="@context.Item.Comment">
-                            <MudIcon Icon="@Icons.Material.Filled.Comment" Size="Size.Small" Color="Color.Secondary" />
-                        </MudTooltip>
-                    }
-                </MudStack>
-            </CellTemplate>
-        </PropertyColumn>
-
-        @foreach (var lang in VisibleLanguages)
-        {
-            var langCode = lang;
-            <TemplateColumn T="TranslationGridRow" Title="@GetLanguageTitle(lang)" CellStyle="min-width: 200px;">
-                <CellTemplate>
-                    @{
-                        // For plural keys, show "other" form; for non-plural, show direct value
-                        var cell = context.Item.IsPlural
-                            ? context.Item.GetCell(langCode, PluralForms.Other)
-                            : context.Item.Translations.GetValueOrDefault(langCode);
-                        var value = cell?.Value ?? "";
-                        var isDirty = context.Item.IsPlural
-                            ? context.Item.GetTranslationsForLanguage(langCode).Any(c => c.IsDirty)
-                            : (cell?.IsDirty ?? false);
-
-                        // For plural keys, show summary of all forms
-                        var pluralSummary = context.Item.IsPlural
-                            ? GetPluralSummary(context.Item, langCode)
-                            : null;
-                    }
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Class="@(isDirty ? "dirty-cell" : "")">
-                        @if (context.Item.IsPlural && pluralSummary != null)
-                        {
-                            <MudTooltip Text="@pluralSummary">
-                                @if (string.IsNullOrEmpty(value))
-                                {
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="font-italic">
-                                        (empty)
-                                    </MudText>
-                                }
-                                else
-                                {
-                                    <MudText Typo="Typo.body2" Style="@(value.Length > 50 ? "overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;" : "")">
-                                        @value
-                                    </MudText>
-                                }
-                            </MudTooltip>
-                        }
-                        else if (string.IsNullOrEmpty(value))
-                        {
-                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="font-italic">
-                                (empty)
-                            </MudText>
-                        }
-                        else
-                        {
-                            <MudText Typo="Typo.body2" Style="@(value.Length > 50 ? "overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;" : "")">
-                                @value
-                            </MudText>
-                        }
-                    </MudStack>
-                </CellTemplate>
-                <EditTemplate>
-                    @{
-                        // For plural keys, edit "other" form in grid; use drawer for all forms
-                        var cell = context.Item.IsPlural
-                            ? context.Item.GetCell(langCode, PluralForms.Other)
-                            : context.Item.Translations.GetValueOrDefault(langCode);
-                        var currentValue = cell?.Value ?? "";
-                    }
-                    @if (context.Item.IsPlural)
-                    {
-                        <MudStack>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">other:</MudText>
-                            <MudTextField T="string"
-                                          Value="@currentValue"
-                                          ValueChanged="@(v => OnCellValueChanged(context.Item, langCode, v, PluralForms.Other))"
-                                          Variant="Variant.Outlined"
-                                          Margin="Margin.Dense"
-                                          FullWidth="true"
-                                          AutoFocus="true"
-                                          HelperText="Click row to edit all plural forms" />
-                        </MudStack>
-                    }
-                    else
-                    {
-                        <MudTextField T="string"
-                                      Value="@currentValue"
-                                      ValueChanged="@(v => OnCellValueChanged(context.Item, langCode, v, null))"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      FullWidth="true"
-                                      AutoFocus="true" />
-                    }
-                </EditTemplate>
-            </TemplateColumn>
-        }
-    </Columns>
-
-    <NoRecordsContent>
-        <MudStack AlignItems="AlignItems.Center" Class="py-8">
-            <MudIcon Icon="@Icons.Material.Filled.Translate" Size="Size.Large" Color="Color.Secondary" />
-            <MudText Typo="Typo.subtitle1" Color="Color.Secondary">No translation keys found</MudText>
+    <EmptyTemplate>
+        <RadzenStack AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.Center" Gap="0.5rem" class="rz-p-8">
+            <RadzenIcon Icon="translate" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-color-secondary">No translation keys found</RadzenText>
             @if (!string.IsNullOrEmpty(_searchText) || _statusFilter.HasValue)
             {
-                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(async () => await ClearFilters())">
-                    Clear Filters
-                </MudButton>
+                <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Primary" Text="Clear Filters" Click="@ClearFilters" />
             }
             else
             {
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@OnAddKey">
-                    Add Your First Key
-                </MudButton>
+                <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Add Your First Key" Click="@OnAddKey" />
             }
-        </MudStack>
-    </NoRecordsContent>
+        </RadzenStack>
+    </EmptyTemplate>
 
-    <LoadingContent>
-        <MudStack AlignItems="AlignItems.Center" Class="py-8">
-            <MudProgressCircular Indeterminate="true" />
-            <MudText Typo="Typo.subtitle1" Color="Color.Secondary">Loading translations...</MudText>
-        </MudStack>
-    </LoadingContent>
+    <Columns>
+        @* Selection checkbox *@
+        <RadzenDataGridColumn TItem="TranslationGridRow" Width="40px" Sortable="false" Filterable="false" TextAlign="TextAlign.Center">
+            <HeaderTemplate>
+                <RadzenCheckBox TValue="bool" Value="@_selectAll" Change="@OnSelectAllChanged" />
+            </HeaderTemplate>
+            <Template Context="row">
+                <RadzenCheckBox TValue="bool" Value="@_selectedItems.Contains(row)"
+                                Change="@(args => OnRowSelectionChanged(row, args))" />
+            </Template>
+        </RadzenDataGridColumn>
 
-    <PagerContent>
-        <MudDataGridPager T="TranslationGridRow" />
-    </PagerContent>
-</MudDataGrid>
+        @* Status icon *@
+        <RadzenDataGridColumn TItem="TranslationGridRow" Title="" Width="40px" Sortable="false" Filterable="false">
+            <Template Context="row">
+                @switch (row.Status)
+                {
+                    case TranslationStatus.Complete:
+                        <span title="All translations complete">
+                            <RadzenIcon Icon="check_circle" Style="color: var(--rz-success);" />
+                        </span>
+                        break;
+                    case TranslationStatus.Partial:
+                        <span title="Some translations missing">
+                            <RadzenIcon Icon="warning" Style="color: var(--rz-warning);" />
+                        </span>
+                        break;
+                    case TranslationStatus.Missing:
+                        <span title="No translations">
+                            <RadzenIcon Icon="error" Style="color: var(--rz-danger);" />
+                        </span>
+                        break;
+                }
+            </Template>
+        </RadzenDataGridColumn>
 
-<style>
-    .translation-grid .mud-table-cell {
-        padding: 4px 8px !important;
-    }
+        @* Key name *@
+        <RadzenDataGridColumn TItem="TranslationGridRow" Property="KeyName" Title="Key" Width="220px" Frozen="true">
+            <Template Context="row">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                    <RadzenText TextStyle="TextStyle.Body2" Style="flex: 1;">@row.KeyName</RadzenText>
+                    @if (row.IsPlural)
+                    {
+                        <span title="Plural key">
+                            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="P" Style="font-size: 0.65rem;" />
+                        </span>
+                    }
+                    @if (!string.IsNullOrEmpty(row.Comment))
+                    {
+                        <span title="@row.Comment">
+                            <RadzenIcon Icon="comment" Style="font-size: 0.875rem; color: var(--rz-text-secondary-color);" />
+                        </span>
+                    }
+                </RadzenStack>
+            </Template>
+        </RadzenDataGridColumn>
 
-    .dirty-cell {
-        background-color: rgba(255, 193, 7, 0.1);
-    }
-
-    .translation-grid .mud-table-row:hover {
-        cursor: pointer;
-    }
-</style>
+        @* Language columns *@
+        @foreach (var lang in VisibleLanguages)
+        {
+            var langCode = lang;
+            <RadzenDataGridColumn TItem="TranslationGridRow" Title="@GetLanguageTitle(lang)" MinWidth="200px" Sortable="false">
+                <Template Context="row">
+                    @{
+                        var cell = row.IsPlural
+                            ? row.GetCell(langCode, PluralForms.Other)
+                            : row.Translations.GetValueOrDefault(langCode);
+                        var value = cell?.Value ?? "";
+                        var isDirty = row.IsPlural
+                            ? row.GetTranslationsForLanguage(langCode).Any(c => c.IsDirty)
+                            : (cell?.IsDirty ?? false);
+                        var pluralSummary = row.IsPlural ? GetPluralSummary(row, langCode) : null;
+                    }
+                    <div style="@(isDirty ? "background-color: rgba(255, 193, 7, 0.1); padding: 2px 4px; border-radius: 2px;" : "")"
+                         title="@pluralSummary">
+                        @if (string.IsNullOrEmpty(value))
+                        {
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="font-style: italic;">
+                                (empty)
+                            </RadzenText>
+                        }
+                        else
+                        {
+                            <RadzenText TextStyle="TextStyle.Body2" Style="@GetCellStyle(value)">
+                                @value
+                            </RadzenText>
+                        }
+                    </div>
+                </Template>
+                <EditTemplate Context="row">
+                    @{
+                        var cell = row.IsPlural
+                            ? row.GetCell(langCode, PluralForms.Other)
+                            : row.Translations.GetValueOrDefault(langCode);
+                        var currentValue = cell?.Value ?? "";
+                    }
+                    @if (row.IsPlural)
+                    {
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">other:</RadzenText>
+                            <RadzenTextBox Value="@currentValue"
+                                           ValueChanged="@(v => OnCellValueChanged(row, langCode, v, PluralForms.Other))"
+                                           Style="width: 100%;" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Click row to edit all plural forms
+                            </RadzenText>
+                        </RadzenStack>
+                    }
+                    else
+                    {
+                        <RadzenTextBox Value="@currentValue"
+                                       ValueChanged="@(v => OnCellValueChanged(row, langCode, v, null))"
+                                       Style="width: 100%;" />
+                    }
+                </EditTemplate>
+            </RadzenDataGridColumn>
+        }
+    </Columns>
+</RadzenDataGrid>
 
 @code {
-    private MudDataGrid<TranslationGridRow>? _dataGrid;
+    private RadzenDataGrid<TranslationGridRow>? _dataGrid;
 
     [Parameter]
-    public Func<GridState<TranslationGridRow>, Task<GridData<TranslationGridRow>>>? ServerDataFunc { get; set; }
+    public Func<Models.GridState<TranslationGridRow>, Task<Models.GridData<TranslationGridRow>>>? ServerDataFunc { get; set; }
 
     [Parameter]
     public List<string> Languages { get; set; } = new();
@@ -372,14 +279,58 @@
     private string _searchText = string.Empty;
     private TranslationStatus? _statusFilter;
     private string? _workflowStatusFilter;
-    private HashSet<TranslationGridRow> _selectedItems = new();
+    private IList<TranslationGridRow> _selectedItems = new List<TranslationGridRow>();
     private HashSet<string> _hiddenLanguages = new();
+    private bool _selectAll;
+    private bool _isLoading;
+    private IEnumerable<TranslationGridRow> _data = Enumerable.Empty<TranslationGridRow>();
+    private int _count;
+
+    private readonly List<object> _statusOptions = new()
+    {
+        new { Value = TranslationStatus.Complete, Text = "Complete" },
+        new { Value = TranslationStatus.Partial, Text = "Partial" },
+        new { Value = TranslationStatus.Missing, Text = "Missing" }
+    };
+
+    private readonly List<object> _workflowOptions = new()
+    {
+        new { Value = "pending", Text = "Pending" },
+        new { Value = "translated", Text = "Translated" },
+        new { Value = "reviewed", Text = "Reviewed" },
+        new { Value = "approved", Text = "Approved" }
+    };
 
     public string SearchText => _searchText;
 
     private IEnumerable<string> VisibleLanguages => Languages.Where(l => !_hiddenLanguages.Contains(l));
 
-    private IEnumerable<TranslationGridRow> SelectedItems => _selectedItems;
+    private bool _initialized;
+
+    private void OnRowClick(DataGridRowMouseEventArgs<TranslationGridRow> args)
+    {
+        OnRowSelected.InvokeAsync(args.Data);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Trigger initial load when ServerDataFunc becomes available
+        if (!_initialized && ServerDataFunc != null && _dataGrid != null)
+        {
+            _initialized = true;
+            await _dataGrid.Reload();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Trigger initial load after first render if not yet loaded
+        if (firstRender && ServerDataFunc != null && _dataGrid != null && !_initialized)
+        {
+            _initialized = true;
+            await _dataGrid.Reload();
+        }
+    }
 
     private string GetLanguageTitle(string langCode)
     {
@@ -389,26 +340,84 @@
         return title;
     }
 
+    private string GetLanguageLabel(string langCode)
+    {
+        var label = langCode.ToUpperInvariant();
+        if (langCode == DefaultLanguage)
+            label += " (default)";
+        return label;
+    }
+
+    private static string GetCellStyle(string value)
+    {
+        if (value.Length > 50)
+            return "overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px; display: block;";
+        return "";
+    }
+
+    private async Task LoadData(LoadDataArgs args)
+    {
+        if (ServerDataFunc == null)
+        {
+            _data = Enumerable.Empty<TranslationGridRow>();
+            _count = 0;
+            return;
+        }
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Convert Radzen LoadDataArgs to GridState for compatibility
+            var state = new Models.GridState<TranslationGridRow>
+            {
+                Page = (args.Skip ?? 0) / (args.Top ?? 50),
+                PageSize = args.Top ?? 50
+            };
+
+            var result = await ServerDataFunc(state);
+            _data = result.Items ?? Enumerable.Empty<TranslationGridRow>();
+            _count = result.TotalItems;
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load data: {ex.Message}");
+            _data = Enumerable.Empty<TranslationGridRow>();
+            _count = 0;
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
     private async Task OnSearchChanged(string value)
     {
         _searchText = value;
         await OnSearchTextChanged.InvokeAsync(value);
-        if (_dataGrid != null)
-        {
-            await _dataGrid.ReloadServerData();
-        }
+        await ReloadAsync();
+    }
+
+    private async Task OnStatusFilterChanged(object? value)
+    {
+        await ReloadAsync();
+    }
+
+    private async Task OnWorkflowFilterChanged(object? value)
+    {
+        await ReloadAsync();
     }
 
     private async Task ClearFilters()
     {
         _searchText = string.Empty;
         _statusFilter = null;
+        _workflowStatusFilter = null;
         _hiddenLanguages.Clear();
         await OnSearchTextChanged.InvokeAsync(string.Empty);
-        if (_dataGrid != null)
-        {
-            await _dataGrid.ReloadServerData();
-        }
+        await ReloadAsync();
     }
 
     private void ToggleLanguageVisibility(string langCode)
@@ -417,16 +426,34 @@
             _hiddenLanguages.Remove(langCode);
         else
             _hiddenLanguages.Add(langCode);
+        StateHasChanged();
     }
 
-    private void OnRowClick(DataGridRowClickEventArgs<TranslationGridRow> args)
+    private void OnSelectAllChanged(bool value)
     {
-        OnRowSelected.InvokeAsync(args.Item);
+        _selectAll = value;
+        if (value)
+        {
+            _selectedItems = _data.ToList();
+        }
+        else
+        {
+            _selectedItems.Clear();
+        }
     }
 
-    private void OnSelectedItemsChanged(HashSet<TranslationGridRow> items)
+    private void OnRowSelectionChanged(TranslationGridRow row, bool selected)
     {
-        _selectedItems = items;
+        if (selected)
+        {
+            if (!_selectedItems.Contains(row))
+                _selectedItems.Add(row);
+        }
+        else
+        {
+            _selectedItems.Remove(row);
+        }
+        _selectAll = _selectedItems.Count == _data.Count() && _data.Any();
     }
 
     private void OnCellValueChanged(TranslationGridRow row, string languageCode, string value, string? pluralForm)
@@ -435,7 +462,7 @@
         OnCellChanged.InvokeAsync((row, languageCode, value));
     }
 
-    private static string GetPluralSummary(TranslationGridRow row, string langCode)
+    private static string? GetPluralSummary(TranslationGridRow row, string langCode)
     {
         var parts = new List<string>();
         foreach (var pf in PluralForms.Common)
@@ -448,12 +475,7 @@
                 parts.Add($"{pf}: {display}");
             }
         }
-        return parts.Count > 0 ? string.Join("\n", parts) : "No plural forms set";
-    }
-
-    private void OnCellCommitted(TranslationGridRow row)
-    {
-        // Cell editing committed
+        return parts.Count > 0 ? string.Join("\n", parts) : null;
     }
 
     private void OnAddKey()
@@ -488,7 +510,7 @@
     {
         if (_dataGrid != null)
         {
-            await _dataGrid.ReloadServerData();
+            await _dataGrid.Reload();
         }
     }
 }

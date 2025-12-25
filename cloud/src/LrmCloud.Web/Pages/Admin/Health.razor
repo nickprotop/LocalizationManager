@@ -6,205 +6,190 @@
 
 <PageTitle>System Health - LRM Cloud Admin</PageTitle>
 
-<div class="d-flex justify-space-between align-center mb-4">
-    <div>
-        <MudText Typo="Typo.h4">
-            <MudIcon Icon="@Icons.Material.Filled.HealthAndSafety" Class="mr-2" Style="vertical-align: middle;" />
-            System Health
-        </MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+    <RadzenStack Gap="0">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="health_and_safety" />
+            <RadzenText TextStyle="TextStyle.H4">System Health</RadzenText>
+        </RadzenStack>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
             Real-time status of all system services.
-        </MudText>
-    </div>
-    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadHealthAsync" StartIcon="@Icons.Material.Filled.Refresh">
-        Refresh
-    </MudButton>
-</div>
+        </RadzenText>
+    </RadzenStack>
+    <RadzenButton Variant="Radzen.Variant.Outlined" Icon="refresh" Text="Refresh" Click="LoadHealthAsync" />
+</RadzenStack>
 
 @if (_isLoading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
 }
 else if (_health == null)
 {
-    <MudAlert Severity="Severity.Error">Failed to load system health status.</MudAlert>
+    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">Failed to load system health status.</RadzenAlert>
 }
 else
 {
     @* Overall Status Banner *@
-    <MudAlert Severity="@(_health.IsHealthy ? Severity.Success : Severity.Error)" Class="mb-4">
-        <div class="d-flex align-center">
-            <MudIcon Icon="@(_health.IsHealthy ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Error)" Class="mr-2" />
-            <MudText Typo="Typo.subtitle1">
-                System is @(_health.IsHealthy ? "Healthy" : "Unhealthy")
-            </MudText>
-        </div>
-    </MudAlert>
+    <RadzenAlert AlertStyle="@(_health.IsHealthy ? AlertStyle.Success : AlertStyle.Danger)" Shade="Shade.Lighter" AllowClose="false" class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.Subtitle1">
+            System is @(_health.IsHealthy ? "Healthy" : "Unhealthy")
+        </RadzenText>
+    </RadzenAlert>
 
-    <MudGrid>
+    <RadzenRow Gap="1rem">
         @* Database *@
-        <MudItem xs="12" sm="6" md="4">
-            <MudPaper Class="pa-4" Elevation="2">
-                <div class="d-flex justify-space-between align-center mb-3">
-                    <div class="d-flex align-center">
-                        <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Medium" Class="mr-2"
-                                 Color="@(_health.Database.IsHealthy ? Color.Success : Color.Error)" />
-                        <MudText Typo="Typo.h6">Database</MudText>
-                    </div>
-                    <MudChip T="string" Size="Size.Small" Color="@(_health.Database.IsHealthy ? Color.Success : Color.Error)">
-                        @(_health.Database.IsHealthy ? "Healthy" : "Error")
-                    </MudChip>
-                </div>
-                <MudDivider Class="mb-3" />
-                <MudGrid>
-                    <MudItem xs="6">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
-                        <MudText Typo="Typo.body2">@(_health.Database.IsHealthy ? "Connected" : "Disconnected")</MudText>
-                    </MudItem>
-                    <MudItem xs="6">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Latency</MudText>
-                        <MudText Typo="Typo.body2">@(_health.Database.LatencyMs.HasValue ? $"{_health.Database.LatencyMs}ms" : "-")</MudText>
-                    </MudItem>
-                </MudGrid>
-            </MudPaper>
-        </MudItem>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-3">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="storage" Style="@($"color: {(_health.Database.IsHealthy ? "var(--rz-success)" : "var(--rz-danger)")};")" />
+                        <RadzenText TextStyle="TextStyle.H6">Database</RadzenText>
+                    </RadzenStack>
+                    <RadzenBadge BadgeStyle="@(_health.Database.IsHealthy ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                 Text="@(_health.Database.IsHealthy ? "Healthy" : "Error")" />
+                </RadzenStack>
+                <hr class="rz-mb-3" />
+                <RadzenRow>
+                    <RadzenColumn Size="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Status</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">@(_health.Database.IsHealthy ? "Connected" : "Disconnected")</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Latency</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">@(_health.Database.LatencyMs.HasValue ? $"{_health.Database.LatencyMs}ms" : "-")</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenCard>
+        </RadzenColumn>
 
         @* Redis *@
-        <MudItem xs="12" sm="6" md="4">
-            <MudPaper Class="pa-4" Elevation="2">
-                <div class="d-flex justify-space-between align-center mb-3">
-                    <div class="d-flex align-center">
-                        <MudIcon Icon="@Icons.Material.Filled.Memory" Size="Size.Medium" Class="mr-2"
-                                 Color="@(_health.Redis.IsHealthy ? Color.Success : Color.Error)" />
-                        <MudText Typo="Typo.h6">Redis</MudText>
-                    </div>
-                    <MudChip T="string" Size="Size.Small" Color="@(_health.Redis.IsHealthy ? Color.Success : Color.Error)">
-                        @(_health.Redis.IsHealthy ? "Healthy" : "Error")
-                    </MudChip>
-                </div>
-                <MudDivider Class="mb-3" />
-                <MudGrid>
-                    <MudItem xs="6">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
-                        <MudText Typo="Typo.body2">@(_health.Redis.IsHealthy ? "Connected" : "Disconnected")</MudText>
-                    </MudItem>
-                    <MudItem xs="6">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Latency</MudText>
-                        <MudText Typo="Typo.body2">@(_health.Redis.LatencyMs.HasValue ? $"{_health.Redis.LatencyMs}ms" : "-")</MudText>
-                    </MudItem>
-                </MudGrid>
-            </MudPaper>
-        </MudItem>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-3">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="memory" Style="@($"color: {(_health.Redis.IsHealthy ? "var(--rz-success)" : "var(--rz-danger)")};")" />
+                        <RadzenText TextStyle="TextStyle.H6">Redis</RadzenText>
+                    </RadzenStack>
+                    <RadzenBadge BadgeStyle="@(_health.Redis.IsHealthy ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                 Text="@(_health.Redis.IsHealthy ? "Healthy" : "Error")" />
+                </RadzenStack>
+                <hr class="rz-mb-3" />
+                <RadzenRow>
+                    <RadzenColumn Size="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Status</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">@(_health.Redis.IsHealthy ? "Connected" : "Disconnected")</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Latency</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">@(_health.Redis.LatencyMs.HasValue ? $"{_health.Redis.LatencyMs}ms" : "-")</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenCard>
+        </RadzenColumn>
 
         @* MinIO *@
-        <MudItem xs="12" sm="6" md="4">
-            <MudPaper Class="pa-4" Elevation="2">
-                <div class="d-flex justify-space-between align-center mb-3">
-                    <div class="d-flex align-center">
-                        <MudIcon Icon="@Icons.Material.Filled.CloudQueue" Size="Size.Medium" Class="mr-2"
-                                 Color="@(_health.MinIO.IsHealthy ? Color.Success : Color.Error)" />
-                        <MudText Typo="Typo.h6">MinIO Storage</MudText>
-                    </div>
-                    <MudChip T="string" Size="Size.Small" Color="@(_health.MinIO.IsHealthy ? Color.Success : Color.Error)">
-                        @(_health.MinIO.IsHealthy ? "Healthy" : "Error")
-                    </MudChip>
-                </div>
-                <MudDivider Class="mb-3" />
-                <MudGrid>
-                    <MudItem xs="6">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
-                        <MudText Typo="Typo.body2">@(_health.MinIO.IsHealthy ? "Connected" : "Disconnected")</MudText>
-                    </MudItem>
-                    <MudItem xs="6">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Latency</MudText>
-                        <MudText Typo="Typo.body2">@(_health.MinIO.LatencyMs.HasValue ? $"{_health.MinIO.LatencyMs}ms" : "-")</MudText>
-                    </MudItem>
-                </MudGrid>
-            </MudPaper>
-        </MudItem>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-3">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="cloud_queue" Style="@($"color: {(_health.MinIO.IsHealthy ? "var(--rz-success)" : "var(--rz-danger)")};")" />
+                        <RadzenText TextStyle="TextStyle.H6">MinIO Storage</RadzenText>
+                    </RadzenStack>
+                    <RadzenBadge BadgeStyle="@(_health.MinIO.IsHealthy ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                 Text="@(_health.MinIO.IsHealthy ? "Healthy" : "Error")" />
+                </RadzenStack>
+                <hr class="rz-mb-3" />
+                <RadzenRow>
+                    <RadzenColumn Size="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Status</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">@(_health.MinIO.IsHealthy ? "Connected" : "Disconnected")</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Latency</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">@(_health.MinIO.LatencyMs.HasValue ? $"{_health.MinIO.LatencyMs}ms" : "-")</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenCard>
+        </RadzenColumn>
 
         @* PayPal *@
         @if (_health.PayPal != null)
         {
-            <MudItem xs="12" sm="6" md="4">
-                <MudPaper Class="pa-4" Elevation="2">
-                    <div class="d-flex justify-space-between align-center mb-3">
-                        <div class="d-flex align-center">
-                            <MudIcon Icon="@Icons.Material.Filled.Payment" Size="Size.Medium" Class="mr-2"
-                                     Color="@(_health.PayPal.IsHealthy ? Color.Success : Color.Error)" />
-                            <MudText Typo="Typo.h6">PayPal</MudText>
-                        </div>
-                        <MudChip T="string" Size="Size.Small" Color="@(_health.PayPal.IsHealthy ? Color.Success : Color.Error)">
-                            @(_health.PayPal.IsHealthy ? "Healthy" : "Error")
-                        </MudChip>
-                    </div>
-                    <MudDivider Class="mb-3" />
-                    <MudGrid>
-                        <MudItem xs="6">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
-                            <MudText Typo="Typo.body2">@(_health.PayPal.IsHealthy ? "Connected" : "Disconnected")</MudText>
-                        </MudItem>
-                        <MudItem xs="6">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Latency</MudText>
-                            <MudText Typo="Typo.body2">@(_health.PayPal.LatencyMs.HasValue ? $"{_health.PayPal.LatencyMs}ms" : "-")</MudText>
-                        </MudItem>
-                    </MudGrid>
-                </MudPaper>
-            </MudItem>
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
+                <RadzenCard>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-3">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="payment" Style="@($"color: {(_health.PayPal.IsHealthy ? "var(--rz-success)" : "var(--rz-danger)")};")" />
+                            <RadzenText TextStyle="TextStyle.H6">PayPal</RadzenText>
+                        </RadzenStack>
+                        <RadzenBadge BadgeStyle="@(_health.PayPal.IsHealthy ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                     Text="@(_health.PayPal.IsHealthy ? "Healthy" : "Error")" />
+                    </RadzenStack>
+                    <hr class="rz-mb-3" />
+                    <RadzenRow>
+                        <RadzenColumn Size="6">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Status</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2">@(_health.PayPal.IsHealthy ? "Connected" : "Disconnected")</RadzenText>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Latency</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2">@(_health.PayPal.LatencyMs.HasValue ? $"{_health.PayPal.LatencyMs}ms" : "-")</RadzenText>
+                        </RadzenColumn>
+                    </RadzenRow>
+                </RadzenCard>
+            </RadzenColumn>
         }
 
         @* Stripe *@
         @if (_health.Stripe != null)
         {
-            <MudItem xs="12" sm="6" md="4">
-                <MudPaper Class="pa-4" Elevation="2">
-                    <div class="d-flex justify-space-between align-center mb-3">
-                        <div class="d-flex align-center">
-                            <MudIcon Icon="@Icons.Material.Filled.CreditCard" Size="Size.Medium" Class="mr-2"
-                                     Color="@(_health.Stripe.IsHealthy ? Color.Success : Color.Error)" />
-                            <MudText Typo="Typo.h6">Stripe</MudText>
-                        </div>
-                        <MudChip T="string" Size="Size.Small" Color="@(_health.Stripe.IsHealthy ? Color.Success : Color.Error)">
-                            @(_health.Stripe.IsHealthy ? "Healthy" : "Error")
-                        </MudChip>
-                    </div>
-                    <MudDivider Class="mb-3" />
-                    <MudGrid>
-                        <MudItem xs="6">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
-                            <MudText Typo="Typo.body2">@(_health.Stripe.IsHealthy ? "Connected" : "Disconnected")</MudText>
-                        </MudItem>
-                        <MudItem xs="6">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Latency</MudText>
-                            <MudText Typo="Typo.body2">@(_health.Stripe.LatencyMs.HasValue ? $"{_health.Stripe.LatencyMs}ms" : "-")</MudText>
-                        </MudItem>
-                    </MudGrid>
-                </MudPaper>
-            </MudItem>
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
+                <RadzenCard>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-3">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="credit_card" Style="@($"color: {(_health.Stripe.IsHealthy ? "var(--rz-success)" : "var(--rz-danger)")};")" />
+                            <RadzenText TextStyle="TextStyle.H6">Stripe</RadzenText>
+                        </RadzenStack>
+                        <RadzenBadge BadgeStyle="@(_health.Stripe.IsHealthy ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                     Text="@(_health.Stripe.IsHealthy ? "Healthy" : "Error")" />
+                    </RadzenStack>
+                    <hr class="rz-mb-3" />
+                    <RadzenRow>
+                        <RadzenColumn Size="6">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Status</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2">@(_health.Stripe.IsHealthy ? "Connected" : "Disconnected")</RadzenText>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Latency</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2">@(_health.Stripe.LatencyMs.HasValue ? $"{_health.Stripe.LatencyMs}ms" : "-")</RadzenText>
+                        </RadzenColumn>
+                    </RadzenRow>
+                </RadzenCard>
+            </RadzenColumn>
         }
-    </MudGrid>
+    </RadzenRow>
 
     @* Server Info *@
-    <MudPaper Class="pa-4 mt-4" Elevation="2">
-        <MudText Typo="Typo.h6" Class="mb-4">
-            <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" Style="vertical-align: middle;" />
-            Server Information
-        </MudText>
-        <MudGrid>
-            <MudItem xs="12" md="4">
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Server Time (UTC)</MudText>
-                <MudText Typo="Typo.body1">@_health.ServerTime.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
-            </MudItem>
-            <MudItem xs="12" md="4">
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Uptime</MudText>
-                <MudText Typo="Typo.body1">@FormatUptime(_health.Uptime)</MudText>
-            </MudItem>
-            <MudItem xs="12" md="4">
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Last Check</MudText>
-                <MudText Typo="Typo.body1">@DateTime.Now.ToString("HH:mm:ss")</MudText>
-            </MudItem>
-        </MudGrid>
-    </MudPaper>
+    <RadzenCard class="rz-mt-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+            <RadzenIcon Icon="info" />
+            <RadzenText TextStyle="TextStyle.H6">Server Information</RadzenText>
+        </RadzenStack>
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Server Time (UTC)</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1">@_health.ServerTime.ToString("yyyy-MM-dd HH:mm:ss")</RadzenText>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Uptime</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1">@FormatUptime(_health.Uptime)</RadzenText>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Last Check</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1">@DateTime.Now.ToString("HH:mm:ss")</RadzenText>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenCard>
 }
 
 @code {

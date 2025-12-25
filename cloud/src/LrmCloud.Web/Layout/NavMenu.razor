@@ -1,31 +1,31 @@
 @using Microsoft.AspNetCore.Components.Authorization
 
-<MudNavMenu>
-    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-    <MudNavLink Href="projects" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Folder">Projects</MudNavLink>
-    <MudNavLink Href="organizations" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Business">Organizations</MudNavLink>
-    <MudNavGroup Title="Settings" Icon="@Icons.Material.Filled.Settings" Expanded="false">
-        <MudNavLink Href="settings/profile" Icon="@Icons.Material.Filled.Person">Profile</MudNavLink>
-        <MudNavLink Href="settings/api-keys" Icon="@Icons.Material.Filled.Key">CLI API Keys</MudNavLink>
-        <MudNavLink Href="settings/translation" Icon="@Icons.Material.Filled.Translate">Translation Providers</MudNavLink>
-        <MudNavLink Href="settings/translation-memory" Icon="@Icons.Material.Filled.Memory">Translation Memory</MudNavLink>
-        <MudNavLink Href="settings/glossary" Icon="@Icons.Material.Filled.Book">Organization Glossary</MudNavLink>
-        <MudNavLink Href="settings/usage" Icon="@Icons.Material.Filled.Analytics">Usage</MudNavLink>
-        <MudNavLink Href="settings/billing" Icon="@Icons.Material.Filled.CreditCard">Billing</MudNavLink>
-    </MudNavGroup>
+<RadzenPanelMenu>
+    <RadzenPanelMenuItem Text="Dashboard" Path="" Icon="dashboard" />
+    <RadzenPanelMenuItem Text="Projects" Path="projects" Icon="folder" />
+    <RadzenPanelMenuItem Text="Organizations" Path="organizations" Icon="business" />
+    <RadzenPanelMenuItem Text="Settings" Icon="settings">
+        <RadzenPanelMenuItem Text="Profile" Path="settings/profile" Icon="person" />
+        <RadzenPanelMenuItem Text="CLI API Keys" Path="settings/api-keys" Icon="key" />
+        <RadzenPanelMenuItem Text="Translation Providers" Path="settings/translation" Icon="translate" />
+        <RadzenPanelMenuItem Text="Translation Memory" Path="settings/translation-memory" Icon="memory" />
+        <RadzenPanelMenuItem Text="Organization Glossary" Path="settings/glossary" Icon="menu_book" />
+        <RadzenPanelMenuItem Text="Usage" Path="settings/usage" Icon="analytics" />
+        <RadzenPanelMenuItem Text="Billing" Path="settings/billing" Icon="credit_card" />
+    </RadzenPanelMenuItem>
     <AuthorizeView>
         <Authorized>
             @if (context.User.FindFirst("is_superadmin")?.Value == "true")
             {
-                <MudNavGroup Title="Admin" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="false">
-                    <MudNavLink Href="admin" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-                    <MudNavLink Href="admin/analytics" Icon="@Icons.Material.Filled.TrendingUp">Analytics</MudNavLink>
-                    <MudNavLink Href="admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Users</MudNavLink>
-                    <MudNavLink Href="admin/organizations" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Business">Organizations</MudNavLink>
-                    <MudNavLink Href="admin/health" Icon="@Icons.Material.Filled.HealthAndSafety">System Health</MudNavLink>
-                    <MudNavLink Href="admin/logs" Icon="@Icons.Material.Filled.Article">Logs</MudNavLink>
-                </MudNavGroup>
+                <RadzenPanelMenuItem Text="Admin" Icon="admin_panel_settings">
+                    <RadzenPanelMenuItem Text="Dashboard" Path="admin" Icon="dashboard" />
+                    <RadzenPanelMenuItem Text="Analytics" Path="admin/analytics" Icon="trending_up" />
+                    <RadzenPanelMenuItem Text="Users" Path="admin/users" Icon="people" />
+                    <RadzenPanelMenuItem Text="Organizations" Path="admin/organizations" Icon="business" />
+                    <RadzenPanelMenuItem Text="System Health" Path="admin/health" Icon="health_and_safety" />
+                    <RadzenPanelMenuItem Text="Logs" Path="admin/logs" Icon="article" />
+                </RadzenPanelMenuItem>
             }
         </Authorized>
     </AuthorizeView>
-</MudNavMenu>
+</RadzenPanelMenu>

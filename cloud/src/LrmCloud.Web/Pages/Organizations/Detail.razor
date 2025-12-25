@@ -9,241 +9,173 @@
 @inject OrganizationService OrganizationService
 @inject ProjectService ProjectService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 
 <PageTitle>@(_organization?.Name ?? "Organization") - LRM Cloud</PageTitle>
 
 @if (_isLoading)
 {
-    <MudStack>
-        <MudSkeleton Width="300px" Height="40px" />
-        <MudGrid>
+    <RadzenStack Gap="1rem">
+        <div style="background: var(--rz-base-300); width: 300px; height: 40px; border-radius: 4px;"></div>
+        <RadzenRow Gap="1rem">
             @for (int i = 0; i < 4; i++)
             {
-                <MudItem xs="12" sm="6" md="3">
+                <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
                     <LoadingSkeleton Type="LoadingSkeletonType.Card" />
-                </MudItem>
+                </RadzenColumn>
             }
-        </MudGrid>
-    </MudStack>
+        </RadzenRow>
+    </RadzenStack>
 }
 else if (_organization == null)
 {
-    <MudAlert Severity="Severity.Error">
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
         Organization not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="organizations">Back to Organizations</MudButton>
-    </MudAlert>
+        <RadzenLink Path="organizations" Text="Back to Organizations" class="rz-ms-2" />
+    </RadzenAlert>
 }
 else
 {
-    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
-        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                       OnClick="@(() => Navigation.NavigateTo("organizations"))"
-                       Size="Size.Small" />
-        <MudBreadcrumbs Items="_breadcrumbs" />
-    </MudStack>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+        <RadzenButton Variant="Radzen.Variant.Text" Icon="arrow_back" Click="@(() => Navigation.NavigateTo("organizations"))" Size="ButtonSize.Small" />
+        <RadzenBreadCrumb>
+            <RadzenBreadCrumbItem Path="organizations" Text="Organizations" />
+            <RadzenBreadCrumbItem Text="@_organization.Name" />
+        </RadzenBreadCrumb>
+    </RadzenStack>
 
     <!-- Organization Header -->
-    <MudPaper Elevation="2" Class="pa-4 mb-4">
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
-                <MudAvatar Color="@UiHelpers.GetHashColor(_organization.Name)" Size="Size.Large" Style="font-size: 1.5rem;">
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Gap="1rem" Wrap="FlexWrap.Wrap">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
+                <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--rz-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.5rem;">
                     @UiHelpers.GetInitials(_organization.Name)
-                </MudAvatar>
-                <MudStack Spacing="0">
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudText Typo="Typo.h5">@_organization.Name</MudText>
-                        <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetRoleColor(_organization.UserRole)">
-                            @_organization.UserRole
-                        </MudChip>
-                    </MudStack>
+                </div>
+                <RadzenStack Gap="0.25rem">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.H5">@_organization.Name</RadzenText>
+                        <RadzenBadge BadgeStyle="@UiHelpers.GetRoleBadgeStyle(_organization.UserRole)" Text="@_organization.UserRole" />
+                    </RadzenStack>
                     @if (!string.IsNullOrEmpty(_organization.Description))
                     {
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">@_organization.Description</MudText>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">@_organization.Description</RadzenText>
                     }
-                </MudStack>
-            </MudStack>
+                </RadzenStack>
+            </RadzenStack>
 
-            <MudStack Row="true" Spacing="2">
-                <MudButton Variant="Variant.Outlined"
-                           StartIcon="@Icons.Material.Filled.People"
-                           Href="@($"organizations/{OrganizationId}/members")">
-                    Members (@_organization.MemberCount)
-                </MudButton>
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                <RadzenButton Variant="Radzen.Variant.Outlined" Icon="people" Text="@($"Members ({_organization.MemberCount})")" Click="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}/members"))" />
                 @if (OrganizationRole.IsAdminOrOwner(_organization.UserRole))
                 {
-                    <MudButton Variant="Variant.Outlined"
-                               StartIcon="@Icons.Material.Filled.Key"
-                               Href="@($"organizations/{OrganizationId}/api-keys")">
-                        API Keys
-                    </MudButton>
-                    <MudButton Variant="Variant.Outlined"
-                               StartIcon="@Icons.Material.Filled.CreditCard"
-                               Href="@($"organizations/{OrganizationId}/billing")">
-                        Billing
-                    </MudButton>
-                    <MudButton Variant="Variant.Outlined"
-                               StartIcon="@Icons.Material.Filled.Settings"
-                               Href="@($"organizations/{OrganizationId}/settings")">
-                        Settings
-                    </MudButton>
+                    <RadzenButton Variant="Radzen.Variant.Outlined" Icon="key" Text="API Keys" Click="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}/api-keys"))" />
+                    <RadzenButton Variant="Radzen.Variant.Outlined" Icon="credit_card" Text="Billing" Click="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}/billing"))" />
+                    <RadzenButton Variant="Radzen.Variant.Outlined" Icon="settings" Text="Settings" Click="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}/settings"))" />
                 }
                 @if (_organization.UserRole != OrganizationRole.Owner)
                 {
-                    <MudMenu Icon="@Icons.Material.Filled.MoreVert"
-                             Color="Color.Default"
-                             AnchorOrigin="Origin.BottomRight"
-                             TransformOrigin="Origin.TopRight">
-                        <MudMenuItem Icon="@Icons.Material.Filled.ExitToApp"
-                                     IconColor="Color.Error"
-                                     OnClick="@ShowLeaveConfirmation">
-                            Leave Organization
-                        </MudMenuItem>
-                    </MudMenu>
+                    <RadzenSplitButton Icon="more_vert" Click="@ShowLeaveConfirmation">
+                        <ChildContent>
+                            <RadzenSplitButtonItem Text="Leave Organization" Icon="exit_to_app" />
+                        </ChildContent>
+                    </RadzenSplitButton>
                 }
-            </MudStack>
-        </MudStack>
-    </MudPaper>
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
 
     <!-- Quick Stats -->
-    <MudGrid Class="mb-4">
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack Spacing="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">PLAN</MudText>
-                        <MudText Typo="Typo.h6">@_organization.Plan.ToUpperInvariant()</MudText>
-                    </MudStack>
-                    <MudIcon Icon="@Icons.Material.Filled.CreditCard" Size="Size.Large" Color="Color.Secondary" Style="opacity: 0.5;" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack Spacing="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">MEMBERS</MudText>
-                        <MudText Typo="Typo.h6">@_organization.MemberCount</MudText>
-                    </MudStack>
-                    <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Secondary" Style="opacity: 0.5;" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack Spacing="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">PROJECTS</MudText>
-                        <MudText Typo="Typo.h6">@_orgProjects.Count</MudText>
-                    </MudStack>
-                    <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Large" Color="Color.Secondary" Style="opacity: 0.5;" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack Spacing="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">CREATED</MudText>
-                        <MudText Typo="Typo.h6">@_organization.CreatedAt.ToString("MMM yyyy")</MudText>
-                    </MudStack>
-                    <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Large" Color="Color.Secondary" Style="opacity: 0.5;" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+    <RadzenRow Gap="1rem" class="rz-mb-4">
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">PLAN</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H6">@_organization.Plan.ToUpperInvariant()</RadzenText>
+                    </RadzenStack>
+                    <RadzenIcon Icon="credit_card" Style="font-size: 2.5rem; opacity: 0.3; color: var(--rz-text-secondary-color);" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">MEMBERS</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H6">@_organization.MemberCount</RadzenText>
+                    </RadzenStack>
+                    <RadzenIcon Icon="people" Style="font-size: 2.5rem; opacity: 0.3; color: var(--rz-text-secondary-color);" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">PROJECTS</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H6">@_orgProjects.Count</RadzenText>
+                    </RadzenStack>
+                    <RadzenIcon Icon="folder" Style="font-size: 2.5rem; opacity: 0.3; color: var(--rz-text-secondary-color);" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">CREATED</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H6">@_organization.CreatedAt.ToString("MMM yyyy")</RadzenText>
+                    </RadzenStack>
+                    <RadzenIcon Icon="calendar_month" Style="font-size: 2.5rem; opacity: 0.3; color: var(--rz-text-secondary-color);" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
 
     <!-- Organization Projects -->
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudText Typo="Typo.h6">Projects</MudText>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.H6">Projects</RadzenText>
         @if (OrganizationRole.IsAdminOrOwner(_organization.UserRole) || _organization.UserRole == OrganizationRole.Member)
         {
-            <MudButton Variant="Variant.Outlined"
-                       Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       Href="projects">
-                View All Projects
-            </MudButton>
+            <RadzenButton Variant="Radzen.Variant.Outlined" Size="ButtonSize.Small" Icon="add" Text="View All Projects" Click="@(() => Navigation.NavigateTo("projects"))" />
         }
-    </MudStack>
+    </RadzenStack>
 
     @if (!_orgProjects.Any())
     {
-        <EmptyState Icon="@Icons.Material.Filled.FolderOpen"
+        <EmptyState Icon="folder_open"
                     Title="No projects yet"
-                    Description="This organization doesn't have any projects. Create a project and assign it to this organization."
-                    Elevation="1" />
+                    Description="This organization doesn't have any projects. Create a project and assign it to this organization." />
     }
     else
     {
-        <MudGrid>
+        <RadzenRow Gap="1rem">
             @foreach (var project in _orgProjects.Take(6))
             {
-                <MudItem xs="12" sm="6" md="4">
-                    <MudCard Elevation="2" Class="cursor-pointer" @onclick="@(() => Navigation.NavigateTo($"projects/{project.Id}"))">
-                        <MudCardHeader>
-                            <CardHeaderContent>
-                                <MudText Typo="Typo.subtitle1">@project.Name</MudText>
-                            </CardHeaderContent>
-                            <CardHeaderActions>
-                                <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetFormatColor(project.Format)">@project.Format</MudChip>
-                            </CardHeaderActions>
-                        </MudCardHeader>
-                        <MudCardContent>
-                            <MudStack Row="true" Justify="Justify.SpaceBetween">
-                                <MudText Typo="Typo.caption">@project.KeyCount keys</MudText>
-                                <MudText Typo="Typo.caption">@project.CompletionPercentage.ToString("F0")% complete</MudText>
-                            </MudStack>
-                            <MudProgressLinear Value="@project.CompletionPercentage"
-                                               Color="@UiHelpers.GetCompletionColor(project.CompletionPercentage)"
-                                               Class="mt-2" />
-                        </MudCardContent>
-                    </MudCard>
-                </MudItem>
+                <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
+                    <RadzenCard Style="cursor: pointer;" @onclick="@(() => Navigation.NavigateTo($"projects/{project.Id}"))">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
+                            <RadzenText TextStyle="TextStyle.Subtitle1">@project.Name</RadzenText>
+                            <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(project.Format)" Text="@project.Format" />
+                        </RadzenStack>
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mt-3">
+                            <RadzenText TextStyle="TextStyle.Caption">@project.KeyCount keys</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption">@project.CompletionPercentage.ToString("F0")% complete</RadzenText>
+                        </RadzenStack>
+                        <RadzenProgressBar Value="@project.CompletionPercentage" ShowValue="false" ProgressBarStyle="@UiHelpers.GetCompletionProgressStyle(project.CompletionPercentage)" class="rz-mt-2" Style="height: 4px;" />
+                    </RadzenCard>
+                </RadzenColumn>
             }
-        </MudGrid>
+        </RadzenRow>
 
         @if (_orgProjects.Count > 6)
         {
-            <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
-                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="projects">
-                    View all @_orgProjects.Count projects
-                </MudButton>
-            </MudStack>
+            <RadzenStack JustifyContent="JustifyContent.Center" class="rz-mt-4">
+                <RadzenLink Path="projects" Text="@($"View all {_orgProjects.Count} projects")" />
+            </RadzenStack>
         }
     }
 }
-
-<!-- Leave Organization Confirmation Dialog -->
-<MudDialog @bind-Visible="_leaveDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" />
-            <MudText Typo="Typo.h6">Leave Organization</MudText>
-        </MudStack>
-    </TitleContent>
-    <DialogContent>
-        <MudText Typo="Typo.body1">
-            Are you sure you want to leave <strong>@_organization?.Name</strong>?
-        </MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
-            You will lose access to all organization projects and resources. To rejoin, you'll need to be invited again.
-        </MudText>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CloseLeaveDialog" Disabled="@_isLeaving">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Error"
-                   OnClick="@ConfirmLeaveOrganization"
-                   Disabled="@_isLeaving">
-            @if (_isLeaving)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Leave Organization
-        </MudButton>
-    </DialogActions>
-</MudDialog>
 
 @code {
     [Parameter]
@@ -252,9 +184,6 @@ else
     private OrganizationDto? _organization;
     private List<LrmCloud.Shared.DTOs.Projects.ProjectDto> _orgProjects = new();
     private bool _isLoading = true;
-    private bool _leaveDialogVisible;
-    private bool _isLeaving;
-    private List<BreadcrumbItem> _breadcrumbs = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -269,20 +198,13 @@ else
             _organization = await OrganizationService.GetOrganizationAsync(OrganizationId);
             if (_organization != null)
             {
-                // Load organization projects
                 var allProjects = await ProjectService.GetProjectsAsync();
                 _orgProjects = allProjects.Where(p => p.OrganizationId == OrganizationId).ToList();
-
-                _breadcrumbs = new List<BreadcrumbItem>
-                {
-                    new("Organizations", "organizations"),
-                    new(_organization.Name, null, disabled: true)
-                };
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load organization: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load organization: {ex.Message}");
         }
         finally
         {
@@ -290,37 +212,31 @@ else
         }
     }
 
-    private void ShowLeaveConfirmation()
+    private async Task ShowLeaveConfirmation()
     {
-        _leaveDialogVisible = true;
-    }
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to leave {_organization?.Name}? You will lose access to all organization projects and resources. To rejoin, you'll need to be invited again.",
+            "Leave Organization",
+            new ConfirmOptions { OkButtonText = "Leave Organization", CancelButtonText = "Cancel" });
 
-    private void CloseLeaveDialog()
-    {
-        _leaveDialogVisible = false;
+        if (confirmed == true)
+        {
+            await ConfirmLeaveOrganization();
+        }
     }
 
     private async Task ConfirmLeaveOrganization()
     {
-        _isLeaving = true;
-        try
-        {
-            var (success, error) = await OrganizationService.LeaveOrganizationAsync(OrganizationId);
+        var (success, error) = await OrganizationService.LeaveOrganizationAsync(OrganizationId);
 
-            if (success)
-            {
-                Snackbar.Add($"You have left {_organization?.Name}", Severity.Info);
-                Navigation.NavigateTo("organizations");
-            }
-            else
-            {
-                Snackbar.Add(error ?? "Failed to leave organization", Severity.Error);
-            }
-        }
-        finally
+        if (success)
         {
-            _isLeaving = false;
-            _leaveDialogVisible = false;
+            NotificationService.Notify(NotificationSeverity.Info, "Info", $"You have left {_organization?.Name}");
+            Navigation.NavigateTo("organizations");
+        }
+        else
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", error ?? "Failed to leave organization");
         }
     }
 }

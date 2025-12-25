@@ -3,160 +3,110 @@
 @inject OrganizationService OrganizationService
 @inject AuthService AuthService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
 
 <PageTitle>Accept Invitation - LRM Cloud</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="min-height: 80vh;">
-    <MudPaper Elevation="3" Class="pa-8" Style="width: 100%;">
+<div style="min-height: 80vh; display: flex; align-items: center; justify-content: center;">
+    <RadzenCard Style="width: 100%; max-width: 500px; padding: 2rem;">
         @if (_isProcessing)
         {
-            <MudStack AlignItems="AlignItems.Center" Spacing="4">
-                <MudProgressCircular Size="Size.Large" Indeterminate="true" />
-                <MudText Typo="Typo.h6">Processing invitation...</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Please wait while we process your invitation.</MudText>
-            </MudStack>
+            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Large" />
+                <RadzenText TextStyle="TextStyle.H6">Processing invitation...</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Please wait while we process your invitation.</RadzenText>
+            </RadzenStack>
         }
         else if (_isSuccess)
         {
-            <MudStack AlignItems="AlignItems.Center" Spacing="4">
-                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Style="font-size: 5rem;" />
-                <MudText Typo="Typo.h5" Align="Align.Center">Invitation Accepted!</MudText>
-                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                <RadzenIcon Icon="check_circle" Style="font-size: 5rem; color: var(--rz-success);" />
+                <RadzenText TextStyle="TextStyle.H5" TextAlign="TextAlign.Center">Invitation Accepted!</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary" TextAlign="TextAlign.Center">
                     You've successfully joined the organization.
-                </MudText>
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           Size="Size.Large"
-                           Href="organizations"
-                           Class="mt-4">
-                    Go to Organizations
-                </MudButton>
-            </MudStack>
+                </RadzenText>
+                <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Large"
+                              Text="Go to Organizations" Click="@(() => Navigation.NavigateTo("organizations"))" class="rz-mt-4" />
+            </RadzenStack>
         }
         else if (_requiresLogin)
         {
-            <MudStack AlignItems="AlignItems.Center" Spacing="4">
-                <MudIcon Icon="@Icons.Material.Filled.Email" Color="Color.Primary" Style="font-size: 5rem;" />
-                <MudText Typo="Typo.h5" Align="Align.Center">You've Been Invited!</MudText>
-                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                <RadzenIcon Icon="email" Style="font-size: 5rem; color: var(--rz-primary);" />
+                <RadzenText TextStyle="TextStyle.H5" TextAlign="TextAlign.Center">You've Been Invited!</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary" TextAlign="TextAlign.Center">
                     Please log in or create an account to accept this invitation.
-                </MudText>
-                <MudStack Row="true" Spacing="2" Class="mt-4">
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Primary"
-                               Size="Size.Large"
-                               Href="@($"login?returnUrl=invite/{Token}")">
-                        Log In
-                    </MudButton>
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Primary"
-                               Size="Size.Large"
-                               Href="@($"register?returnUrl=invite/{Token}")">
-                        Create Account
-                    </MudButton>
-                </MudStack>
-            </MudStack>
+                </RadzenText>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" class="rz-mt-4">
+                    <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Large"
+                                  Text="Log In" Click="@(() => Navigation.NavigateTo($"login?returnUrl=invite/{Token}"))" />
+                    <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Large"
+                                  Text="Create Account" Click="@(() => Navigation.NavigateTo($"register?returnUrl=invite/{Token}"))" />
+                </RadzenStack>
+            </RadzenStack>
         }
         else if (_showDeclineConfirm)
         {
-            <MudStack AlignItems="AlignItems.Center" Spacing="4">
-                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Style="font-size: 5rem;" />
-                <MudText Typo="Typo.h5" Align="Align.Center">Decline Invitation?</MudText>
-                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                <RadzenIcon Icon="warning" Style="font-size: 5rem; color: var(--rz-warning);" />
+                <RadzenText TextStyle="TextStyle.H5" TextAlign="TextAlign.Center">Decline Invitation?</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary" TextAlign="TextAlign.Center">
                     Are you sure you want to decline this invitation? You'll need to be invited again to join.
-                </MudText>
-                <MudStack Row="true" Spacing="2" Class="mt-4">
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Primary"
-                               Size="Size.Large"
-                               OnClick="@CancelDecline">
-                        Cancel
-                    </MudButton>
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Error"
-                               Size="Size.Large"
-                               OnClick="@ConfirmDecline"
-                               Disabled="@_isProcessing">
-                        @if (_isProcessing)
-                        {
-                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                        }
-                        Decline Invitation
-                    </MudButton>
-                </MudStack>
-            </MudStack>
+                </RadzenText>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" class="rz-mt-4">
+                    <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Large"
+                                  Text="Cancel" Click="@CancelDecline" />
+                    <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Large"
+                                  Text="Decline Invitation" Click="@ConfirmDecline" Disabled="@_isProcessing" IsBusy="@_isProcessing" />
+                </RadzenStack>
+            </RadzenStack>
         }
         else if (_isDeclined)
         {
-            <MudStack AlignItems="AlignItems.Center" Spacing="4">
-                <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Default" Style="font-size: 5rem;" />
-                <MudText Typo="Typo.h5" Align="Align.Center">Invitation Declined</MudText>
-                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                <RadzenIcon Icon="cancel" Style="font-size: 5rem; color: var(--rz-text-secondary-color);" />
+                <RadzenText TextStyle="TextStyle.H5" TextAlign="TextAlign.Center">Invitation Declined</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary" TextAlign="TextAlign.Center">
                     You've declined this invitation.
-                </MudText>
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           Size="Size.Large"
-                           Href=""
-                           Class="mt-4">
-                    Go to Dashboard
-                </MudButton>
-            </MudStack>
+                </RadzenText>
+                <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Large"
+                              Text="Go to Dashboard" Click="@(() => Navigation.NavigateTo(""))" class="rz-mt-4" />
+            </RadzenStack>
         }
         else if (_showAcceptConfirm)
         {
-            <MudStack AlignItems="AlignItems.Center" Spacing="4">
-                <MudIcon Icon="@Icons.Material.Filled.Email" Color="Color.Primary" Style="font-size: 5rem;" />
-                <MudText Typo="Typo.h5" Align="Align.Center">Organization Invitation</MudText>
-                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                <RadzenIcon Icon="email" Style="font-size: 5rem; color: var(--rz-primary);" />
+                <RadzenText TextStyle="TextStyle.H5" TextAlign="TextAlign.Center">Organization Invitation</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary" TextAlign="TextAlign.Center">
                     What would you like to do with this invitation?
-                </MudText>
-                <MudStack Row="true" Spacing="2" Class="mt-4">
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Default"
-                               Size="Size.Large"
-                               OnClick="@ShowDeclineConfirm">
-                        Decline
-                    </MudButton>
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Primary"
-                               Size="Size.Large"
-                               OnClick="@ProcessInvitation"
-                               Disabled="@_isProcessing">
-                        @if (_isProcessing)
-                        {
-                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                        }
-                        Accept
-                    </MudButton>
-                </MudStack>
-            </MudStack>
+                </RadzenText>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" class="rz-mt-4">
+                    <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Large"
+                                  Text="Decline" Click="@ShowDeclineConfirm" />
+                    <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Large"
+                                  Text="Accept" Click="@ProcessInvitation" Disabled="@_isProcessing" IsBusy="@_isProcessing" />
+                </RadzenStack>
+            </RadzenStack>
         }
         else
         {
-            <MudStack AlignItems="AlignItems.Center" Spacing="4">
-                <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Style="font-size: 5rem;" />
-                <MudText Typo="Typo.h5" Align="Align.Center">Invitation Failed</MudText>
-                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                <RadzenIcon Icon="error" Style="font-size: 5rem; color: var(--rz-danger);" />
+                <RadzenText TextStyle="TextStyle.H5" TextAlign="TextAlign.Center">Invitation Failed</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary" TextAlign="TextAlign.Center">
                     @_errorMessage
-                </MudText>
-                <MudStack Row="true" Spacing="2" Class="mt-4">
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Primary"
-                               Href="">
-                        Go to Dashboard
-                    </MudButton>
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Primary"
-                               OnClick="@RetryAcceptInvitation">
-                        Try Again
-                    </MudButton>
-                </MudStack>
-            </MudStack>
+                </RadzenText>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" class="rz-mt-4">
+                    <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary"
+                                  Text="Go to Dashboard" Click="@(() => Navigation.NavigateTo(""))" />
+                    <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary"
+                                  Text="Try Again" Click="@RetryAcceptInvitation" />
+                </RadzenStack>
+            </RadzenStack>
         }
-    </MudPaper>
-</MudContainer>
+    </RadzenCard>
+</div>
 
 @code {
     [Parameter]
@@ -205,7 +155,7 @@
         if (success)
         {
             _isSuccess = true;
-            Snackbar.Add("Invitation accepted successfully!", Severity.Success);
+            NotificationService.Notify(NotificationSeverity.Success, "Success", "Invitation accepted successfully!");
         }
         else
         {
@@ -237,10 +187,10 @@
         // A proper implementation would need a decline endpoint that works with email tokens
         _isDeclined = true;
         _isProcessing = false;
-        Snackbar.Add("Invitation declined", Severity.Info);
+        NotificationService.Notify(NotificationSeverity.Info, "Info", "Invitation declined");
     }
 
-    private async Task RetryAcceptInvitation()
+    private void RetryAcceptInvitation()
     {
         _showAcceptConfirm = true;
         _isProcessing = false;

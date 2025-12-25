@@ -1,0 +1,140 @@
+@using LrmCloud.Shared.Constants
+@using LrmCloud.Shared.DTOs.Organizations
+@inject OrganizationService OrganizationService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+@if (_isLoadingMembers)
+{
+    <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem" class="rz-py-4">
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Medium" />
+        <RadzenText>Loading members...</RadzenText>
+    </RadzenStack>
+}
+else if (!_eligibleMembers.Any())
+{
+    <RadzenStack Gap="1rem">
+        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">
+            There are no other members in this organization. Invite someone first before transferring ownership.
+        </RadzenAlert>
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End">
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Close" Click="@Cancel" />
+        </RadzenStack>
+    </RadzenStack>
+}
+else
+{
+    <RadzenStack Gap="1rem">
+        <RadzenText>
+            Select a member to transfer ownership to. You will become an admin after the transfer.
+        </RadzenText>
+
+        <RadzenFormField Text="New Owner" Variant="Radzen.Variant.Outlined">
+            <ChildContent>
+                <RadzenDropDown @bind-Value="_selectedNewOwnerId"
+                                Data="@_eligibleMembers"
+                                TextProperty="DisplayText"
+                                ValueProperty="UserId"
+                                Placeholder="Select a member"
+                                Style="width: 100%;" />
+            </ChildContent>
+        </RadzenFormField>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
+                @_errorMessage
+            </RadzenAlert>
+        }
+
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" Disabled="@_isTransferring" />
+            <RadzenButton ButtonStyle="ButtonStyle.Warning" Text="Transfer Ownership" Click="@TransferOwnership" Disabled="@(!_selectedNewOwnerId.HasValue || _isTransferring)" IsBusy="@_isTransferring" />
+        </RadzenStack>
+    </RadzenStack>
+}
+
+@code {
+    [Parameter]
+    public int OrganizationId { get; set; }
+
+    private bool _isLoadingMembers = true;
+    private bool _isTransferring;
+    private int? _selectedNewOwnerId;
+    private List<MemberDisplayItem> _eligibleMembers = new();
+    private string? _errorMessage;
+
+    // Helper class for dropdown display
+    private class MemberDisplayItem
+    {
+        public int UserId { get; set; }
+        public string DisplayText { get; set; } = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMembersAsync();
+    }
+
+    private async Task LoadMembersAsync()
+    {
+        _isLoadingMembers = true;
+        try
+        {
+            var members = await OrganizationService.GetMembersAsync(OrganizationId);
+            _eligibleMembers = members
+                .Where(m => m.Role != OrganizationRole.Owner)
+                .Select(m => new MemberDisplayItem
+                {
+                    UserId = m.UserId,
+                    DisplayText = $"{m.Email} ({m.Role})"
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load members: {ex.Message}");
+            _eligibleMembers = new();
+        }
+        finally
+        {
+            _isLoadingMembers = false;
+        }
+    }
+
+    private async Task TransferOwnership()
+    {
+        if (!_selectedNewOwnerId.HasValue) return;
+
+        _isTransferring = true;
+        _errorMessage = null;
+
+        try
+        {
+            var (success, error) = await OrganizationService.TransferOwnershipAsync(OrganizationId, _selectedNewOwnerId.Value);
+
+            if (success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Ownership transferred successfully. You are now an admin.");
+                DialogService.Close(true);
+            }
+            else
+            {
+                _errorMessage = error ?? "Failed to transfer ownership";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isTransferring = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(false);
+    }
+}

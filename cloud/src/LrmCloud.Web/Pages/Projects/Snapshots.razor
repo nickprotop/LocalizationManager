@@ -5,451 +5,116 @@
 @inject SnapshotService SnapshotService
 @inject ProjectService ProjectService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 
 <PageTitle>Snapshots - @(_project?.Name ?? "Project") - LRM Cloud</PageTitle>
 
 @if (_isLoading)
 {
-    <MudStack Spacing="4">
-        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" />
-        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" />
-    </MudStack>
+    <RadzenStack Gap="1rem">
+        <RadzenSkeleton Style="height: 60px; width: 100%;" />
+        <RadzenSkeleton Style="height: 400px; width: 100%;" />
+    </RadzenStack>
 }
 else if (_project == null)
 {
-    <MudAlert Severity="Severity.Error">
+    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">
         Project not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="">Go to Dashboard</MudButton>
-    </MudAlert>
+        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Primary" Text="Go to Dashboard" Click="@(() => Navigation.NavigateTo(""))" />
+    </RadzenAlert>
 }
 else
 {
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                           OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))"
-                           Size="Size.Small" />
-            <MudText Typo="Typo.h4">Snapshots</MudText>
-            <MudChip T="string" Size="Size.Small" Color="Color.Info">@_project.Name</MudChip>
-        </MudStack>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" Size="ButtonSize.Small" />
+            <RadzenText TextStyle="TextStyle.H4">Snapshots</RadzenText>
+            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@_project.Name" />
+        </RadzenStack>
 
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.AddCircle"
-                   OnClick="@OpenCreateDialog"
-                   Disabled="@_isCreating">
-            @if (_isCreating)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                <span>Creating...</span>
-            }
-            else
-            {
-                <span>Create Snapshot</span>
-            }
-        </MudButton>
-    </MudStack>
+        <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Icon="add_circle"
+                      Text="Create Snapshot" Click="@OpenCreateDialog" Disabled="@_isCreating" IsBusy="@_isCreating" />
+    </RadzenStack>
 
-    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-4">
         Snapshots are point-in-time backups of your project's translations. Use them to track changes and restore to previous states.
-    </MudText>
+    </RadzenText>
 
     @if (_snapshots.Count == 0)
     {
-        <MudPaper Class="pa-6" Elevation="2">
-            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="3">
-                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Large" Color="Color.Secondary" />
-                <MudText Typo="Typo.h6" Color="Color.Secondary">No snapshots yet</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">
+        <RadzenCard Style="padding: 3rem;">
+            <RadzenStack AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.Center" Gap="1rem">
+                <RadzenIcon Icon="history" Style="font-size: 3rem;" class="rz-color-secondary" />
+                <RadzenText TextStyle="TextStyle.H6" class="rz-color-secondary">No snapshots yet</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="text-align: center;">
                     Snapshots are created automatically when you push changes from the CLI.<br/>
                     You can also create manual snapshots using the button above.
-                </MudText>
-            </MudStack>
-        </MudPaper>
+                </RadzenText>
+            </RadzenStack>
+        </RadzenCard>
     }
     else
     {
-        <MudTimeline TimelinePosition="TimelinePosition.Start">
+        <RadzenStack Gap="1rem">
             @foreach (var snapshot in _snapshots)
             {
-                <MudTimelineItem Color="@GetSnapshotTypeColor(snapshot.SnapshotType)" Size="Size.Medium">
-                    <ItemOpposite>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">
-                            @snapshot.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")
-                        </MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            @snapshot.CreatedAt.ToLocalTime().ToString("HH:mm")
-                        </MudText>
-                    </ItemOpposite>
-                    <ItemContent>
-                        <MudPaper Class="pa-4" Elevation="2">
-                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
-                                <div>
-                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
-                                        <MudText Typo="Typo.subtitle1" Style="font-family: monospace;">
-                                            @snapshot.SnapshotId
-                                        </MudText>
-                                        <MudChip T="string" Size="Size.Small" Color="@GetSnapshotTypeColor(snapshot.SnapshotType)" Variant="Variant.Outlined">
-                                            @snapshot.SnapshotType
-                                        </MudChip>
-                                    </MudStack>
-                                    @if (!string.IsNullOrEmpty(snapshot.Description))
-                                    {
-                                        <MudText Typo="Typo.body2" Class="mb-2">@snapshot.Description</MudText>
-                                    }
-                                    <MudStack Row="true" Spacing="3">
-                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                            <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" Size="Size.Small" Color="Color.Secondary" />
-                                            <MudText Typo="Typo.caption">@snapshot.FileCount files</MudText>
-                                        </MudStack>
-                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                            <MudIcon Icon="@Icons.Material.Filled.Key" Size="Size.Small" Color="Color.Secondary" />
-                                            <MudText Typo="Typo.caption">@snapshot.KeyCount keys</MudText>
-                                        </MudStack>
-                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                            <MudIcon Icon="@Icons.Material.Filled.Translate" Size="Size.Small" Color="Color.Secondary" />
-                                            <MudText Typo="Typo.caption">@snapshot.TranslationCount translations</MudText>
-                                        </MudStack>
-                                        @if (!string.IsNullOrEmpty(snapshot.CreatedByUsername))
-                                        {
-                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Color="Color.Secondary" />
-                                                <MudText Typo="Typo.caption">@snapshot.CreatedByUsername</MudText>
-                                            </MudStack>
-                                        }
-                                    </MudStack>
-                                </div>
-                                <MudStack Row="true" Spacing="1">
-                                    <MudTooltip Text="View details">
-                                        <MudIconButton Icon="@Icons.Material.Filled.Visibility"
-                                                       Size="Size.Small"
-                                                       OnClick="@(() => ViewSnapshotAsync(snapshot))" />
-                                    </MudTooltip>
-                                    <MudTooltip Text="Compare with another snapshot">
-                                        <MudIconButton Icon="@Icons.Material.Filled.Compare"
-                                                       Size="Size.Small"
-                                                       Color="Color.Info"
-                                                       OnClick="@(() => OpenCompareDialog(snapshot))"
-                                                       Disabled="@(_snapshots.Count < 2)" />
-                                    </MudTooltip>
-                                    <MudTooltip Text="Restore to this snapshot">
-                                        <MudIconButton Icon="@Icons.Material.Filled.Restore"
-                                                       Size="Size.Small"
-                                                       Color="Color.Warning"
-                                                       OnClick="@(() => OpenRestoreDialog(snapshot))" />
-                                    </MudTooltip>
-                                    <MudTooltip Text="Delete snapshot">
-                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                       Size="Size.Small"
-                                                       Color="Color.Error"
-                                                       OnClick="@(() => OpenDeleteDialog(snapshot))" />
-                                    </MudTooltip>
-                                </MudStack>
-                            </MudStack>
-                        </MudPaper>
-                    </ItemContent>
-                </MudTimelineItem>
+                <RadzenCard Style="@($"border-left: 4px solid {GetSnapshotTypeColorValue(snapshot.SnapshotType)};")">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" Style="font-family: monospace;">@snapshot.SnapshotId</RadzenText>
+                                <RadzenBadge BadgeStyle="@GetSnapshotTypeBadgeStyle(snapshot.SnapshotType)" Variant="Radzen.Variant.Outlined" Text="@snapshot.SnapshotType" />
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                    @snapshot.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")
+                                </RadzenText>
+                            </RadzenStack>
+
+                            @if (!string.IsNullOrEmpty(snapshot.Description))
+                            {
+                                <RadzenText TextStyle="TextStyle.Body2">@snapshot.Description</RadzenText>
+                            }
+
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                    <RadzenIcon Icon="description" Style="font-size: 1rem;" class="rz-color-secondary" />
+                                    <RadzenText TextStyle="TextStyle.Caption">@snapshot.FileCount files</RadzenText>
+                                </RadzenStack>
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                    <RadzenIcon Icon="key" Style="font-size: 1rem;" class="rz-color-secondary" />
+                                    <RadzenText TextStyle="TextStyle.Caption">@snapshot.KeyCount keys</RadzenText>
+                                </RadzenStack>
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                    <RadzenIcon Icon="translate" Style="font-size: 1rem;" class="rz-color-secondary" />
+                                    <RadzenText TextStyle="TextStyle.Caption">@snapshot.TranslationCount translations</RadzenText>
+                                </RadzenStack>
+                                @if (!string.IsNullOrEmpty(snapshot.CreatedByUsername))
+                                {
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                        <RadzenIcon Icon="person" Style="font-size: 1rem;" class="rz-color-secondary" />
+                                        <RadzenText TextStyle="TextStyle.Caption">@snapshot.CreatedByUsername</RadzenText>
+                                    </RadzenStack>
+                                }
+                            </RadzenStack>
+                        </RadzenStack>
+
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem">
+                            <RadzenButton Icon="visibility" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                          Click="@(() => ViewSnapshotAsync(snapshot))" title="View details" />
+                            <RadzenButton Icon="compare" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                          ButtonStyle="ButtonStyle.Info" Click="@(() => OpenCompareDialog(snapshot))"
+                                          Disabled="@(_snapshots.Count < 2)" title="Compare with another snapshot" />
+                            <RadzenButton Icon="restore" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                          ButtonStyle="ButtonStyle.Warning" Click="@(() => OpenRestoreDialog(snapshot))" title="Restore to this snapshot" />
+                            <RadzenButton Icon="delete" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                          ButtonStyle="ButtonStyle.Danger" Click="@(() => OpenDeleteDialog(snapshot))" title="Delete snapshot" />
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
             }
-        </MudTimeline>
+        </RadzenStack>
     }
 }
-
-@* Create Snapshot Dialog *@
-<MudDialog @bind-Visible="_createDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Create Manual Snapshot</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudTextField @bind-Value="_createDescription"
-                      Label="Description (optional)"
-                      Placeholder="e.g., Before major refactoring"
-                      HelperText="A brief description of this snapshot"
-                      Lines="2"
-                      Class="mb-3" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="CloseCreateDialog">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateSnapshotAsync" Disabled="_isCreating">
-            @if (_isCreating)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Create Snapshot
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-@* View Snapshot Dialog *@
-<MudDialog @bind-Visible="_viewDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Snapshot Details</MudText>
-    </TitleContent>
-    <DialogContent>
-        @if (_viewSnapshot != null)
-        {
-            <MudGrid>
-                <MudItem xs="12" sm="6">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Snapshot ID</MudText>
-                    <MudText Typo="Typo.body1" Style="font-family: monospace;">@_viewSnapshot.SnapshotId</MudText>
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Type</MudText>
-                    <MudChip T="string" Size="Size.Small" Color="@GetSnapshotTypeColor(_viewSnapshot.SnapshotType)">@_viewSnapshot.SnapshotType</MudChip>
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Created</MudText>
-                    <MudText Typo="Typo.body1">@_viewSnapshot.CreatedAt.ToLocalTime().ToString("g")</MudText>
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Created By</MudText>
-                    <MudText Typo="Typo.body1">@(_viewSnapshot.CreatedByUsername ?? "System")</MudText>
-                </MudItem>
-                @if (!string.IsNullOrEmpty(_viewSnapshot.Description))
-                {
-                    <MudItem xs="12">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Description</MudText>
-                        <MudText Typo="Typo.body1">@_viewSnapshot.Description</MudText>
-                    </MudItem>
-                }
-                <MudItem xs="4">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Files</MudText>
-                    <MudText Typo="Typo.body1">@_viewSnapshot.FileCount</MudText>
-                </MudItem>
-                <MudItem xs="4">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Keys</MudText>
-                    <MudText Typo="Typo.body1">@_viewSnapshot.KeyCount</MudText>
-                </MudItem>
-                <MudItem xs="4">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Translations</MudText>
-                    <MudText Typo="Typo.body1">@_viewSnapshot.TranslationCount</MudText>
-                </MudItem>
-            </MudGrid>
-
-            @if (_viewSnapshotDetail?.Files?.Any() == true)
-            {
-                <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Files in Snapshot</MudText>
-                <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-surface); max-height: 200px; overflow-y: auto;">
-                    <MudList T="string" Dense="true">
-                        @foreach (var file in _viewSnapshotDetail.Files)
-                        {
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.Description">
-                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                                    <MudText Typo="Typo.body2">@file.Path</MudText>
-                                    @if (!string.IsNullOrEmpty(file.LanguageCode))
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Info">@file.LanguageCode</MudChip>
-                                    }
-                                </MudStack>
-                            </MudListItem>
-                        }
-                    </MudList>
-                </MudPaper>
-            }
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="CloseViewDialog">Close</MudButton>
-    </DialogActions>
-</MudDialog>
-
-@* Restore Snapshot Dialog *@
-<MudDialog @bind-Visible="_restoreDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">
-            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-2" />
-            Restore Snapshot
-        </MudText>
-    </TitleContent>
-    <DialogContent>
-        @if (_hasUnsnapshotedChanges)
-        {
-            <MudAlert Severity="Severity.Error" Class="mb-4" Icon="@Icons.Material.Filled.ErrorOutline">
-                <strong>Warning:</strong> There are unsaved changes since the last snapshot
-                @if (_lastChangeAt.HasValue)
-                {
-                    <span> (last change: @_lastChangeAt.Value.ToLocalTime().ToString("g"))</span>
-                }
-                that may be lost if you restore without creating a backup.
-            </MudAlert>
-        }
-
-        <MudAlert Severity="Severity.Warning" Class="mb-4">
-            This will replace your current project state with the snapshot from <strong>@_restoreSnapshot?.CreatedAt.ToLocalTime().ToString("g")</strong>.
-        </MudAlert>
-
-        <MudCheckBox @bind-Value="_restoreCreateBackup" Label="Create backup of current state before restoring" />
-
-        <MudTextField @bind-Value="_restoreMessage"
-                      Label="Restore message (optional)"
-                      Placeholder="e.g., Rolling back breaking changes"
-                      Class="mt-3" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="CloseRestoreDialog">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Warning" OnClick="RestoreSnapshotAsync" Disabled="_isRestoring">
-            @if (_isRestoring)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Restore
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-@* Delete Snapshot Dialog *@
-<MudDialog @bind-Visible="_deleteDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Delete Snapshot?</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudText>
-            Are you sure you want to delete snapshot <strong>@_deleteSnapshot?.SnapshotId</strong>?
-        </MudText>
-        <MudText Color="Color.Secondary" Class="mt-2">
-            This action cannot be undone.
-        </MudText>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="CloseDeleteDialog">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="DeleteSnapshotAsync" Disabled="_isDeleting">
-            @if (_isDeleting)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Delete
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-@* Compare Snapshots Dialog *@
-<MudDialog @bind-Visible="_compareDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">
-            <MudIcon Icon="@Icons.Material.Filled.Compare" Class="mr-2" />
-            Compare Snapshots
-        </MudText>
-    </TitleContent>
-    <DialogContent>
-        @if (_compareFromSnapshot != null)
-        {
-            <MudGrid>
-                <MudItem xs="12" sm="5">
-                    <MudPaper Class="pa-3" Elevation="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">From (Base)</MudText>
-                        <MudText Typo="Typo.subtitle1" Style="font-family: monospace;">@_compareFromSnapshot.SnapshotId</MudText>
-                        <MudText Typo="Typo.body2" Class="text-truncate">@(_compareFromSnapshot.Description ?? "No description")</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@_compareFromSnapshot.CreatedAt.ToLocalTime().ToString("g")</MudText>
-                    </MudPaper>
-                </MudItem>
-                <MudItem xs="12" sm="2" Class="d-flex align-center justify-center">
-                    <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Large" Color="Color.Secondary" />
-                </MudItem>
-                <MudItem xs="12" sm="5">
-                    <MudPaper Class="pa-3" Elevation="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">To (Compare)</MudText>
-                        @if (_compareToSnapshot == null)
-                        {
-                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="font-italic">Select a snapshot below</MudText>
-                        }
-                        else
-                        {
-                            <MudText Typo="Typo.subtitle1" Style="font-family: monospace;">@_compareToSnapshot.SnapshotId</MudText>
-                            <MudText Typo="Typo.body2" Class="text-truncate">@(_compareToSnapshot.Description ?? "No description")</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@_compareToSnapshot.CreatedAt.ToLocalTime().ToString("g")</MudText>
-                        }
-                    </MudPaper>
-                </MudItem>
-            </MudGrid>
-
-            <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Select snapshot to compare with:</MudText>
-            <MudPaper Class="pa-2" Elevation="0" Style="background-color: var(--mud-palette-surface); max-height: 200px; overflow-y: auto;">
-                <MudList T="SnapshotDto" Dense="true" @bind-SelectedValue="_compareToSnapshot">
-                    @foreach (var snapshot in _snapshots.Where(s => s.SnapshotId != _compareFromSnapshot.SnapshotId))
-                    {
-                        <MudListItem T="SnapshotDto" Value="@snapshot" OnClick="@(() => SelectCompareToSnapshot(snapshot))">
-                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                    <MudText Typo="Typo.body2" Style="font-family: monospace;">@snapshot.SnapshotId</MudText>
-                                    <MudChip T="string" Size="Size.Small" Color="@GetSnapshotTypeColor(snapshot.SnapshotType)" Variant="Variant.Outlined">@snapshot.SnapshotType</MudChip>
-                                </MudStack>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">@snapshot.CreatedAt.ToLocalTime().ToString("g")</MudText>
-                            </MudStack>
-                        </MudListItem>
-                    }
-                </MudList>
-            </MudPaper>
-
-            @if (_compareDiff != null)
-            {
-                <MudDivider Class="my-4" />
-                <MudText Typo="Typo.subtitle2" Class="mb-2">
-                    <MudIcon Icon="@Icons.Material.Filled.Difference" Size="Size.Small" Class="mr-1" />
-                    Comparison Results
-                </MudText>
-
-                <MudGrid>
-                    <MudItem xs="4">
-                        <MudPaper Class="pa-3 text-center" Elevation="1" Style="border-left: 3px solid var(--mud-palette-success);">
-                            <MudText Typo="Typo.h5" Color="Color.Success">@_compareDiff.KeysAdded</MudText>
-                            <MudText Typo="Typo.caption">Keys Added</MudText>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="4">
-                        <MudPaper Class="pa-3 text-center" Elevation="1" Style="border-left: 3px solid var(--mud-palette-error);">
-                            <MudText Typo="Typo.h5" Color="Color.Error">@_compareDiff.KeysRemoved</MudText>
-                            <MudText Typo="Typo.caption">Keys Removed</MudText>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="4">
-                        <MudPaper Class="pa-3 text-center" Elevation="1" Style="border-left: 3px solid var(--mud-palette-warning);">
-                            <MudText Typo="Typo.h5" Color="Color.Warning">@_compareDiff.KeysModified</MudText>
-                            <MudText Typo="Typo.caption">Keys Modified</MudText>
-                        </MudPaper>
-                    </MudItem>
-                </MudGrid>
-
-                @if (_compareDiff.Files?.Any() == true)
-                {
-                    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Changed Files</MudText>
-                    <MudPaper Class="pa-2" Elevation="0" Style="background-color: var(--mud-palette-surface); max-height: 150px; overflow-y: auto;">
-                        <MudList T="string" Dense="true">
-                            @foreach (var file in _compareDiff.Files)
-                            {
-                                <MudListItem T="string">
-                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
-                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                            <MudIcon Icon="@GetChangeTypeIcon(file.ChangeType)" Size="Size.Small" Color="@GetChangeTypeColor(file.ChangeType)" />
-                                            <MudText Typo="Typo.body2">@file.Path</MudText>
-                                        </MudStack>
-                                        <MudChip T="string" Size="Size.Small" Color="@GetChangeTypeColor(file.ChangeType)" Variant="Variant.Text">@file.ChangeType</MudChip>
-                                    </MudStack>
-                                </MudListItem>
-                            }
-                        </MudList>
-                    </MudPaper>
-                }
-            }
-            else if (_isComparing)
-            {
-                <MudStack AlignItems="AlignItems.Center" Class="mt-4">
-                    <MudProgressCircular Indeterminate="true" />
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">Comparing snapshots...</MudText>
-                </MudStack>
-            }
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="CloseCompareDialog">Close</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Info" OnClick="CompareSnapshotsAsync" Disabled="@(_compareToSnapshot == null || _isComparing)">
-            @if (_isComparing)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Compare
-        </MudButton>
-    </DialogActions>
-</MudDialog>
 
 @code {
     [Parameter]
@@ -460,17 +125,14 @@ else
     private bool _isLoading = true;
 
     // Create dialog
-    private bool _createDialogVisible;
     private string _createDescription = "";
     private bool _isCreating;
 
     // View dialog
-    private bool _viewDialogVisible;
     private SnapshotDto? _viewSnapshot;
     private SnapshotDetailDto? _viewSnapshotDetail;
 
     // Restore dialog
-    private bool _restoreDialogVisible;
     private SnapshotDto? _restoreSnapshot;
     private bool _restoreCreateBackup = true;
     private string _restoreMessage = "";
@@ -479,12 +141,10 @@ else
     private DateTime? _lastChangeAt;
 
     // Delete dialog
-    private bool _deleteDialogVisible;
     private SnapshotDto? _deleteSnapshot;
     private bool _isDeleting;
 
     // Compare dialog
-    private bool _compareDialogVisible;
     private SnapshotDto? _compareFromSnapshot;
     private SnapshotDto? _compareToSnapshot;
     private SnapshotDiffDto? _compareDiff;
@@ -508,7 +168,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error loading snapshots: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error loading snapshots: {ex.Message}");
         }
         finally
         {
@@ -516,16 +176,29 @@ else
         }
     }
 
-    // Create dialog methods
-    private void OpenCreateDialog()
+    // Create dialog
+    private async Task OpenCreateDialog()
     {
         _createDescription = "";
-        _createDialogVisible = true;
-    }
 
-    private void CloseCreateDialog()
-    {
-        _createDialogVisible = false;
+        var result = await DialogService.OpenAsync("Create Manual Snapshot", ds =>
+            @<RadzenStack Gap="1rem">
+                <RadzenFormField Text="Description (optional)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <RadzenTextArea @bind-Value="_createDescription" Rows="3" Placeholder="e.g., Before major refactoring" Style="width: 100%;" />
+                </RadzenFormField>
+
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+                    <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@(() => ds.Close(false))" />
+                    <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Text="Create Snapshot"
+                                  Click="@(() => ds.Close(true))" Disabled="@_isCreating" IsBusy="@_isCreating" />
+                </RadzenStack>
+            </RadzenStack>,
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result == true)
+        {
+            await CreateSnapshotAsync();
+        }
     }
 
     private async Task CreateSnapshotAsync()
@@ -537,13 +210,12 @@ else
             if (result.IsSuccess && result.Data != null)
             {
                 _snapshots.Insert(0, result.Data);
-                Snackbar.Add($"Snapshot {result.Data.SnapshotId} created successfully", Severity.Success);
-                _createDialogVisible = false;
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Snapshot {result.Data.SnapshotId} created successfully");
                 StateHasChanged();
             }
             else
             {
-                Snackbar.Add(result.ErrorMessage ?? "Failed to create snapshot", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to create snapshot");
             }
         }
         finally
@@ -552,32 +224,99 @@ else
         }
     }
 
-    // View dialog methods
+    // View dialog
     private async Task ViewSnapshotAsync(SnapshotDto snapshot)
     {
         _viewSnapshot = snapshot;
         _viewSnapshotDetail = null;
-        _viewDialogVisible = true;
 
         try
         {
             _viewSnapshotDetail = await SnapshotService.GetSnapshotAsync(ProjectId, snapshot.SnapshotId);
-            StateHasChanged();
+
+            await DialogService.OpenAsync("Snapshot Details", ds =>
+                @<RadzenStack Gap="1rem">
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="12" SizeSM="6">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Snapshot ID</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body1" Style="font-family: monospace;">@_viewSnapshot.SnapshotId</RadzenText>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeSM="6">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Type</RadzenText>
+                            <RadzenBadge BadgeStyle="@GetSnapshotTypeBadgeStyle(_viewSnapshot.SnapshotType)" Text="@_viewSnapshot.SnapshotType" />
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeSM="6">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Created</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body1">@_viewSnapshot.CreatedAt.ToLocalTime().ToString("g")</RadzenText>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeSM="6">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Created By</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body1">@(_viewSnapshot.CreatedByUsername ?? "System")</RadzenText>
+                        </RadzenColumn>
+                    </RadzenRow>
+
+                    @if (!string.IsNullOrEmpty(_viewSnapshot.Description))
+                    {
+                        <div>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Description</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body1">@_viewSnapshot.Description</RadzenText>
+                        </div>
+                    }
+
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="4">
+                            <RadzenCard Style="text-align: center;">
+                                <RadzenText TextStyle="TextStyle.H5">@_viewSnapshot.FileCount</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption">Files</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="4">
+                            <RadzenCard Style="text-align: center;">
+                                <RadzenText TextStyle="TextStyle.H5">@_viewSnapshot.KeyCount</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption">Keys</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="4">
+                            <RadzenCard Style="text-align: center;">
+                                <RadzenText TextStyle="TextStyle.H5">@_viewSnapshot.TranslationCount</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption">Translations</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                    </RadzenRow>
+
+                    @if (_viewSnapshotDetail?.Files?.Any() == true)
+                    {
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mt-4 rz-mb-2">Files in Snapshot</RadzenText>
+                        <div style="max-height: 200px; overflow-y: auto;">
+                            <RadzenDataGrid TItem="SnapshotFileDto" Data="@_viewSnapshotDetail.Files" Density="Density.Compact" AllowSorting="false" AllowPaging="false">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="SnapshotFileDto" Property="Path" Title="Path" />
+                                    <RadzenDataGridColumn TItem="SnapshotFileDto" Property="LanguageCode" Title="Language" Width="100px">
+                                        <Template Context="file">
+                                            @if (!string.IsNullOrEmpty(file.LanguageCode))
+                                            {
+                                                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@file.LanguageCode" />
+                                            }
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        </div>
+                    }
+
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+                        <RadzenButton Variant="Radzen.Variant.Text" Text="Close" Click="@(() => ds.Close())" />
+                    </RadzenStack>
+                </RadzenStack>,
+                new Radzen.DialogOptions { Width = "600px" });
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error loading snapshot details: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error loading snapshot details: {ex.Message}");
         }
     }
 
-    private void CloseViewDialog()
-    {
-        _viewDialogVisible = false;
-        _viewSnapshot = null;
-        _viewSnapshotDetail = null;
-    }
-
-    // Restore dialog methods
+    // Restore dialog
     private async Task OpenRestoreDialog(SnapshotDto snapshot)
     {
         _restoreSnapshot = snapshot;
@@ -594,13 +333,44 @@ else
             _lastChangeAt = unsnapshotedChanges.LastChangeAt;
         }
 
-        _restoreDialogVisible = true;
-    }
+        var result = await DialogService.OpenAsync("Restore Snapshot", ds =>
+            @<RadzenStack Gap="1rem">
+                @if (_hasUnsnapshotedChanges)
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">
+                        <strong>Warning:</strong> There are unsaved changes since the last snapshot
+                        @if (_lastChangeAt.HasValue)
+                        {
+                            <span> (last change: @_lastChangeAt.Value.ToLocalTime().ToString("g"))</span>
+                        }
+                        that may be lost if you restore without creating a backup.
+                    </RadzenAlert>
+                }
 
-    private void CloseRestoreDialog()
-    {
-        _restoreDialogVisible = false;
-        _restoreSnapshot = null;
+                <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false">
+                    This will replace your current project state with the snapshot from <strong>@_restoreSnapshot?.CreatedAt.ToLocalTime().ToString("g")</strong>.
+                </RadzenAlert>
+
+                <RadzenCheckBox @bind-Value="_restoreCreateBackup" TValue="bool">
+                    <Template>Create backup of current state before restoring</Template>
+                </RadzenCheckBox>
+
+                <RadzenFormField Text="Restore message (optional)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <RadzenTextBox @bind-Value="_restoreMessage" Placeholder="e.g., Rolling back breaking changes" Style="width: 100%;" />
+                </RadzenFormField>
+
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+                    <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@(() => ds.Close(false))" />
+                    <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Warning" Text="Restore"
+                                  Click="@(() => ds.Close(true))" Disabled="@_isRestoring" IsBusy="@_isRestoring" />
+                </RadzenStack>
+            </RadzenStack>,
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result == true)
+        {
+            await RestoreSnapshotAsync();
+        }
     }
 
     private async Task RestoreSnapshotAsync()
@@ -618,13 +388,12 @@ else
 
             if (result.IsSuccess)
             {
-                Snackbar.Add($"Project restored to snapshot {_restoreSnapshot.SnapshotId}", Severity.Success);
-                _restoreDialogVisible = false;
-                await LoadDataAsync(); // Reload to show new restore snapshot
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Project restored to snapshot {_restoreSnapshot.SnapshotId}");
+                await LoadDataAsync();
             }
             else
             {
-                Snackbar.Add(result.ErrorMessage ?? "Failed to restore snapshot", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to restore snapshot");
             }
         }
         finally
@@ -633,17 +402,20 @@ else
         }
     }
 
-    // Delete dialog methods
-    private void OpenDeleteDialog(SnapshotDto snapshot)
+    // Delete dialog
+    private async Task OpenDeleteDialog(SnapshotDto snapshot)
     {
         _deleteSnapshot = snapshot;
-        _deleteDialogVisible = true;
-    }
 
-    private void CloseDeleteDialog()
-    {
-        _deleteDialogVisible = false;
-        _deleteSnapshot = null;
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to delete snapshot {snapshot.SnapshotId}? This action cannot be undone.",
+            "Delete Snapshot?",
+            new ConfirmOptions { OkButtonText = "Delete", CancelButtonText = "Cancel" });
+
+        if (confirmed == true)
+        {
+            await DeleteSnapshotAsync();
+        }
     }
 
     private async Task DeleteSnapshotAsync()
@@ -657,13 +429,12 @@ else
             if (result.IsSuccess)
             {
                 _snapshots.Remove(_deleteSnapshot);
-                Snackbar.Add("Snapshot deleted successfully", Severity.Success);
-                _deleteDialogVisible = false;
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Snapshot deleted successfully");
                 StateHasChanged();
             }
             else
             {
-                Snackbar.Add(result.ErrorMessage ?? "Failed to delete snapshot", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to delete snapshot");
             }
         }
         finally
@@ -672,28 +443,135 @@ else
         }
     }
 
-    // Compare dialog methods
-    private void OpenCompareDialog(SnapshotDto snapshot)
+    // Compare dialog
+    private async Task OpenCompareDialog(SnapshotDto snapshot)
     {
         _compareFromSnapshot = snapshot;
         _compareToSnapshot = null;
         _compareDiff = null;
-        _compareDialogVisible = true;
+
+        var result = await DialogService.OpenAsync("Compare Snapshots", ds =>
+            @<RadzenStack Gap="1rem">
+                <RadzenRow Gap="1rem">
+                    <RadzenColumn Size="12" SizeMD="5">
+                        <RadzenCard>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">From (Base)</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Subtitle1" Style="font-family: monospace;">@_compareFromSnapshot.SnapshotId</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2" class="text-truncate">@(_compareFromSnapshot.Description ?? "No description")</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@_compareFromSnapshot.CreatedAt.ToLocalTime().ToString("g")</RadzenText>
+                        </RadzenCard>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="2" Style="display: flex; align-items: center; justify-content: center;">
+                        <RadzenIcon Icon="arrow_forward" Style="font-size: 2rem;" class="rz-color-secondary" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="5">
+                        <RadzenCard>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">To (Compare)</RadzenText>
+                            @if (_compareToSnapshot == null)
+                            {
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="font-style: italic;">Select a snapshot below</RadzenText>
+                            }
+                            else
+                            {
+                                <RadzenText TextStyle="TextStyle.Subtitle1" Style="font-family: monospace;">@_compareToSnapshot.SnapshotId</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Body2" class="text-truncate">@(_compareToSnapshot.Description ?? "No description")</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@_compareToSnapshot.CreatedAt.ToLocalTime().ToString("g")</RadzenText>
+                            }
+                        </RadzenCard>
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mt-4 rz-mb-2">Select snapshot to compare with:</RadzenText>
+                <div style="max-height: 200px; overflow-y: auto;">
+                    <RadzenDataGrid TItem="SnapshotDto"
+                                    Data="@_snapshots.Where(s => s.SnapshotId != _compareFromSnapshot.SnapshotId)"
+                                    Density="Density.Compact" AllowSorting="false" AllowPaging="false"
+                                    SelectionMode="DataGridSelectionMode.Single" @bind-Value="@_compareToSnapshotList">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="SnapshotDto" Property="SnapshotId" Title="ID" Width="150px">
+                                <Template Context="s">
+                                    <span style="font-family: monospace;">@s.SnapshotId</span>
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="SnapshotDto" Property="SnapshotType" Title="Type" Width="100px">
+                                <Template Context="s">
+                                    <RadzenBadge BadgeStyle="@GetSnapshotTypeBadgeStyle(s.SnapshotType)" Variant="Radzen.Variant.Outlined" Text="@s.SnapshotType" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="SnapshotDto" Property="CreatedAt" Title="Created">
+                                <Template Context="s">@s.CreatedAt.ToLocalTime().ToString("g")</Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </div>
+
+                @if (_compareDiff != null)
+                {
+                    <hr />
+                    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-2">
+                        <RadzenIcon Icon="difference" Style="font-size: 1rem;" />
+                        Comparison Results
+                    </RadzenText>
+
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="4">
+                            <RadzenCard Style="border-left: 3px solid var(--rz-success); text-align: center;">
+                                <RadzenText TextStyle="TextStyle.H5" Style="color: var(--rz-success);">@_compareDiff.KeysAdded</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption">Keys Added</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="4">
+                            <RadzenCard Style="border-left: 3px solid var(--rz-danger); text-align: center;">
+                                <RadzenText TextStyle="TextStyle.H5" Style="color: var(--rz-danger);">@_compareDiff.KeysRemoved</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption">Keys Removed</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="4">
+                            <RadzenCard Style="border-left: 3px solid var(--rz-warning); text-align: center;">
+                                <RadzenText TextStyle="TextStyle.H5" Style="color: var(--rz-warning);">@_compareDiff.KeysModified</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption">Keys Modified</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                    </RadzenRow>
+
+                    @if (_compareDiff.Files?.Any() == true)
+                    {
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mt-4 rz-mb-2">Changed Files</RadzenText>
+                        <div style="max-height: 150px; overflow-y: auto;">
+                            <RadzenDataGrid TItem="SnapshotDiffFileDto" Data="@_compareDiff.Files" Density="Density.Compact" AllowSorting="false" AllowPaging="false">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="SnapshotDiffFileDto" Title="Change" Width="80px">
+                                        <Template Context="file">
+                                            <RadzenBadge BadgeStyle="@GetChangeTypeBadgeStyle(file.ChangeType)" Variant="Radzen.Variant.Text" Text="@file.ChangeType" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="SnapshotDiffFileDto" Property="Path" Title="Path" />
+                                </Columns>
+                            </RadzenDataGrid>
+                        </div>
+                    }
+                }
+                else if (_isComparing)
+                {
+                    <RadzenStack AlignItems="Radzen.AlignItems.Center" class="rz-mt-4">
+                        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Comparing snapshots...</RadzenText>
+                    </RadzenStack>
+                }
+
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+                    <RadzenButton Variant="Radzen.Variant.Text" Text="Close" Click="@(() => ds.Close())" />
+                    <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Info" Text="Compare"
+                                  Click="@CompareSnapshotsAsync" Disabled="@(_compareToSnapshot == null || _isComparing)" IsBusy="@_isComparing" />
+                </RadzenStack>
+            </RadzenStack>,
+            new Radzen.DialogOptions { Width = "700px" });
     }
 
-    private void CloseCompareDialog()
+    private IList<SnapshotDto>? _compareToSnapshotList
     {
-        _compareDialogVisible = false;
-        _compareFromSnapshot = null;
-        _compareToSnapshot = null;
-        _compareDiff = null;
-    }
-
-    private void SelectCompareToSnapshot(SnapshotDto snapshot)
-    {
-        _compareToSnapshot = snapshot;
-        _compareDiff = null; // Reset diff when selection changes
-        StateHasChanged();
+        get => _compareToSnapshot != null ? new List<SnapshotDto> { _compareToSnapshot } : null;
+        set => _compareToSnapshot = value?.FirstOrDefault();
     }
 
     private async Task CompareSnapshotsAsync()
@@ -711,12 +589,12 @@ else
 
             if (_compareDiff == null)
             {
-                Snackbar.Add("Failed to compare snapshots", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to compare snapshots");
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error comparing snapshots: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error comparing snapshots: {ex.Message}");
         }
         finally
         {
@@ -725,28 +603,29 @@ else
         }
     }
 
-    private static Color GetSnapshotTypeColor(string type) => type.ToLower() switch
+    private static string GetSnapshotTypeColorValue(string type) => type.ToLower() switch
     {
-        "push" => Color.Primary,
-        "manual" => Color.Info,
-        "restore" => Color.Warning,
-        "auto" => Color.Secondary,
-        _ => Color.Default
+        "push" => "var(--rz-primary)",
+        "manual" => "var(--rz-info)",
+        "restore" => "var(--rz-warning)",
+        "auto" => "var(--rz-secondary)",
+        _ => "var(--rz-base-600)"
     };
 
-    private static Color GetChangeTypeColor(string changeType) => changeType.ToLower() switch
+    private static BadgeStyle GetSnapshotTypeBadgeStyle(string type) => type.ToLower() switch
     {
-        "added" => Color.Success,
-        "removed" => Color.Error,
-        "modified" => Color.Warning,
-        _ => Color.Default
+        "push" => BadgeStyle.Primary,
+        "manual" => BadgeStyle.Info,
+        "restore" => BadgeStyle.Warning,
+        "auto" => BadgeStyle.Secondary,
+        _ => BadgeStyle.Light
     };
 
-    private static string GetChangeTypeIcon(string changeType) => changeType.ToLower() switch
+    private static BadgeStyle GetChangeTypeBadgeStyle(string changeType) => changeType.ToLower() switch
     {
-        "added" => Icons.Material.Filled.Add,
-        "removed" => Icons.Material.Filled.Remove,
-        "modified" => Icons.Material.Filled.Edit,
-        _ => Icons.Material.Filled.QuestionMark
+        "added" => BadgeStyle.Success,
+        "removed" => BadgeStyle.Danger,
+        "modified" => BadgeStyle.Warning,
+        _ => BadgeStyle.Light
     };
 }

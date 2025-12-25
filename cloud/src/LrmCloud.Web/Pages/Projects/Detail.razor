@@ -6,315 +6,187 @@
 @inject ResourceService ResourceService
 @inject TranslationService TranslationService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
-@inject IDialogService DialogService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 @inject IJSRuntime JS
 
 <PageTitle>@(_project?.Name ?? "Project") - LRM Cloud</PageTitle>
 
 @if (_isLoading)
 {
-    <MudStack Spacing="4">
-        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="120px" />
-        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
-    </MudStack>
+    <RadzenStack Gap="1rem">
+        <RadzenSkeleton Style="height: 120px; width: 100%;" />
+        <RadzenSkeleton Style="height: 200px; width: 100%;" />
+    </RadzenStack>
 }
 else if (_project == null)
 {
-    <MudAlert Severity="Severity.Error">
+    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">
         Project not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="">Go to Dashboard</MudButton>
-    </MudAlert>
+        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Primary" Text="Go to Dashboard" Click="@(() => Navigation.NavigateTo(""))" />
+    </RadzenAlert>
 }
 else
 {
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                           OnClick="@(() => Navigation.NavigateTo(""))"
-                           Size="Size.Small" />
-            <MudText Typo="Typo.h4">@_project.Name</MudText>
-            <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetFormatColor(_project.Format)">@_project.Format</MudChip>
-        </MudStack>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Click="@(() => Navigation.NavigateTo(""))" Size="ButtonSize.Small" />
+            <RadzenText TextStyle="TextStyle.H4">@_project.Name</RadzenText>
+            <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(_project.Format)" Text="@_project.Format" />
+        </RadzenStack>
 
-        <MudStack Row="true" Spacing="2">
-            <MudButton Variant="Variant.Outlined"
-                       Color="Color.Secondary"
-                       StartIcon="@Icons.Material.Filled.Settings"
-                       OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/settings"))">
-                Settings
-            </MudButton>
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Edit"
-                       OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/editor"))">
-                Open Editor
-            </MudButton>
-        </MudStack>
-    </MudStack>
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Secondary" Icon="settings"
+                          Text="Settings" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/settings"))" />
+            <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Icon="edit"
+                          Text="Open Editor" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/editor"))" />
+        </RadzenStack>
+    </RadzenStack>
 
     @if (!string.IsNullOrEmpty(_project.Description))
     {
-        <MudText Typo="Typo.body1" Class="mb-4" Color="Color.Secondary">@_project.Description</MudText>
+        <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary rz-mb-4">@_project.Description</RadzenText>
     }
 
-    <MudGrid>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <div>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Keys</MudText>
-                        <MudText Typo="Typo.h4">@(_stats?.TotalKeys ?? _project.KeyCount)</MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Key" Color="Color.Primary" Size="Size.Large" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <div>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Languages</MudText>
-                        <MudText Typo="Typo.h4">@(_stats?.Languages.Count ?? 0)</MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Language" Color="Color.Info" Size="Size.Large" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <div>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Completion</MudText>
-                        <MudText Typo="Typo.h4">@(_stats?.OverallCompletion.ToString("F0") ?? _project.CompletionPercentage.ToString("F0"))%</MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="@UiHelpers.GetCompletionColor(_stats?.OverallCompletion ?? _project.CompletionPercentage)" Size="Size.Large" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <div>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Last Updated</MudText>
-                        <MudText Typo="Typo.h6">@_project.UpdatedAt.ToString("MMM dd")</MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Color="Color.Secondary" Size="Size.Large" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+    <RadzenRow Gap="1rem" class="rz-mb-4">
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Keys</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H4">@(_stats?.TotalKeys ?? _project.KeyCount)</RadzenText>
+                    </RadzenStack>
+                    <RadzenIcon Icon="key" Style="font-size: 2rem; color: var(--rz-primary);" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Languages</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H4">@(_stats?.Languages.Count ?? 0)</RadzenText>
+                    </RadzenStack>
+                    <RadzenIcon Icon="language" Style="font-size: 2rem; color: var(--rz-info);" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Completion</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H4">@(_stats?.OverallCompletion.ToString("F0") ?? _project.CompletionPercentage.ToString("F0"))%</RadzenText>
+                    </RadzenStack>
+                    <RadzenIcon Icon="check_circle" Style="@($"font-size: 2rem; color: {GetCompletionColor(_stats?.OverallCompletion ?? _project.CompletionPercentage)};")" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Last Updated</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H6">@_project.UpdatedAt.ToString("MMM dd")</RadzenText>
+                    </RadzenStack>
+                    <RadzenIcon Icon="schedule" Style="font-size: 2rem;" class="rz-color-secondary" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
 
     @if (_stats != null && _stats.Languages.Any())
     {
-        <MudText Typo="Typo.h6" Class="mt-6 mb-3">Language Progress</MudText>
-        <MudPaper Class="pa-4" Elevation="2">
-            <MudStack Spacing="3">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mt-6 rz-mb-3">Language Progress</RadzenText>
+        <RadzenCard>
+            <RadzenStack Gap="1rem">
                 @foreach (var lang in _stats.Languages.OrderByDescending(l => l.Value.CompletionPercentage))
                 {
-                    <div>
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                <MudText Typo="Typo.body1">@lang.Key.ToUpperInvariant()</MudText>
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                <RadzenText>@lang.Key.ToUpperInvariant()</RadzenText>
                                 @if (lang.Key == _project.DefaultLanguage)
                                 {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">Default</MudChip>
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Primary" Variant="Radzen.Variant.Outlined" Text="Default" />
                                 }
-                            </MudStack>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            </RadzenStack>
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
                                 @lang.Value.TranslatedCount / @_stats.TotalKeys translated
-                            </MudText>
-                        </MudStack>
-                        <MudProgressLinear Value="@lang.Value.CompletionPercentage"
-                                           Color="@UiHelpers.GetCompletionColor(lang.Value.CompletionPercentage)"
-                                           Class="mt-1" />
-                    </div>
+                            </RadzenText>
+                        </RadzenStack>
+                        <RadzenProgressBar Value="@lang.Value.CompletionPercentage" Max="100"
+                                           ProgressBarStyle="@UiHelpers.GetCompletionProgressStyle(lang.Value.CompletionPercentage)"
+                                           ShowValue="false" Style="height: 8px;" />
+                    </RadzenStack>
                 }
-            </MudStack>
-        </MudPaper>
+            </RadzenStack>
+        </RadzenCard>
     }
 
-    <MudText Typo="Typo.h6" Class="mt-6 mb-3">Project Details</MudText>
-    <MudPaper Class="pa-4" Elevation="2">
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Project ID (Slug)</MudText>
-                <MudText Typo="Typo.body1">@_project.Slug</MudText>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Format</MudText>
-                <MudText Typo="Typo.body1">@_project.Format</MudText>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Default Language</MudText>
-                <MudText Typo="Typo.body1">@_project.DefaultLanguage</MudText>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Localization Path</MudText>
-                <MudText Typo="Typo.body1">@_project.LocalizationPath</MudText>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Organization</MudText>
-                <MudText Typo="Typo.body1">@(_project.OrganizationName ?? "Personal")</MudText>
-            </MudItem>
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-6 rz-mb-3">Project Details</RadzenText>
+    <RadzenCard>
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeSM="6">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Project ID (Slug)</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1">@_project.Slug</RadzenText>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeSM="6">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Format</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1">@_project.Format</RadzenText>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeSM="6">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Default Language</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1">@_project.DefaultLanguage</RadzenText>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeSM="6">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Localization Path</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1">@_project.LocalizationPath</RadzenText>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeSM="6">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Organization</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1">@(_project.OrganizationName ?? "Personal")</RadzenText>
+            </RadzenColumn>
             @if (!string.IsNullOrEmpty(_project.GitHubRepo))
             {
-                <MudItem xs="12" sm="6">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">GitHub Repository</MudText>
-                    <MudLink Href="@($"https://github.com/{_project.GitHubRepo}")" Target="_blank">
-                        @_project.GitHubRepo
-                    </MudLink>
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Default Branch</MudText>
-                    <MudText Typo="Typo.body1">@(_project.GitHubDefaultBranch ?? "main")</MudText>
-                </MudItem>
+                <RadzenColumn Size="12" SizeSM="6">
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">GitHub Repository</RadzenText>
+                    <RadzenLink Path="@($"https://github.com/{_project.GitHubRepo}")" Target="_blank" Text="@_project.GitHubRepo" />
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeSM="6">
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Default Branch</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body1">@(_project.GitHubDefaultBranch ?? "main")</RadzenText>
+                </RadzenColumn>
             }
-            <MudItem xs="12" sm="6">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Created</MudText>
-                <MudText Typo="Typo.body1">@_project.CreatedAt.ToString("MMMM dd, yyyy")</MudText>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Last Synced</MudText>
-                <MudText Typo="Typo.body1">@(_project.LastSyncedAt?.ToString("MMMM dd, yyyy HH:mm") ?? "Never")</MudText>
-            </MudItem>
-        </MudGrid>
-    </MudPaper>
+            <RadzenColumn Size="12" SizeSM="6">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Created</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1">@_project.CreatedAt.ToString("MMMM dd, yyyy")</RadzenText>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeSM="6">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Last Synced</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1">@(_project.LastSyncedAt?.ToString("MMMM dd, yyyy HH:mm") ?? "Never")</RadzenText>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenCard>
 
-    <MudText Typo="Typo.h6" Class="mt-6 mb-3">Quick Actions</MudText>
-    <MudStack Row="true" Spacing="2" Class="flex-wrap">
-        <MudButton Variant="Variant.Outlined"
-                   StartIcon="@Icons.Material.Filled.Edit"
-                   OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/editor"))">
-            Open Editor
-        </MudButton>
-        <MudButton Variant="Variant.Outlined"
-                   StartIcon="@Icons.Material.Filled.History"
-                   OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/snapshots"))">
-            View Snapshots
-        </MudButton>
-        <MudButton Variant="Variant.Outlined"
-                   StartIcon="@Icons.Material.Filled.Restore"
-                   OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/history"))">
-            Sync History
-        </MudButton>
-        <MudButton Variant="Variant.Outlined"
-                   StartIcon="@Icons.Material.Filled.Book"
-                   OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}/glossary"))">
-            Glossary
-        </MudButton>
-        <MudButton Variant="Variant.Outlined"
-                   StartIcon="@Icons.Material.Filled.Translate"
-                   OnClick="@OpenTranslateDialog"
-                   Disabled="@_isTranslating">
-            @if (_isTranslating)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Translate All Missing
-        </MudButton>
-        <MudButton Variant="Variant.Outlined"
-                   StartIcon="@Icons.Material.Filled.FileDownload"
-                   OnClick="@ExportProject">
-            Export
-        </MudButton>
-        <MudButton Variant="Variant.Outlined"
-                   StartIcon="@Icons.Material.Filled.ContentCopy"
-                   OnClick="@CopySyncCommand">
-            CLI Sync Command
-        </MudButton>
-    </MudStack>
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-6 rz-mb-3">Quick Actions</RadzenText>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="edit" Text="Open Editor"
+                      Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/editor"))" />
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="history" Text="View Snapshots"
+                      Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/snapshots"))" />
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="restore" Text="Sync History"
+                      Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/history"))" />
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="book" Text="Glossary"
+                      Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/glossary"))" />
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="translate" Text="Translate All Missing"
+                      Click="@OpenTranslateDialog" Disabled="@_isTranslating" IsBusy="@_isTranslating" />
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="file_download" Text="Export"
+                      Click="@ExportProject" />
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="content_copy" Text="CLI Sync Command"
+                      Click="@CopySyncCommand" />
+    </RadzenStack>
 }
-
-@* Translate All Dialog *@
-<MudDialog @bind-Visible="_translateDialogVisible" Options="@(new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">
-            <MudIcon Icon="@Icons.Material.Filled.Translate" Class="mr-2" />
-            Translate All Missing
-        </MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudStack Spacing="3">
-            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                This will translate all missing translations from the default language (@_project?.DefaultLanguage) to the selected target languages.
-            </MudText>
-
-            <MudSelect T="string" Label="Translation Provider" @bind-Value="_selectedProvider"
-                       Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
-                @foreach (var provider in _availableProviders)
-                {
-                    <MudSelectItem Value="@provider.Name">
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                            <span>@provider.DisplayName</span>
-                            @if (provider.IsConfigured)
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Success" />
-                            }
-                        </MudStack>
-                    </MudSelectItem>
-                }
-            </MudSelect>
-
-            <MudText Typo="Typo.subtitle2">Target Languages</MudText>
-            @if (_stats?.Languages != null)
-            {
-                <MudStack Spacing="1">
-                    @foreach (var lang in _stats.Languages.Where(l => l.Key != _project?.DefaultLanguage))
-                    {
-                        <MudCheckBox T="bool" Label="@($"{lang.Key.ToUpperInvariant()} ({100 - lang.Value.CompletionPercentage:F0}% missing)")"
-                                     Checked="@_selectedLanguages.Contains(lang.Key)"
-                                     CheckedChanged="@((bool value) => ToggleLanguage(lang.Key, value))"
-                                     Color="Color.Primary" />
-                    }
-                </MudStack>
-            }
-        </MudStack>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CloseTranslateDialog" Variant="Variant.Text">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@ExecuteTranslateAll"
-                   Disabled="@(!_selectedLanguages.Any() || string.IsNullOrEmpty(_selectedProvider) || _isTranslating)">
-            @if (_isTranslating)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Translate
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-@* Export Dialog *@
-<MudDialog @bind-Visible="_exportDialogVisible" Options="@(new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">
-            <MudIcon Icon="@Icons.Material.Filled.FileDownload" Class="mr-2" />
-            Export Project
-        </MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudStack Spacing="3">
-            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Export your localization resources in various formats.
-            </MudText>
-
-            <MudRadioGroup T="string" @bind-Value="_exportFormat">
-                <MudRadio Value="@("json")" Color="Color.Primary">JSON (all languages in one file)</MudRadio>
-                <MudRadio Value="@("csv")" Color="Color.Primary">CSV (spreadsheet compatible)</MudRadio>
-                <MudRadio Value="@("native")" Color="Color.Primary">Native format (@_project?.Format files)</MudRadio>
-            </MudRadioGroup>
-        </MudStack>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CloseExportDialog" Variant="Variant.Text">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@ExecuteExport"
-                   Disabled="@(string.IsNullOrEmpty(_exportFormat))">
-            <MudIcon Icon="@Icons.Material.Filled.Download" Class="mr-1" />
-            Download
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
 
 @code {
     [Parameter]
@@ -325,14 +197,12 @@ else
     private bool _isLoading = true;
 
     // Translate dialog state
-    private bool _translateDialogVisible;
     private bool _isTranslating;
     private List<TranslationProviderDto> _availableProviders = new();
     private string? _selectedProvider;
     private HashSet<string> _selectedLanguages = new();
 
     // Export dialog state
-    private bool _exportDialogVisible;
     private string _exportFormat = "json";
 
     protected override async Task OnInitializedAsync()
@@ -353,13 +223,20 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error loading project: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error loading project: {ex.Message}");
         }
         finally
         {
             _isLoading = false;
         }
     }
+
+    private static string GetCompletionColor(double percentage) => percentage switch
+    {
+        >= 90 => "var(--rz-success)",
+        >= 50 => "var(--rz-warning)",
+        _ => "var(--rz-danger)"
+    };
 
     // =========================================================================
     // Translate All
@@ -378,12 +255,56 @@ else
             .Select(l => l.Key)
             .ToHashSet() ?? new HashSet<string>();
 
-        _translateDialogVisible = true;
-    }
+        var result = await DialogService.OpenAsync("Translate All Missing", ds =>
+            @<RadzenStack Gap="1rem">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                    This will translate all missing translations from the default language (@_project?.DefaultLanguage) to the selected target languages.
+                </RadzenText>
 
-    private void CloseTranslateDialog()
-    {
-        _translateDialogVisible = false;
+                <RadzenFormField Text="Translation Provider" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <RadzenDropDown @bind-Value="_selectedProvider" Data="@_availableProviders" TextProperty="DisplayName" ValueProperty="Name" Style="width: 100%;">
+                        <Template Context="provider">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                <span>@provider.DisplayName</span>
+                                @if (provider.IsConfigured)
+                                {
+                                    <RadzenIcon Icon="check" Style="color: var(--rz-success); font-size: 1rem;" />
+                                }
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDropDown>
+                </RadzenFormField>
+
+                <RadzenText TextStyle="TextStyle.Subtitle2">Target Languages</RadzenText>
+                @if (_stats?.Languages != null)
+                {
+                    <RadzenStack Gap="0.5rem">
+                        @foreach (var lang in _stats.Languages.Where(l => l.Key != _project?.DefaultLanguage))
+                        {
+                            <RadzenCheckBox TValue="bool" Value="@_selectedLanguages.Contains(lang.Key)"
+                                            Change="@((bool value) => ToggleLanguage(lang.Key, value))">
+                                <Template Context="cb">
+                                    @lang.Key.ToUpperInvariant() (@((100 - lang.Value.CompletionPercentage).ToString("F0"))% missing)
+                                </Template>
+                            </RadzenCheckBox>
+                        }
+                    </RadzenStack>
+                }
+
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+                    <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@(() => ds.Close(false))" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Translate"
+                                  Click="@(() => ds.Close(true))"
+                                  Disabled="@(!_selectedLanguages.Any() || string.IsNullOrEmpty(_selectedProvider))"
+                                  IsBusy="@_isTranslating" />
+                </RadzenStack>
+            </RadzenStack>,
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result == true)
+        {
+            await ExecuteTranslateAll();
+        }
     }
 
     private void ToggleLanguage(string langCode, bool selected)
@@ -414,8 +335,7 @@ else
 
             if (result.Success)
             {
-                Snackbar.Add($"Successfully translated {result.TranslatedCount} items!", Severity.Success);
-                _translateDialogVisible = false;
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Successfully translated {result.TranslatedCount} items!");
 
                 // Refresh stats
                 _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
@@ -423,12 +343,12 @@ else
             else
             {
                 var errorMsg = result.Errors?.FirstOrDefault() ?? "Translation failed";
-                Snackbar.Add(errorMsg, Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", errorMsg);
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Translation error: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Translation error: {ex.Message}");
         }
         finally
         {
@@ -440,15 +360,37 @@ else
     // Export
     // =========================================================================
 
-    private void ExportProject()
+    private async Task ExportProject()
     {
         _exportFormat = "json";
-        _exportDialogVisible = true;
-    }
 
-    private void CloseExportDialog()
-    {
-        _exportDialogVisible = false;
+        var result = await DialogService.OpenAsync("Export Project", ds =>
+            @<RadzenStack Gap="1rem">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                    Export your localization resources in various formats.
+                </RadzenText>
+
+                <RadzenRadioButtonList @bind-Value="_exportFormat" TValue="string" Orientation="Radzen.Orientation.Vertical">
+                    <Items>
+                        <RadzenRadioButtonListItem Text="JSON (all languages in one file)" Value="@("json")" />
+                        <RadzenRadioButtonListItem Text="CSV (spreadsheet compatible)" Value="@("csv")" />
+                        <RadzenRadioButtonListItem Text="@($"Native format ({_project?.Format} files)")" Value="@("native")" />
+                    </Items>
+                </RadzenRadioButtonList>
+
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+                    <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@(() => ds.Close(false))" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Icon="download" Text="Download"
+                                  Click="@(() => ds.Close(true))"
+                                  Disabled="@(string.IsNullOrEmpty(_exportFormat))" />
+                </RadzenStack>
+            </RadzenStack>,
+            new Radzen.DialogOptions { Width = "400px" });
+
+        if (result == true)
+        {
+            await ExecuteExport();
+        }
     }
 
     private async Task ExecuteExport()
@@ -458,8 +400,8 @@ else
 
         // For now, show a message about using CLI
         // In the future, this could download files directly
-        Snackbar.Add($"Export to {_exportFormat.ToUpper()} format - Use CLI: lrm cloud sync --project {ProjectId} --export {_exportFormat}", Severity.Info);
-        _exportDialogVisible = false;
+        NotificationService.Notify(NotificationSeverity.Info, "Export",
+            $"Export to {_exportFormat.ToUpper()} format - Use CLI: lrm cloud sync --project {ProjectId} --export {_exportFormat}");
     }
 
     // =========================================================================
@@ -472,11 +414,11 @@ else
         try
         {
             await JS.InvokeVoidAsync("navigator.clipboard.writeText", command);
-            Snackbar.Add("CLI command copied to clipboard!", Severity.Success);
+            NotificationService.Notify(NotificationSeverity.Success, "Copied", "CLI command copied to clipboard!");
         }
         catch
         {
-            Snackbar.Add($"CLI command: {command}", Severity.Info);
+            NotificationService.Notify(NotificationSeverity.Info, "CLI Command", command);
         }
     }
 }

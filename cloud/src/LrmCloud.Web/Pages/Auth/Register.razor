@@ -5,120 +5,115 @@
 
 <PageTitle>Register - LRM Cloud</PageTitle>
 
-<MudPaper Class="pa-8" Elevation="3" Style="max-width: 450px; margin: auto;">
-    <MudStack Spacing="4">
-        <div style="text-align: center;">
-            <MudIcon Icon="@Icons.Material.Filled.Language" Size="Size.Large" Color="Color.Primary" />
-            <MudText Typo="Typo.h4" Class="mt-2">LRM Cloud</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Create your account</MudText>
-        </div>
+<RadzenStack Gap="1rem">
+    <div style="text-align: center;">
+        <RadzenIcon Icon="language" Style="font-size: 3rem; color: var(--rz-primary);" />
+        <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">LRM Cloud</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Create your account</RadzenText>
+    </div>
 
-        @if (_successMessage != null)
+    @if (_successMessage != null)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Success" Shade="Shade.Lighter" AllowClose="false">
+            @_successMessage
+            <br />
+            <RadzenLink Path="login" Text="Go to login" />
+        </RadzenAlert>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(_errorMessage))
         {
-            <MudAlert Severity="Severity.Success" Dense="true">
-                @_successMessage
-                <br />
-                <MudLink Href="login">Go to login</MudLink>
-            </MudAlert>
+            <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false" class="rz-mb-2">
+                @_errorMessage
+            </RadzenAlert>
         }
-        else
-        {
-            @if (!string.IsNullOrEmpty(_errorMessage))
-            {
-                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">@_errorMessage</MudAlert>
-            }
 
-            <EditForm Model="_model" OnValidSubmit="HandleRegister">
-                <DataAnnotationsValidator />
+        <RadzenTemplateForm TItem="RegisterRequest" Data="@_model" Submit="@HandleRegister">
+            <RadzenStack Gap="1rem">
+                <RadzenFormField Text="Email" Variant="Radzen.Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_model.Email" Name="Email" autocomplete="email" Disabled="@_isLoading" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">We'll send a verification email</RadzenText>
+                        <RadzenRequiredValidator Component="Email" Text="Email is required" />
+                        <RadzenEmailValidator Component="Email" Text="Invalid email format" />
+                    </Helper>
+                </RadzenFormField>
 
-                <MudTextField @bind-Value="_model.Email"
-                              Label="Email"
-                              Variant="Variant.Outlined"
-                              InputType="InputType.Email"
-                              For="@(() => _model.Email)"
-                              Disabled="_isLoading"
-                              HelperText="We'll send a verification email"
-                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "email" } })" />
+                <RadzenFormField Text="Username" Variant="Radzen.Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_model.Username" Name="Username" autocomplete="username" Disabled="@_isLoading" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">3-50 characters, letters, numbers, - and _</RadzenText>
+                        <RadzenRequiredValidator Component="Username" Text="Username is required" />
+                        <RadzenLengthValidator Component="Username" Min="3" Max="50" Text="Username must be 3-50 characters" />
+                    </Helper>
+                </RadzenFormField>
 
-                <MudTextField @bind-Value="_model.Username"
-                              Label="Username"
-                              Variant="Variant.Outlined"
-                              For="@(() => _model.Username)"
-                              Disabled="_isLoading"
-                              HelperText="3-50 characters, letters, numbers, - and _"
-                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "username" } })" />
+                <RadzenFormField Text="Password" Variant="Radzen.Variant.Outlined">
+                    <ChildContent>
+                        <RadzenPassword @bind-Value="_model.Password" Name="Password" autocomplete="new-password" Disabled="@_isLoading" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Minimum 12 characters</RadzenText>
+                        <RadzenRequiredValidator Component="Password" Text="Password is required" />
+                        <RadzenLengthValidator Component="Password" Min="12" Text="Password must be at least 12 characters" />
+                    </Helper>
+                </RadzenFormField>
 
-                <MudTextField @bind-Value="_model.Password"
-                              Label="Password"
-                              Variant="Variant.Outlined"
-                              InputType="@(_showPassword ? InputType.Text : InputType.Password)"
-                              Adornment="Adornment.End"
-                              AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
-                              OnAdornmentClick="@(() => _showPassword = !_showPassword)"
-                              For="@(() => _model.Password)"
-                              Disabled="_isLoading"
-                              HelperText="Minimum 12 characters"
-                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "new-password" } })" />
+                <RadzenFormField Text="Confirm Password" Variant="Radzen.Variant.Outlined">
+                    <ChildContent>
+                        <RadzenPassword @bind-Value="_confirmPassword" Name="ConfirmPassword" autocomplete="new-password" Disabled="@_isLoading" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenCompareValidator Component="ConfirmPassword" Value="@_model.Password" Text="Passwords do not match" />
+                    </Helper>
+                </RadzenFormField>
 
-                <MudTextField @bind-Value="_confirmPassword"
-                              Label="Confirm Password"
-                              Variant="Variant.Outlined"
-                              InputType="@(_showPassword ? InputType.Text : InputType.Password)"
-                              Disabled="_isLoading"
-                              Error="@(_confirmPassword != _model.Password && !string.IsNullOrEmpty(_confirmPassword))"
-                              ErrorText="Passwords do not match"
-                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "new-password" } })" />
-
-                <MudButton ButtonType="ButtonType.Submit"
-                           Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           FullWidth="true"
-                           Disabled="_isLoading || _confirmPassword != _model.Password"
-                           Class="mt-4">
+                <RadzenButton ButtonType="Radzen.ButtonType.Submit" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Large" class="rz-w-100 rz-mt-4" Disabled="@(_isLoading || _confirmPassword != _model.Password)">
                     @if (_isLoading)
                     {
-                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                        <MudText Class="ms-2">Creating account...</MudText>
+                        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.ExtraSmall" class="rz-me-2" />
+                        <span>Creating account...</span>
                     }
                     else
                     {
-                        <MudText>Create Account</MudText>
+                        <span>Create Account</span>
                     }
-                </MudButton>
-            </EditForm>
+                </RadzenButton>
+            </RadzenStack>
+        </RadzenTemplateForm>
 
-            <MudStack Row="true" AlignItems="AlignItems.Center" Class="my-2">
-                <MudDivider />
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="px-2">or</MudText>
-                <MudDivider />
-            </MudStack>
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="1rem" class="rz-my-2">
+            <hr style="flex: 1;" />
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">or</RadzenText>
+            <hr style="flex: 1;" />
+        </RadzenStack>
 
-            <MudButton Variant="Variant.Outlined"
-                       StartIcon="@Icons.Custom.Brands.GitHub"
-                       FullWidth="true"
-                       Href="/api/auth/github"
-                       Disabled="_isLoading">
-                Continue with GitHub
-            </MudButton>
+        <RadzenButton Variant="Radzen.Variant.Outlined" Size="ButtonSize.Large" class="rz-w-100" Disabled="@_isLoading">
+            <a href="/api/auth/github" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.5rem;">
+                <RadzenIcon Icon="code" /> Continue with GitHub
+            </a>
+        </RadzenButton>
 
-            <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-4">
-                Already have an account? <MudLink Href="login">Sign in</MudLink>
-            </MudText>
-        }
-    </MudStack>
-</MudPaper>
+        <RadzenText TextStyle="TextStyle.Body2" Style="text-align: center;" class="rz-mt-4">
+            Already have an account? <RadzenLink Path="login" Text="Sign in" />
+        </RadzenText>
+    }
+</RadzenStack>
 
 @code {
     private readonly RegisterRequest _model = new();
     private string _confirmPassword = string.Empty;
     private bool _isLoading;
-    private bool _showPassword;
     private string? _errorMessage;
     private string? _successMessage;
 
     protected override async Task OnInitializedAsync()
     {
-        // If user is already authenticated, redirect to home
         if (await AuthService.IsAuthenticatedAsync())
         {
             Navigation.NavigateTo("", forceLoad: false);

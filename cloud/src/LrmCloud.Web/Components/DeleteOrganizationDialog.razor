@@ -1,0 +1,79 @@
+@using LrmCloud.Shared.DTOs.Organizations
+@inject OrganizationService OrganizationService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<RadzenStack Gap="1rem">
+    <RadzenText>
+        This action is <strong>permanent</strong> and cannot be undone.
+    </RadzenText>
+    <RadzenText>
+        Type <code>@OrganizationName</code> to confirm:
+    </RadzenText>
+
+    <RadzenFormField Text="Organization Name" Variant="Radzen.Variant.Outlined">
+        <ChildContent>
+            <RadzenTextBox @bind-Value="_deleteConfirmation" Placeholder="@OrganizationName" Style="width: 100%;" />
+        </ChildContent>
+    </RadzenFormField>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
+            @_errorMessage
+        </RadzenAlert>
+    }
+
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+        <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" Disabled="@_isDeleting" />
+        <RadzenButton ButtonStyle="ButtonStyle.Danger" Text="Delete Organization" Click="@DeleteOrganization" Disabled="@(_deleteConfirmation != OrganizationName || _isDeleting)" IsBusy="@_isDeleting" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public int OrganizationId { get; set; }
+
+    [Parameter]
+    public string OrganizationName { get; set; } = "";
+
+    private string _deleteConfirmation = "";
+    private bool _isDeleting;
+    private string? _errorMessage;
+
+    private async Task DeleteOrganization()
+    {
+        if (_deleteConfirmation != OrganizationName) return;
+
+        _isDeleting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var (success, error) = await OrganizationService.DeleteOrganizationAsync(OrganizationId);
+
+            if (success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Organization deleted successfully");
+                DialogService.Close(true);
+            }
+            else
+            {
+                _errorMessage = error ?? "Failed to delete organization";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isDeleting = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(false);
+    }
+}

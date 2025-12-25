@@ -12,396 +12,306 @@
 @inject UsageService UsageService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 
 <PageTitle>Billing - @(_organization?.Name ?? "Organization") - LRM Cloud</PageTitle>
 
 @if (_isLoading)
 {
-    <MudStack>
-        <MudSkeleton Width="300px" Height="40px" />
-        <MudGrid>
+    <RadzenStack Gap="1rem">
+        <div style="background: var(--rz-base-300); width: 300px; height: 40px; border-radius: 4px;"></div>
+        <RadzenRow Gap="1rem">
             @for (int i = 0; i < 3; i++)
             {
-                <MudItem xs="12" sm="4">
+                <RadzenColumn Size="12" SizeSM="4">
                     <LoadingSkeleton Type="LoadingSkeletonType.Card" />
-                </MudItem>
+                </RadzenColumn>
             }
-        </MudGrid>
-    </MudStack>
+        </RadzenRow>
+    </RadzenStack>
 }
 else if (_organization == null)
 {
-    <MudAlert Severity="Severity.Error">
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
         Organization not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="organizations">Back to Organizations</MudButton>
-    </MudAlert>
+        <RadzenLink Path="organizations" Text="Back to Organizations" class="rz-ms-2" />
+    </RadzenAlert>
 }
 else if (!OrganizationRole.IsAdminOrOwner(_organization.UserRole))
 {
-    <MudAlert Severity="Severity.Warning">
+    <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">
         You don't have permission to access billing information.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"organizations/{OrganizationId}")">Back to Organization</MudButton>
-    </MudAlert>
+        <RadzenLink Path="@($"organizations/{OrganizationId}")" Text="Back to Organization" class="rz-ms-2" />
+    </RadzenAlert>
 }
 else
 {
-    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
-        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                       OnClick="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}"))"
-                       Size="Size.Small" />
-        <MudBreadcrumbs Items="_breadcrumbs" />
-    </MudStack>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+        <RadzenButton Variant="Radzen.Variant.Text" Icon="arrow_back" Click="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}"))" Size="ButtonSize.Small" />
+        <RadzenBreadCrumb>
+            <RadzenBreadCrumbItem Path="organizations" Text="Organizations" />
+            <RadzenBreadCrumbItem Path="@($"organizations/{OrganizationId}")" Text="@_organization.Name" />
+            <RadzenBreadCrumbItem Text="Billing" />
+        </RadzenBreadCrumb>
+    </RadzenStack>
 
-    <MudText Typo="Typo.h5" Class="mb-4">Billing & Usage</MudText>
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-4">Billing & Usage</RadzenText>
 
-        <!-- Shared Quota Info -->
-        <MudAlert Severity="Severity.Info" Class="mb-4">
-            <MudText Typo="Typo.body2">
-                Organization usage counts against the owner's plan quota. All translation activity (LRM and BYOK) within organization projects is billed to the organization owner.
-            </MudText>
-        </MudAlert>
+    <!-- Shared Quota Info -->
+    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" class="rz-mb-4">
+        Organization usage counts against the owner's plan quota. All translation activity (LRM and BYOK) within organization projects is billed to the organization owner.
+    </RadzenAlert>
 
-        <!-- Current Plan Card -->
-        <MudCard Class="mb-6">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudIcon Icon="@Icons.Material.Filled.CreditCard" />
-                        <MudText Typo="Typo.h6">Current Plan</MudText>
-                    </MudStack>
-                </CardHeaderContent>
-                <CardHeaderActions>
-                    <MudChip T="string" Color="@UiHelpers.GetPlanColor(_organization.Plan)" Size="Size.Medium">
-                        @_organization.Plan.ToUpperInvariant()
-                    </MudChip>
-                </CardHeaderActions>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudGrid>
-                    <MudItem xs="12" md="8">
-                        <MudStack Spacing="2">
-                            <MudText Typo="Typo.subtitle1">@GetPlanDescription(_organization.Plan)</MudText>
-                            <MudStack Row="true" Spacing="4">
-                                <div>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Members</MudText>
-                                    <MudText Typo="Typo.body1">@_organization.MemberCount / @FormatLimit(_usageStats?.MaxMembers ?? 0)</MudText>
+    <!-- Current Plan Card -->
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" class="rz-mb-4">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="credit_card" />
+                <RadzenText TextStyle="TextStyle.H6">Current Plan</RadzenText>
+            </RadzenStack>
+            <RadzenBadge BadgeStyle="@UiHelpers.GetPlanBadgeStyle(_organization.Plan)" Text="@_organization.Plan.ToUpperInvariant()" />
+        </RadzenStack>
+
+        <RadzenRow Gap="1rem" AlignItems="Radzen.AlignItems.Center">
+            <RadzenColumn Size="12" SizeMD="8">
+                <RadzenStack Gap="0.5rem">
+                    <RadzenText TextStyle="TextStyle.Subtitle1">@GetPlanDescription(_organization.Plan)</RadzenText>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="2rem" Wrap="FlexWrap.Wrap">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Members</RadzenText>
+                            <RadzenText>@_organization.MemberCount / @FormatLimit(_usageStats?.MaxMembers ?? 0)</RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Projects</RadzenText>
+                            <RadzenText>Unlimited</RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">LRM Translation</RadzenText>
+                            <RadzenText>@UiHelpers.FormatNumber(_usageStats?.LrmCharsLimit ?? 0)/month</RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End">
+                    @if (_organization.Plan.ToLower() != "enterprise")
+                    {
+                        <RadzenButton ButtonStyle="ButtonStyle.Primary"
+                                      Icon="upgrade"
+                                      Text="Upgrade Plan"
+                                      Click="@(() => ShowUpgradeDialog(_organization.Plan.ToLower() == "team" ? "enterprise" : "team"))" />
+                    }
+                </RadzenStack>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenCard>
+
+    <!-- Usage Statistics -->
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+            <RadzenIcon Icon="analytics" />
+            <RadzenText TextStyle="TextStyle.H6">This Month's Usage</RadzenText>
+        </RadzenStack>
+
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">LRM TRANSLATION</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H5">@UiHelpers.FormatNumber(_usageStats?.LrmCharsUsed ?? 0)</RadzenText>
+                        <RadzenProgressBar Value="@UiHelpers.GetUsagePercentage(_usageStats?.LrmCharsUsed ?? 0, _usageStats?.LrmCharsLimit ?? 1)"
+                                           ProgressBarStyle="@UiHelpers.GetUsageProgressStyle(UiHelpers.GetUsagePercentage(_usageStats?.LrmCharsUsed ?? 0, _usageStats?.LrmCharsLimit ?? 1))"
+                                           ShowValue="false" Style="height: 6px;" />
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            of @UiHelpers.FormatNumber(_usageStats?.LrmCharsLimit ?? 0) limit
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">BYOK PROVIDERS</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H5">@UiHelpers.FormatNumber(_usageStats?.OtherCharsUsed ?? 0)</RadzenText>
+                        <RadzenProgressBar Value="@UiHelpers.GetUsagePercentage(_usageStats?.OtherCharsUsed ?? 0, _usageStats?.OtherCharsLimit ?? 1)"
+                                           ProgressBarStyle="@UiHelpers.GetUsageProgressStyle(UiHelpers.GetUsagePercentage(_usageStats?.OtherCharsUsed ?? 0, _usageStats?.OtherCharsLimit ?? 1))"
+                                           ShowValue="false" Style="height: 6px;" />
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            of @UiHelpers.FormatNumber(_usageStats?.OtherCharsLimit ?? 0) limit
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="2">
+                <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">PROJECTS</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H5">@(_usageStats?.ProjectCount ?? 0)</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">In this organization</RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="2">
+                <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">TEAM MEMBERS</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H5">@(_usageStats?.MemberCount ?? 0) / @(_usageStats?.MaxMembers == int.MaxValue ? "∞" : _usageStats?.MaxMembers.ToString() ?? "0")</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Active members</RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="2">
+                <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">BILLING CYCLE</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H5">@(_usageStats?.DaysRemaining ?? 0) days</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Until reset</RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenCard>
+
+    <!-- Member Usage Breakdown -->
+    @if (_memberUsage != null && _memberUsage.Any())
+    {
+        <RadzenCard class="rz-mb-4">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+                <RadzenIcon Icon="people" />
+                <RadzenText TextStyle="TextStyle.H6">Usage by Member</RadzenText>
+            </RadzenStack>
+
+            <RadzenDataGrid TItem="OrgMemberUsageDto" Data="@_memberUsage" Density="Density.Compact" AllowSorting="true">
+                <Columns>
+                    <RadzenDataGridColumn TItem="OrgMemberUsageDto" Title="Member" Width="auto">
+                        <Template Context="member">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--rz-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 0.75rem;">
+                                    @UiHelpers.GetInitials(member.UserName)
                                 </div>
-                                <div>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Projects</MudText>
-                                    <MudText Typo="Typo.body1">Unlimited</MudText>
-                                </div>
-                                <div>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">LRM Translation</MudText>
-                                    <MudText Typo="Typo.body1">@UiHelpers.FormatNumber(_usageStats?.LrmCharsLimit ?? 0)/month</MudText>
-                                </div>
-                            </MudStack>
-                        </MudStack>
-                    </MudItem>
-                    <MudItem xs="12" md="4" Class="d-flex align-center justify-end">
-                        @if (_organization.Plan.ToLower() != "enterprise")
-                        {
-                            <MudButton Variant="Variant.Filled"
-                                       Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Filled.Upgrade"
-                                       OnClick="@(() => ShowUpgradeDialog(_organization.Plan.ToLower() == "team" ? "enterprise" : "team"))">
-                                Upgrade Plan
-                            </MudButton>
-                        }
-                    </MudItem>
-                </MudGrid>
-            </MudCardContent>
-        </MudCard>
+                                <RadzenStack Gap="0">
+                                    <RadzenText TextStyle="TextStyle.Body2">@member.UserName</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@member.Email</RadzenText>
+                                </RadzenStack>
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="OrgMemberUsageDto" Property="LrmCharsUsed" Title="LRM Chars" Width="120px" TextAlign="TextAlign.End">
+                        <Template Context="member">@UiHelpers.FormatNumber(member.LrmCharsUsed)</Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="OrgMemberUsageDto" Property="ByokCharsUsed" Title="BYOK Chars" Width="120px" TextAlign="TextAlign.End">
+                        <Template Context="member">@UiHelpers.FormatNumber(member.ByokCharsUsed)</Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="OrgMemberUsageDto" Property="TotalCharsUsed" Title="Total" Width="120px" TextAlign="TextAlign.End">
+                        <Template Context="member"><strong>@UiHelpers.FormatNumber(member.TotalCharsUsed)</strong></Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenCard>
+    }
 
-        <!-- Usage Statistics -->
-        <MudCard Class="mb-6">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudIcon Icon="@Icons.Material.Filled.Analytics" />
-                        <MudText Typo="Typo.h6">This Month's Usage</MudText>
-                    </MudStack>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudGrid>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
-                            <MudStack Spacing="1">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">LRM TRANSLATION</MudText>
-                                <MudText Typo="Typo.h5">@UiHelpers.FormatNumber(_usageStats?.LrmCharsUsed ?? 0)</MudText>
-                                <MudProgressLinear Value="@UiHelpers.GetUsagePercentage(_usageStats?.LrmCharsUsed ?? 0, _usageStats?.LrmCharsLimit ?? 1)"
-                                                   Color="@UiHelpers.GetUsageColor(_usageStats?.LrmCharsUsed ?? 0, _usageStats?.LrmCharsLimit ?? 1)"
-                                                   Class="mt-2" />
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    of @UiHelpers.FormatNumber(_usageStats?.LrmCharsLimit ?? 0) limit
-                                </MudText>
-                            </MudStack>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
-                            <MudStack Spacing="1">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">BYOK PROVIDERS</MudText>
-                                <MudText Typo="Typo.h5">@UiHelpers.FormatNumber(_usageStats?.OtherCharsUsed ?? 0)</MudText>
-                                <MudProgressLinear Value="@UiHelpers.GetUsagePercentage(_usageStats?.OtherCharsUsed ?? 0, _usageStats?.OtherCharsLimit ?? 1)"
-                                                   Color="@UiHelpers.GetUsageColor(_usageStats?.OtherCharsUsed ?? 0, _usageStats?.OtherCharsLimit ?? 1)"
-                                                   Class="mt-2" />
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    of @UiHelpers.FormatNumber(_usageStats?.OtherCharsLimit ?? 0) limit
-                                </MudText>
-                            </MudStack>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
-                            <MudStack Spacing="1">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">PROJECTS</MudText>
-                                <MudText Typo="Typo.h5">@(_usageStats?.ProjectCount ?? 0)</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-                                    In this organization
-                                </MudText>
-                            </MudStack>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
-                            <MudStack Spacing="1">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">TEAM MEMBERS</MudText>
-                                <MudText Typo="Typo.h5">@(_usageStats?.MemberCount ?? 0) / @(_usageStats?.MaxMembers == int.MaxValue ? "∞" : _usageStats?.MaxMembers.ToString() ?? "0")</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-                                    Active members
-                                </MudText>
-                            </MudStack>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
-                            <MudStack Spacing="1">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">BILLING CYCLE</MudText>
-                                <MudText Typo="Typo.h5">@(_usageStats?.DaysRemaining ?? 0) days</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-                                    Until reset
-                                </MudText>
-                            </MudStack>
-                        </MudPaper>
-                    </MudItem>
-                </MudGrid>
-            </MudCardContent>
-        </MudCard>
+    <!-- Plan Comparison -->
+    <RadzenCard>
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+            <RadzenIcon Icon="compare" />
+            <RadzenText TextStyle="TextStyle.H6">Compare Plans</RadzenText>
+        </RadzenStack>
 
-        <!-- Member Usage Breakdown (for admins/owners) -->
-        @if (_memberUsage != null && _memberUsage.Any())
-        {
-            <MudCard Class="mb-6">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                            <MudIcon Icon="@Icons.Material.Filled.People" />
-                            <MudText Typo="Typo.h6">Usage by Member</MudText>
-                        </MudStack>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    <MudSimpleTable Dense="true" Hover="true" Elevation="0">
-                        <thead>
-                            <tr>
-                                <th>Member</th>
-                                <th style="text-align: right">LRM Chars</th>
-                                <th style="text-align: right">BYOK Chars</th>
-                                <th style="text-align: right">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var member in _memberUsage)
-                            {
-                                <tr>
-                                    <td>
-                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                            <MudAvatar Size="Size.Small" Color="@UiHelpers.GetHashColor(member.UserName)">
-                                                @UiHelpers.GetInitials(member.UserName)
-                                            </MudAvatar>
-                                            <MudStack Spacing="0">
-                                                <MudText Typo="Typo.body2">@member.UserName</MudText>
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary">@member.Email</MudText>
-                                            </MudStack>
-                                        </MudStack>
-                                    </td>
-                                    <td style="text-align: right">@UiHelpers.FormatNumber(member.LrmCharsUsed)</td>
-                                    <td style="text-align: right">@UiHelpers.FormatNumber(member.ByokCharsUsed)</td>
-                                    <td style="text-align: right"><strong>@UiHelpers.FormatNumber(member.TotalCharsUsed)</strong></td>
-                                </tr>
-                            }
-                        </tbody>
-                    </MudSimpleTable>
-                </MudCardContent>
-            </MudCard>
-        }
-
-        <!-- Plan Comparison -->
-        <MudCard>
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudIcon Icon="@Icons.Material.Filled.Compare" />
-                        <MudText Typo="Typo.h6">Compare Plans</MudText>
-                    </MudStack>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudSimpleTable Dense="true" Hover="true" Class="rounded-lg">
-                    <thead>
-                        <tr>
-                            <th>Feature</th>
-                            <th>
-                                <MudStack AlignItems="AlignItems.Center">
-                                    <MudText>Free</MudText>
-                                    @if (_organization.Plan.ToLower() == "free")
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">Current</MudChip>
-                                    }
-                                </MudStack>
-                            </th>
-                            <th>
-                                <MudStack AlignItems="AlignItems.Center">
-                                    <MudText>Team</MudText>
-                                    @if (_organization.Plan.ToLower() == "team")
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary">Current</MudChip>
-                                    }
-                                </MudStack>
-                            </th>
-                            <th>
-                                <MudStack AlignItems="AlignItems.Center">
-                                    <MudText>Enterprise</MudText>
-                                    @if (_organization.Plan.ToLower() == "enterprise")
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">Current</MudChip>
-                                    }
-                                </MudStack>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Team Members</td>
-                            <td><MudIcon Icon="@Icons.Material.Filled.Close" Color="Color.Default" Size="Size.Small" Title="Organizations require Team plan" /></td>
-                            <td>@FormatLimit(_subscription?.PlanLimits?.Team.MaxTeamMembers ?? 10)</td>
-                            <td>@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxTeamMembers ?? int.MaxValue)</td>
-                        </tr>
-                        <tr>
-                            <td>LRM Translation/month</td>
-                            <td>@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Free.TranslationChars ?? 5000)</td>
-                            <td>@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Team.TranslationChars ?? 50000)</td>
-                            <td>@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Enterprise.TranslationChars ?? 500000)</td>
-                        </tr>
-                        <tr>
-                            <td>Other Providers/month</td>
-                            <td>@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Free.OtherChars ?? 25000)</td>
-                            <td>@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Team.OtherChars ?? 250000)</td>
-                            <td>@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Enterprise.OtherChars ?? 2500000)</td>
-                        </tr>
-                        <tr>
-                            <td>Projects</td>
-                            <td>@FormatLimit(_subscription?.PlanLimits?.Free.MaxProjects ?? 3)</td>
-                            <td>@FormatLimit(_subscription?.PlanLimits?.Team.MaxProjects ?? int.MaxValue)</td>
-                            <td>@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxProjects ?? int.MaxValue)</td>
-                        </tr>
-                        <tr>
-                            <td>API Keys (BYOK)</td>
-                            <td>@FormatLimit(_subscription?.PlanLimits?.Free.MaxApiKeys ?? 3)</td>
-                            <td>@FormatLimit(_subscription?.PlanLimits?.Team.MaxApiKeys ?? 10)</td>
-                            <td>@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxApiKeys ?? int.MaxValue)</td>
-                        </tr>
-                        <tr>
-                            <td>API Access</td>
-                            <td><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-                            <td><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-                            <td><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-                        </tr>
-                        <tr>
-                            <td>Priority Support</td>
-                            <td><MudIcon Icon="@Icons.Material.Filled.Close" Color="Color.Default" Size="Size.Small" /></td>
-                            <td><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-                            <td><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-                        </tr>
-                        <tr>
-                            <td>SSO/SAML</td>
-                            <td><MudIcon Icon="@Icons.Material.Filled.Close" Color="Color.Default" Size="Size.Small" /></td>
-                            <td><MudIcon Icon="@Icons.Material.Filled.Close" Color="Color.Default" Size="Size.Small" /></td>
-                            <td><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-                        </tr>
-                        <tr>
-                            <td><strong>Price</strong></td>
-                            <td><strong>Free</strong></td>
-                            <td><strong>$@(_subscription?.PlanLimits?.Team.Price ?? 9)/month</strong></td>
-                            <td><strong>$@(_subscription?.PlanLimits?.Enterprise.Price ?? 29)/month</strong></td>
-                        </tr>
-                    </tbody>
-                </MudSimpleTable>
-            </MudCardContent>
-        </MudCard>
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 1px solid var(--rz-base-400);">
+                        <th style="text-align: left; padding: 0.75rem;">Feature</th>
+                        <th style="text-align: center; padding: 0.75rem;">
+                            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                <span>Free</span>
+                                @if (_organization.Plan.ToLower() == "free")
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="Current" />
+                                }
+                            </RadzenStack>
+                        </th>
+                        <th style="text-align: center; padding: 0.75rem;">
+                            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                <span>Team</span>
+                                @if (_organization.Plan.ToLower() == "team")
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Text="Current" />
+                                }
+                            </RadzenStack>
+                        </th>
+                        <th style="text-align: center; padding: 0.75rem;">
+                            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                <span>Enterprise</span>
+                                @if (_organization.Plan.ToLower() == "enterprise")
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="Current" />
+                                }
+                            </RadzenStack>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                        <td style="padding: 0.75rem;">Team Members</td>
+                        <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="close" Style="color: var(--rz-text-secondary-color);" /></td>
+                        <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Team.MaxTeamMembers ?? 10)</td>
+                        <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxTeamMembers ?? int.MaxValue)</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                        <td style="padding: 0.75rem;">LRM Translation/month</td>
+                        <td style="text-align: center; padding: 0.75rem;">@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Free.TranslationChars ?? 5000)</td>
+                        <td style="text-align: center; padding: 0.75rem;">@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Team.TranslationChars ?? 50000)</td>
+                        <td style="text-align: center; padding: 0.75rem;">@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Enterprise.TranslationChars ?? 500000)</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                        <td style="padding: 0.75rem;">Other Providers/month</td>
+                        <td style="text-align: center; padding: 0.75rem;">@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Free.OtherChars ?? 25000)</td>
+                        <td style="text-align: center; padding: 0.75rem;">@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Team.OtherChars ?? 250000)</td>
+                        <td style="text-align: center; padding: 0.75rem;">@UiHelpers.FormatNumber(_subscription?.PlanLimits?.Enterprise.OtherChars ?? 2500000)</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                        <td style="padding: 0.75rem;">Projects</td>
+                        <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Free.MaxProjects ?? 3)</td>
+                        <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Team.MaxProjects ?? int.MaxValue)</td>
+                        <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxProjects ?? int.MaxValue)</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                        <td style="padding: 0.75rem;">API Keys (BYOK)</td>
+                        <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Free.MaxApiKeys ?? 3)</td>
+                        <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Team.MaxApiKeys ?? 10)</td>
+                        <td style="text-align: center; padding: 0.75rem;">@FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxApiKeys ?? int.MaxValue)</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                        <td style="padding: 0.75rem;">API Access</td>
+                        <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="check" Style="color: var(--rz-success);" /></td>
+                        <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="check" Style="color: var(--rz-success);" /></td>
+                        <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="check" Style="color: var(--rz-success);" /></td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                        <td style="padding: 0.75rem;">Priority Support</td>
+                        <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="close" Style="color: var(--rz-text-secondary-color);" /></td>
+                        <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="check" Style="color: var(--rz-success);" /></td>
+                        <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="check" Style="color: var(--rz-success);" /></td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--rz-base-300);">
+                        <td style="padding: 0.75rem;">SSO/SAML</td>
+                        <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="close" Style="color: var(--rz-text-secondary-color);" /></td>
+                        <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="close" Style="color: var(--rz-text-secondary-color);" /></td>
+                        <td style="text-align: center; padding: 0.75rem;"><RadzenIcon Icon="check" Style="color: var(--rz-success);" /></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75rem;"><strong>Price</strong></td>
+                        <td style="text-align: center; padding: 0.75rem;"><strong>Free</strong></td>
+                        <td style="text-align: center; padding: 0.75rem;"><strong>$@(_subscription?.PlanLimits?.Team.Price ?? 9)/month</strong></td>
+                        <td style="text-align: center; padding: 0.75rem;"><strong>$@(_subscription?.PlanLimits?.Enterprise.Price ?? 29)/month</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </RadzenCard>
 }
-
-<!-- Upgrade Dialog -->
-<MudDialog @bind-Visible="_upgradeDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Upgrade" Color="Color.Primary" />
-            <MudText Typo="Typo.h6">Upgrade to @(_selectedPlan?.ToUpperInvariant())</MudText>
-        </MudStack>
-    </TitleContent>
-    <DialogContent>
-        @if (_subscription?.BillingEnabled == true)
-        {
-            <MudText Typo="Typo.body1" Class="mb-3">
-                You'll be redirected to our secure payment page powered by Stripe.
-            </MudText>
-            <MudAlert Severity="Severity.Info" Class="mb-3">
-                @if (_selectedPlan == "team")
-                {
-                    <MudText>Team plan: $@(_subscription?.PlanLimits?.Team.Price ?? 9)/month with @UiHelpers.FormatNumber(_subscription?.PlanLimits?.Team.TranslationChars ?? 50000) LRM translation characters and @FormatLimit(_subscription?.PlanLimits?.Team.MaxTeamMembers ?? 10) team members.</MudText>
-                }
-                else if (_selectedPlan == "enterprise")
-                {
-                    <MudText>Enterprise plan: $@(_subscription?.PlanLimits?.Enterprise.Price ?? 29)/month with @UiHelpers.FormatNumber(_subscription?.PlanLimits?.Enterprise.TranslationChars ?? 500000) LRM translation characters and @FormatLimit(_subscription?.PlanLimits?.Enterprise.MaxTeamMembers ?? int.MaxValue).ToLower() team members.</MudText>
-                }
-            </MudAlert>
-        }
-        else
-        {
-            <MudAlert Severity="Severity.Info" Class="mb-4">
-                Billing integration coming soon! Contact us to upgrade your plan.
-            </MudAlert>
-            <MudText Typo="Typo.body1">
-                For now, please contact our sales team to upgrade your organization's plan.
-            </MudText>
-            <MudStack Class="mt-4" Spacing="2">
-                <MudTextField Value="@("sales@lrmcloud.com")" Label="Email" ReadOnly="true" Variant="Variant.Outlined" />
-            </MudStack>
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CloseUpgradeDialog">Cancel</MudButton>
-        @if (_subscription?.BillingEnabled == true)
-        {
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       OnClick="@StartCheckout" Disabled="@_isProcessing">
-                @if (_isProcessing)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                }
-                Proceed to Payment
-            </MudButton>
-        }
-        else
-        {
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="mailto:sales@lrmcloud.com?subject=LRM Cloud Plan Upgrade">
-                Contact Sales
-            </MudButton>
-        }
-    </DialogActions>
-</MudDialog>
 
 @code {
     [Parameter]
@@ -412,10 +322,6 @@ else
     private OrganizationUsageDto? _usageStats;
     private List<OrgMemberUsageDto>? _memberUsage;
     private bool _isLoading = true;
-    private bool _isProcessing;
-    private bool _upgradeDialogVisible;
-    private string? _selectedPlan;
-    private List<BreadcrumbItem> _breadcrumbs = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -438,20 +344,10 @@ else
             _subscription = await subscriptionTask;
             _usageStats = await usageTask;
             _memberUsage = await memberUsageTask;
-
-            if (_organization != null)
-            {
-                _breadcrumbs = new List<BreadcrumbItem>
-                {
-                    new("Organizations", "organizations"),
-                    new(_organization.Name, $"organizations/{OrganizationId}"),
-                    new("Billing", null, disabled: true)
-                };
-            }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load billing info: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load billing info: {ex.Message}");
         }
         finally
         {
@@ -459,49 +355,20 @@ else
         }
     }
 
-    private void ShowUpgradeDialog(string plan = "team")
+    private async Task ShowUpgradeDialog(string plan = "team")
     {
-        _selectedPlan = plan;
-        _upgradeDialogVisible = true;
-    }
-
-    private void CloseUpgradeDialog()
-    {
-        _upgradeDialogVisible = false;
-        _selectedPlan = null;
-    }
-
-    private async Task StartCheckout()
-    {
-        if (string.IsNullOrEmpty(_selectedPlan)) return;
-
-        _isProcessing = true;
-        try
-        {
-            var baseUrl = Navigation.BaseUri.TrimEnd('/');
-            var result = await BillingService.CreateCheckoutAsync(
-                _selectedPlan,
-                $"{baseUrl}/organizations/{OrganizationId}/billing?success=true",
-                $"{baseUrl}/organizations/{OrganizationId}/billing?canceled=true"
-            );
-
-            if (result?.SessionUrl != null)
+        var result = await DialogService.OpenAsync<UpgradePlanDialog>("Upgrade Plan",
+            new Dictionary<string, object>
             {
-                await JS.InvokeVoidAsync("open", result.SessionUrl, "_self");
-            }
-            else
-            {
-                Snackbar.Add("Failed to create checkout session", Severity.Error);
-            }
-        }
-        catch (Exception ex)
+                { "OrganizationId", OrganizationId },
+                { "SelectedPlan", plan },
+                { "Subscription", _subscription }
+            },
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result == true)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
-        }
-        finally
-        {
-            _isProcessing = false;
-            CloseUpgradeDialog();
+            await LoadDataAsync();
         }
     }
 
@@ -513,9 +380,6 @@ else
         _ => "Standard plan"
     };
 
-    /// <summary>
-    /// Formats a limit value, showing "Unlimited" for int.MaxValue or "Up to X" for finite values.
-    /// </summary>
     private static string FormatLimit(int limit) => limit >= int.MaxValue - 1
         ? "Unlimited"
         : limit <= 0

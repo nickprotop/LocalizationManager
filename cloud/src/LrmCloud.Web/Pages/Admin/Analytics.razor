@@ -1,322 +1,316 @@
 @page "/admin/analytics"
 @using LrmCloud.Shared.DTOs.Admin
 @using LrmCloud.Web.Services
+@using LrmCloud.Web.Helpers
 @inject AdminService AdminService
 @inject NavigationManager Navigation
 @attribute [Authorize]
 
 <PageTitle>Analytics - LRM Cloud</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-2">
-    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Class="mr-2" Style="vertical-align: middle;" />
-    Analytics
-</MudText>
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+    <RadzenIcon Icon="trending_up" />
+    <RadzenText TextStyle="TextStyle.H4">Analytics</RadzenText>
+</RadzenStack>
+<RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-4">
     Revenue, user growth, and usage trends.
-</MudText>
+</RadzenText>
 
 @if (_isLoading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
 }
 else
 {
-    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
-        @* Revenue Tab *@
-        <MudTabPanel Text="Revenue" Icon="@Icons.Material.Filled.AttachMoney">
-            @if (_revenue != null)
-            {
-                <MudGrid Class="mb-4">
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Class="pa-4" Elevation="1">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Current MRR</MudText>
-                            <MudText Typo="Typo.h4" Color="Color.Success">$@_revenue.CurrentMrr.ToString("N2")</MudText>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Class="pa-4" Elevation="1">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Previous MRR</MudText>
-                            <MudText Typo="Typo.h4">$@_revenue.PreviousMrr.ToString("N2")</MudText>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Class="pa-4" Elevation="1">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Growth</MudText>
-                            <MudText Typo="Typo.h4" Color="@(_revenue.MrrGrowthPercent >= 0 ? Color.Success : Color.Error)">
-                                @(_revenue.MrrGrowthPercent >= 0 ? "+" : "")@_revenue.MrrGrowthPercent.ToString("N1")%
-                            </MudText>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Class="pa-4" Elevation="1">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Paid Users</MudText>
-                            <MudText Typo="Typo.h4">@_revenue.MrrHistory.LastOrDefault()?.PaidUsers.ToString("N0")</MudText>
-                        </MudPaper>
-                    </MudItem>
-                </MudGrid>
+    <RadzenTabs @bind-SelectedIndex="_selectedTab" RenderMode="TabRenderMode.Client">
+        <Tabs>
+            @* Revenue Tab *@
+            <RadzenTabsItem Text="Revenue" Icon="attach_money">
+                @if (_revenue != null)
+                {
+                    <RadzenRow Gap="1rem" class="rz-p-4 rz-mb-4">
+                        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                            <RadzenCard>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Current MRR</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4" Style="color: var(--rz-success);">$@_revenue.CurrentMrr.ToString("N2")</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                            <RadzenCard>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Previous MRR</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4">$@_revenue.PreviousMrr.ToString("N2")</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                            <RadzenCard>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Growth</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4" Style="@(GetGrowthStyle(_revenue.MrrGrowthPercent))">
+                                    @(_revenue.MrrGrowthPercent >= 0 ? "+" : "")@_revenue.MrrGrowthPercent.ToString("N1")%
+                                </RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                            <RadzenCard>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Paid Users</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4">@_revenue.MrrHistory.LastOrDefault()?.PaidUsers.ToString("N0")</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                    </RadzenRow>
 
-                @* Revenue by Plan *@
-                <MudPaper Class="pa-4 mb-4" Elevation="1">
-                    <MudText Typo="Typo.h6" Class="mb-3">Revenue by Plan</MudText>
-                    @if (_revenue.RevenueByPlan.Any())
-                    {
-                        <MudSimpleTable Dense="true" Bordered="true">
-                            <thead>
-                                <tr>
-                                    <th>Plan</th>
-                                    <th>Monthly Revenue</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var (plan, amount) in _revenue.RevenueByPlan)
-                                {
-                                    <tr>
-                                        <td>
-                                            <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(plan)">@plan.ToUpper()</MudChip>
-                                        </td>
-                                        <td>$@amount.ToString("N2")</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </MudSimpleTable>
-                    }
-                    else
-                    {
-                        <MudAlert Severity="Severity.Info">No paid subscriptions yet</MudAlert>
-                    }
-                </MudPaper>
+                    @* Revenue by Plan *@
+                    <RadzenCard class="rz-mb-4">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">Revenue by Plan</RadzenText>
+                        @if (_revenue.RevenueByPlan.Any())
+                        {
+                            <RadzenDataGrid TItem="KeyValuePair<string, decimal>" Data="@_revenue.RevenueByPlan.ToList()"
+                                            Density="Density.Compact" AllowSorting="false">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="KeyValuePair<string, decimal>" Title="Plan">
+                                        <Template Context="kv">
+                                            <RadzenBadge BadgeStyle="@GetPlanBadgeStyle(kv.Key)" Text="@kv.Key.ToUpper()" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="KeyValuePair<string, decimal>" Title="Monthly Revenue">
+                                        <Template Context="kv">$@kv.Value.ToString("N2")</Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        }
+                        else
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">No paid subscriptions yet</RadzenAlert>
+                        }
+                    </RadzenCard>
 
-                @* MRR History Chart *@
-                <MudPaper Class="pa-4" Elevation="1">
-                    <MudText Typo="Typo.h6" Class="mb-3">MRR History (12 Months)</MudText>
-                    @if (_revenue.MrrHistory.Any())
-                    {
-                        <MudChart ChartType="ChartType.Line"
-                                  ChartSeries="@_mrrChartSeries"
-                                  XAxisLabels="@_mrrChartLabels"
-                                  Width="100%"
-                                  Height="300px"
-                                  ChartOptions="@_chartOptions" />
-                    }
-                    else
-                    {
-                        <MudAlert Severity="Severity.Info">No historical data available</MudAlert>
-                    }
-                </MudPaper>
-            }
-            else
-            {
-                <MudAlert Severity="Severity.Warning">Failed to load revenue data</MudAlert>
-            }
-        </MudTabPanel>
+                    @* MRR History *@
+                    <RadzenCard>
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">MRR History (12 Months)</RadzenText>
+                        @if (_revenue.MrrHistory.Any())
+                        {
+                            <RadzenDataGrid TItem="MrrDataPoint" Data="@_revenue.MrrHistory" Density="Density.Compact" AllowSorting="false">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="MrrDataPoint" Title="Month">
+                                        <Template Context="entry">@entry.Month.ToString("MMM yyyy")</Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="MrrDataPoint" Title="MRR">
+                                        <Template Context="entry">$@entry.Mrr.ToString("N2")</Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="MrrDataPoint" Property="PaidUsers" Title="Paid Users" />
+                                </Columns>
+                            </RadzenDataGrid>
+                        }
+                        else
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">No historical data available</RadzenAlert>
+                        }
+                    </RadzenCard>
+                }
+                else
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">Failed to load revenue data</RadzenAlert>
+                }
+            </RadzenTabsItem>
 
-        @* Users Tab *@
-        <MudTabPanel Text="Users" Icon="@Icons.Material.Filled.People">
-            @if (_users != null)
-            {
-                <MudGrid Class="mb-4">
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Class="pa-4" Elevation="1">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Total Users</MudText>
-                            <MudText Typo="Typo.h4">@_users.TotalUsers.ToString("N0")</MudText>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Class="pa-4" Elevation="1">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">New This Month</MudText>
-                            <MudText Typo="Typo.h4" Color="Color.Success">+@_users.NewUsersThisMonth.ToString("N0")</MudText>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Class="pa-4" Elevation="1">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Growth Rate</MudText>
-                            <MudText Typo="Typo.h4" Color="@(_users.GrowthRate >= 0 ? Color.Success : Color.Error)">
-                                @(_users.GrowthRate >= 0 ? "+" : "")@_users.GrowthRate.ToString("N1")%
-                            </MudText>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Class="pa-4" Elevation="1">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Churn Rate</MudText>
-                            <MudText Typo="Typo.h4" Color="@(_users.ChurnRate > 5 ? Color.Error : Color.Default)">
-                                @_users.ChurnRate.ToString("N1")%
-                            </MudText>
-                        </MudPaper>
-                    </MudItem>
-                </MudGrid>
+            @* Users Tab *@
+            <RadzenTabsItem Text="Users" Icon="people">
+                @if (_users != null)
+                {
+                    <RadzenRow Gap="1rem" class="rz-p-4 rz-mb-4">
+                        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                            <RadzenCard>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Total Users</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4">@_users.TotalUsers.ToString("N0")</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                            <RadzenCard>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">New This Month</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4" Style="color: var(--rz-success);">+@_users.NewUsersThisMonth.ToString("N0")</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                            <RadzenCard>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Growth Rate</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4" Style="@(GetGrowthStyle(_users.GrowthRate))">
+                                    @(_users.GrowthRate >= 0 ? "+" : "")@_users.GrowthRate.ToString("N1")%
+                                </RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                            <RadzenCard>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Churn Rate</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4" Style="@(GetChurnStyle(_users.ChurnRate))">
+                                    @_users.ChurnRate.ToString("N1")%
+                                </RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                    </RadzenRow>
 
-                @* User Growth Chart *@
-                <MudPaper Class="pa-4 mb-4" Elevation="1">
-                    <MudText Typo="Typo.h6" Class="mb-3">User Growth (12 Months)</MudText>
-                    @if (_users.GrowthHistory.Any())
-                    {
-                        <MudChart ChartType="ChartType.Bar"
-                                  ChartSeries="@_userGrowthChartSeries"
-                                  XAxisLabels="@_userGrowthChartLabels"
-                                  Width="100%"
-                                  Height="300px"
-                                  ChartOptions="@_chartOptions" />
-                    }
-                    else
-                    {
-                        <MudAlert Severity="Severity.Info">No historical data available</MudAlert>
-                    }
-                </MudPaper>
+                    @* User Growth History *@
+                    <RadzenCard class="rz-mb-4">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">User Growth (12 Months)</RadzenText>
+                        @if (_users.GrowthHistory.Any())
+                        {
+                            <RadzenDataGrid TItem="UserGrowthDataPoint" Data="@_users.GrowthHistory" Density="Density.Compact" AllowSorting="false">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="UserGrowthDataPoint" Title="Month">
+                                        <Template Context="entry">@entry.Month.ToString("MMM yyyy")</Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="UserGrowthDataPoint" Property="NewUsers" Title="New Users" />
+                                    <RadzenDataGridColumn TItem="UserGrowthDataPoint" Property="ActiveUsers" Title="Active Users" />
+                                    <RadzenDataGridColumn TItem="UserGrowthDataPoint" Property="TotalUsers" Title="Total Users" />
+                                </Columns>
+                            </RadzenDataGrid>
+                        }
+                        else
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">No historical data available</RadzenAlert>
+                        }
+                    </RadzenCard>
 
-                @* Conversion Funnel *@
-                <MudPaper Class="pa-4" Elevation="1">
-                    <MudText Typo="Typo.h6" Class="mb-3">Plan Distribution</MudText>
-                    @if (_users.ConversionFunnel.Any())
-                    {
-                        <MudSimpleTable Dense="true" Bordered="true">
-                            <thead>
-                                <tr>
-                                    <th>From Plan</th>
-                                    <th>To Plan</th>
-                                    <th>Count</th>
-                                    <th>Rate</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var conversion in _users.ConversionFunnel)
-                                {
-                                    <tr>
-                                        <td><MudChip T="string" Size="Size.Small" Color="@GetPlanColor(conversion.FromPlan)">@conversion.FromPlan.ToUpper()</MudChip></td>
-                                        <td><MudChip T="string" Size="Size.Small" Color="@GetPlanColor(conversion.ToPlan)">@conversion.ToPlan.ToUpper()</MudChip></td>
-                                        <td>@conversion.Count.ToString("N0")</td>
-                                        <td>@conversion.Rate.ToString("N1")%</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </MudSimpleTable>
-                    }
-                    else
-                    {
-                        <MudAlert Severity="Severity.Info">No conversion data available</MudAlert>
-                    }
-                </MudPaper>
-            }
-            else
-            {
-                <MudAlert Severity="Severity.Warning">Failed to load user data</MudAlert>
-            }
-        </MudTabPanel>
+                    @* Conversion Funnel *@
+                    <RadzenCard>
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">Plan Distribution</RadzenText>
+                        @if (_users.ConversionFunnel.Any())
+                        {
+                            <RadzenDataGrid TItem="ConversionDataPoint" Data="@_users.ConversionFunnel" Density="Density.Compact" AllowSorting="false">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="ConversionDataPoint" Title="From Plan">
+                                        <Template Context="entry">
+                                            <RadzenBadge BadgeStyle="@GetPlanBadgeStyle(entry.FromPlan)" Text="@entry.FromPlan.ToUpper()" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="ConversionDataPoint" Title="To Plan">
+                                        <Template Context="entry">
+                                            <RadzenBadge BadgeStyle="@GetPlanBadgeStyle(entry.ToPlan)" Text="@entry.ToPlan.ToUpper()" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="ConversionDataPoint" Property="Count" Title="Count" />
+                                    <RadzenDataGridColumn TItem="ConversionDataPoint" Title="Rate">
+                                        <Template Context="entry">@entry.Rate.ToString("N1")%</Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        }
+                        else
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">No conversion data available</RadzenAlert>
+                        }
+                    </RadzenCard>
+                }
+                else
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">Failed to load user data</RadzenAlert>
+                }
+            </RadzenTabsItem>
 
-        @* Usage Tab *@
-        <MudTabPanel Text="Usage" Icon="@Icons.Material.Filled.DataUsage">
-            @if (_usage != null)
-            {
-                <MudGrid Class="mb-4">
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Class="pa-4" Elevation="1">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Total Chars (30 days)</MudText>
-                            <MudText Typo="Typo.h4">@FormatNumber(_usage.TotalCharsThisMonth)</MudText>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Class="pa-4" Elevation="1">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">LRM Chars</MudText>
-                            <MudText Typo="Typo.h4" Color="Color.Primary">@FormatNumber(_usage.TotalLrmChars)</MudText>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Class="pa-4" Elevation="1">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">BYOK Chars</MudText>
-                            <MudText Typo="Typo.h4" Color="Color.Info">@FormatNumber(_usage.TotalByokChars)</MudText>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" sm="6" md="3">
-                        <MudPaper Class="pa-4" Elevation="1">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Growth</MudText>
-                            <MudText Typo="Typo.h4" Color="@(_usage.GrowthPercent >= 0 ? Color.Success : Color.Error)">
-                                @(_usage.GrowthPercent >= 0 ? "+" : "")@_usage.GrowthPercent.ToString("N1")%
-                            </MudText>
-                        </MudPaper>
-                    </MudItem>
-                </MudGrid>
+            @* Usage Tab *@
+            <RadzenTabsItem Text="Usage" Icon="data_usage">
+                @if (_usage != null)
+                {
+                    <RadzenRow Gap="1rem" class="rz-p-4 rz-mb-4">
+                        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                            <RadzenCard>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Total Chars (30 days)</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4">@UiHelpers.FormatNumber(_usage.TotalCharsThisMonth)</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                            <RadzenCard>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">LRM Chars</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4" Style="color: var(--rz-primary);">@UiHelpers.FormatNumber(_usage.TotalLrmChars)</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                            <RadzenCard>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">BYOK Chars</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4" Style="color: var(--rz-info);">@UiHelpers.FormatNumber(_usage.TotalByokChars)</RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                            <RadzenCard>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Growth</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4" Style="@(GetGrowthStyle(_usage.GrowthPercent))">
+                                    @(_usage.GrowthPercent >= 0 ? "+" : "")@_usage.GrowthPercent.ToString("N1")%
+                                </RadzenText>
+                            </RadzenCard>
+                        </RadzenColumn>
+                    </RadzenRow>
 
-                @* Usage by Provider *@
-                <MudPaper Class="pa-4 mb-4" Elevation="1">
-                    <MudText Typo="Typo.h6" Class="mb-3">Usage by Provider</MudText>
-                    @if (_usage.UsageByProvider.Any())
-                    {
-                        <MudSimpleTable Dense="true" Bordered="true">
-                            <thead>
-                                <tr>
-                                    <th>Provider</th>
-                                    <th>Characters</th>
-                                    <th>%</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @{
-                                    var totalProviderChars = _usage.UsageByProvider.Values.Sum();
-                                }
-                                @foreach (var (provider, chars) in _usage.UsageByProvider.OrderByDescending(x => x.Value))
-                                {
-                                    var percent = totalProviderChars > 0 ? (chars * 100.0 / totalProviderChars) : 0;
-                                    <tr>
-                                        <td>@provider</td>
-                                        <td>@FormatNumber(chars)</td>
-                                        <td>@percent.ToString("N1")%</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </MudSimpleTable>
-                    }
-                    else
-                    {
-                        <MudAlert Severity="Severity.Info">No usage data available</MudAlert>
-                    }
-                </MudPaper>
+                    @* Usage by Provider *@
+                    <RadzenCard class="rz-mb-4">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">Usage by Provider</RadzenText>
+                        @if (_usage.UsageByProvider.Any())
+                        {
+                            var totalProviderChars = _usage.UsageByProvider.Values.Sum();
+                            <RadzenDataGrid TItem="KeyValuePair<string, long>" Data="@_usage.UsageByProvider.OrderByDescending(x => x.Value).ToList()"
+                                            Density="Density.Compact" AllowSorting="false">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="KeyValuePair<string, long>" Title="Provider">
+                                        <Template Context="kv">@kv.Key</Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="KeyValuePair<string, long>" Title="Characters">
+                                        <Template Context="kv">@UiHelpers.FormatNumber(kv.Value)</Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="KeyValuePair<string, long>" Title="%">
+                                        <Template Context="kv">
+                                            @((totalProviderChars > 0 ? kv.Value * 100.0 / totalProviderChars : 0).ToString("N1"))%
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        }
+                        else
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">No usage data available</RadzenAlert>
+                        }
+                    </RadzenCard>
 
-                @* Daily Usage Chart *@
-                <MudPaper Class="pa-4" Elevation="1">
-                    <MudText Typo="Typo.h6" Class="mb-3">Daily Usage (30 Days)</MudText>
-                    @if (_usage.DailyTrends.Any())
-                    {
-                        <MudChart ChartType="ChartType.Line"
-                                  ChartSeries="@_usageChartSeries"
-                                  XAxisLabels="@_usageChartLabels"
-                                  Width="100%"
-                                  Height="300px"
-                                  ChartOptions="@_chartOptions" />
-                    }
-                    else
-                    {
-                        <MudAlert Severity="Severity.Info">No daily usage data available</MudAlert>
-                    }
-                </MudPaper>
-            }
-            else
-            {
-                <MudAlert Severity="Severity.Warning">Failed to load usage data</MudAlert>
-            }
-        </MudTabPanel>
-    </MudTabs>
+                    @* Daily Usage *@
+                    <RadzenCard>
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">Daily Usage (30 Days)</RadzenText>
+                        @if (_usage.DailyTrends.Any())
+                        {
+                            <RadzenDataGrid TItem="UsageTrendDataPoint" Data="@_usage.DailyTrends.TakeLast(10).ToList()"
+                                            Density="Density.Compact" AllowSorting="false">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="UsageTrendDataPoint" Title="Date">
+                                        <Template Context="entry">@entry.Date.ToString("MMM dd")</Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="UsageTrendDataPoint" Title="LRM Chars">
+                                        <Template Context="entry">@UiHelpers.FormatNumber(entry.LrmChars)</Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="UsageTrendDataPoint" Title="BYOK Chars">
+                                        <Template Context="entry">@UiHelpers.FormatNumber(entry.ByokChars)</Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="UsageTrendDataPoint" Title="Total">
+                                        <Template Context="entry">@UiHelpers.FormatNumber(entry.LrmChars + entry.ByokChars)</Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-2">Showing last 10 days</RadzenText>
+                        }
+                        else
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">No daily usage data available</RadzenAlert>
+                        }
+                    </RadzenCard>
+                }
+                else
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">Failed to load usage data</RadzenAlert>
+                }
+            </RadzenTabsItem>
+        </Tabs>
+    </RadzenTabs>
 }
 
 @code {
     private bool _isLoading = true;
+    private int _selectedTab;
     private RevenueAnalyticsDto? _revenue;
     private UserAnalyticsDto? _users;
     private UsageAnalyticsDto? _usage;
-
-    // Chart data
-    private List<ChartSeries> _mrrChartSeries = new();
-    private string[] _mrrChartLabels = Array.Empty<string>();
-
-    private List<ChartSeries> _userGrowthChartSeries = new();
-    private string[] _userGrowthChartLabels = Array.Empty<string>();
-
-    private List<ChartSeries> _usageChartSeries = new();
-    private string[] _usageChartLabels = Array.Empty<string>();
-
-    private ChartOptions _chartOptions = new()
-    {
-        YAxisTicks = 5,
-        MaxNumYAxisTicks = 5
-    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -337,8 +331,6 @@ else
             _revenue = await revenueTask;
             _users = await usersTask;
             _usage = await usageTask;
-
-            BuildCharts();
         }
         finally
         {
@@ -346,58 +338,16 @@ else
         }
     }
 
-    private void BuildCharts()
+    private static BadgeStyle GetPlanBadgeStyle(string plan) => plan.ToLower() switch
     {
-        // MRR Chart
-        if (_revenue?.MrrHistory != null && _revenue.MrrHistory.Any())
-        {
-            _mrrChartLabels = _revenue.MrrHistory.Select(m => m.Month.ToString("MMM yy")).ToArray();
-            _mrrChartSeries = new List<ChartSeries>
-            {
-                new ChartSeries { Name = "MRR ($)", Data = _revenue.MrrHistory.Select(m => (double)m.Mrr).ToArray() }
-            };
-        }
-
-        // User Growth Chart
-        if (_users?.GrowthHistory != null && _users.GrowthHistory.Any())
-        {
-            _userGrowthChartLabels = _users.GrowthHistory.Select(m => m.Month.ToString("MMM yy")).ToArray();
-            _userGrowthChartSeries = new List<ChartSeries>
-            {
-                new ChartSeries { Name = "New Users", Data = _users.GrowthHistory.Select(m => (double)m.NewUsers).ToArray() },
-                new ChartSeries { Name = "Active Users", Data = _users.GrowthHistory.Select(m => (double)m.ActiveUsers).ToArray() }
-            };
-        }
-
-        // Usage Chart
-        if (_usage?.DailyTrends != null && _usage.DailyTrends.Any())
-        {
-            // Take every 3rd day to avoid label crowding
-            var sampledTrends = _usage.DailyTrends.Where((_, i) => i % 3 == 0).ToList();
-            _usageChartLabels = sampledTrends.Select(d => d.Date.ToString("MM/dd")).ToArray();
-            _usageChartSeries = new List<ChartSeries>
-            {
-                new ChartSeries { Name = "LRM Chars", Data = sampledTrends.Select(d => (double)d.LrmChars / 1000).ToArray() },
-                new ChartSeries { Name = "BYOK Chars", Data = sampledTrends.Select(d => (double)d.ByokChars / 1000).ToArray() }
-            };
-        }
-    }
-
-    private static Color GetPlanColor(string plan) => plan.ToLower() switch
-    {
-        "enterprise" => Color.Success,
-        "team" => Color.Primary,
-        _ => Color.Default
+        "enterprise" => BadgeStyle.Success,
+        "team" => BadgeStyle.Primary,
+        _ => BadgeStyle.Light
     };
 
-    private static string FormatNumber(long number)
-    {
-        if (number >= 1_000_000_000)
-            return $"{number / 1_000_000_000.0:F1}B";
-        if (number >= 1_000_000)
-            return $"{number / 1_000_000.0:F1}M";
-        if (number >= 1_000)
-            return $"{number / 1_000.0:F1}K";
-        return number.ToString("N0");
-    }
+    private static string GetGrowthStyle(decimal value) =>
+        $"color: {(value >= 0 ? "var(--rz-success)" : "var(--rz-danger)")}";
+
+    private static string GetChurnStyle(decimal value) =>
+        $"color: {(value > 5 ? "var(--rz-danger)" : "inherit")}";
 }

@@ -4,130 +4,106 @@
 @inject ProjectService ProjectService
 @inject LimitsService LimitsService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 
 <PageTitle>Projects - LRM Cloud</PageTitle>
 
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">Projects</MudText>
-    <MudTooltip Text="@_limitMessage" Disabled="@_canCreateProject">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreateDialog" Disabled="@(!_canCreateProject)">
-            New Project
-        </MudButton>
-    </MudTooltip>
-</MudStack>
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.H4">Projects</RadzenText>
+    <RadzenButton Variant="Radzen.Variant.Filled" Icon="add" Text="New Project" Click="@OpenCreateDialog" Disabled="@(!_canCreateProject)" title="@_limitMessage" />
+</RadzenStack>
 
-<MudStack Row="true" Class="mb-4" Spacing="2">
-    <MudTextField @bind-Value="_searchText"
-                  Placeholder="Search projects..."
-                  Variant="Variant.Outlined"
-                  Adornment="Adornment.Start"
-                  AdornmentIcon="@Icons.Material.Filled.Search"
-                  Immediate="true"
-                  DebounceInterval="300"
-                  Class="flex-grow-1" />
-    <MudSelect @bind-Value="_formatFilter"
-               Label="Format"
-               Variant="Variant.Outlined"
-               Style="min-width: 150px;">
-        <MudSelectItem Value="@("")">All Formats</MudSelectItem>
-        <MudSelectItem Value="@("resx")">.resx</MudSelectItem>
-        <MudSelectItem Value="@("json")">JSON</MudSelectItem>
-        <MudSelectItem Value="@("i18next")">i18next</MudSelectItem>
-    </MudSelect>
-</MudStack>
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" class="rz-mb-4" Gap="0.5rem">
+    <RadzenTextBox @bind-Value="_searchText" Placeholder="Search projects..." Style="flex: 1;" Change="@(_ => StateHasChanged())" />
+    <RadzenDropDown @bind-Value="_formatFilter" Data="@_formatOptions" TextProperty="Text" ValueProperty="Value" Style="min-width: 150px;" Placeholder="All Formats" AllowClear="true" Change="@(_ => StateHasChanged())" />
+</RadzenStack>
 
 @if (_isLoading)
 {
-    <MudGrid>
+    <RadzenRow Gap="1rem">
         @for (int i = 0; i < 6; i++)
         {
-            <MudItem xs="12" sm="6" md="4">
-                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="180px" />
-            </MudItem>
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
+                <RadzenCard Style="height: 180px;">
+                    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+                </RadzenCard>
+            </RadzenColumn>
         }
-    </MudGrid>
+    </RadzenRow>
 }
 else if (!FilteredProjects.Any())
 {
-    <MudPaper Class="pa-4" Elevation="2">
-        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="py-8">
+    <RadzenCard>
+        <RadzenStack AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.Center" class="rz-py-8">
             @if (_projects.Count == 0)
             {
-                <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Size="Size.Large" Color="Color.Secondary" />
-                <MudText Typo="Typo.subtitle1" Color="Color.Secondary">No projects yet</MudText>
-                <MudTooltip Text="@_limitMessage" Disabled="@_canCreateProject">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreateDialog" Class="mt-2" Disabled="@(!_canCreateProject)">
-                        Create Your First Project
-                    </MudButton>
-                </MudTooltip>
+                <RadzenIcon Icon="folder_open" Style="font-size: 3rem; color: var(--rz-text-secondary-color);" />
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-color-secondary">No projects yet</RadzenText>
+                <RadzenButton Variant="Radzen.Variant.Filled" Icon="add" Text="Create Your First Project" Click="@OpenCreateDialog" class="rz-mt-2" Disabled="@(!_canCreateProject)" title="@_limitMessage" />
             }
             else
             {
-                <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
-                <MudText Typo="Typo.subtitle1" Color="Color.Secondary">No projects match your search</MudText>
-                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ClearFilters" Class="mt-2">
-                    Clear Filters
-                </MudButton>
+                <RadzenIcon Icon="search_off" Style="font-size: 3rem; color: var(--rz-text-secondary-color);" />
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-color-secondary">No projects match your search</RadzenText>
+                <RadzenButton Variant="Radzen.Variant.Text" Text="Clear Filters" Click="ClearFilters" class="rz-mt-2" />
             }
-        </MudStack>
-    </MudPaper>
+        </RadzenStack>
+    </RadzenCard>
 }
 else
 {
-    <MudGrid>
+    <RadzenRow Gap="1rem">
         @foreach (var project in FilteredProjects)
         {
-            <MudItem xs="12" sm="6" md="4">
-                <MudCard Elevation="2" Class="cursor-pointer" @onclick="@(() => NavigateToProject(project.Id))">
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">@project.Name</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
+                <RadzenCard Style="cursor: pointer;" @onclick="@(() => NavigateToProject(project.Id))">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
+                        <div>
+                            <RadzenText TextStyle="TextStyle.H6">@project.Name</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
                                 @(project.OrganizationName ?? "Personal")
-                            </MudText>
-                        </CardHeaderContent>
-                        <CardHeaderActions>
-                            <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetFormatColor(project.Format)">@project.Format</MudChip>
-                        </CardHeaderActions>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        @if (!string.IsNullOrEmpty(project.Description))
-                        {
-                            <MudText Typo="Typo.body2" Class="mb-2" Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                @project.Description
-                            </MudText>
-                        }
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-2">
-                            <MudText Typo="Typo.caption">@project.KeyCount keys</MudText>
-                            <MudText Typo="Typo.caption">@project.CompletionPercentage.ToString("F0")% complete</MudText>
-                        </MudStack>
-                        <MudProgressLinear Value="@project.CompletionPercentage" Color="@UiHelpers.GetCompletionColor(project.CompletionPercentage)" Class="mt-2" />
-                    </MudCardContent>
-                    <MudCardActions>
-                        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => NavigateToEditor(project.Id))" ClickPropagation="false">
-                            Edit
-                        </MudButton>
-                        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="@(() => NavigateToSettings(project.Id))" ClickPropagation="false">
-                            Settings
-                        </MudButton>
-                    </MudCardActions>
-                </MudCard>
-            </MudItem>
+                            </RadzenText>
+                        </div>
+                        <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(project.Format)" Text="@project.Format" />
+                    </RadzenStack>
+                    @if (!string.IsNullOrEmpty(project.Description))
+                    {
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-2" Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            @project.Description
+                        </RadzenText>
+                    }
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mt-2">
+                        <RadzenText TextStyle="TextStyle.Caption">@project.KeyCount keys</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption">@project.CompletionPercentage.ToString("F0")% complete</RadzenText>
+                    </RadzenStack>
+                    <RadzenProgressBar Value="@project.CompletionPercentage" ShowValue="false" ProgressBarStyle="@UiHelpers.GetCompletionProgressStyle(project.CompletionPercentage)" class="rz-mt-2" Style="height: 4px;" />
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" class="rz-mt-3">
+                        <RadzenButton Variant="Radzen.Variant.Text" Text="Edit" Click="@(() => NavigateToEditor(project.Id))" @onclick:stopPropagation="true" />
+                        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Secondary" Text="Settings" Click="@(() => NavigateToSettings(project.Id))" @onclick:stopPropagation="true" />
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
         }
-    </MudGrid>
+    </RadzenRow>
 }
-
-<CreateProjectDialog @ref="_createDialog" OnProjectCreated="OnProjectCreated" />
 
 @code {
     private List<ProjectDto> _projects = new();
     private bool _isLoading = true;
     private string _searchText = string.Empty;
-    private string _formatFilter = string.Empty;
-    private CreateProjectDialog? _createDialog;
+    private string? _formatFilter;
     private bool _canCreateProject = true;
     private string? _limitMessage;
+
+    private readonly List<object> _formatOptions = new()
+    {
+        new { Value = "resx", Text = ".resx" },
+        new { Value = "json", Text = "JSON" },
+        new { Value = "i18next", Text = "i18next" },
+        new { Value = "android", Text = "Android" },
+        new { Value = "ios", Text = "iOS" }
+    };
 
     private IEnumerable<ProjectDto> FilteredProjects => _projects
         .Where(p => string.IsNullOrEmpty(_searchText) ||
@@ -157,7 +133,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error loading projects: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error loading projects: {ex.Message}");
         }
         finally
         {
@@ -168,12 +144,19 @@ else
     private void ClearFilters()
     {
         _searchText = string.Empty;
-        _formatFilter = string.Empty;
+        _formatFilter = null;
     }
 
-    private void OpenCreateDialog()
+    private async Task OpenCreateDialog()
     {
-        _createDialog?.Open();
+        var result = await DialogService.OpenAsync<CreateProjectDialog>("Create Project",
+            null,
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result is ProjectDto project)
+        {
+            await OnProjectCreated(project);
+        }
     }
 
     private void NavigateToSettings(int projectId)

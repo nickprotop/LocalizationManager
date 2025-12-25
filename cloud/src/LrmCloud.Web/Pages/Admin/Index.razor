@@ -1,338 +1,290 @@
 @page "/admin"
 @using LrmCloud.Shared.DTOs.Admin
 @using LrmCloud.Web.Services
+@using LrmCloud.Web.Helpers
 @inject AdminService AdminService
 @inject NavigationManager Navigation
 @attribute [Authorize]
 
 <PageTitle>Admin Dashboard - LRM Cloud</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-2">
-    <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Class="mr-2" Style="vertical-align: middle;" />
-    Admin Dashboard
-</MudText>
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+    <RadzenIcon Icon="admin_panel_settings" />
+    <RadzenText TextStyle="TextStyle.H4">Admin Dashboard</RadzenText>
+</RadzenStack>
+<RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-4">
     System-wide statistics, health monitoring, and user management.
-</MudText>
+</RadzenText>
 
 @if (_isLoading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
 }
 else
 {
     @* Stats Cards - Row 1 *@
-    <MudGrid Class="mb-4">
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <div class="d-flex align-center">
-                    <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Primary" Class="mr-3" />
-                    <div>
-                        <MudText Typo="Typo.h4">@(_stats?.TotalUsers.ToString("N0") ?? "-")</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Total Users</MudText>
-                    </div>
-                </div>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <div class="d-flex align-center">
-                    <MudIcon Icon="@Icons.Material.Filled.CreditCard" Size="Size.Large" Color="Color.Success" Class="mr-3" />
-                    <div>
-                        <MudText Typo="Typo.h4">@(_stats?.PaidUsers.ToString("N0") ?? "-")</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Active Subscribers</MudText>
-                    </div>
-                </div>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <div class="d-flex align-center">
-                    <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Large" Color="Color.Info" Class="mr-3" />
-                    <div>
-                        <MudText Typo="Typo.h4">@(_stats?.TotalProjects.ToString("N0") ?? "-")</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Projects</MudText>
-                    </div>
-                </div>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <div class="d-flex align-center">
-                    <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Large" Color="Color.Warning" Class="mr-3" />
-                    <div>
-                        <MudText Typo="Typo.h4">@(_stats?.TotalOrganizations.ToString("N0") ?? "-")</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Organizations</MudText>
-                    </div>
-                </div>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+    <RadzenRow Gap="1rem" class="rz-mb-4">
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
+                    <RadzenIcon Icon="people" Style="font-size: 2rem; color: var(--rz-primary);" />
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.H4">@(_stats?.TotalUsers.ToString("N0") ?? "-")</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Total Users</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
+                    <RadzenIcon Icon="credit_card" Style="font-size: 2rem; color: var(--rz-success);" />
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.H4">@(_stats?.PaidUsers.ToString("N0") ?? "-")</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Active Subscribers</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
+                    <RadzenIcon Icon="folder" Style="font-size: 2rem; color: var(--rz-info);" />
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.H4">@(_stats?.TotalProjects.ToString("N0") ?? "-")</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Projects</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
+                    <RadzenIcon Icon="business" Style="font-size: 2rem; color: var(--rz-warning);" />
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.H4">@(_stats?.TotalOrganizations.ToString("N0") ?? "-")</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Organizations</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
 
     @* Stats Cards - Row 2 (MRR) *@
-    <MudGrid Class="mb-4">
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2" Style="cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("admin/analytics"))">
-                <div class="d-flex align-center">
-                    <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Color="Color.Success" Class="mr-3" />
-                    <div>
-                        <MudText Typo="Typo.h4">$@(_revenue?.CurrentMrr.ToString("N0") ?? "-")</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Monthly Revenue</MudText>
-                    </div>
-                </div>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2" Style="cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("admin/analytics"))">
-                <div class="d-flex align-center">
-                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Large" Color="@(_userAnalytics?.GrowthRate >= 0 ? Color.Success : Color.Error)" Class="mr-3" />
-                    <div>
-                        <MudText Typo="Typo.h4">@((_userAnalytics?.NewUsersThisMonth ?? 0) > 0 ? "+" : "")@(_userAnalytics?.NewUsersThisMonth.ToString("N0") ?? "-")</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">New Users (Month)</MudText>
-                    </div>
-                </div>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <div class="d-flex align-center">
-                    <MudIcon Icon="@Icons.Material.Filled.Translate" Size="Size.Large" Color="Color.Primary" Class="mr-3" />
-                    <div>
-                        <MudText Typo="Typo.h4">@FormatNumber(_stats?.TotalTranslationCharsUsed ?? 0)</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">LRM Chars Used</MudText>
-                    </div>
-                </div>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <div class="d-flex align-center">
-                    <MudIcon Icon="@Icons.Material.Filled.Key" Size="Size.Large" Color="Color.Info" Class="mr-3" />
-                    <div>
-                        <MudText Typo="Typo.h4">@FormatNumber(_stats?.TotalOtherCharsUsed ?? 0)</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">BYOK Chars Used</MudText>
-                    </div>
-                </div>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+    <RadzenRow Gap="1rem" class="rz-mb-4">
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard Style="cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("admin/analytics"))">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
+                    <RadzenIcon Icon="attach_money" Style="font-size: 2rem; color: var(--rz-success);" />
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.H4">$@(_revenue?.CurrentMrr.ToString("N0") ?? "-")</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Monthly Revenue</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard Style="cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("admin/analytics"))">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
+                    <RadzenIcon Icon="trending_up" Style="@($"font-size: 2rem; color: {(_userAnalytics?.GrowthRate >= 0 ? "var(--rz-success)" : "var(--rz-danger)")};")" />
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.H4">@((_userAnalytics?.NewUsersThisMonth ?? 0) > 0 ? "+" : "")@(_userAnalytics?.NewUsersThisMonth.ToString("N0") ?? "-")</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">New Users (Month)</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
+                    <RadzenIcon Icon="translate" Style="font-size: 2rem; color: var(--rz-primary);" />
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.H4">@UiHelpers.FormatNumber(_stats?.TotalTranslationCharsUsed ?? 0)</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">LRM Chars Used</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
+                    <RadzenIcon Icon="key" Style="font-size: 2rem; color: var(--rz-info);" />
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.H4">@UiHelpers.FormatNumber(_stats?.TotalOtherCharsUsed ?? 0)</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">BYOK Chars Used</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
 
-    <MudGrid>
+    <RadzenRow Gap="1rem">
         @* System Health *@
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="2">
-                <div class="d-flex justify-space-between align-center mb-4">
-                    <MudText Typo="Typo.h6">
-                        <MudIcon Icon="@Icons.Material.Filled.HealthAndSafety" Class="mr-2" Style="vertical-align: middle;" />
-                        System Health
-                    </MudText>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="health_and_safety" />
+                        <RadzenText TextStyle="TextStyle.H6">System Health</RadzenText>
+                    </RadzenStack>
                     @if (_health != null)
                     {
-                        <MudChip T="string" Size="Size.Small" Color="@(_health.IsHealthy ? Color.Success : Color.Error)">
-                            @(_health.IsHealthy ? "Healthy" : "Unhealthy")
-                        </MudChip>
+                        <RadzenBadge BadgeStyle="@(_health.IsHealthy ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                     Text="@(_health.IsHealthy ? "Healthy" : "Unhealthy")" />
                     }
-                </div>
+                </RadzenStack>
                 @if (_health != null)
                 {
-                    <MudSimpleTable Dense="true" Hover="true" Bordered="true">
-                        <tbody>
-                            <tr>
-                                <td><MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" Class="mr-2" />Database</td>
-                                <td>
-                                    <MudChip T="string" Size="Size.Small" Color="@(_health.Database.IsHealthy ? Color.Success : Color.Error)">
-                                        @(_health.Database.IsHealthy ? "OK" : "Error")
-                                    </MudChip>
-                                </td>
-                                <td>@(_health.Database.LatencyMs.HasValue ? $"{_health.Database.LatencyMs}ms" : "-")</td>
-                            </tr>
-                            <tr>
-                                <td><MudIcon Icon="@Icons.Material.Filled.Memory" Size="Size.Small" Class="mr-2" />Redis</td>
-                                <td>
-                                    <MudChip T="string" Size="Size.Small" Color="@(_health.Redis.IsHealthy ? Color.Success : Color.Error)">
-                                        @(_health.Redis.IsHealthy ? "OK" : "Error")
-                                    </MudChip>
-                                </td>
-                                <td>@(_health.Redis.LatencyMs.HasValue ? $"{_health.Redis.LatencyMs}ms" : "-")</td>
-                            </tr>
-                            <tr>
-                                <td><MudIcon Icon="@Icons.Material.Filled.CloudQueue" Size="Size.Small" Class="mr-2" />MinIO</td>
-                                <td>
-                                    <MudChip T="string" Size="Size.Small" Color="@(_health.MinIO.IsHealthy ? Color.Success : Color.Error)">
-                                        @(_health.MinIO.IsHealthy ? "OK" : "Error")
-                                    </MudChip>
-                                </td>
-                                <td>@(_health.MinIO.LatencyMs.HasValue ? $"{_health.MinIO.LatencyMs}ms" : "-")</td>
-                            </tr>
-                            @if (_health.PayPal != null)
-                            {
-                                <tr>
-                                    <td><MudIcon Icon="@Icons.Material.Filled.Payment" Size="Size.Small" Class="mr-2" />PayPal</td>
-                                    <td>
-                                        <MudChip T="string" Size="Size.Small" Color="@(_health.PayPal.IsHealthy ? Color.Success : Color.Error)">
-                                            @(_health.PayPal.IsHealthy ? "OK" : "Error")
-                                        </MudChip>
-                                    </td>
-                                    <td>@(_health.PayPal.LatencyMs.HasValue ? $"{_health.PayPal.LatencyMs}ms" : "-")</td>
-                                </tr>
-                            }
-                            @if (_health.Stripe != null)
-                            {
-                                <tr>
-                                    <td><MudIcon Icon="@Icons.Material.Filled.CreditCard" Size="Size.Small" Class="mr-2" />Stripe</td>
-                                    <td>
-                                        <MudChip T="string" Size="Size.Small" Color="@(_health.Stripe.IsHealthy ? Color.Success : Color.Error)">
-                                            @(_health.Stripe.IsHealthy ? "OK" : "Error")
-                                        </MudChip>
-                                    </td>
-                                    <td>@(_health.Stripe.LatencyMs.HasValue ? $"{_health.Stripe.LatencyMs}ms" : "-")</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </MudSimpleTable>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                    <RadzenDataGrid TItem="HealthItem" Data="@GetHealthItems()" Density="Density.Compact" AllowSorting="false">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="HealthItem" Title="Service">
+                                <Template Context="item">
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                        <RadzenIcon Icon="@item.Icon" Style="font-size: 1rem;" />
+                                        <RadzenText>@item.Name</RadzenText>
+                                    </RadzenStack>
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="HealthItem" Title="Status" Width="80px">
+                                <Template Context="item">
+                                    <RadzenBadge BadgeStyle="@(item.IsHealthy ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                                 Text="@(item.IsHealthy ? "OK" : "Error")" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="HealthItem" Title="Latency" Width="80px">
+                                <Template Context="item">
+                                    @(item.LatencyMs.HasValue ? $"{item.LatencyMs}ms" : "-")
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-2">
                         Server Time: @_health.ServerTime.ToString("yyyy-MM-dd HH:mm:ss") UTC
-                    </MudText>
+                    </RadzenText>
                 }
                 else
                 {
-                    <MudAlert Severity="Severity.Warning">Failed to load health status</MudAlert>
+                    <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">Failed to load health status</RadzenAlert>
                 }
-            </MudPaper>
-        </MudItem>
+            </RadzenCard>
+        </RadzenColumn>
 
         @* Users by Plan *@
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-4">
-                    <MudIcon Icon="@Icons.Material.Filled.PieChart" Class="mr-2" Style="vertical-align: middle;" />
-                    Users by Plan
-                </MudText>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+                    <RadzenIcon Icon="pie_chart" />
+                    <RadzenText TextStyle="TextStyle.H6">Users by Plan</RadzenText>
+                </RadzenStack>
                 @if (_stats?.UsersByPlan != null)
                 {
-                    <MudSimpleTable Dense="true" Hover="true" Bordered="true">
-                        <thead>
-                            <tr>
-                                <th>Plan</th>
-                                <th>Users</th>
-                                <th>%</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var (plan, count) in _stats.UsersByPlan)
-                            {
-                                var percent = _stats.TotalUsers > 0 ? (count * 100.0 / _stats.TotalUsers) : 0;
-                                <tr>
-                                    <td>
-                                        <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(plan)">@plan.ToUpper()</MudChip>
-                                    </td>
-                                    <td>@count.ToString("N0")</td>
-                                    <td>@percent.ToString("F1")%</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </MudSimpleTable>
+                    <RadzenDataGrid TItem="PlanStat" Data="@GetPlanStats()" Density="Density.Compact" AllowSorting="false">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="PlanStat" Title="Plan">
+                                <Template Context="item">
+                                    <RadzenBadge BadgeStyle="@GetPlanBadgeStyle(item.Plan)" Text="@item.Plan.ToUpper()" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="PlanStat" Property="Count" Title="Users" Width="80px" />
+                            <RadzenDataGridColumn TItem="PlanStat" Title="%" Width="80px">
+                                <Template Context="item">@item.Percent.ToString("F1")%</Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
                 }
                 else
                 {
-                    <MudAlert Severity="Severity.Info">No data available</MudAlert>
+                    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">No data available</RadzenAlert>
                 }
-            </MudPaper>
-        </MudItem>
+            </RadzenCard>
+        </RadzenColumn>
 
         @* Usage Summary *@
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-4">
-                    <MudIcon Icon="@Icons.Material.Filled.DataUsage" Class="mr-2" Style="vertical-align: middle;" />
-                    Total Usage
-                </MudText>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+                    <RadzenIcon Icon="data_usage" />
+                    <RadzenText TextStyle="TextStyle.H6">Total Usage</RadzenText>
+                </RadzenStack>
                 @if (_stats != null)
                 {
-                    <MudGrid>
-                        <MudItem xs="6">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">LRM Translation Chars</MudText>
-                            <MudText Typo="Typo.h5">@FormatBytes(_stats.TotalTranslationCharsUsed)</MudText>
-                        </MudItem>
-                        <MudItem xs="6">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Other Provider Chars</MudText>
-                            <MudText Typo="Typo.h5">@FormatBytes(_stats.TotalOtherCharsUsed)</MudText>
-                        </MudItem>
-                        <MudItem xs="6">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Database Size</MudText>
-                            <MudText Typo="Typo.h5">@FormatBytes(_stats.DatabaseSizeBytes)</MudText>
-                        </MudItem>
-                        <MudItem xs="6">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Storage Size</MudText>
-                            <MudText Typo="Typo.h5">@FormatBytes(_stats.StorageSizeBytes)</MudText>
-                        </MudItem>
-                    </MudGrid>
+                    <RadzenRow>
+                        <RadzenColumn Size="6">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">LRM Translation Chars</RadzenText>
+                            <RadzenText TextStyle="TextStyle.H5">@UiHelpers.FormatBytes(_stats.TotalTranslationCharsUsed)</RadzenText>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Other Provider Chars</RadzenText>
+                            <RadzenText TextStyle="TextStyle.H5">@UiHelpers.FormatBytes(_stats.TotalOtherCharsUsed)</RadzenText>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Database Size</RadzenText>
+                            <RadzenText TextStyle="TextStyle.H5">@UiHelpers.FormatBytes(_stats.DatabaseSizeBytes)</RadzenText>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Storage Size</RadzenText>
+                            <RadzenText TextStyle="TextStyle.H5">@UiHelpers.FormatBytes(_stats.StorageSizeBytes)</RadzenText>
+                        </RadzenColumn>
+                    </RadzenRow>
                 }
-            </MudPaper>
-        </MudItem>
+            </RadzenCard>
+        </RadzenColumn>
 
         @* Users by Auth Type *@
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-4">
-                    <MudIcon Icon="@Icons.Material.Filled.Security" Class="mr-2" Style="vertical-align: middle;" />
-                    Users by Auth Type
-                </MudText>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+                    <RadzenIcon Icon="security" />
+                    <RadzenText TextStyle="TextStyle.H6">Users by Auth Type</RadzenText>
+                </RadzenStack>
                 @if (_stats?.UsersByAuthType != null)
                 {
-                    <MudSimpleTable Dense="true" Hover="true" Bordered="true">
-                        <thead>
-                            <tr>
-                                <th>Auth Type</th>
-                                <th>Users</th>
-                                <th>%</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var (authType, count) in _stats.UsersByAuthType)
-                            {
-                                var percent = _stats.TotalUsers > 0 ? (count * 100.0 / _stats.TotalUsers) : 0;
-                                <tr>
-                                    <td>
-                                        <MudIcon Icon="@GetAuthTypeIcon(authType)" Size="Size.Small" Class="mr-2" />
-                                        @authType
-                                    </td>
-                                    <td>@count.ToString("N0")</td>
-                                    <td>@percent.ToString("F1")%</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </MudSimpleTable>
+                    <RadzenDataGrid TItem="AuthTypeStat" Data="@GetAuthTypeStats()" Density="Density.Compact" AllowSorting="false">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="AuthTypeStat" Title="Auth Type">
+                                <Template Context="item">
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                        <RadzenIcon Icon="@item.Icon" Style="font-size: 1rem;" />
+                                        <RadzenText>@item.AuthType</RadzenText>
+                                    </RadzenStack>
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="AuthTypeStat" Property="Count" Title="Users" Width="80px" />
+                            <RadzenDataGridColumn TItem="AuthTypeStat" Title="%" Width="80px">
+                                <Template Context="item">@item.Percent.ToString("F1")%</Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
                 }
                 else
                 {
-                    <MudAlert Severity="Severity.Info">No data available</MudAlert>
+                    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">No data available</RadzenAlert>
                 }
-            </MudPaper>
-        </MudItem>
+            </RadzenCard>
+        </RadzenColumn>
 
         @* Quick Actions *@
-        <MudItem xs="12">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-4">
-                    <MudIcon Icon="@Icons.Material.Filled.FlashOn" Class="mr-2" Style="vertical-align: middle;" />
-                    Quick Actions
-                </MudText>
-                <div class="d-flex gap-2 flex-wrap">
-                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.TrendingUp"
-                               Href="admin/analytics">Analytics</MudButton>
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.People"
-                               Href="admin/users">Manage Users</MudButton>
-                    <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Business"
-                               Href="admin/organizations">View Organizations</MudButton>
-                    <MudButton Variant="Variant.Filled" Color="Color.Warning" StartIcon="@Icons.Material.Filled.HealthAndSafety"
-                               Href="admin/health">System Health</MudButton>
-                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Article"
-                               Href="admin/logs">View Logs</MudButton>
-                </div>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+        <RadzenColumn Size="12">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+                    <RadzenIcon Icon="flash_on" />
+                    <RadzenText TextStyle="TextStyle.H6">Quick Actions</RadzenText>
+                </RadzenStack>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Style="flex-wrap: wrap;">
+                    <RadzenButton ButtonStyle="ButtonStyle.Success" Icon="trending_up" Text="Analytics"
+                                  Click="@(() => Navigation.NavigateTo("admin/analytics"))" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Icon="people" Text="Manage Users"
+                                  Click="@(() => Navigation.NavigateTo("admin/users"))" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Info" Icon="business" Text="View Organizations"
+                                  Click="@(() => Navigation.NavigateTo("admin/organizations"))" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Warning" Icon="health_and_safety" Text="System Health"
+                                  Click="@(() => Navigation.NavigateTo("admin/health"))" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Secondary" Icon="article" Text="View Logs"
+                                  Click="@(() => Navigation.NavigateTo("admin/logs"))" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
 }
 
 @code {
@@ -370,38 +322,51 @@ else
         }
     }
 
-    private static Color GetPlanColor(string plan) => plan.ToLower() switch
+    private static BadgeStyle GetPlanBadgeStyle(string plan) => plan.ToLower() switch
     {
-        "enterprise" => Color.Success,
-        "team" => Color.Primary,
-        _ => Color.Default
+        "enterprise" => BadgeStyle.Success,
+        "team" => BadgeStyle.Primary,
+        _ => BadgeStyle.Light
     };
 
-    private static string GetAuthTypeIcon(string authType) => authType.ToLower() switch
-    {
-        "github" => Icons.Custom.Brands.GitHub,
-        _ => Icons.Material.Filled.Email
-    };
+    private record HealthItem(string Name, string Icon, bool IsHealthy, long? LatencyMs);
+    private record PlanStat(string Plan, int Count, double Percent);
+    private record AuthTypeStat(string AuthType, string Icon, int Count, double Percent);
 
-    private static string FormatBytes(long bytes)
+    private List<HealthItem> GetHealthItems()
     {
-        if (bytes >= 1_073_741_824)
-            return $"{bytes / 1_073_741_824.0:F1} GB";
-        if (bytes >= 1_048_576)
-            return $"{bytes / 1_048_576.0:F1} MB";
-        if (bytes >= 1024)
-            return $"{bytes / 1024.0:F1} KB";
-        return $"{bytes:N0}";
+        if (_health == null) return new();
+        var items = new List<HealthItem>
+        {
+            new("Database", "storage", _health.Database.IsHealthy, _health.Database.LatencyMs),
+            new("Redis", "memory", _health.Redis.IsHealthy, _health.Redis.LatencyMs),
+            new("MinIO", "cloud_queue", _health.MinIO.IsHealthy, _health.MinIO.LatencyMs)
+        };
+        if (_health.PayPal != null)
+            items.Add(new("PayPal", "payment", _health.PayPal.IsHealthy, _health.PayPal.LatencyMs));
+        if (_health.Stripe != null)
+            items.Add(new("Stripe", "credit_card", _health.Stripe.IsHealthy, _health.Stripe.LatencyMs));
+        return items;
     }
 
-    private static string FormatNumber(long number)
+    private List<PlanStat> GetPlanStats()
     {
-        if (number >= 1_000_000_000)
-            return $"{number / 1_000_000_000.0:F1}B";
-        if (number >= 1_000_000)
-            return $"{number / 1_000_000.0:F1}M";
-        if (number >= 1_000)
-            return $"{number / 1_000.0:F1}K";
-        return number.ToString("N0");
+        if (_stats?.UsersByPlan == null) return new();
+        return _stats.UsersByPlan.Select(kv => new PlanStat(
+            kv.Key,
+            kv.Value,
+            _stats.TotalUsers > 0 ? kv.Value * 100.0 / _stats.TotalUsers : 0
+        )).ToList();
+    }
+
+    private List<AuthTypeStat> GetAuthTypeStats()
+    {
+        if (_stats?.UsersByAuthType == null) return new();
+        return _stats.UsersByAuthType.Select(kv => new AuthTypeStat(
+            kv.Key,
+            kv.Key.ToLower() == "github" ? "code" : "email",
+            kv.Value,
+            _stats.TotalUsers > 0 ? kv.Value * 100.0 / _stats.TotalUsers : 0
+        )).ToList();
     }
 }

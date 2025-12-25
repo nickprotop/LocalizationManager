@@ -1,0 +1,108 @@
+@using LrmCloud.Shared.Constants
+@using LrmCloud.Shared.DTOs.Organizations
+@inject OrganizationService OrganizationService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<RadzenTemplateForm TItem="InviteMemberRequest" Data="@_request" Submit="@HandleSubmit">
+    <RadzenStack Gap="1rem">
+        <RadzenFormField Text="Email Address" Variant="Radzen.Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="_request.Email" Name="Email" MaxLength="255" Disabled="@_isSubmitting" Style="width: 100%;" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">The person will receive an invitation email</RadzenText>
+                <RadzenRequiredValidator Component="Email" Text="Email is required" />
+                <RadzenEmailValidator Component="Email" Text="Invalid email format" />
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Role" Variant="Radzen.Variant.Outlined">
+            <ChildContent>
+                <RadzenDropDown @bind-Value="_request.Role"
+                                Data="@_roles"
+                                TextProperty="Text"
+                                ValueProperty="Value"
+                                Disabled="@_isSubmitting"
+                                Style="width: 100%;" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@GetRoleDescription(_request.Role)</RadzenText>
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">
+            An email invitation will be sent. The invitation expires in 7 days.
+        </RadzenAlert>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
+                @_errorMessage
+            </RadzenAlert>
+        }
+
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" Disabled="@_isSubmitting" />
+            <RadzenButton ButtonType="Radzen.ButtonType.Submit" ButtonStyle="ButtonStyle.Primary" Text="Send Invitation" IsBusy="@_isSubmitting" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter]
+    public int OrganizationId { get; set; }
+
+    private InviteMemberRequest _request = new() { Email = "", Role = OrganizationRole.Member };
+    private bool _isSubmitting;
+    private string? _errorMessage;
+
+    private readonly List<object> _roles = new()
+    {
+        new { Text = "Admin", Value = OrganizationRole.Admin },
+        new { Text = "Member", Value = OrganizationRole.Member },
+        new { Text = "Viewer", Value = OrganizationRole.Viewer }
+    };
+
+    private async Task HandleSubmit()
+    {
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var (success, error) = await OrganizationService.InviteMemberAsync(OrganizationId, _request);
+
+            if (success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Invitation sent successfully");
+                DialogService.Close(true);
+            }
+            else
+            {
+                _errorMessage = error ?? "Failed to send invitation";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(false);
+    }
+
+    private static string GetRoleDescription(string role) => role switch
+    {
+        OrganizationRole.Admin => "Can manage members, projects, and settings",
+        OrganizationRole.Member => "Can view and edit projects",
+        OrganizationRole.Viewer => "Read-only access to projects",
+        _ => ""
+    };
+}

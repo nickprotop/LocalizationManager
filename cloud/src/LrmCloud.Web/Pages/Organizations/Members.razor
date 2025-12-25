@@ -9,252 +9,118 @@
 @inject OrganizationService OrganizationService
 @inject LimitsService LimitsService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 
 <PageTitle>Members - @(_organization?.Name ?? "Organization") - LRM Cloud</PageTitle>
 
 @if (_isLoading)
 {
-    <MudStack>
-        <MudSkeleton Width="300px" Height="40px" />
+    <RadzenStack Gap="1rem">
+        <div style="background: var(--rz-base-300); width: 300px; height: 40px; border-radius: 4px;"></div>
         <LoadingSkeleton Type="LoadingSkeletonType.Table" Rows="5" />
-    </MudStack>
+    </RadzenStack>
 }
 else if (_organization == null)
 {
-    <MudAlert Severity="Severity.Error">
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
         Organization not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="organizations">Back to Organizations</MudButton>
-    </MudAlert>
+        <RadzenLink Path="organizations" Text="Back to Organizations" class="rz-ms-2" />
+    </RadzenAlert>
 }
 else
 {
-    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
-        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                       OnClick="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}"))"
-                       Size="Size.Small" />
-        <MudBreadcrumbs Items="_breadcrumbs" />
-    </MudStack>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+        <RadzenButton Variant="Radzen.Variant.Text" Icon="arrow_back" Click="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}"))" Size="ButtonSize.Small" />
+        <RadzenBreadCrumb>
+            <RadzenBreadCrumbItem Path="organizations" Text="Organizations" />
+            <RadzenBreadCrumbItem Path="@($"organizations/{OrganizationId}")" Text="@_organization.Name" />
+            <RadzenBreadCrumbItem Text="Members" />
+        </RadzenBreadCrumb>
+    </RadzenStack>
 
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudText Typo="Typo.h5">Team Members</MudText>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.H5">Team Members</RadzenText>
         @if (_canInvite)
         {
-            <MudTooltip Text="@_memberLimitMessage" Disabled="@_canInviteMember">
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.PersonAdd"
-                           OnClick="@OpenInviteDialog"
-                           Disabled="@(!_canInviteMember)">
-                    Invite Member
-                </MudButton>
-            </MudTooltip>
+            <RadzenButton Variant="Radzen.Variant.Filled"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Icon="person_add"
+                          Text="Invite Member"
+                          Click="@OpenInviteDialog"
+                          Disabled="@(!_canInviteMember)"
+                          title="@_memberLimitMessage" />
         }
-    </MudStack>
+    </RadzenStack>
 
-    <MudPaper Elevation="2">
-        <MudDataGrid Items="@_members"
-                     Dense="true"
-                     Hover="true"
-                     Striped="true"
-                     Filterable="false"
-                     SortMode="SortMode.Single">
+    <RadzenCard>
+        <RadzenDataGrid TItem="OrganizationMemberDto"
+                        Data="@_members"
+                        AllowSorting="true"
+                        AllowFiltering="false"
+                        Density="Density.Compact"
+                        GridLines="DataGridGridLines.Horizontal">
             <Columns>
-                <PropertyColumn Property="x => x.Email" Title="Member">
-                    <CellTemplate>
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                            <MudAvatar Size="Size.Small">
-                                @if (!string.IsNullOrEmpty(context.Item.AvatarUrl))
-                                {
-                                    <MudImage Src="@context.Item.AvatarUrl" Alt="@context.Item.DisplayName" />
-                                }
-                                else
-                                {
-                                    @GetMemberInitials(context.Item)
-                                }
-                            </MudAvatar>
-                            <MudStack Spacing="0">
-                                <MudText Typo="Typo.body2">
-                                    @(context.Item.DisplayName ?? context.Item.Username ?? context.Item.Email)
-                                </MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Item.Email</MudText>
-                            </MudStack>
-                        </MudStack>
-                    </CellTemplate>
-                </PropertyColumn>
+                <RadzenDataGridColumn TItem="OrganizationMemberDto" Title="Member" Width="auto">
+                    <Template Context="member">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                            <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--rz-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 0.75rem;">
+                                @GetMemberInitials(member)
+                            </div>
+                            <RadzenStack Gap="0">
+                                <RadzenText TextStyle="TextStyle.Body2">
+                                    @(member.DisplayName ?? member.Username ?? member.Email)
+                                </RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@member.Email</RadzenText>
+                            </RadzenStack>
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
 
-                <PropertyColumn Property="x => x.Role" Title="Role">
-                    <CellTemplate>
-                        <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetRoleColor(context.Item.Role)">
-                            @context.Item.Role
-                        </MudChip>
-                    </CellTemplate>
-                </PropertyColumn>
+                <RadzenDataGridColumn TItem="OrganizationMemberDto" Property="Role" Title="Role" Width="120px">
+                    <Template Context="member">
+                        <RadzenBadge BadgeStyle="@UiHelpers.GetRoleBadgeStyle(member.Role)" Text="@member.Role" />
+                    </Template>
+                </RadzenDataGridColumn>
 
-                <PropertyColumn Property="x => x.JoinedAt" Title="Joined">
-                    <CellTemplate>
-                        @if (context.Item.JoinedAt.HasValue)
+                <RadzenDataGridColumn TItem="OrganizationMemberDto" Title="Joined" Width="140px">
+                    <Template Context="member">
+                        @if (member.JoinedAt.HasValue)
                         {
-                            <MudText Typo="Typo.body2">@context.Item.JoinedAt.Value.ToString("MMM d, yyyy")</MudText>
+                            <RadzenText TextStyle="TextStyle.Body2">@member.JoinedAt.Value.ToString("MMM d, yyyy")</RadzenText>
                         }
                         else
                         {
-                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Pending</MudChip>
+                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" Variant="Radzen.Variant.Outlined" Text="Pending" />
                         }
-                    </CellTemplate>
-                </PropertyColumn>
+                    </Template>
+                </RadzenDataGridColumn>
 
-                <TemplateColumn Title="Actions" Sortable="false">
-                    <CellTemplate>
-                        @if (_canManageMembers && context.Item.Role != OrganizationRole.Owner)
+                <RadzenDataGridColumn TItem="OrganizationMemberDto" Title="Actions" Width="100px" Sortable="false" Filterable="false">
+                    <Template Context="member">
+                        @if (_canManageMembers && !OrganizationRole.IsOwner(member.Role))
                         {
-                            <MudStack Row="true" Spacing="1">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem">
                                 @if (_isOwner)
                                 {
-                                    <MudTooltip Text="Change Role">
-                                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                                       Size="Size.Small"
-                                                       Color="Color.Primary"
-                                                       OnClick="@(() => OpenChangeRoleDialog(context.Item))" />
-                                    </MudTooltip>
+                                    <RadzenButton Icon="edit" Size="ButtonSize.Small" Variant="Radzen.Variant.Text" Click="@(() => OpenChangeRoleDialog(member))" title="Change Role" />
                                 }
-                                <MudTooltip Text="Remove Member">
-                                    <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
-                                                   Size="Size.Small"
-                                                   Color="Color.Error"
-                                                   OnClick="@(() => OpenRemoveDialog(context.Item))" />
-                                </MudTooltip>
-                            </MudStack>
+                                <RadzenButton Icon="person_remove" Size="ButtonSize.Small" Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Danger" Click="@(() => OpenRemoveDialog(member))" title="Remove Member" />
+                            </RadzenStack>
                         }
-                    </CellTemplate>
-                </TemplateColumn>
+                    </Template>
+                </RadzenDataGridColumn>
             </Columns>
-
-            <NoRecordsContent>
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4">
-                    No members found. Invite team members to get started.
-                </MudText>
-            </NoRecordsContent>
-        </MudDataGrid>
-    </MudPaper>
+            <EmptyTemplate>
+                <RadzenStack AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.Center" class="rz-py-4">
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                        No members found. Invite team members to get started.
+                    </RadzenText>
+                </RadzenStack>
+            </EmptyTemplate>
+        </RadzenDataGrid>
+    </RadzenCard>
 }
-
-<!-- Invite Member Dialog -->
-<MudDialog @bind-Visible="_inviteDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" />
-            <MudText Typo="Typo.h6">Invite Team Member</MudText>
-        </MudStack>
-    </TitleContent>
-    <DialogContent>
-        <MudForm @ref="_inviteForm" @bind-IsValid="_inviteFormValid">
-            <MudStack Spacing="3">
-                <MudTextField @bind-Value="_inviteRequest.Email"
-                              Label="Email Address"
-                              Variant="Variant.Outlined"
-                              Required="true"
-                              RequiredError="Email is required"
-                              Validation="@(new Func<string, IEnumerable<string>>(ValidateEmail))"
-                              InputType="InputType.Email"
-                              HelperText="The person will receive an invitation email" />
-
-                <MudSelect @bind-Value="_inviteRequest.Role"
-                           Label="Role"
-                           Variant="Variant.Outlined"
-                           Required="true"
-                           HelperText="@GetRoleDescription(_inviteRequest.Role)">
-                    <MudSelectItem Value="@OrganizationRole.Admin">Admin</MudSelectItem>
-                    <MudSelectItem Value="@OrganizationRole.Member">Member</MudSelectItem>
-                    <MudSelectItem Value="@OrganizationRole.Viewer">Viewer</MudSelectItem>
-                </MudSelect>
-
-                <MudAlert Severity="Severity.Info" Dense="true">
-                    <MudText Typo="Typo.body2">
-                        An email invitation will be sent. The invitation expires in 7 days.
-                    </MudText>
-                </MudAlert>
-            </MudStack>
-        </MudForm>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CloseInviteDialog">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   OnClick="@InviteMember"
-                   Disabled="@(!_inviteFormValid || _isInviting)">
-            @if (_isInviting)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Send Invitation
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-<!-- Change Role Dialog -->
-<MudDialog @bind-Visible="_changeRoleDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Change Role</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudText Class="mb-4">
-            Change role for <strong>@(_selectedMember?.DisplayName ?? _selectedMember?.Email)</strong>
-        </MudText>
-        <MudSelect @bind-Value="_newRole"
-                   Label="Role"
-                   Variant="Variant.Outlined"
-                   HelperText="@GetRoleDescription(_newRole)">
-            <MudSelectItem Value="@OrganizationRole.Admin">Admin</MudSelectItem>
-            <MudSelectItem Value="@OrganizationRole.Member">Member</MudSelectItem>
-            <MudSelectItem Value="@OrganizationRole.Viewer">Viewer</MudSelectItem>
-        </MudSelect>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CloseChangeRoleDialog">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   OnClick="@ChangeRole"
-                   Disabled="@(_isChangingRole || _newRole == _selectedMember?.Role)">
-            @if (_isChangingRole)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Update Role
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-<!-- Remove Member Dialog -->
-<MudDialog @bind-Visible="_removeDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
-            <MudText Typo="Typo.h6">Remove Member</MudText>
-        </MudStack>
-    </TitleContent>
-    <DialogContent>
-        <MudText>
-            Are you sure you want to remove <strong>@(_selectedMember?.DisplayName ?? _selectedMember?.Email)</strong> from this organization?
-        </MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
-            They will lose access to all organization projects immediately.
-        </MudText>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CloseRemoveDialog">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Error"
-                   OnClick="@RemoveMember"
-                   Disabled="_isRemoving">
-            @if (_isRemoving)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Remove
-        </MudButton>
-    </DialogActions>
-</MudDialog>
 
 @code {
     [Parameter]
@@ -268,24 +134,6 @@ else
     private bool _isOwner;
     private bool _canInviteMember = true;
     private string? _memberLimitMessage;
-    private List<BreadcrumbItem> _breadcrumbs = new();
-
-    // Invite dialog
-    private bool _inviteDialogVisible;
-    private bool _inviteFormValid;
-    private bool _isInviting;
-    private MudForm? _inviteForm;
-    private InviteMemberRequest _inviteRequest = new() { Email = "", Role = OrganizationRole.Member };
-
-    // Change role dialog
-    private bool _changeRoleDialogVisible;
-    private bool _isChangingRole;
-    private OrganizationMemberDto? _selectedMember;
-    private string _newRole = OrganizationRole.Member;
-
-    // Remove dialog
-    private bool _removeDialogVisible;
-    private bool _isRemoving;
 
     protected override async Task OnInitializedAsync()
     {
@@ -311,21 +159,12 @@ else
                 _isOwner = OrganizationRole.IsOwner(_organization.UserRole);
                 _canManageMembers = OrganizationRole.IsAdminOrOwner(_organization.UserRole);
                 _canInvite = _canManageMembers;
-
-                // Check member limit
                 await CheckMemberLimitAsync();
-
-                _breadcrumbs = new List<BreadcrumbItem>
-                {
-                    new("Organizations", "organizations"),
-                    new(_organization.Name, $"organizations/{OrganizationId}"),
-                    new("Members", null, disabled: true)
-                };
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load organization: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load organization: {ex.Message}");
         }
         finally
         {
@@ -337,44 +176,16 @@ else
     // Invite Member
     // ============================================================
 
-    private void OpenInviteDialog()
+    private async Task OpenInviteDialog()
     {
-        _inviteRequest = new InviteMemberRequest { Email = "", Role = OrganizationRole.Member };
-        _inviteDialogVisible = true;
-    }
+        var result = await DialogService.OpenAsync<InviteMemberDialog>("Invite Team Member",
+            new Dictionary<string, object> { { "OrganizationId", OrganizationId } },
+            new Radzen.DialogOptions { Width = "450px" });
 
-    private void CloseInviteDialog()
-    {
-        _inviteDialogVisible = false;
-    }
-
-    private async Task InviteMember()
-    {
-        if (_inviteForm != null)
-            await _inviteForm.Validate();
-
-        if (!_inviteFormValid) return;
-
-        _isInviting = true;
-        try
+        if (result == true)
         {
-            var (success, error) = await OrganizationService.InviteMemberAsync(OrganizationId, _inviteRequest);
-
-            if (success)
-            {
-                Snackbar.Add("Invitation sent successfully", Severity.Success);
-                CloseInviteDialog();
-                LimitsService.InvalidateCache();
-                await LoadDataAsync();
-            }
-            else
-            {
-                Snackbar.Add(error ?? "Failed to send invitation", Severity.Error);
-            }
-        }
-        finally
-        {
-            _isInviting = false;
+            LimitsService.InvalidateCache();
+            await LoadDataAsync();
         }
     }
 
@@ -382,43 +193,20 @@ else
     // Change Role
     // ============================================================
 
-    private void OpenChangeRoleDialog(OrganizationMemberDto member)
+    private async Task OpenChangeRoleDialog(OrganizationMemberDto member)
     {
-        _selectedMember = member;
-        _newRole = member.Role;
-        _changeRoleDialogVisible = true;
-    }
-
-    private void CloseChangeRoleDialog()
-    {
-        _changeRoleDialogVisible = false;
-        _selectedMember = null;
-    }
-
-    private async Task ChangeRole()
-    {
-        if (_selectedMember == null) return;
-
-        _isChangingRole = true;
-        try
-        {
-            var (success, error) = await OrganizationService.UpdateMemberRoleAsync(
-                OrganizationId, _selectedMember.UserId, _newRole);
-
-            if (success)
+        var result = await DialogService.OpenAsync<ChangeRoleDialog>("Change Role",
+            new Dictionary<string, object>
             {
-                _selectedMember.Role = _newRole;
-                Snackbar.Add("Role updated successfully", Severity.Success);
-                CloseChangeRoleDialog();
-            }
-            else
-            {
-                Snackbar.Add(error ?? "Failed to update role", Severity.Error);
-            }
-        }
-        finally
+                { "OrganizationId", OrganizationId },
+                { "Member", member }
+            },
+            new Radzen.DialogOptions { Width = "400px" });
+
+        if (result is string newRole)
         {
-            _isChangingRole = false;
+            member.Role = newRole;
+            StateHasChanged();
         }
     }
 
@@ -426,58 +214,39 @@ else
     // Remove Member
     // ============================================================
 
-    private void OpenRemoveDialog(OrganizationMemberDto member)
+    private async Task OpenRemoveDialog(OrganizationMemberDto member)
     {
-        _selectedMember = member;
-        _removeDialogVisible = true;
-    }
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to remove {member.DisplayName ?? member.Email} from this organization? They will lose access to all organization projects immediately.",
+            "Remove Member",
+            new ConfirmOptions { OkButtonText = "Remove", CancelButtonText = "Cancel" });
 
-    private void CloseRemoveDialog()
-    {
-        _removeDialogVisible = false;
-        _selectedMember = null;
-    }
-
-    private async Task RemoveMember()
-    {
-        if (_selectedMember == null) return;
-
-        _isRemoving = true;
-        try
+        if (confirmed == true)
         {
-            var (success, error) = await OrganizationService.RemoveMemberAsync(
-                OrganizationId, _selectedMember.UserId);
-
-            if (success)
-            {
-                _members.RemoveAll(m => m.UserId == _selectedMember.UserId);
-                Snackbar.Add("Member removed successfully", Severity.Success);
-                CloseRemoveDialog();
-                LimitsService.InvalidateCache();
-                await CheckMemberLimitAsync();
-            }
-            else
-            {
-                Snackbar.Add(error ?? "Failed to remove member", Severity.Error);
-            }
+            await RemoveMember(member);
         }
-        finally
+    }
+
+    private async Task RemoveMember(OrganizationMemberDto member)
+    {
+        var (success, error) = await OrganizationService.RemoveMemberAsync(OrganizationId, member.UserId);
+
+        if (success)
         {
-            _isRemoving = false;
+            _members.RemoveAll(m => m.UserId == member.UserId);
+            NotificationService.Notify(NotificationSeverity.Success, "Success", "Member removed successfully");
+            LimitsService.InvalidateCache();
+            await CheckMemberLimitAsync();
+        }
+        else
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", error ?? "Failed to remove member");
         }
     }
 
     // ============================================================
     // Helpers
     // ============================================================
-
-    private IEnumerable<string> ValidateEmail(string email)
-    {
-        if (string.IsNullOrWhiteSpace(email))
-            yield return "Email is required";
-        else if (!email.Contains('@') || !email.Contains('.'))
-            yield return "Invalid email format";
-    }
 
     private static string GetMemberInitials(OrganizationMemberDto member)
     {
@@ -491,12 +260,4 @@ else
 
         return name.Length >= 2 ? name[..2].ToUpper() : name.ToUpper();
     }
-
-    private static string GetRoleDescription(string role) => role switch
-    {
-        OrganizationRole.Admin => "Can manage members, projects, and settings",
-        OrganizationRole.Member => "Can view and edit projects",
-        OrganizationRole.Viewer => "Read-only access to projects",
-        _ => ""
-    };
 }

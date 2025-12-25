@@ -3,305 +3,249 @@
 @using LrmCloud.Shared.DTOs.Auth
 @using LrmCloud.Web.Services
 @inject AuthService AuthService
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
 @inject NavigationManager NavigationManager
+@inject Radzen.DialogService DialogService
 
 <PageTitle>Profile Settings - LRM Cloud</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-6">Profile Settings</MudText>
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">Profile Settings</RadzenText>
 
-    @if (_isLoading)
-    {
-        <MudStack Spacing="4">
-            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
-            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="150px" />
-        </MudStack>
-    }
-    else if (_profile == null)
-    {
-        <MudAlert Severity="Severity.Error">Failed to load profile</MudAlert>
-    }
-    else
-    {
-        <!-- Profile Information Card -->
-        <MudCard Class="mb-6">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudIcon Icon="@Icons.Material.Filled.Person" />
-                        <MudText Typo="Typo.h6">Profile Information</MudText>
-                    </MudStack>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudForm @ref="_profileForm" @bind-IsValid="_profileFormValid">
-                    <MudGrid Spacing="3">
-                        <MudItem xs="12" sm="6">
-                            <MudTextField T="string"
-                                          @bind-Value="_username"
-                                          Label="Username"
-                                          Variant="Variant.Outlined"
-                                          Required="true"
-                                          RequiredError="Username is required"
-                                          Validation="@(new Func<string, IEnumerable<string>>(ValidateUsername))"
-                                          HelperText="3-50 characters, letters, numbers, underscores, and hyphens" />
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudTextField T="string"
-                                          @bind-Value="_displayName"
-                                          Label="Display Name"
-                                          Variant="Variant.Outlined"
-                                          HelperText="Optional - how you appear to others" />
-                        </MudItem>
-                        <MudItem xs="12">
-                            <MudTextField T="string"
-                                          Value="@_profile.Email"
-                                          Label="Email"
-                                          Variant="Variant.Outlined"
-                                          ReadOnly="true"
-                                          Adornment="Adornment.End"
-                                          AdornmentIcon="@(_profile.EmailVerified ? Icons.Material.Filled.Verified : Icons.Material.Filled.Warning)"
-                                          AdornmentColor="@(_profile.EmailVerified ? Color.Success : Color.Warning)" />
-                        </MudItem>
-                        <MudItem xs="12">
-                            <MudTextField T="string"
-                                          @bind-Value="_avatarUrl"
-                                          Label="Avatar URL"
-                                          Variant="Variant.Outlined"
-                                          Validation="@(new Func<string, IEnumerable<string>>(ValidateUrl))"
-                                          HelperText="URL to your avatar image" />
-                        </MudItem>
-                        @if (!string.IsNullOrEmpty(_avatarUrl))
+@if (_isLoading)
+{
+    <RadzenStack Gap="1rem">
+        <RadzenCard Style="height: 200px;"><RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" /></RadzenCard>
+        <RadzenCard Style="height: 150px;"><RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" /></RadzenCard>
+    </RadzenStack>
+}
+else if (_profile == null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">Failed to load profile</RadzenAlert>
+}
+else
+{
+    <!-- Profile Information Card -->
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+            <RadzenIcon Icon="person" />
+            <RadzenText TextStyle="TextStyle.H6">Profile Information</RadzenText>
+        </RadzenStack>
+
+        <RadzenTemplateForm TItem="object" Data="@(new object())" Submit="@SaveProfileAsync">
+            <RadzenRow Gap="1rem">
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Username" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_username" Name="Username" Style="width: 100%;" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">3-50 characters, letters, numbers, underscores, and hyphens</RadzenText>
+                            <RadzenRequiredValidator Component="Username" Text="Username is required" />
+                            <RadzenLengthValidator Component="Username" Min="3" Max="50" Text="Username must be 3-50 characters" />
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Display Name" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_displayName" Style="width: 100%;" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional - how you appear to others</RadzenText>
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12">
+                    <RadzenFormField Text="Email" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox Value="@_profile.Email" ReadOnly="true" Style="width: 100%;" />
+                        </ChildContent>
+                        <End>
+                            @if (_profile.EmailVerified)
+                            {
+                                <RadzenIcon Icon="verified" Style="color: var(--rz-success);" />
+                            }
+                            else
+                            {
+                                <RadzenIcon Icon="warning" Style="color: var(--rz-warning);" />
+                            }
+                        </End>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12">
+                    <RadzenFormField Text="Avatar URL" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_avatarUrl" Style="width: 100%;" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">URL to your avatar image</RadzenText>
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenColumn>
+                @if (!string.IsNullOrEmpty(_avatarUrl))
+                {
+                    <RadzenColumn Size="12">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mb-2">Preview:</RadzenText>
+                        <RadzenImage Path="@_avatarUrl" Style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;" AlternateText="Avatar preview" />
+                    </RadzenColumn>
+                }
+            </RadzenRow>
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" class="rz-mt-4">
+                <RadzenButton ButtonType="Radzen.ButtonType.Submit" ButtonStyle="ButtonStyle.Primary" Text="Save Changes" Disabled="@_isSaving" IsBusy="@_isSaving" />
+            </RadzenStack>
+        </RadzenTemplateForm>
+    </RadzenCard>
+
+    <!-- Account Information Card -->
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+            <RadzenIcon Icon="info" />
+            <RadzenText TextStyle="TextStyle.H6">Account Information</RadzenText>
+        </RadzenStack>
+
+        <RadzenDataGrid TItem="AccountInfo" Data="@GetAccountInfo()" AllowSorting="false" AllowPaging="false" Density="Density.Compact">
+            <Columns>
+                <RadzenDataGridColumn TItem="AccountInfo" Property="Label" Title="" Width="200px">
+                    <Template Context="item">
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">@item.Label</RadzenText>
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="AccountInfo" Property="Value" Title="">
+                    <Template Context="item">
+                        @if (item.Label == "Auth Method")
                         {
-                            <MudItem xs="12">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">Preview:</MudText>
-                                <MudAvatar Size="Size.Large">
-                                    <MudImage Src="@_avatarUrl" Alt="Avatar preview" />
-                                </MudAvatar>
-                            </MudItem>
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                @if (_profile!.AuthType == "github")
+                                {
+                                    <RadzenIcon Icon="code" Style="font-size: 1rem;" />
+                                    <RadzenText>GitHub</RadzenText>
+                                }
+                                else
+                                {
+                                    <RadzenIcon Icon="email" Style="font-size: 1rem;" />
+                                    <RadzenText>Email</RadzenText>
+                                }
+                            </RadzenStack>
                         }
-                    </MudGrid>
-                </MudForm>
-            </MudCardContent>
-            <MudCardActions Class="pa-4">
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           OnClick="SaveProfileAsync"
-                           Disabled="@(!_profileFormValid || _isSaving)">
-                    @if (_isSaving)
-                    {
-                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                    }
-                    Save Changes
-                </MudButton>
-            </MudCardActions>
-        </MudCard>
-
-        <!-- Account Information Card -->
-        <MudCard Class="mb-6">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudIcon Icon="@Icons.Material.Filled.Info" />
-                        <MudText Typo="Typo.h6">Account Information</MudText>
-                    </MudStack>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudSimpleTable Dense="true" Hover="true" Bordered="false" Striped="false" Class="rounded-lg">
-                    <tbody>
-                        <tr>
-                            <td><MudText Typo="Typo.body2" Color="Color.Secondary">Auth Method</MudText></td>
-                            <td>
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                    @if (_profile.AuthType == "github")
-                                    {
-                                        <MudIcon Icon="@Icons.Custom.Brands.GitHub" Size="Size.Small" />
-                                        <MudText>GitHub</MudText>
-                                    }
-                                    else
-                                    {
-                                        <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" />
-                                        <MudText>Email</MudText>
-                                    }
-                                </MudStack>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td><MudText Typo="Typo.body2" Color="Color.Secondary">Plan</MudText></td>
-                            <td>
-                                <MudChip T="string" Color="@GetPlanColor(_profile.Plan)" Size="Size.Small">
-                                    @_profile.Plan.ToUpperInvariant()
-                                </MudChip>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td><MudText Typo="Typo.body2" Color="Color.Secondary">Account Created</MudText></td>
-                            <td>@_profile.CreatedAt.ToString("MMMM d, yyyy")</td>
-                        </tr>
-                        @if (_profile.LastLoginAt.HasValue)
+                        else if (item.Label == "Plan")
                         {
-                            <tr>
-                                <td><MudText Typo="Typo.body2" Color="Color.Secondary">Last Login</MudText></td>
-                                <td>@_profile.LastLoginAt.Value.ToString("g")</td>
-                            </tr>
+                            <RadzenBadge BadgeStyle="@GetPlanBadgeStyle(_profile!.Plan)" Text="@_profile.Plan.ToUpperInvariant()" />
                         }
-                    </tbody>
-                </MudSimpleTable>
-            </MudCardContent>
-        </MudCard>
-
-        <!-- Change Password Card (only for email auth) -->
-        @if (_profile.AuthType == "email")
-        {
-            <MudCard Class="mb-6">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                            <MudIcon Icon="@Icons.Material.Filled.Lock" />
-                            <MudText Typo="Typo.h6">Change Password</MudText>
-                        </MudStack>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    <MudForm @ref="_passwordForm" @bind-IsValid="_passwordFormValid">
-                        <MudGrid Spacing="3">
-                            <MudItem xs="12">
-                                <MudTextField T="string"
-                                              @bind-Value="_currentPassword"
-                                              Label="Current Password"
-                                              Variant="Variant.Outlined"
-                                              InputType="InputType.Password"
-                                              Required="true"
-                                              RequiredError="Current password is required"
-                                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "current-password" } })" />
-                            </MudItem>
-                            <MudItem xs="12" sm="6">
-                                <MudTextField T="string"
-                                              @bind-Value="_newPassword"
-                                              Label="New Password"
-                                              Variant="Variant.Outlined"
-                                              InputType="InputType.Password"
-                                              Required="true"
-                                              RequiredError="New password is required"
-                                              Validation="@(new Func<string, IEnumerable<string>>(ValidatePassword))"
-                                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "new-password" } })" />
-                            </MudItem>
-                            <MudItem xs="12" sm="6">
-                                <MudTextField T="string"
-                                              @bind-Value="_confirmPassword"
-                                              Label="Confirm New Password"
-                                              Variant="Variant.Outlined"
-                                              InputType="InputType.Password"
-                                              Required="true"
-                                              RequiredError="Please confirm your password"
-                                              Validation="@(new Func<string, IEnumerable<string>>(ValidateConfirmPassword))"
-                                              UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "new-password" } })" />
-                            </MudItem>
-                        </MudGrid>
-                    </MudForm>
-                </MudCardContent>
-                <MudCardActions Class="pa-4">
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Primary"
-                               OnClick="ChangePasswordAsync"
-                               Disabled="@(!_passwordFormValid || _isChangingPassword)">
-                        @if (_isChangingPassword)
+                        else
                         {
-                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <RadzenText>@item.Value</RadzenText>
                         }
-                        Change Password
-                    </MudButton>
-                </MudCardActions>
-            </MudCard>
-        }
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
 
-        <!-- Danger Zone Card -->
-        <MudCard>
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
-                        <MudText Typo="Typo.h6" Color="Color.Error">Danger Zone</MudText>
-                    </MudStack>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudAlert Severity="Severity.Warning" Class="mb-4">
-                    Deleting your account is permanent and cannot be undone. All your projects, translations, and settings will be permanently deleted.
-                </MudAlert>
-                <MudButton Variant="Variant.Outlined"
-                           Color="Color.Error"
-                           OnClick="OpenDeleteDialog">
-                    Delete Account
-                </MudButton>
-            </MudCardContent>
-        </MudCard>
+    <!-- Change Password Card (only for email auth) -->
+    @if (_profile.AuthType == "email")
+    {
+        <RadzenCard class="rz-mb-4">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+                <RadzenIcon Icon="lock" />
+                <RadzenText TextStyle="TextStyle.H6">Change Password</RadzenText>
+            </RadzenStack>
+
+            <RadzenTemplateForm TItem="object" Data="@(new object())" Submit="@ChangePasswordAsync">
+                <RadzenRow Gap="1rem">
+                    <RadzenColumn Size="12">
+                        <RadzenFormField Text="Current Password" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                            <ChildContent>
+                                <RadzenPassword @bind-Value="_currentPassword" Name="CurrentPassword" Style="width: 100%;" autocomplete="current-password" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenRequiredValidator Component="CurrentPassword" Text="Current password is required" />
+                            </Helper>
+                        </RadzenFormField>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenFormField Text="New Password" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                            <ChildContent>
+                                <RadzenPassword @bind-Value="_newPassword" Name="NewPassword" Style="width: 100%;" autocomplete="new-password" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenRequiredValidator Component="NewPassword" Text="New password is required" />
+                                <RadzenLengthValidator Component="NewPassword" Min="12" Text="Password must be at least 12 characters" />
+                            </Helper>
+                        </RadzenFormField>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenFormField Text="Confirm New Password" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                            <ChildContent>
+                                <RadzenPassword @bind-Value="_confirmPassword" Name="ConfirmPassword" Style="width: 100%;" autocomplete="new-password" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenRequiredValidator Component="ConfirmPassword" Text="Please confirm your password" />
+                                <RadzenCompareValidator Component="ConfirmPassword" Value="@_newPassword" Text="Passwords do not match" />
+                            </Helper>
+                        </RadzenFormField>
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" class="rz-mt-4">
+                    <RadzenButton ButtonType="Radzen.ButtonType.Submit" ButtonStyle="ButtonStyle.Primary" Text="Change Password" Disabled="@_isChangingPassword" IsBusy="@_isChangingPassword" />
+                </RadzenStack>
+            </RadzenTemplateForm>
+        </RadzenCard>
     }
 
-<!-- Delete Account Dialog -->
-<MudDialog @bind-Visible="_showDeleteDialog" Options="@(new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
-            <MudText Typo="Typo.h6">Delete Account</MudText>
-        </MudStack>
-    </TitleContent>
-    <DialogContent>
-        <MudText Class="mb-4">
-            This action is <strong>permanent</strong> and cannot be undone. Enter your password to confirm.
-        </MudText>
-        <MudTextField T="string"
-                      @bind-Value="_deletePassword"
-                      Label="Password"
-                      Variant="Variant.Outlined"
-                      InputType="InputType.Password"
-                      Required="true"
-                      UserAttributes="@(new Dictionary<string, object> { { "autocomplete", "current-password" } })" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="() => _showDeleteDialog = false">Cancel</MudButton>
-        <MudButton Color="Color.Error"
-                   Variant="Variant.Filled"
-                   OnClick="DeleteAccountAsync"
-                   Disabled="@(string.IsNullOrEmpty(_deletePassword) || _isDeleting)">
-            @if (_isDeleting)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Delete My Account
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+    <!-- Danger Zone Card -->
+    <RadzenCard>
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+            <RadzenIcon Icon="warning" Style="color: var(--rz-danger);" />
+            <RadzenText TextStyle="TextStyle.H6" Style="color: var(--rz-danger);">Danger Zone</RadzenText>
+        </RadzenStack>
+
+        <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false" class="rz-mb-4">
+            Deleting your account is permanent and cannot be undone. All your projects, translations, and settings will be permanently deleted.
+        </RadzenAlert>
+
+        <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Danger" Text="Delete Account" Click="@OpenDeleteDialog" />
+    </RadzenCard>
+}
 
 @code {
     private UserProfileDto? _profile;
     private bool _isLoading = true;
     private bool _isSaving;
     private bool _isChangingPassword;
-    private bool _isDeleting;
-    private bool _showDeleteDialog;
 
     // Profile form
-    private MudForm? _profileForm;
-    private bool _profileFormValid;
     private string _username = string.Empty;
     private string _displayName = string.Empty;
     private string _avatarUrl = string.Empty;
 
     // Password form
-    private MudForm? _passwordForm;
-    private bool _passwordFormValid;
     private string _currentPassword = string.Empty;
     private string _newPassword = string.Empty;
     private string _confirmPassword = string.Empty;
 
-    // Delete account
-    private string _deletePassword = string.Empty;
+    // Helper class for account info display
+    private class AccountInfo
+    {
+        public string Label { get; set; } = "";
+        public string Value { get; set; } = "";
+    }
 
     protected override async Task OnInitializedAsync()
     {
         await LoadProfileAsync();
+    }
+
+    private IEnumerable<AccountInfo> GetAccountInfo()
+    {
+        if (_profile == null) yield break;
+
+        yield return new AccountInfo { Label = "Auth Method", Value = _profile.AuthType };
+        yield return new AccountInfo { Label = "Plan", Value = _profile.Plan };
+        yield return new AccountInfo { Label = "Account Created", Value = _profile.CreatedAt.ToString("MMMM d, yyyy") };
+        if (_profile.LastLoginAt.HasValue)
+        {
+            yield return new AccountInfo { Label = "Last Login", Value = _profile.LastLoginAt.Value.ToString("g") };
+        }
     }
 
     private async Task LoadProfileAsync()
@@ -318,7 +262,7 @@
         }
         else
         {
-            Snackbar.Add(result.ErrorMessage ?? "Failed to load profile", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to load profile");
         }
 
         _isLoading = false;
@@ -326,11 +270,6 @@
 
     private async Task SaveProfileAsync()
     {
-        if (_profileForm != null)
-            await _profileForm.Validate();
-
-        if (!_profileFormValid) return;
-
         _isSaving = true;
 
         var request = new UpdateProfileRequest
@@ -345,11 +284,11 @@
         if (result.IsSuccess)
         {
             _profile = result.Profile;
-            Snackbar.Add(result.SuccessMessage ?? "Profile updated", Severity.Success);
+            NotificationService.Notify(NotificationSeverity.Success, "Success", result.SuccessMessage ?? "Profile updated");
         }
         else
         {
-            Snackbar.Add(result.ErrorMessage ?? "Failed to update profile", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to update profile");
         }
 
         _isSaving = false;
@@ -357,10 +296,11 @@
 
     private async Task ChangePasswordAsync()
     {
-        if (_passwordForm != null)
-            await _passwordForm.Validate();
-
-        if (!_passwordFormValid) return;
+        if (_newPassword != _confirmPassword)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Passwords do not match");
+            return;
+        }
 
         _isChangingPassword = true;
 
@@ -374,84 +314,36 @@
 
         if (result.IsSuccess)
         {
-            Snackbar.Add(result.SuccessMessage ?? "Password changed", Severity.Success);
+            NotificationService.Notify(NotificationSeverity.Success, "Success", result.SuccessMessage ?? "Password changed");
             _currentPassword = string.Empty;
             _newPassword = string.Empty;
             _confirmPassword = string.Empty;
         }
         else
         {
-            Snackbar.Add(result.ErrorMessage ?? "Failed to change password", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to change password");
         }
 
         _isChangingPassword = false;
     }
 
-    private void OpenDeleteDialog()
+    private async Task OpenDeleteDialog()
     {
-        _deletePassword = string.Empty;
-        _showDeleteDialog = true;
-    }
+        var result = await DialogService.OpenAsync<DeleteAccountDialog>(
+            "Delete Account",
+            new Dictionary<string, object>(),
+            new Radzen.DialogOptions { Width = "500px" });
 
-    private async Task DeleteAccountAsync()
-    {
-        if (string.IsNullOrEmpty(_deletePassword)) return;
-
-        _isDeleting = true;
-
-        var request = new DeleteAccountRequest { Password = _deletePassword };
-        var result = await AuthService.DeleteAccountAsync(request);
-
-        if (result.IsSuccess)
+        if (result == true)
         {
-            Snackbar.Add("Account deleted successfully", Severity.Success);
             NavigationManager.NavigateTo("/app");
         }
-        else
-        {
-            Snackbar.Add(result.ErrorMessage ?? "Failed to delete account", Severity.Error);
-        }
-
-        _isDeleting = false;
-        _showDeleteDialog = false;
     }
 
-    private IEnumerable<string> ValidateUsername(string username)
+    private static BadgeStyle GetPlanBadgeStyle(string plan) => plan.ToLowerInvariant() switch
     {
-        if (string.IsNullOrWhiteSpace(username))
-            yield return "Username is required";
-        else if (username.Length < 3)
-            yield return "Username must be at least 3 characters";
-        else if (username.Length > 50)
-            yield return "Username cannot exceed 50 characters";
-        else if (!System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-zA-Z0-9_-]+$"))
-            yield return "Username can only contain letters, numbers, underscores, and hyphens";
-    }
-
-    private IEnumerable<string> ValidatePassword(string password)
-    {
-        if (string.IsNullOrWhiteSpace(password))
-            yield return "Password is required";
-        else if (password.Length < 12)
-            yield return "Password must be at least 12 characters";
-    }
-
-    private IEnumerable<string> ValidateConfirmPassword(string confirm)
-    {
-        if (confirm != _newPassword)
-            yield return "Passwords do not match";
-    }
-
-    private IEnumerable<string> ValidateUrl(string url)
-    {
-        if (!string.IsNullOrWhiteSpace(url) && !Uri.TryCreate(url, UriKind.Absolute, out _))
-            yield return "Please enter a valid URL";
-    }
-
-    private static Color GetPlanColor(string plan) => plan.ToLowerInvariant() switch
-    {
-        "pro" => Color.Primary,
-        "team" => Color.Secondary,
-        _ => Color.Default
+        "pro" => BadgeStyle.Primary,
+        "team" => BadgeStyle.Secondary,
+        _ => BadgeStyle.Light
     };
 }

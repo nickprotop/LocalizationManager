@@ -3,9 +3,9 @@
 @inject ProjectService ProjectService
 @inject ResourceService ResourceService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
 @inject IJSRuntime JS
-@inject IDialogService DialogService
+@inject Radzen.DialogService DialogService
 @inject ReviewWorkflowService WorkflowService
 @implements IAsyncDisposable
 @using LrmCloud.Web.Models
@@ -14,158 +14,103 @@
 @using LrmCloud.Shared.DTOs.Resources
 @using LrmCloud.Shared.DTOs.Translation
 @using LrmCloud.Shared.DTOs.Reviews
-@using MudBlazor
 
 <PageTitle>@(_project?.Name ?? "Editor") - LRM Cloud</PageTitle>
 
 @if (_isLoading)
 {
-    <MudStack>
-        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" />
-        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="calc(100vh - 250px)" />
-    </MudStack>
+    <RadzenStack Gap="1rem">
+        <RadzenSkeleton Style="height: 50px;" />
+        <RadzenSkeleton Style="height: calc(100vh - 250px);" />
+    </RadzenStack>
 }
 else if (_project == null)
 {
-    <MudAlert Severity="Severity.Error">
+    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">
         Project not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="">Go to Dashboard</MudButton>
-    </MudAlert>
+        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Primary" Text="Go to Dashboard"
+                      Click="@(() => Navigation.NavigateTo(""))" />
+    </RadzenAlert>
 }
 else
 {
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                           OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))"
-                           Size="Size.Small" />
-            <MudText Typo="Typo.h5">@_project.Name</MudText>
-            <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetFormatColor(_project.Format)">@_project.Format</MudChip>
-        </MudStack>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                          Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" />
+            <RadzenText TextStyle="TextStyle.H5">@_project.Name</RadzenText>
+            <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(_project.Format)" Text="@_project.Format" />
+        </RadzenStack>
 
-        <MudStack Row="true" Spacing="2">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
             @if (_hasUnsavedChanges)
             {
-                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Unsaved changes</MudChip>
+                <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Unsaved changes" />
             }
-            <MudButton Variant="Variant.Outlined"
-                       Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Refresh"
-                       OnClick="@RefreshData"
-                       Disabled="_isRefreshing">
-                @if (_isRefreshing)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                }
-                Refresh
-            </MudButton>
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Save"
-                       OnClick="@OpenSaveDialog"
-                       Disabled="@(!_hasUnsavedChanges || _isSaving)">
-                @if (_isSaving)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                }
-                Save
-            </MudButton>
-        </MudStack>
-    </MudStack>
+            <RadzenButton Variant="Radzen.Variant.Outlined" Size="ButtonSize.Small"
+                          Icon="refresh" Text="@(_isRefreshing ? "Refreshing..." : "Refresh")"
+                          Click="@RefreshData" Disabled="_isRefreshing" IsBusy="_isRefreshing" />
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                          Icon="save" Text="@(_isSaving ? "Saving..." : "Save")"
+                          Click="@OpenSaveDialog"
+                          Disabled="@(!_hasUnsavedChanges || _isSaving)" IsBusy="_isSaving" />
+        </RadzenStack>
+    </RadzenStack>
 
     @if (_stats != null)
     {
-        <MudStack Row="true" Class="mb-4" Spacing="2">
-            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
-                @_stats.TotalKeys keys
-            </MudChip>
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" class="rz-mb-4" Gap="0.5rem" Style="flex-wrap: wrap;">
+            <RadzenBadge Variant="Radzen.Variant.Outlined" Text="@($"{_stats.TotalKeys} keys")" />
             @foreach (var lang in _stats.Languages)
             {
-                <MudTooltip Text="@($"{lang.Value.TranslatedCount}/{_stats.TotalKeys} translated")">
-                    <MudChip T="string" Size="Size.Small"
-                             Color="@UiHelpers.GetCompletionColor(lang.Value.CompletionPercentage)"
-                             Variant="Variant.Outlined">
-                        @lang.Key: @lang.Value.CompletionPercentage.ToString("F0")%
-                    </MudChip>
-                </MudTooltip>
+                <span title="@($"{lang.Value.TranslatedCount}/{_stats.TotalKeys} translated")">
+                    <RadzenBadge Variant="Radzen.Variant.Outlined"
+                                 BadgeStyle="@GetCompletionBadgeStyle(lang.Value.CompletionPercentage)"
+                                 Text="@($"{lang.Key}: {lang.Value.CompletionPercentage:F0}%")" />
+                </span>
             }
-        </MudStack>
+        </RadzenStack>
     }
 
-    <TranslationGrid @ref="_translationGrid"
-                     ServerDataFunc="@LoadServerData"
-                     Languages="@_languages"
-                     DefaultLanguage="@_project.DefaultLanguage"
-                     OnRowSelected="@OnRowSelected"
-                     OnAddKeyClicked="@OpenAddKeyDialog"
-                     OnTranslateClicked="@OnTranslateSelected"
-                     OnDeleteClicked="@OnDeleteSelected"
-                     OnCellChanged="@OnCellChanged"
-                     OnSearchTextChanged="@OnSearchTextChanged"
-                     WorkflowEnabled="@_workflowEnabled"
-                     CanReview="@_canReview"
-                     CanApprove="@_canApprove"
-                     OnReviewClicked="@OnReviewSelected"
-                     OnApproveClicked="@OnApproveSelected" />
+    <div style="display: flex; gap: 1rem;">
+        <div style="@(_drawerOpen ? "flex: 1; min-width: 0;" : "flex: 1;")">
+            <TranslationGrid @ref="_translationGrid"
+                             ServerDataFunc="@LoadServerData"
+                             Languages="@_languages"
+                             DefaultLanguage="@_project.DefaultLanguage"
+                             OnRowSelected="@OnRowSelected"
+                             OnAddKeyClicked="@OpenAddKeyDialog"
+                             OnTranslateClicked="@OnTranslateSelected"
+                             OnDeleteClicked="@OnDeleteSelected"
+                             OnCellChanged="@OnCellChanged"
+                             OnSearchTextChanged="@OnSearchTextChanged"
+                             WorkflowEnabled="@_workflowEnabled"
+                             CanReview="@_canReview"
+                             CanApprove="@_canApprove"
+                             OnReviewClicked="@OnReviewSelected"
+                             OnApproveClicked="@OnApproveSelected" />
+        </div>
 
-    <MudDrawer @bind-Open="_drawerOpen"
-               Anchor="Anchor.Right"
-               Elevation="1"
-               Variant="DrawerVariant.Temporary"
-               Width="400px">
-        <MudDrawerHeader>
-            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
-                <MudText Typo="Typo.h6">Key Preview</MudText>
-                <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@CloseDrawer" Size="Size.Small" />
-            </MudStack>
-        </MudDrawerHeader>
-        <MudDrawerContainer Class="pa-4">
-            @if (_selectedRow != null)
-            {
-                <KeyDetailDrawer Row="@_selectedRow"
-                                 Languages="@_languages"
-                                 DefaultLanguage="@_project.DefaultLanguage"
-                                 OnEdit="@OpenKeyEditorDialog"
-                                 OnTranslate="@TranslateKey"
-                                 OnDelete="@DeleteKey" />
-            }
-        </MudDrawerContainer>
-    </MudDrawer>
+        @if (_drawerOpen && _selectedRow != null)
+        {
+            <RadzenCard Style="width: 400px; height: fit-content; flex-shrink: 0; position: sticky; top: 1rem;">
+                <RadzenStack Gap="1rem">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                        <RadzenText TextStyle="TextStyle.H6">Key Preview</RadzenText>
+                        <RadzenButton Icon="close" Variant="Radzen.Variant.Text" Size="ButtonSize.Small" Click="@CloseDrawer" />
+                    </RadzenStack>
+                    <KeyDetailDrawer Row="@_selectedRow"
+                                     Languages="@_languages"
+                                     DefaultLanguage="@_project.DefaultLanguage"
+                                     OnEdit="@OpenKeyEditorDialog"
+                                     OnTranslate="@TranslateKey"
+                                     OnDelete="@DeleteKey" />
+                </RadzenStack>
+            </RadzenCard>
+        }
+    </div>
 }
 
-<AddKeyDialog @ref="_addKeyDialog" OnKeyAdded="@OnKeyAdded" ProjectId="@ProjectId" />
-<ConfirmDeleteDialog @ref="_deleteDialog" OnConfirmed="@OnDeleteConfirmed" />
-
-@* Save Changes Dialog *@
-<MudDialog @bind-Visible="_saveDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">
-            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-2" />
-            Save Changes
-        </MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudText Typo="Typo.body2" Class="mb-3">
-            @_pendingSaveCount translation(s) will be saved.
-        </MudText>
-        <MudTextField @bind-Value="_saveMessage"
-                      Label="Message (optional)"
-                      Placeholder="e.g., Updated French translations"
-                      HelperText="This message will be recorded in sync history"
-                      Lines="2" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="CloseSaveDialog">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveChangesWithMessage" Disabled="_isSaving">
-            @if (_isSaving)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Save Changes
-        </MudButton>
-    </DialogActions>
-</MudDialog>
 
 @code {
     [Parameter]
@@ -179,16 +124,12 @@ else
     private bool _isSaving;
     private bool _hasUnsavedChanges;
     private bool _drawerOpen;
-    private TranslationGridRow? _selectedRow;        // Row shown in drawer (for preview and passing to dialog)
-    private AddKeyDialog? _addKeyDialog;
-    private ConfirmDeleteDialog? _deleteDialog;
-    private IEnumerable<TranslationGridRow>? _pendingDeleteRows;
+    private TranslationGridRow? _selectedRow;
     private TranslationGrid? _translationGrid;
     private string _searchText = string.Empty;
     private Dictionary<string, TranslationGridRow> _editedRows = new();
 
     // Save dialog
-    private bool _saveDialogVisible;
     private string _saveMessage = "";
     private int _pendingSaveCount;
 
@@ -197,16 +138,19 @@ else
     private bool _canReview;
     private bool _canApprove;
 
-    /// <summary>
-    /// Whether the current project format supports plural keys.
-    /// JSON/i18next support plurals, RESX does not.
-    /// </summary>
     private bool SupportsPluralKeys => _project?.Format?.ToLowerInvariant() switch
     {
         "json" => true,
         "i18next" => true,
         "resx" => false,
         _ => false
+    };
+
+    private static BadgeStyle GetCompletionBadgeStyle(double percentage) => percentage switch
+    {
+        >= 90 => BadgeStyle.Success,
+        >= 50 => BadgeStyle.Warning,
+        _ => BadgeStyle.Danger
     };
 
     protected override async Task OnInitializedAsync()
@@ -225,22 +169,18 @@ else
                 _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
                 _languages = _stats?.Languages.Keys.ToList() ?? new List<string> { _project.DefaultLanguage };
 
-                // Ensure default language is first
                 if (_languages.Contains(_project.DefaultLanguage))
                 {
                     _languages.Remove(_project.DefaultLanguage);
                     _languages.Insert(0, _project.DefaultLanguage);
                 }
 
-                // Load workflow settings
                 await LoadWorkflowAsync();
-
-                // Grid will load data via ServerData callback
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error loading project: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error loading project: {ex.Message}");
         }
         finally
         {
@@ -259,7 +199,6 @@ else
 
                 if (_workflowEnabled)
                 {
-                    // Check user permissions
                     _canReview = await WorkflowService.CanReviewAsync(ProjectId);
                     _canApprove = await WorkflowService.CanApproveAsync(ProjectId);
                 }
@@ -267,37 +206,29 @@ else
         }
         catch
         {
-            // Workflow feature may not be enabled, ignore errors
             _workflowEnabled = false;
         }
     }
 
-    /// <summary>
-    /// Server-side data loading callback for the grid.
-    /// </summary>
-    private async Task<GridData<TranslationGridRow>> LoadServerData(GridState<TranslationGridRow> state)
+    private async Task<Models.GridData<TranslationGridRow>> LoadServerData(Models.GridState<TranslationGridRow> state)
     {
         try
         {
-            // Get sort info
             var sortDef = state.SortDefinitions.FirstOrDefault();
             var sortBy = sortDef?.SortBy;
             var sortDesc = sortDef?.Descending ?? false;
 
-            // Call paginated API
             var result = await ResourceService.GetResourceKeysPagedAsync(
                 ProjectId,
-                state.Page + 1,  // MudDataGrid uses 0-indexed pages
+                state.Page + 1,
                 state.PageSize,
                 _searchText,
                 sortBy,
                 sortDesc);
 
-            // Map API results to grid rows
             var rows = new List<TranslationGridRow>();
             foreach (var detail in result.Items)
             {
-                // Check if we have a cached edited row
                 if (_editedRows.TryGetValue(detail.KeyName, out var editedRow))
                 {
                     rows.Add(editedRow);
@@ -313,14 +244,12 @@ else
                     Comment = detail.Comment,
                     Version = detail.Version,
                     UpdatedAt = detail.UpdatedAt,
-                    // Set original values for dirty tracking
                     OriginalComment = detail.Comment,
                     OriginalIsPlural = detail.IsPlural
                 };
 
                 foreach (var translation in detail.Translations)
                 {
-                    // Use key that includes plural form for plural keys
                     var key = detail.IsPlural
                         ? TranslationGridRow.GetKey(translation.LanguageCode, translation.PluralForm)
                         : translation.LanguageCode;
@@ -337,12 +266,10 @@ else
                     };
                 }
 
-                // Ensure all languages have entries
                 foreach (var lang in _languages)
                 {
                     if (detail.IsPlural)
                     {
-                        // For plural keys, ensure all plural forms exist
                         foreach (var pluralForm in PluralForms.Common)
                         {
                             var key = TranslationGridRow.GetKey(lang, pluralForm);
@@ -360,7 +287,6 @@ else
                     }
                     else
                     {
-                        // For non-plural keys, ensure language exists
                         if (!row.Translations.ContainsKey(lang))
                         {
                             row.Translations[lang] = new TranslationCell
@@ -376,7 +302,7 @@ else
                 rows.Add(row);
             }
 
-            return new GridData<TranslationGridRow>
+            return new Models.GridData<TranslationGridRow>
             {
                 Items = rows,
                 TotalItems = result.TotalCount
@@ -384,8 +310,8 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error loading data: {ex.Message}", Severity.Error);
-            return new GridData<TranslationGridRow> { Items = new List<TranslationGridRow>(), TotalItems = 0 };
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error loading data: {ex.Message}");
+            return new Models.GridData<TranslationGridRow> { Items = new List<TranslationGridRow>(), TotalItems = 0 };
         }
     }
 
@@ -398,7 +324,7 @@ else
     {
         if (_hasUnsavedChanges)
         {
-            Snackbar.Add("Please save or discard your changes before refreshing", Severity.Warning);
+            NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Please save or discard your changes before refreshing");
             return;
         }
 
@@ -411,11 +337,11 @@ else
             {
                 await _translationGrid.ReloadAsync();
             }
-            Snackbar.Add("Data refreshed", Severity.Success);
+            NotificationService.Notify(NotificationSeverity.Success, "Success", "Data refreshed");
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error refreshing: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error refreshing: {ex.Message}");
         }
         finally
         {
@@ -423,18 +349,12 @@ else
         }
     }
 
-    // ============================================================
-    // Save Dialog Methods
-    // ============================================================
-
-    private void OpenSaveDialog()
+    private async Task OpenSaveDialog()
     {
-        // Count pending changes
         _pendingSaveCount = _editedRows.Values
             .SelectMany(r => r.Translations.Values)
             .Count(t => t.IsDirty);
 
-        // Generate default message
         var languagesChanged = _editedRows.Values
             .SelectMany(r => r.Translations.Where(t => t.Value.IsDirty))
             .Select(t => t.Key)
@@ -454,19 +374,32 @@ else
             _saveMessage = "Updated via web editor";
         }
 
-        _saveDialogVisible = true;
-    }
+        var result = await DialogService.OpenAsync("Save Changes", ds =>
+            @<RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenIcon Icon="save" />
+                    <RadzenText>@_pendingSaveCount translation(s) will be saved.</RadzenText>
+                </RadzenStack>
+                <RadzenFormField Text="Message (optional)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextArea @bind-Value="_saveMessage" Rows="2" Style="width: 100%;"
+                                        Placeholder="e.g., Updated French translations" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">This message will be recorded in sync history</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                    <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@(() => ds.Close(false))" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Save Changes" Click="@(() => ds.Close(true))" />
+                </RadzenStack>
+            </RadzenStack>,
+            new Radzen.DialogOptions { Width = "500px" });
 
-    private void CloseSaveDialog()
-    {
-        _saveDialogVisible = false;
-        _saveMessage = "";
-    }
-
-    private async Task SaveChangesWithMessage()
-    {
-        _saveDialogVisible = false;
-        await SaveChanges();
+        if (result is true)
+        {
+            await SaveChanges();
+        }
     }
 
     private async Task SaveChanges()
@@ -475,7 +408,6 @@ else
 
         try
         {
-            // Build the batch save request
             var request = new BatchSaveRequest
             {
                 Message = _saveMessage
@@ -483,7 +415,6 @@ else
 
             foreach (var row in _editedRows.Values)
             {
-                // Add key metadata changes (Comment only - IsPlural changes are more complex)
                 if (row.IsKeyMetadataDirty && row.Comment != row.OriginalComment)
                 {
                     request.KeyChanges.Add(new KeyChangeDto
@@ -493,7 +424,6 @@ else
                     });
                 }
 
-                // Add translation changes
                 foreach (var (langKey, cell) in row.Translations.Where(t => t.Value.IsDirty))
                 {
                     request.TranslationChanges.Add(new TranslationChangeDto
@@ -507,14 +437,12 @@ else
                 }
             }
 
-            // Call batch save API
             var result = await ResourceService.BatchSaveAsync(ProjectId, request);
 
             if (result.IsSuccess && result.Data != null)
             {
                 var response = result.Data;
 
-                // Mark all dirty cells as clean
                 foreach (var row in _editedRows.Values)
                 {
                     if (row.Comment != row.OriginalComment)
@@ -529,7 +457,6 @@ else
                     }
                 }
 
-                // Remove rows that have no more dirty changes
                 var keysToRemove = _editedRows
                     .Where(kv => !kv.Value.Translations.Values.Any(t => t.IsDirty) && !kv.Value.IsKeyMetadataDirty)
                     .Select(kv => kv.Key)
@@ -542,7 +469,6 @@ else
                 _hasUnsavedChanges = _editedRows.Any(kv =>
                     kv.Value.Translations.Values.Any(t => t.IsDirty) || kv.Value.IsKeyMetadataDirty);
 
-                // Show success message with history ID
                 var message = $"Saved {response.TranslationsModified} translations";
                 if (response.KeysModified > 0)
                 {
@@ -552,19 +478,18 @@ else
                 {
                     message += $" (history: {response.HistoryId})";
                 }
-                Snackbar.Add(message, Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Saved", message);
 
-                // Refresh stats
                 _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
             }
             else
             {
-                Snackbar.Add($"Error saving: {result.ErrorMessage}", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error saving: {result.ErrorMessage}");
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error saving: {ex.Message}");
         }
         finally
         {
@@ -574,7 +499,7 @@ else
 
     private void OnRowSelected(TranslationGridRow row)
     {
-        _selectedRow = row; // Drawer is now read-only preview
+        _selectedRow = row;
         _drawerOpen = true;
     }
 
@@ -586,7 +511,6 @@ else
 
     private void OnCellChanged((TranslationGridRow Row, string LanguageCode, string Value) args)
     {
-        // Track the edited row
         if (!_editedRows.ContainsKey(args.Row.KeyName))
         {
             _editedRows[args.Row.KeyName] = args.Row;
@@ -594,14 +518,16 @@ else
         _hasUnsavedChanges = true;
     }
 
-    private void OpenAddKeyDialog()
+    private async Task OpenAddKeyDialog()
     {
-        _addKeyDialog?.Open();
-    }
+        var result = await DialogService.OpenAsync<AddKeyDialog>("Add Key",
+            new Dictionary<string, object> { { "ProjectId", ProjectId } },
+            new Radzen.DialogOptions { Width = "500px" });
 
-    private async Task OnKeyAdded(ResourceKeyDto key)
-    {
-        await RefreshData();
+        if (result is ResourceKeyDto key)
+        {
+            await RefreshData();
+        }
     }
 
     private async Task OnTranslateSelected(IEnumerable<TranslationGridRow> rows)
@@ -609,45 +535,27 @@ else
         if (_project == null) return;
 
         var rowList = rows.ToList();
-
-        // Build source texts from current UI state (may include unsaved edits)
         var sourceTexts = BuildSourceTextsFromRows(rowList, _project.DefaultLanguage);
-
-        // Build key metadata to tell API about unsaved state (e.g., IsPlural)
         var keyMetadata = BuildKeyMetadataFromRows(rowList);
 
-        var parameters = new DialogParameters
-        {
-            { nameof(TranslateDialog.ProjectId), ProjectId },
-            { nameof(TranslateDialog.SourceLanguage), _project.DefaultLanguage },
-            { nameof(TranslateDialog.AvailableLanguages), _languages },
-            { nameof(TranslateDialog.KeysToTranslate), rowList.Select(r => r.KeyName).ToList() },
-            { nameof(TranslateDialog.SourceTexts), sourceTexts },
-            { nameof(TranslateDialog.KeyMetadata), keyMetadata }
-        };
+        var result = await DialogService.OpenAsync<TranslateDialog>("Translate",
+            new Dictionary<string, object>
+            {
+                { "ProjectId", ProjectId },
+                { "SourceLanguage", _project.DefaultLanguage },
+                { "AvailableLanguages", _languages },
+                { "KeysToTranslate", rowList.Select(r => r.KeyName).ToList() },
+                { "SourceTexts", sourceTexts },
+                { "KeyMetadata", keyMetadata }
+            },
+            new Radzen.DialogOptions { Width = "700px" });
 
-        var options = new DialogOptions
+        if (result is TranslateResponseDto translationResult)
         {
-            MaxWidth = MaxWidth.Medium,
-            FullWidth = true,
-            CloseButton = true,
-            BackdropClick = false
-        };
-
-        var dialog = await DialogService.ShowAsync<TranslateDialog>("Translate", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false, Data: TranslateResponseDto translationResult })
-        {
-            // Apply translations to UI state instead of refreshing from DB
             ApplyTranslationsToUI(rowList, translationResult);
         }
     }
 
-    /// <summary>
-    /// Applies translation results to the UI state, marking cells as dirty so Save button enables.
-    /// Handles both non-plural and plural keys.
-    /// </summary>
     private void ApplyTranslationsToUI(List<TranslationGridRow> rows, TranslateResponseDto translationResult)
     {
         var rowsByKey = rows.ToDictionary(r => r.KeyName);
@@ -660,14 +568,12 @@ else
                 continue;
             }
 
-            // Build the cell key: "lang" for non-plural, "lang:pluralForm" for plural
             var cellKey = string.IsNullOrEmpty(translationRes.PluralForm)
                 ? translationRes.TargetLanguage
                 : TranslationGridRow.GetKey(translationRes.TargetLanguage, translationRes.PluralForm);
 
             if (!row.Translations.TryGetValue(cellKey, out var cell))
             {
-                // Create new cell for this language/plural form
                 cell = new TranslationCell
                 {
                     LanguageCode = translationRes.TargetLanguage,
@@ -678,11 +584,9 @@ else
                 row.Translations[cellKey] = cell;
             }
 
-            // Apply translated text and mark as dirty
             cell.Value = translationRes.TranslatedText;
             cell.IsDirty = true;
 
-            // Track edited row
             if (!_editedRows.ContainsKey(row.KeyName))
             {
                 _editedRows[row.KeyName] = row;
@@ -694,28 +598,34 @@ else
         if (appliedCount > 0)
         {
             _hasUnsavedChanges = true;
-            Snackbar.Add($"Applied {appliedCount} translations. Click Save to persist changes.", Severity.Info);
+            NotificationService.Notify(NotificationSeverity.Info, "Applied", $"Applied {appliedCount} translations. Click Save to persist changes.");
             StateHasChanged();
         }
     }
 
-    private void OnDeleteSelected(IEnumerable<TranslationGridRow> rows)
+    private async Task OnDeleteSelected(IEnumerable<TranslationGridRow> rows)
     {
-        _pendingDeleteRows = rows;
-        _deleteDialog?.Open(
-            "Delete Keys",
-            $"Are you sure you want to delete {rows.Count()} key(s)? This action cannot be undone.",
-            rows.Select(r => r.KeyName).ToList());
+        var rowList = rows.ToList();
+        var result = await DialogService.OpenAsync<ConfirmDeleteDialog>("Delete Keys",
+            new Dictionary<string, object>
+            {
+                { "Message", $"Are you sure you want to delete {rowList.Count} key(s)? This action cannot be undone." },
+                { "Items", rowList.Select(r => r.KeyName).ToList() }
+            },
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result is true)
+        {
+            await PerformDelete(rowList);
+        }
     }
 
-    private async Task OnDeleteConfirmed()
+    private async Task PerformDelete(IEnumerable<TranslationGridRow> rows)
     {
-        if (_pendingDeleteRows == null) return;
-
         var deleted = 0;
         var failed = 0;
 
-        foreach (var row in _pendingDeleteRows)
+        foreach (var row in rows)
         {
             var result = await ResourceService.DeleteResourceKeyAsync(ProjectId, row.KeyName);
             if (result.IsSuccess)
@@ -725,116 +635,75 @@ else
         }
 
         if (failed > 0)
-            Snackbar.Add($"Deleted {deleted} keys, {failed} failed", Severity.Warning);
+            NotificationService.Notify(NotificationSeverity.Warning, "Partial Success", $"Deleted {deleted} keys, {failed} failed");
         else
-            Snackbar.Add($"Deleted {deleted} keys", Severity.Success);
+            NotificationService.Notify(NotificationSeverity.Success, "Deleted", $"Deleted {deleted} keys");
 
-        _pendingDeleteRows = null;
         await RefreshData();
     }
 
-    /// <summary>
-    /// Opens the KeyEditorDialog for full editing capabilities.
-    /// Called from the drawer's Edit button.
-    /// </summary>
     private async Task OpenKeyEditorDialog(TranslationGridRow row)
     {
         if (_project == null) return;
 
-        // Create a clone for the dialog to work on (isolated from grid)
         var editingRow = row.Clone();
 
-        var parameters = new DialogParameters
-        {
-            { nameof(KeyEditorDialog.Row), editingRow },
-            { nameof(KeyEditorDialog.Languages), _languages },
-            { nameof(KeyEditorDialog.DefaultLanguage), _project.DefaultLanguage },
-            { nameof(KeyEditorDialog.ProjectFormat), _project.Format },
-            { nameof(KeyEditorDialog.SupportsPluralKeys), SupportsPluralKeys },
-            { nameof(KeyEditorDialog.OnTranslate), EventCallback.Factory.Create<TranslationGridRow>(this, TranslateKeyInDialog) }
-        };
+        var result = await DialogService.OpenAsync<KeyEditorDialog>("Edit Key",
+            new Dictionary<string, object>
+            {
+                { "Row", editingRow },
+                { "Languages", _languages },
+                { "DefaultLanguage", _project.DefaultLanguage },
+                { "ProjectFormat", _project.Format },
+                { "SupportsPluralKeys", SupportsPluralKeys },
+                { "OnTranslate", EventCallback.Factory.Create<TranslationGridRow>(this, TranslateKeyInDialog) }
+            },
+            new Radzen.DialogOptions { Width = "900px" });
 
-        var options = new DialogOptions
+        if (result is TranslationGridRow editedRow)
         {
-            MaxWidth = MaxWidth.Large,
-            FullWidth = true,
-            CloseButton = true,
-            BackdropClick = false
-        };
-
-        var dialog = await DialogService.ShowAsync<KeyEditorDialog>("Edit Key", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false, Data: TranslationGridRow editedRow })
-        {
-            // Apply changes from the dialog's clone to the original row in the grid
             row.ApplyFrom(editedRow);
 
-            // Track the row as edited
             if (!_editedRows.ContainsKey(row.KeyName))
             {
                 _editedRows[row.KeyName] = row;
             }
 
-            // Mark that we have unsaved changes
             _hasUnsavedChanges = true;
-
-            // Close the drawer since edits have been applied
             _drawerOpen = false;
             _selectedRow = null;
 
-            Snackbar.Add("Changes staged. Click Save to persist.", Severity.Info);
+            NotificationService.Notify(NotificationSeverity.Info, "Staged", "Changes staged. Click Save to persist.");
             StateHasChanged();
         }
     }
 
-    /// <summary>
-    /// Handles translation requests from within the KeyEditorDialog.
-    /// Opens the translate dialog and applies results to the dialog's row.
-    /// </summary>
     private async Task TranslateKeyInDialog(TranslationGridRow dialogRow)
     {
         if (_project == null) return;
 
         var rowList = new List<TranslationGridRow> { dialogRow };
-
-        // Build source texts from the dialog row's current state
         var sourceTexts = BuildSourceTextsFromRows(rowList, _project.DefaultLanguage);
-
-        // Build key metadata
         var keyMetadata = BuildKeyMetadataFromRows(rowList);
 
-        var parameters = new DialogParameters
-        {
-            { nameof(TranslateDialog.ProjectId), ProjectId },
-            { nameof(TranslateDialog.SourceLanguage), _project.DefaultLanguage },
-            { nameof(TranslateDialog.AvailableLanguages), _languages },
-            { nameof(TranslateDialog.KeysToTranslate), new List<string> { dialogRow.KeyName } },
-            { nameof(TranslateDialog.SourceTexts), sourceTexts },
-            { nameof(TranslateDialog.KeyMetadata), keyMetadata }
-        };
+        var result = await DialogService.OpenAsync<TranslateDialog>("Translate",
+            new Dictionary<string, object>
+            {
+                { "ProjectId", ProjectId },
+                { "SourceLanguage", _project.DefaultLanguage },
+                { "AvailableLanguages", _languages },
+                { "KeysToTranslate", new List<string> { dialogRow.KeyName } },
+                { "SourceTexts", sourceTexts },
+                { "KeyMetadata", keyMetadata }
+            },
+            new Radzen.DialogOptions { Width = "700px" });
 
-        var options = new DialogOptions
+        if (result is TranslateResponseDto translationResult)
         {
-            MaxWidth = MaxWidth.Medium,
-            FullWidth = true,
-            CloseButton = true,
-            BackdropClick = false
-        };
-
-        var dialog = await DialogService.ShowAsync<TranslateDialog>("Translate", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false, Data: TranslateResponseDto translationResult })
-        {
-            // Apply translations directly to the dialog row (it's a clone, user will save from dialog)
             ApplyTranslationsToRow(dialogRow, translationResult);
         }
     }
 
-    /// <summary>
-    /// Applies translation results to a specific row.
-    /// </summary>
     private void ApplyTranslationsToRow(TranslationGridRow row, TranslateResponseDto translationResult)
     {
         var appliedCount = 0;
@@ -864,60 +733,36 @@ else
 
         if (appliedCount > 0)
         {
-            Snackbar.Add($"Applied {appliedCount} translation(s)", Severity.Success);
+            NotificationService.Notify(NotificationSeverity.Success, "Applied", $"Applied {appliedCount} translation(s)");
         }
     }
 
-    /// <summary>
-    /// Translates a single key from the drawer's Translate button.
-    /// Since the drawer now shows the actual row (not a clone), translations are
-    /// directly applied and marked as staged for saving.
-    /// </summary>
     private async Task TranslateKey(TranslationGridRow row)
     {
         if (_project == null) return;
 
         var rowList = new List<TranslationGridRow> { row };
-
-        // Build source texts from current UI state (may include unsaved edits)
         var sourceTexts = BuildSourceTextsFromRows(rowList, _project.DefaultLanguage);
-
-        // Build key metadata to tell API about unsaved state (e.g., IsPlural)
         var keyMetadata = BuildKeyMetadataFromRows(rowList);
 
-        var parameters = new DialogParameters
-        {
-            { nameof(TranslateDialog.ProjectId), ProjectId },
-            { nameof(TranslateDialog.SourceLanguage), _project.DefaultLanguage },
-            { nameof(TranslateDialog.AvailableLanguages), _languages },
-            { nameof(TranslateDialog.KeysToTranslate), new List<string> { row.KeyName } },
-            { nameof(TranslateDialog.SourceTexts), sourceTexts },
-            { nameof(TranslateDialog.KeyMetadata), keyMetadata }
-        };
+        var result = await DialogService.OpenAsync<TranslateDialog>("Translate",
+            new Dictionary<string, object>
+            {
+                { "ProjectId", ProjectId },
+                { "SourceLanguage", _project.DefaultLanguage },
+                { "AvailableLanguages", _languages },
+                { "KeysToTranslate", new List<string> { row.KeyName } },
+                { "SourceTexts", sourceTexts },
+                { "KeyMetadata", keyMetadata }
+            },
+            new Radzen.DialogOptions { Width = "700px" });
 
-        var options = new DialogOptions
+        if (result is TranslateResponseDto translationResult)
         {
-            MaxWidth = MaxWidth.Medium,
-            FullWidth = true,
-            CloseButton = true,
-            BackdropClick = false
-        };
-
-        var dialog = await DialogService.ShowAsync<TranslateDialog>("Translate", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false, Data: TranslateResponseDto translationResult })
-        {
-            // Apply translations directly to the row and stage them
             ApplyTranslationsToUI(rowList, translationResult);
         }
     }
 
-    /// <summary>
-    /// Builds a dictionary of source texts from the current UI state.
-    /// This allows translating unsaved edits (what the user sees in the editor).
-    /// For plural keys, includes all plural forms with "keyName:pluralForm" keys.
-    /// </summary>
     private Dictionary<string, string> BuildSourceTextsFromRows(List<TranslationGridRow> rows, string defaultLanguage)
     {
         var sourceTexts = new Dictionary<string, string>();
@@ -926,20 +771,17 @@ else
         {
             if (row.IsPlural)
             {
-                // For plural keys, include all plural forms
                 foreach (var pluralForm in PluralForms.All)
                 {
                     var cell = row.GetCell(defaultLanguage, pluralForm);
                     if (cell != null && !string.IsNullOrEmpty(cell.Value))
                     {
-                        // Use "keyName:pluralForm" format for plural keys
                         sourceTexts[$"{row.KeyName}:{pluralForm}"] = cell.Value;
                     }
                 }
             }
             else
             {
-                // For non-plural keys, just use the key name
                 var cell = row.Translations.GetValueOrDefault(defaultLanguage);
                 if (cell != null && !string.IsNullOrEmpty(cell.Value))
                 {
@@ -951,10 +793,6 @@ else
         return sourceTexts;
     }
 
-    /// <summary>
-    /// Builds a dictionary of key metadata from the current UI state.
-    /// This tells the API about unsaved changes like IsPlural conversions.
-    /// </summary>
     private Dictionary<string, KeyTranslationMetadata> BuildKeyMetadataFromRows(List<TranslationGridRow> rows)
     {
         var metadata = new Dictionary<string, KeyTranslationMetadata>();
@@ -972,16 +810,19 @@ else
 
     private async Task DeleteKey(TranslationGridRow row)
     {
-        _pendingDeleteRows = new[] { row };
-        _deleteDialog?.Open(
-            "Delete Key",
-            $"Are you sure you want to delete '{row.KeyName}'? This action cannot be undone.",
-            new List<string> { row.KeyName });
-    }
+        var result = await DialogService.OpenAsync<ConfirmDeleteDialog>("Delete Key",
+            new Dictionary<string, object>
+            {
+                { "Message", $"Are you sure you want to delete '{row.KeyName}'? This action cannot be undone." },
+                { "Items", new List<string> { row.KeyName } }
+            },
+            new Radzen.DialogOptions { Width = "500px" });
 
-    // ============================================================
-    // Review/Approve Actions
-    // ============================================================
+        if (result is true)
+        {
+            await PerformDelete(new[] { row });
+        }
+    }
 
     private async Task OnReviewSelected(IEnumerable<TranslationGridRow> rows)
     {
@@ -995,7 +836,7 @@ else
 
         if (!translationIds.Any())
         {
-            Snackbar.Add("No translations eligible for review (must be in 'translated' status)", Severity.Warning);
+            NotificationService.Notify(NotificationSeverity.Warning, "Warning", "No translations eligible for review (must be in 'translated' status)");
             return;
         }
 
@@ -1009,9 +850,9 @@ else
             var result = await WorkflowService.ReviewTranslationsAsync(ProjectId, request);
             if (result != null)
             {
-                Snackbar.Add($"Reviewed {result.ProcessedCount} translation(s){(result.SkippedCount > 0 ? $", {result.SkippedCount} skipped" : "")}", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Reviewed",
+                    $"Reviewed {result.ProcessedCount} translation(s){(result.SkippedCount > 0 ? $", {result.SkippedCount} skipped" : "")}");
 
-                // Refresh grid to show new status
                 if (_translationGrid != null)
                 {
                     await _translationGrid.ReloadAsync();
@@ -1020,7 +861,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error reviewing translations: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error reviewing translations: {ex.Message}");
         }
     }
 
@@ -1036,7 +877,7 @@ else
 
         if (!translationIds.Any())
         {
-            Snackbar.Add("No translations eligible for approval (must be in 'translated' or 'reviewed' status)", Severity.Warning);
+            NotificationService.Notify(NotificationSeverity.Warning, "Warning", "No translations eligible for approval (must be in 'translated' or 'reviewed' status)");
             return;
         }
 
@@ -1050,9 +891,9 @@ else
             var result = await WorkflowService.ApproveTranslationsAsync(ProjectId, request);
             if (result != null)
             {
-                Snackbar.Add($"Approved {result.ProcessedCount} translation(s){(result.SkippedCount > 0 ? $", {result.SkippedCount} skipped" : "")}", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Approved",
+                    $"Approved {result.ProcessedCount} translation(s){(result.SkippedCount > 0 ? $", {result.SkippedCount} skipped" : "")}");
 
-                // Refresh grid to show new status
                 if (_translationGrid != null)
                 {
                     await _translationGrid.ReloadAsync();
@@ -1061,14 +902,11 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error approving translations: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error approving translations: {ex.Message}");
         }
     }
 
-    // ============================================================
     // Keyboard Shortcuts
-    // ============================================================
-
     private DotNetObjectReference<Editor>? _dotNetRef;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -1102,7 +940,6 @@ else
     [JSInvokable]
     public async Task OnKeyboardSearch()
     {
-        // Focus the search input in the grid
         await JS.InvokeVoidAsync("lrmKeyboard.focusElement", ".translation-grid input[type='text']");
     }
 
@@ -1119,8 +956,6 @@ else
     [JSInvokable]
     public void OnKeyboardDelete()
     {
-        // This would require getting selected items from the grid
-        // For now, just show a message
-        Snackbar.Add("Select rows and click Delete to remove keys", Severity.Info);
+        NotificationService.Notify(NotificationSeverity.Info, "Tip", "Select rows and click Delete to remove keys");
     }
 }

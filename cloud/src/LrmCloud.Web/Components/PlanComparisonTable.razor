@@ -1,175 +1,152 @@
 @using LrmCloud.Shared.DTOs.Billing
 @using LrmCloud.Web.Helpers
 
-<MudSimpleTable Hover="true" Dense="@Dense">
-    <thead>
-        <tr>
-            <th>Feature</th>
-            <th class="text-center">
-                <MudStack AlignItems="AlignItems.Center">
-                    <MudText>Free</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">$@((Limits?.Free.Price ?? 0).ToString("0"))/mo</MudText>
+<RadzenDataGrid TItem="PlanFeature" Data="@GetFeatures()" Density="Density.Compact" AllowSorting="false" AllowPaging="false">
+    <Columns>
+        <RadzenDataGridColumn TItem="PlanFeature" Property="Feature" Title="Feature" Width="200px" />
+        <RadzenDataGridColumn TItem="PlanFeature" Title="Free" TextAlign="TextAlign.Center">
+            <HeaderTemplate>
+                <RadzenStack AlignItems="Radzen.AlignItems.Center">
+                    <RadzenText>Free</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">$@((Limits?.Free.Price ?? 0).ToString("0"))/mo</RadzenText>
                     @if (CurrentPlan?.ToLower() == "free")
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">Current</MudChip>
+                        <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="Current" />
                     }
-                </MudStack>
-            </th>
-            <th class="text-center">
-                <MudStack AlignItems="AlignItems.Center">
-                    <MudText>Team</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">$@((Limits?.Team.Price ?? 9).ToString("0"))/mo</MudText>
+                </RadzenStack>
+            </HeaderTemplate>
+            <Template Context="feature">
+                @if (feature.FreeValue == "check")
+                {
+                    <RadzenIcon Icon="check" Style="color: var(--rz-success);" />
+                }
+                else if (feature.FreeValue == "close")
+                {
+                    <RadzenIcon Icon="close" class="rz-color-secondary" />
+                }
+                else
+                {
+                    @feature.FreeValue
+                }
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="PlanFeature" Title="Team" TextAlign="TextAlign.Center">
+            <HeaderTemplate>
+                <RadzenStack AlignItems="Radzen.AlignItems.Center">
+                    <RadzenText>Team</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">$@((Limits?.Team.Price ?? 9).ToString("0"))/mo</RadzenText>
                     @if (CurrentPlan?.ToLower() == "team")
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary">Current</MudChip>
+                        <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Text="Current" />
                     }
-                </MudStack>
-            </th>
-            <th class="text-center">
-                <MudStack AlignItems="AlignItems.Center">
-                    <MudText>Enterprise</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">$@((Limits?.Enterprise.Price ?? 29).ToString("0"))/mo</MudText>
+                </RadzenStack>
+            </HeaderTemplate>
+            <Template Context="feature">
+                @if (feature.TeamValue == "check")
+                {
+                    <RadzenIcon Icon="check" Style="color: var(--rz-success);" />
+                }
+                else if (feature.TeamValue == "close")
+                {
+                    <RadzenIcon Icon="close" class="rz-color-secondary" />
+                }
+                else
+                {
+                    @feature.TeamValue
+                }
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="PlanFeature" Title="Enterprise" TextAlign="TextAlign.Center">
+            <HeaderTemplate>
+                <RadzenStack AlignItems="Radzen.AlignItems.Center">
+                    <RadzenText>Enterprise</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">$@((Limits?.Enterprise.Price ?? 29).ToString("0"))/mo</RadzenText>
                     @if (CurrentPlan?.ToLower() == "enterprise")
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Tertiary">Current</MudChip>
+                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Current" />
                     }
-                </MudStack>
-            </th>
-        </tr>
-    </thead>
-    <tbody>
-        @* Translation Limits *@
-        <tr>
-            <td>LRM Translation</td>
-            <td class="text-center">@FormatChars(Limits?.Free.TranslationChars ?? 5000)/mo</td>
-            <td class="text-center">@FormatChars(Limits?.Team.TranslationChars ?? 50000)/mo</td>
-            <td class="text-center">@FormatChars(Limits?.Enterprise.TranslationChars ?? 500000)/mo</td>
-        </tr>
-        <tr>
-            <td>BYOK Providers</td>
-            <td class="text-center">@FormatChars(Limits?.Free.OtherChars ?? 25000)/mo</td>
-            <td class="text-center">@FormatChars(Limits?.Team.OtherChars ?? 250000)/mo</td>
-            <td class="text-center">@FormatChars(Limits?.Enterprise.OtherChars ?? 2500000)/mo</td>
-        </tr>
-
-        @* Resource Limits *@
-        <tr>
-            <td>Projects</td>
-            <td class="text-center">@FormatLimit(Limits?.Free.MaxProjects ?? 3)</td>
-            <td class="text-center">@FormatLimit(Limits?.Team.MaxProjects ?? int.MaxValue)</td>
-            <td class="text-center">@FormatLimit(Limits?.Enterprise.MaxProjects ?? int.MaxValue)</td>
-        </tr>
-        <tr>
-            <td>Team Members</td>
-            <td class="text-center">@FormatLimit(Limits?.Free.MaxTeamMembers ?? 0)</td>
-            <td class="text-center">@FormatLimit(Limits?.Team.MaxTeamMembers ?? 10)</td>
-            <td class="text-center">@FormatLimit(Limits?.Enterprise.MaxTeamMembers ?? int.MaxValue)</td>
-        </tr>
-
-        @* Storage Limits *@
-        <tr>
-            <td>Cloud Storage</td>
-            <td class="text-center">@UiHelpers.FormatBytes(Limits?.Free.MaxStorageBytes ?? 26_214_400)</td>
-            <td class="text-center">@UiHelpers.FormatBytes(Limits?.Team.MaxStorageBytes ?? 262_144_000)</td>
-            <td class="text-center">@UiHelpers.FormatBytes(Limits?.Enterprise.MaxStorageBytes ?? 524_288_000)</td>
-        </tr>
-        <tr>
-            <td>Max File Size</td>
-            <td class="text-center">@UiHelpers.FormatBytes(Limits?.Free.MaxFileSizeBytes ?? 1_048_576)</td>
-            <td class="text-center">@UiHelpers.FormatBytes(Limits?.Team.MaxFileSizeBytes ?? 2_097_152)</td>
-            <td class="text-center">@UiHelpers.FormatBytes(Limits?.Enterprise.MaxFileSizeBytes ?? 5_242_880)</td>
-        </tr>
-
-        @* Snapshot Limits *@
-        <tr>
-            <td>Snapshots (per project)</td>
-            <td class="text-center">@(Limits?.Free.MaxSnapshots ?? 3)</td>
-            <td class="text-center">@(Limits?.Team.MaxSnapshots ?? 10)</td>
-            <td class="text-center">@(Limits?.Enterprise.MaxSnapshots ?? 30)</td>
-        </tr>
-        <tr>
-            <td>Snapshot Retention</td>
-            <td class="text-center">@(Limits?.Free.SnapshotRetentionDays ?? 7) days</td>
-            <td class="text-center">@(Limits?.Team.SnapshotRetentionDays ?? 30) days</td>
-            <td class="text-center">@(Limits?.Enterprise.SnapshotRetentionDays ?? 90) days</td>
-        </tr>
-
-        @* Features *@
-        <tr>
-            <td>Translation Providers</td>
-            <td class="text-center">All</td>
-            <td class="text-center">All</td>
-            <td class="text-center">All</td>
-        </tr>
-        <tr>
-            <td>API Access</td>
-            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-        </tr>
-        <tr>
-            <td>Priority Support</td>
-            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Close" Color="Color.Default" Size="Size.Small" /></td>
-            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-            <td class="text-center"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /></td>
-        </tr>
-    </tbody>
-</MudSimpleTable>
+                </RadzenStack>
+            </HeaderTemplate>
+            <Template Context="feature">
+                @if (feature.EnterpriseValue == "check")
+                {
+                    <RadzenIcon Icon="check" Style="color: var(--rz-success);" />
+                }
+                else if (feature.EnterpriseValue == "close")
+                {
+                    <RadzenIcon Icon="close" class="rz-color-secondary" />
+                }
+                else
+                {
+                    @feature.EnterpriseValue
+                }
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
 
 @if (ShowUpgradeButtons && CurrentPlan?.ToLower() != "enterprise")
 {
-    <MudStack Row="true" Justify="Justify.Center" Class="mt-4" Spacing="2">
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.Center" Gap="0.5rem" class="rz-mt-4">
         @if (CurrentPlan?.ToLower() == "free")
         {
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       OnClick="@(() => OnUpgradeClick.InvokeAsync("team"))">
-                Upgrade to Team - $@((Limits?.Team.Price ?? 9).ToString("0"))/mo
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                       OnClick="@(() => OnUpgradeClick.InvokeAsync("enterprise"))">
-                Upgrade to Enterprise - $@((Limits?.Enterprise.Price ?? 29).ToString("0"))/mo
-            </MudButton>
+            <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary"
+                          Click="@(() => OnUpgradeClick.InvokeAsync("team"))"
+                          Text="@($"Upgrade to Team - ${(Limits?.Team.Price ?? 9).ToString("0")}/mo")" />
+            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary"
+                          Click="@(() => OnUpgradeClick.InvokeAsync("enterprise"))"
+                          Text="@($"Upgrade to Enterprise - ${(Limits?.Enterprise.Price ?? 29).ToString("0")}/mo")" />
         }
         else if (CurrentPlan?.ToLower() == "team")
         {
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       OnClick="@(() => OnUpgradeClick.InvokeAsync("enterprise"))">
-                Upgrade to Enterprise - $@((Limits?.Enterprise.Price ?? 29).ToString("0"))/mo
-            </MudButton>
+            <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary"
+                          Click="@(() => OnUpgradeClick.InvokeAsync("enterprise"))"
+                          Text="@($"Upgrade to Enterprise - ${(Limits?.Enterprise.Price ?? 29).ToString("0")}/mo")" />
         }
-    </MudStack>
+    </RadzenStack>
 }
 
 @code {
-    /// <summary>
-    /// Plan limits from the API.
-    /// </summary>
     [Parameter]
     public PlanLimitsDto? Limits { get; set; }
 
-    /// <summary>
-    /// Current user's plan (free, team, enterprise).
-    /// </summary>
     [Parameter]
     public string? CurrentPlan { get; set; }
 
-    /// <summary>
-    /// Whether to use dense table styling.
-    /// </summary>
     [Parameter]
     public bool Dense { get; set; } = true;
 
-    /// <summary>
-    /// Whether to show upgrade buttons below the table.
-    /// </summary>
     [Parameter]
     public bool ShowUpgradeButtons { get; set; } = false;
 
-    /// <summary>
-    /// Callback when upgrade button is clicked. Receives the target plan name.
-    /// </summary>
     [Parameter]
     public EventCallback<string> OnUpgradeClick { get; set; }
+
+    private class PlanFeature
+    {
+        public string Feature { get; set; } = "";
+        public string FreeValue { get; set; } = "";
+        public string TeamValue { get; set; } = "";
+        public string EnterpriseValue { get; set; } = "";
+    }
+
+    private List<PlanFeature> GetFeatures()
+    {
+        return new List<PlanFeature>
+        {
+            new() { Feature = "LRM Translation", FreeValue = $"{FormatChars(Limits?.Free.TranslationChars ?? 5000)}/mo", TeamValue = $"{FormatChars(Limits?.Team.TranslationChars ?? 50000)}/mo", EnterpriseValue = $"{FormatChars(Limits?.Enterprise.TranslationChars ?? 500000)}/mo" },
+            new() { Feature = "BYOK Providers", FreeValue = $"{FormatChars(Limits?.Free.OtherChars ?? 25000)}/mo", TeamValue = $"{FormatChars(Limits?.Team.OtherChars ?? 250000)}/mo", EnterpriseValue = $"{FormatChars(Limits?.Enterprise.OtherChars ?? 2500000)}/mo" },
+            new() { Feature = "Projects", FreeValue = FormatLimit(Limits?.Free.MaxProjects ?? 3), TeamValue = FormatLimit(Limits?.Team.MaxProjects ?? int.MaxValue), EnterpriseValue = FormatLimit(Limits?.Enterprise.MaxProjects ?? int.MaxValue) },
+            new() { Feature = "Team Members", FreeValue = FormatLimit(Limits?.Free.MaxTeamMembers ?? 0), TeamValue = FormatLimit(Limits?.Team.MaxTeamMembers ?? 10), EnterpriseValue = FormatLimit(Limits?.Enterprise.MaxTeamMembers ?? int.MaxValue) },
+            new() { Feature = "Cloud Storage", FreeValue = UiHelpers.FormatBytes(Limits?.Free.MaxStorageBytes ?? 26_214_400), TeamValue = UiHelpers.FormatBytes(Limits?.Team.MaxStorageBytes ?? 262_144_000), EnterpriseValue = UiHelpers.FormatBytes(Limits?.Enterprise.MaxStorageBytes ?? 524_288_000) },
+            new() { Feature = "Max File Size", FreeValue = UiHelpers.FormatBytes(Limits?.Free.MaxFileSizeBytes ?? 1_048_576), TeamValue = UiHelpers.FormatBytes(Limits?.Team.MaxFileSizeBytes ?? 2_097_152), EnterpriseValue = UiHelpers.FormatBytes(Limits?.Enterprise.MaxFileSizeBytes ?? 5_242_880) },
+            new() { Feature = "Snapshots (per project)", FreeValue = (Limits?.Free.MaxSnapshots ?? 3).ToString(), TeamValue = (Limits?.Team.MaxSnapshots ?? 10).ToString(), EnterpriseValue = (Limits?.Enterprise.MaxSnapshots ?? 30).ToString() },
+            new() { Feature = "Snapshot Retention", FreeValue = $"{Limits?.Free.SnapshotRetentionDays ?? 7} days", TeamValue = $"{Limits?.Team.SnapshotRetentionDays ?? 30} days", EnterpriseValue = $"{Limits?.Enterprise.SnapshotRetentionDays ?? 90} days" },
+            new() { Feature = "Translation Providers", FreeValue = "All", TeamValue = "All", EnterpriseValue = "All" },
+            new() { Feature = "API Access", FreeValue = "check", TeamValue = "check", EnterpriseValue = "check" },
+            new() { Feature = "Priority Support", FreeValue = "close", TeamValue = "check", EnterpriseValue = "check" }
+        };
+    }
 
     private static string FormatChars(long chars) => chars.ToString("N0");
 

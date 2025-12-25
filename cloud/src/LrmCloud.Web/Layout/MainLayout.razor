@@ -2,126 +2,161 @@
 @inject AuthService AuthService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject LrmThemeService ThemeService
+@inject Radzen.ThemeService RadzenThemeService
 @using LrmCloud.Web.Components
 
-<MudThemeProvider @ref="_themeProvider" @bind-IsDarkMode="_isDarkMode" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+<HeadContent>
+    <RadzenTheme Theme="@RadzenThemeService.Theme" />
+</HeadContent>
 
-<MudLayout>
-    <MudAppBar Elevation="1" Dense="@_isMobile">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
-        <MudLink Href="" Typo="Typo.h6" Color="Color.Inherit" Underline="Underline.None" Class="ml-3 d-none d-sm-flex">LRM Cloud</MudLink>
-        <MudLink Href="" Typo="Typo.h6" Color="Color.Inherit" Underline="Underline.None" Class="ml-2 d-flex d-sm-none">LRM</MudLink>
-        <MudDivider Vertical="true" FlexItem="true" Class="mx-2 d-none d-sm-flex" />
-        <OrgSelector />
-        <MudSpacer />
-        <MudTooltip Text="Toggle dark mode">
-            <MudToggleIconButton Toggled="@_isDarkMode"
-                                 ToggledChanged="@OnDarkModeToggled"
-                                 Icon="@Icons.Material.Filled.DarkMode"
-                                 ToggledIcon="@Icons.Material.Filled.LightMode"
-                                 Color="Color.Inherit"
-                                 Size="@(_isMobile ? Size.Small : Size.Medium)" />
-        </MudTooltip>
-        <AuthorizeView>
-            <Authorized>
-                <MudMenu Icon="@Icons.Material.Filled.Person" Color="Color.Inherit" Size="@(_isMobile ? Size.Small : Size.Medium)">
-                    <MudMenuItem Disabled="true">
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">@context.User.Identity?.Name</MudText>
-                    </MudMenuItem>
-                    <MudDivider />
-                    <MudMenuItem Href="settings/profile" Icon="@Icons.Material.Filled.Person">Profile</MudMenuItem>
-                    <MudMenuItem Href="settings/api-keys" Icon="@Icons.Material.Filled.Key">API Keys</MudMenuItem>
-                    <MudMenuItem Href="settings/usage" Icon="@Icons.Material.Filled.Analytics">Usage</MudMenuItem>
-                    <MudMenuItem Href="settings/billing" Icon="@Icons.Material.Filled.CreditCard">Billing</MudMenuItem>
-                    <MudDivider />
-                    <MudMenuItem OnClick="@Logout" Icon="@Icons.Material.Filled.Logout">Logout</MudMenuItem>
-                </MudMenu>
-            </Authorized>
-            <NotAuthorized>
-                <MudButton Variant="Variant.Text" Color="Color.Inherit" Href="login" Size="@(_isMobile ? Size.Small : Size.Medium)">Login</MudButton>
-            </NotAuthorized>
-        </AuthorizeView>
-    </MudAppBar>
+<RadzenLayout>
+    <RadzenHeader>
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" Style="padding: 0 1rem; height: 100%;">
+            <RadzenSidebarToggle Click="@(() => _sidebarExpanded = !_sidebarExpanded)" />
+            <RadzenLink Path="" Style="text-decoration: none; color: inherit;">
+                <RadzenText Text="LRM Cloud" TextStyle="TextStyle.H6" Style="margin: 0;" class="rz-display-none rz-display-sm-inline" />
+                <RadzenText Text="LRM" TextStyle="TextStyle.H6" Style="margin: 0;" class="rz-display-sm-none" />
+            </RadzenLink>
+            <div style="flex: 1;"></div>
+            <AuthorizeView>
+                <Authorized Context="authContext">
+                    <RadzenAppearanceToggle />
+                    <RadzenProfileMenu Click="@OnProfileMenuClick">
+                        <Template>
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                <RadzenIcon Icon="account_circle" />
+                                <span class="rz-display-none rz-display-md-inline">@(authContext.User.Identity?.Name ?? "User")</span>
+                            </RadzenStack>
+                        </Template>
+                        <ChildContent>
+                            <RadzenProfileMenuItem Text="Dashboard" Path="" Icon="dashboard" />
+                            <RadzenProfileMenuItem Text="Profile" Path="settings/profile" Icon="person" />
+                            <RadzenProfileMenuItem Text="API Keys" Path="settings/api-keys" Icon="key" />
+                            <RadzenProfileMenuItem Text="Usage" Path="settings/usage" Icon="analytics" />
+                            <RadzenProfileMenuItem Text="Billing" Path="settings/billing" Icon="credit_card" />
+                            <RadzenStack Gap="0.25rem" Style="padding: 0.5rem 1rem; min-width: 180px;">
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Theme</RadzenText>
+                                <RadzenDropDown TValue="string"
+                                                Value="@RadzenThemeService.Theme"
+                                                Data="@LrmThemeService.AvailableThemes"
+                                                Change="@OnThemeDropdownChanged">
+                                    <Template Context="themeName">
+                                        @GetThemeDisplayName(themeName)
+                                    </Template>
+                                </RadzenDropDown>
+                            </RadzenStack>
+                            <RadzenProfileMenuItem Text="Logout" Icon="logout" Value="logout" />
+                        </ChildContent>
+                    </RadzenProfileMenu>
+                </Authorized>
+                <NotAuthorized>
+                    <RadzenButton Text="Login" Variant="Radzen.Variant.Text" Click="@(() => Navigation.NavigateTo("login"))" />
+                </NotAuthorized>
+            </AuthorizeView>
+        </RadzenStack>
+    </RadzenHeader>
 
-    <MudDrawer @bind-Open="_drawerOpen"
-               ClipMode="DrawerClipMode.Always"
-               Elevation="2"
-               Breakpoint="Breakpoint.Md"
-               Variant="@(_isMobile ? DrawerVariant.Temporary : DrawerVariant.Mini)"
-               OpenMiniOnHover="@(!_isMobile)">
-        <NavMenu />
-        <MudSpacer />
-        <MudNavMenu>
-            <MudNavLink Href="/" Icon="@Icons.Material.Filled.Home" Target="_self">Website</MudNavLink>
-        </MudNavMenu>
-    </MudDrawer>
+    <RadzenSidebar @bind-Expanded="@_sidebarExpanded"
+                   Style="width: 250px;"
+                   Responsive="true">
+        <RadzenPanelMenu>
+            <RadzenPanelMenuItem Text="Dashboard" Path="" Icon="dashboard" />
+            <RadzenPanelMenuItem Text="Projects" Path="projects" Icon="folder" />
+            <RadzenPanelMenuItem Text="Organizations" Path="organizations" Icon="business" />
+            <RadzenPanelMenuItem Text="Settings" Icon="settings">
+                <RadzenPanelMenuItem Text="Profile" Path="settings/profile" Icon="person" />
+                <RadzenPanelMenuItem Text="CLI API Keys" Path="settings/api-keys" Icon="key" />
+                <RadzenPanelMenuItem Text="Translation Providers" Path="settings/translation" Icon="translate" />
+                <RadzenPanelMenuItem Text="Translation Memory" Path="settings/translation-memory" Icon="memory" />
+                <RadzenPanelMenuItem Text="Organization Glossary" Path="settings/glossary" Icon="book" />
+                <RadzenPanelMenuItem Text="Usage" Path="settings/usage" Icon="analytics" />
+                <RadzenPanelMenuItem Text="Billing" Path="settings/billing" Icon="credit_card" />
+            </RadzenPanelMenuItem>
+            <AuthorizeView>
+                <Authorized>
+                    @if (context.User.FindFirst("is_superadmin")?.Value == "true")
+                    {
+                        <RadzenPanelMenuItem Text="Admin" Icon="admin_panel_settings">
+                            <RadzenPanelMenuItem Text="Dashboard" Path="admin" Icon="dashboard" />
+                            <RadzenPanelMenuItem Text="Analytics" Path="admin/analytics" Icon="trending_up" />
+                            <RadzenPanelMenuItem Text="Users" Path="admin/users" Icon="people" />
+                            <RadzenPanelMenuItem Text="Organizations" Path="admin/organizations" Icon="business" />
+                            <RadzenPanelMenuItem Text="System Health" Path="admin/health" Icon="health_and_safety" />
+                            <RadzenPanelMenuItem Text="Logs" Path="admin/logs" Icon="article" />
+                        </RadzenPanelMenuItem>
+                    }
+                </Authorized>
+            </AuthorizeView>
+        </RadzenPanelMenu>
+        <div style="flex: 1;"></div>
+        <RadzenPanelMenu Style="margin-bottom: 1rem;">
+            <RadzenPanelMenuItem Text="Website" Path="/" Icon="home" />
+        </RadzenPanelMenu>
+    </RadzenSidebar>
 
-    <MudMainContent>
+    <RadzenBody>
+        <RadzenComponents />
         <OfflineBanner />
         <UpdateAvailableBanner />
-        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="@(_isMobile ? "pa-2" : "py-4")">
-            <GlobalErrorBoundary>
-                @Body
-            </GlobalErrorBoundary>
-        </MudContainer>
-    </MudMainContent>
-</MudLayout>
+        <RadzenRow Style="padding: 1rem; max-width: 1600px; margin: 0 auto;">
+            <RadzenColumn Size="12">
+                <GlobalErrorBoundary>
+                    @Body
+                </GlobalErrorBoundary>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenBody>
+</RadzenLayout>
 
 @code {
-    private MudThemeProvider? _themeProvider;
-    private bool _drawerOpen = true;
-    private bool _isDarkMode;
-    private bool _isMobile;
+    private bool _sidebarExpanded = true;
+
+    protected override void OnInitialized()
+    {
+        RadzenThemeService.ThemeChanged += OnRadzenThemeChanged;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // Load saved theme preference (falls back to system preference if not set)
-            var theme = await JS.InvokeAsync<string>("lrmTheme.getPreference");
-            _isDarkMode = theme == "dark";
+            await ThemeService.InitializeAsync();
             await InvokeAsync(StateHasChanged);
-
-            // Check if mobile on first render
-            await CheckMobileBreakpoint();
         }
     }
 
-    private async Task CheckMobileBreakpoint()
+    private void OnRadzenThemeChanged()
     {
-        try
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnThemeDropdownChanged(object value)
+    {
+        if (value is string theme)
         {
-            var width = await JS.InvokeAsync<int>("eval", "window.innerWidth");
-            _isMobile = width < 960; // md breakpoint
-            if (_isMobile)
-            {
-                _drawerOpen = false;
-            }
-            StateHasChanged();
+            await ThemeService.SetThemeAsync(theme);
         }
-        catch
+    }
+
+    private static string GetThemeDisplayName(string themeName)
+    {
+        return LrmThemeService.ThemeDisplayNames.TryGetValue(themeName, out var displayName)
+            ? displayName
+            : themeName;
+    }
+
+    private async Task OnProfileMenuClick(RadzenProfileMenuItem item)
+    {
+        if (item.Value == "logout")
         {
-            // Ignore JS interop errors during prerendering
+            await AuthService.LogoutAsync();
+            Navigation.NavigateTo("login", forceLoad: true);
         }
     }
 
-    private void ToggleDrawer()
+    public void Dispose()
     {
-        _drawerOpen = !_drawerOpen;
-    }
-
-    private async Task OnDarkModeToggled(bool isDark)
-    {
-        _isDarkMode = isDark;
-        await JS.InvokeVoidAsync("lrmTheme.setPreference", isDark ? "dark" : "light");
-    }
-
-    private async Task Logout()
-    {
-        await AuthService.LogoutAsync();
-        Navigation.NavigateTo("login", forceLoad: true);
+        RadzenThemeService.ThemeChanged -= OnRadzenThemeChanged;
     }
 }

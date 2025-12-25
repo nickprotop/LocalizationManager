@@ -7,91 +7,98 @@
 
 <PageTitle>Organizations - LRM Cloud Admin</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-2">
-    <MudIcon Icon="@Icons.Material.Filled.Business" Class="mr-2" Style="vertical-align: middle;" />
-    Organizations
-</MudText>
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+    <RadzenIcon Icon="business" />
+    <RadzenText TextStyle="TextStyle.H4">Organizations</RadzenText>
+</RadzenStack>
+<RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-4">
     View all organizations and their details.
-</MudText>
+</RadzenText>
 
 @* Search *@
-<MudPaper Class="pa-4 mb-4" Elevation="2">
-    <MudGrid>
-        <MudItem xs="12" md="10">
-            <MudTextField @bind-Value="_search" Label="Search" Placeholder="Search by name or slug..."
-                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                          Immediate="true" DebounceInterval="300" OnDebounceIntervalElapsed="OnSearchChanged" />
-        </MudItem>
-        <MudItem xs="12" md="2" Class="d-flex align-center">
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadOrganizationsAsync" StartIcon="@Icons.Material.Filled.Refresh">
-                Refresh
-            </MudButton>
-        </MudItem>
-    </MudGrid>
-</MudPaper>
+<RadzenCard class="rz-mb-4">
+    <RadzenRow Gap="1rem" AlignItems="Radzen.AlignItems.End">
+        <RadzenColumn Size="12" SizeMD="10">
+            <RadzenFormField Text="Search" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="_search" Placeholder="Search by name or slug..."
+                                   @oninput="OnSearchInput" Style="width: 100%;" />
+                </ChildContent>
+            </RadzenFormField>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="2">
+            <RadzenButton Variant="Radzen.Variant.Outlined" Icon="refresh" Text="Refresh"
+                          Click="LoadOrganizationsAsync" />
+        </RadzenColumn>
+    </RadzenRow>
+</RadzenCard>
 
 @if (_isLoading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
 }
 else if (_orgs == null || _orgs.Count == 0)
 {
-    <MudAlert Severity="Severity.Info">No organizations found.</MudAlert>
+    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">No organizations found.</RadzenAlert>
 }
 else
 {
-    <MudTable Items="@_orgs" Dense="true" Hover="true" Elevation="2" Loading="@_isLoading">
-        <HeaderContent>
-            <MudTh>Organization</MudTh>
-            <MudTh>Owner</MudTh>
-            <MudTh>Members</MudTh>
-            <MudTh>Projects</MudTh>
-            <MudTh>Created</MudTh>
-            <MudTh>Actions</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="Organization">
-                <div class="d-flex align-center">
-                    <MudAvatar Size="Size.Small" Class="mr-2" Color="Color.Primary">
-                        @context.Name[0].ToString().ToUpper()
-                    </MudAvatar>
-                    <div>
-                        <MudText Typo="Typo.body2">@context.Name</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Slug</MudText>
-                    </div>
-                </div>
-            </MudTd>
-            <MudTd DataLabel="Owner">
-                <MudText Typo="Typo.body2">@context.OwnerEmail</MudText>
-            </MudTd>
-            <MudTd DataLabel="Members">
-                <MudChip T="string" Size="Size.Small" Color="Color.Primary">@context.MemberCount</MudChip>
-            </MudTd>
-            <MudTd DataLabel="Projects">
-                <MudChip T="string" Size="Size.Small" Color="Color.Info">@context.ProjectCount</MudChip>
-            </MudTd>
-            <MudTd DataLabel="Created">
-                <MudText Typo="Typo.body2">@context.CreatedAt.ToString("MMM d, yyyy")</MudText>
-            </MudTd>
-            <MudTd DataLabel="Actions">
-                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
-                               OnClick="@(() => ViewOrganization(context.Id))" />
-            </MudTd>
-        </RowTemplate>
-        <PagerContent>
-            <MudTablePager PageSizeOptions="new int[] { 10, 20, 50, 100 }" />
-        </PagerContent>
-    </MudTable>
+    <RadzenDataGrid TItem="AdminOrganizationDto" Data="@_orgs" Density="Density.Compact" AllowSorting="false">
+        <Columns>
+            <RadzenDataGridColumn TItem="AdminOrganizationDto" Title="Organization">
+                <Template Context="org">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--rz-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                            @org.Name[0].ToString().ToUpper()
+                        </div>
+                        <RadzenStack Gap="0">
+                            <RadzenText TextStyle="TextStyle.Body2">@org.Name</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@org.Slug</RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="AdminOrganizationDto" Title="Owner">
+                <Template Context="org">
+                    <RadzenText TextStyle="TextStyle.Body2">@org.OwnerEmail</RadzenText>
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="AdminOrganizationDto" Title="Members" Width="100px">
+                <Template Context="org">
+                    <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="@org.MemberCount.ToString()" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="AdminOrganizationDto" Title="Projects" Width="100px">
+                <Template Context="org">
+                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@org.ProjectCount.ToString()" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="AdminOrganizationDto" Title="Created" Width="120px">
+                <Template Context="org">
+                    <RadzenText TextStyle="TextStyle.Body2">@org.CreatedAt.ToString("MMM d, yyyy")</RadzenText>
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="AdminOrganizationDto" Title="Actions" Width="80px" TextAlign="TextAlign.Center">
+                <Template Context="org">
+                    <RadzenButton Icon="visibility" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                  Click="@(() => ViewOrganization(org.Id))" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
 
     @* Pagination Info *@
-    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-        Showing @_orgs.Count of @_totalCount organizations (Page @_page)
-    </MudText>
-    <div class="d-flex gap-2 mt-2">
-        <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(_page <= 1)" OnClick="PreviousPage">Previous</MudButton>
-        <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(_orgs.Count < _pageSize)" OnClick="NextPage">Next</MudButton>
-    </div>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mt-2">
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+            Showing @_orgs.Count of @_totalCount organizations (Page @_page)
+        </RadzenText>
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+            <RadzenButton Variant="Radzen.Variant.Outlined" Size="ButtonSize.Small" Text="Previous"
+                          Disabled="@(_page <= 1)" Click="PreviousPage" />
+            <RadzenButton Variant="Radzen.Variant.Outlined" Size="ButtonSize.Small" Text="Next"
+                          Disabled="@(_orgs.Count < _pageSize)" Click="NextPage" />
+        </RadzenStack>
+    </RadzenStack>
 }
 
 @code {
@@ -101,6 +108,8 @@ else
     private string _search = "";
     private int _page = 1;
     private int _pageSize = 20;
+
+    private System.Timers.Timer? _debounceTimer;
 
     protected override async Task OnInitializedAsync()
     {
@@ -122,11 +131,23 @@ else
         }
     }
 
-    private async Task OnSearchChanged(string value)
+    private void OnSearchInput(ChangeEventArgs e)
     {
-        _search = value;
-        _page = 1;
-        await LoadOrganizationsAsync();
+        _search = e.Value?.ToString() ?? "";
+        _debounceTimer?.Stop();
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Timers.Timer(300);
+        _debounceTimer.Elapsed += async (s, ev) =>
+        {
+            _debounceTimer?.Stop();
+            await InvokeAsync(async () =>
+            {
+                _page = 1;
+                await LoadOrganizationsAsync();
+                StateHasChanged();
+            });
+        };
+        _debounceTimer.Start();
     }
 
     private async Task PreviousPage()

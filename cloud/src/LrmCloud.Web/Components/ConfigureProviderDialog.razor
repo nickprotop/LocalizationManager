@@ -1,323 +1,299 @@
 @using LrmCloud.Shared.DTOs.Translation
 @using LrmCloud.Web.Services
 @inject TranslationService TranslationService
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 
-<MudDialog>
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Settings" />
-            <MudText Typo="Typo.h6">Configure @Provider.DisplayName</MudText>
-            <MudChip T="string" Size="Size.Small" Color="@GetLevelColor()" Variant="Variant.Outlined">
-                @GetLevelDisplayName()
-            </MudChip>
-        </MudStack>
-    </TitleContent>
+<RadzenStack Gap="1rem">
+    @if (!string.IsNullOrEmpty(Provider.Description))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+            @Provider.Description
+        </RadzenAlert>
+    }
 
-    <DialogContent>
-        <MudStack Spacing="4">
-            @if (!string.IsNullOrEmpty(Provider.Description))
-            {
-                <MudAlert Severity="Severity.Info" Dense="true">
-                    @Provider.Description
-                </MudAlert>
-            }
-
-            @if (_isLoading)
-            {
-                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
-            }
-            else
-            {
-                <!-- API Key Section (for providers that require it) -->
-                @if (Provider.RequiresApiKey || ShowApiKeyField)
+    @if (_isLoading)
+    {
+        <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" ShowValue="false" Style="height: 200px;" />
+    }
+    else
+    {
+        @* API Key Section *@
+        @if (Provider.RequiresApiKey || ShowApiKeyField)
+        {
+            <RadzenStack Gap="0.5rem">
+                @if (_inheritedKeySource != null)
                 {
-                    <MudStack Spacing="2">
-                        @if (_inheritedKeySource != null)
-                        {
-                            <MudAlert Severity="Severity.Info" Dense="true">
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                    <MudIcon Icon="@Icons.Material.Filled.Key" Size="Size.Small" />
-                                    <MudText Typo="Typo.body2">
-                                        Using API key from <strong>@_inheritedKeySource</strong>
-                                    </MudText>
-                                </MudStack>
-                            </MudAlert>
-                        }
-
-                        <MudTextField T="string"
-                                      @bind-Value="_apiKey"
-                                      Label="@(Level == "user" && _inheritedKeySource != null ? "Override API Key (optional)" : "API Key")"
-                                      Placeholder="@GetApiKeyPlaceholder()"
-                                      Variant="Variant.Outlined"
-                                      InputType="InputType.Text"
-                                      Class="@(_showKey ? "" : "masked-input")"
-                                      Adornment="Adornment.End"
-                                      AdornmentIcon="@(_showKey ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
-                                      OnAdornmentClick="@(() => _showKey = !_showKey)"
-                                      Required="@(Provider.RequiresApiKey && _inheritedKeySource == null && _existingConfig?.HasApiKey != true)"
-                                      HelperText="@GetApiKeyHelpText(Provider.Name)"
-                                      UserAttributes="@_noAutofillAttributes" />
-
-                        @if (_existingConfig?.HasApiKey == true)
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                Current (this level): @_existingConfig.MaskedApiKey
-                            </MudText>
-                        }
-                    </MudStack>
+                    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                        Using API key from <strong>@_inheritedKeySource</strong>
+                    </RadzenAlert>
                 }
 
-                <!-- Provider-Specific Configuration -->
-                @switch (Provider.Name.ToLowerInvariant())
+                <RadzenFormField Text="@(Level == "user" && _inheritedKeySource != null ? "Override API Key (optional)" : "API Key")"
+                                 Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem" Style="width: 100%;">
+                            <RadzenTextBox @bind-Value="_apiKey" Style="width: 100%;"
+                                           Placeholder="@GetApiKeyPlaceholder()"
+                                           type="@(_showKey ? "text" : "password")" />
+                            <RadzenButton Icon="@(_showKey ? "visibility_off" : "visibility")"
+                                          Variant="Radzen.Variant.Text" Click="@(() => _showKey = !_showKey)" />
+                        </RadzenStack>
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@GetApiKeyHelpText(Provider.Name)</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+
+                @if (_existingConfig?.HasApiKey == true)
                 {
-                    case "ollama":
-                        <MudDivider Class="my-2" />
-                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">Ollama Configuration</MudText>
-
-                        <MudTextField T="string"
-                                      @bind-Value="_ollamaApiUrl"
-                                      Label="API URL"
-                                      Placeholder="http://localhost:11434"
-                                      Variant="Variant.Outlined"
-                                      HelperText="Ollama server URL. Default: http://localhost:11434" />
-
-                        <MudTextField T="string"
-                                      @bind-Value="_ollamaModel"
-                                      Label="Model"
-                                      Placeholder="llama3.2"
-                                      Variant="Variant.Outlined"
-                                      HelperText="Model to use (e.g., llama3.2, mistral, qwen2.5)" />
-
-                        <MudTextField T="string"
-                                      @bind-Value="_customSystemPrompt"
-                                      Label="Custom System Prompt"
-                                      Placeholder="Optional: Custom translation instructions..."
-                                      Variant="Variant.Outlined"
-                                      Lines="3"
-                                      HelperText="Override the default translation prompt (optional)" />
-                        break;
-
-                    case "openai":
-                        <MudDivider Class="my-2" />
-                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">OpenAI Configuration</MudText>
-
-                        <MudSelect T="string" @bind-Value="_openaiModel" Label="Model" Variant="Variant.Outlined"
-                                   HelperText="Select the GPT model to use">
-                            <MudSelectItem Value="@("gpt-4o-mini")">GPT-4o Mini (Recommended)</MudSelectItem>
-                            <MudSelectItem Value="@("gpt-4o")">GPT-4o</MudSelectItem>
-                            <MudSelectItem Value="@("gpt-4-turbo")">GPT-4 Turbo</MudSelectItem>
-                            <MudSelectItem Value="@("gpt-3.5-turbo")">GPT-3.5 Turbo</MudSelectItem>
-                        </MudSelect>
-
-                        <MudTextField T="string"
-                                      @bind-Value="_customSystemPrompt"
-                                      Label="Custom System Prompt"
-                                      Placeholder="Optional: Custom translation instructions..."
-                                      Variant="Variant.Outlined"
-                                      Lines="3"
-                                      HelperText="Override the default translation prompt (optional)" />
-                        break;
-
-                    case "claude":
-                        <MudDivider Class="my-2" />
-                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">Claude Configuration</MudText>
-
-                        <MudSelect T="string" @bind-Value="_claudeModel" Label="Model" Variant="Variant.Outlined"
-                                   HelperText="Select the Claude model to use">
-                            <MudSelectItem Value="@("claude-3-5-sonnet-20241022")">Claude 3.5 Sonnet (Recommended)</MudSelectItem>
-                            <MudSelectItem Value="@("claude-3-5-haiku-20241022")">Claude 3.5 Haiku (Fast)</MudSelectItem>
-                            <MudSelectItem Value="@("claude-3-opus-20240229")">Claude 3 Opus</MudSelectItem>
-                        </MudSelect>
-
-                        <MudTextField T="string"
-                                      @bind-Value="_customSystemPrompt"
-                                      Label="Custom System Prompt"
-                                      Placeholder="Optional: Custom translation instructions..."
-                                      Variant="Variant.Outlined"
-                                      Lines="3"
-                                      HelperText="Override the default translation prompt (optional)" />
-                        break;
-
-                    case "azureopenai":
-                        <MudDivider Class="my-2" />
-                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">Azure OpenAI Configuration</MudText>
-
-                        <MudTextField T="string"
-                                      @bind-Value="_azureEndpoint"
-                                      Label="Endpoint URL"
-                                      Placeholder="https://your-resource.openai.azure.com"
-                                      Variant="Variant.Outlined"
-                                      Required="true"
-                                      HelperText="Your Azure OpenAI resource endpoint" />
-
-                        <MudTextField T="string"
-                                      @bind-Value="_azureDeploymentName"
-                                      Label="Deployment Name"
-                                      Placeholder="gpt-4"
-                                      Variant="Variant.Outlined"
-                                      Required="true"
-                                      HelperText="The deployment name in Azure OpenAI Studio" />
-
-                        <MudTextField T="string"
-                                      @bind-Value="_customSystemPrompt"
-                                      Label="Custom System Prompt"
-                                      Placeholder="Optional: Custom translation instructions..."
-                                      Variant="Variant.Outlined"
-                                      Lines="3"
-                                      HelperText="Override the default translation prompt (optional)" />
-                        break;
-
-                    case "azuretranslator":
-                        <MudDivider Class="my-2" />
-                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">Azure Translator Configuration</MudText>
-
-                        <MudTextField T="string"
-                                      @bind-Value="_azureRegion"
-                                      Label="Region"
-                                      Placeholder="eastus"
-                                      Variant="Variant.Outlined"
-                                      HelperText="Azure region (e.g., eastus, westeurope). Required for regional resources." />
-
-                        <MudTextField T="string"
-                                      @bind-Value="_azureEndpoint"
-                                      Label="Custom Endpoint"
-                                      Placeholder="https://api.cognitive.microsofttranslator.com"
-                                      Variant="Variant.Outlined"
-                                      HelperText="Optional: Custom endpoint URL (uses default if not set)" />
-                        break;
-
-                    case "lingva":
-                        <MudDivider Class="my-2" />
-                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">Lingva Configuration</MudText>
-
-                        <MudTextField T="string"
-                                      @bind-Value="_lingvaInstanceUrl"
-                                      Label="Instance URL"
-                                      Placeholder="https://lingva.ml"
-                                      Variant="Variant.Outlined"
-                                      HelperText="Lingva instance URL. Default: https://lingva.ml" />
-
-                        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
-                            Lingva is a free, privacy-respecting Google Translate frontend. No API key required.
-                        </MudAlert>
-                        break;
-
-                    case "libretranslate":
-                        <MudDivider Class="my-2" />
-                        <MudText Typo="Typo.subtitle2" Color="Color.Primary">LibreTranslate Configuration</MudText>
-
-                        <MudTextField T="string"
-                                      @bind-Value="_libreApiUrl"
-                                      Label="API URL"
-                                      Placeholder="https://libretranslate.com"
-                                      Variant="Variant.Outlined"
-                                      HelperText="LibreTranslate instance URL. API key may be optional for public instances." />
-                        break;
-
-                    case "mymemory":
-                        <MudAlert Severity="Severity.Info" Dense="true">
-                            MyMemory is a free translation service. No configuration required.
-                            Rate limited to ~5000 characters/day for anonymous usage.
-                        </MudAlert>
-                        break;
-
-                    case "google":
-                    case "deepl":
-                        <!-- These providers only need API key, no additional config -->
-                        break;
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        Current (this level): @_existingConfig.MaskedApiKey
+                    </RadzenText>
                 }
+            </RadzenStack>
+        }
 
-                <!-- Rate Limit (common to all configurable providers) -->
-                @if (HasConfigOptions(Provider.Name))
+        @* Provider-Specific Configuration *@
+        @switch (Provider.Name.ToLowerInvariant())
+        {
+            case "ollama":
+                <hr />
+                <RadzenText TextStyle="TextStyle.Subtitle2" Style="color: var(--rz-primary);">Ollama Configuration</RadzenText>
+
+                <RadzenFormField Text="API URL" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_ollamaApiUrl" Placeholder="http://localhost:11434" Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Ollama server URL. Default: http://localhost:11434</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Model" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_ollamaModel" Placeholder="llama3.2" Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Model to use (e.g., llama3.2, mistral, qwen2.5)</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Custom System Prompt" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextArea @bind-Value="_customSystemPrompt" Rows="3" Placeholder="Optional: Custom translation instructions..."
+                                        Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Override the default translation prompt (optional)</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+                break;
+
+            case "openai":
+                <hr />
+                <RadzenText TextStyle="TextStyle.Subtitle2" Style="color: var(--rz-primary);">OpenAI Configuration</RadzenText>
+
+                <RadzenFormField Text="Model" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="_openaiModel" Style="width: 100%;" Data="@_openaiModelOptions"
+                                        TextProperty="Text" ValueProperty="Value" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Select the GPT model to use</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Custom System Prompt" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextArea @bind-Value="_customSystemPrompt" Rows="3" Placeholder="Optional: Custom translation instructions..."
+                                        Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Override the default translation prompt (optional)</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+                break;
+
+            case "claude":
+                <hr />
+                <RadzenText TextStyle="TextStyle.Subtitle2" Style="color: var(--rz-primary);">Claude Configuration</RadzenText>
+
+                <RadzenFormField Text="Model" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="_claudeModel" Style="width: 100%;" Data="@_claudeModelOptions"
+                                        TextProperty="Text" ValueProperty="Value" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Select the Claude model to use</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Custom System Prompt" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextArea @bind-Value="_customSystemPrompt" Rows="3" Placeholder="Optional: Custom translation instructions..."
+                                        Style="width: 100%;" />
+                    </ChildContent>
+                </RadzenFormField>
+                break;
+
+            case "azureopenai":
+                <hr />
+                <RadzenText TextStyle="TextStyle.Subtitle2" Style="color: var(--rz-primary);">Azure OpenAI Configuration</RadzenText>
+
+                <RadzenFormField Text="Endpoint URL" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_azureEndpoint" Placeholder="https://your-resource.openai.azure.com"
+                                       Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Your Azure OpenAI resource endpoint</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Deployment Name" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_azureDeploymentName" Placeholder="gpt-4" Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">The deployment name in Azure OpenAI Studio</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Custom System Prompt" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextArea @bind-Value="_customSystemPrompt" Rows="3" Placeholder="Optional: Custom translation instructions..."
+                                        Style="width: 100%;" />
+                    </ChildContent>
+                </RadzenFormField>
+                break;
+
+            case "azuretranslator":
+                <hr />
+                <RadzenText TextStyle="TextStyle.Subtitle2" Style="color: var(--rz-primary);">Azure Translator Configuration</RadzenText>
+
+                <RadzenFormField Text="Region" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_azureRegion" Placeholder="eastus" Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Azure region (e.g., eastus, westeurope). Required for regional resources.</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Custom Endpoint" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_azureEndpoint" Placeholder="https://api.cognitive.microsofttranslator.com"
+                                       Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional: Custom endpoint URL (uses default if not set)</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+                break;
+
+            case "lingva":
+                <hr />
+                <RadzenText TextStyle="TextStyle.Subtitle2" Style="color: var(--rz-primary);">Lingva Configuration</RadzenText>
+
+                <RadzenFormField Text="Instance URL" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_lingvaInstanceUrl" Placeholder="https://lingva.ml" Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Lingva instance URL. Default: https://lingva.ml</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+
+                <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                    Lingva is a free, privacy-respecting Google Translate frontend. No API key required.
+                </RadzenAlert>
+                break;
+
+            case "libretranslate":
+                <hr />
+                <RadzenText TextStyle="TextStyle.Subtitle2" Style="color: var(--rz-primary);">LibreTranslate Configuration</RadzenText>
+
+                <RadzenFormField Text="API URL" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_libreApiUrl" Placeholder="https://libretranslate.com" Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">LibreTranslate instance URL. API key may be optional for public instances.</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+                break;
+
+            case "mymemory":
+                <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                    MyMemory is a free translation service. No configuration required.
+                    Rate limited to ~5000 characters/day for anonymous usage.
+                </RadzenAlert>
+                break;
+        }
+
+        @* Rate Limit *@
+        @if (HasConfigOptions(Provider.Name))
+        {
+            <hr />
+            <RadzenFormField Text="Rate Limit (requests/minute)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenNumeric @bind-Value="_rateLimitPerMinute" Min="1" Max="1000" Style="width: 100%;" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional: Limit API calls per minute</RadzenText>
+                </Helper>
+            </RadzenFormField>
+        }
+
+        @* Test Result *@
+        @if (_testResult != null)
+        {
+            <RadzenAlert AlertStyle="@(_testResult.IsValid ? AlertStyle.Success : AlertStyle.Danger)" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                @if (_testResult.IsValid)
                 {
-                    <MudDivider Class="my-2" />
-                    <MudNumericField T="int?" @bind-Value="_rateLimitPerMinute"
-                                     Label="Rate Limit (requests/minute)"
-                                     Variant="Variant.Outlined"
-                                     Min="1"
-                                     Max="1000"
-                                     HelperText="Optional: Limit API calls per minute" />
+                    @(_testResult.ProviderMessage ?? "Configuration is valid!")
                 }
-
-                <!-- Test Result -->
-                @if (_testResult != null)
+                else
                 {
-                    <MudAlert Severity="@(_testResult.IsValid ? Severity.Success : Severity.Error)" Dense="true">
-                        @if (_testResult.IsValid)
-                        {
-                            <MudText>@(_testResult.ProviderMessage ?? "Configuration is valid!")</MudText>
-                        }
-                        else
-                        {
-                            <MudText>@(_testResult.Error ?? "Invalid configuration")</MudText>
-                        }
-                    </MudAlert>
+                    @(_testResult.Error ?? "Invalid configuration")
                 }
-            }
-        </MudStack>
-    </DialogContent>
+            </RadzenAlert>
+        }
+    }
 
-    <DialogActions>
-        <MudButton OnClick="Cancel" Disabled="_isSaving">Cancel</MudButton>
+    @* Dialog Actions *@
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+        <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="Cancel" Disabled="@_isSaving" />
         @if (Provider.RequiresApiKey)
         {
-            <MudButton Color="Color.Secondary"
-                       Variant="Variant.Outlined"
-                       OnClick="TestConfiguration"
-                       Disabled="@(string.IsNullOrEmpty(_apiKey) && _existingConfig?.HasApiKey != true || _isTesting || _isSaving)">
-                @if (_isTesting)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                }
-                Test
-            </MudButton>
+            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Secondary" Text="Test"
+                          Disabled="@(string.IsNullOrEmpty(_apiKey) && _existingConfig?.HasApiKey != true || _isTesting || _isSaving)"
+                          IsBusy="@_isTesting" Click="TestConfiguration" />
         }
-        <MudButton Color="Color.Primary"
-                   Variant="Variant.Filled"
-                   OnClick="Save"
-                   Disabled="@(!IsValid() || _isSaving)">
-            @if (_isSaving)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Save
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Save" Disabled="@(!IsValid() || _isSaving)"
+                      IsBusy="@_isSaving" Click="Save" />
+    </RadzenStack>
+</RadzenStack>
 
 @code {
-    [CascadingParameter]
-    private IMudDialogInstance MudDialog { get; set; } = null!;
-
     [Parameter, EditorRequired]
     public TranslationProviderDto Provider { get; set; } = null!;
 
-    /// <summary>
-    /// Configuration level: "user", "organization", "project"
-    /// </summary>
     [Parameter]
     public string Level { get; set; } = "user";
 
-    /// <summary>
-    /// Entity ID (user ID, org ID, or project ID depending on Level)
-    /// </summary>
     [Parameter]
     public int? EntityId { get; set; }
 
-    /// <summary>
-    /// Whether to show API key field for providers that don't require it
-    /// </summary>
     [Parameter]
     public bool ShowApiKeyField { get; set; } = false;
 
-    // Common fields
     private string _apiKey = string.Empty;
     private bool _showKey = false;
     private int? _rateLimitPerMinute;
     private string? _customSystemPrompt;
 
-    // Provider-specific fields
     private string? _ollamaApiUrl;
     private string? _ollamaModel;
     private string? _openaiModel;
@@ -328,21 +304,26 @@
     private string? _lingvaInstanceUrl;
     private string? _libreApiUrl;
 
-    // State
     private bool _isLoading = true;
     private bool _isTesting = false;
     private bool _isSaving = false;
     private TestApiKeyResponse? _testResult;
     private ProviderConfigDto? _existingConfig;
-    private string? _inheritedKeySource; // e.g., "Organization" if key comes from org level
+    private string? _inheritedKeySource;
 
-    // Prevent browser autofill on API key fields
-    private static readonly Dictionary<string, object> _noAutofillAttributes = new()
+    private readonly List<object> _openaiModelOptions = new()
     {
-        { "autocomplete", $"off-{Guid.NewGuid():N}" },
-        { "data-lpignore", "true" },
-        { "data-form-type", "other" },
-        { "data-1p-ignore", "true" }
+        new { Value = "gpt-4o-mini", Text = "GPT-4o Mini (Recommended)" },
+        new { Value = "gpt-4o", Text = "GPT-4o" },
+        new { Value = "gpt-4-turbo", Text = "GPT-4 Turbo" },
+        new { Value = "gpt-3.5-turbo", Text = "GPT-3.5 Turbo" }
+    };
+
+    private readonly List<object> _claudeModelOptions = new()
+    {
+        new { Value = "claude-3-5-sonnet-20241022", Text = "Claude 3.5 Sonnet (Recommended)" },
+        new { Value = "claude-3-5-haiku-20241022", Text = "Claude 3.5 Haiku (Fast)" },
+        new { Value = "claude-3-opus-20240229", Text = "Claude 3 Opus" }
     };
 
     protected override async Task OnInitializedAsync()
@@ -355,7 +336,6 @@
         _isLoading = true;
         try
         {
-            // Load config at this level
             _existingConfig = Level.ToLowerInvariant() switch
             {
                 "user" => await TranslationService.GetUserProviderConfigAsync(Provider.Name),
@@ -367,30 +347,19 @@
             };
 
             if (_existingConfig?.Config != null)
-            {
                 PopulateFieldsFromConfig(_existingConfig.Config);
-            }
 
-            // Check if there's an inherited API key from a higher level
             if (_existingConfig?.HasApiKey != true && Provider.RequiresApiKey)
             {
-                // Check the provider's ApiKeySource from the list
                 if (!string.IsNullOrEmpty(Provider.ApiKeySource))
-                {
                     _inheritedKeySource = Provider.ApiKeySource;
-                }
             }
         }
         catch (Exception ex)
         {
-            // Config doesn't exist yet, that's fine
             Console.WriteLine($"No existing config: {ex.Message}");
-
-            // Still check for inherited key
             if (Provider.RequiresApiKey && !string.IsNullOrEmpty(Provider.ApiKeySource))
-            {
                 _inheritedKeySource = Provider.ApiKeySource;
-            }
         }
         finally
         {
@@ -400,11 +369,8 @@
 
     private void PopulateFieldsFromConfig(Dictionary<string, object?> config)
     {
-        // Common
         _rateLimitPerMinute = GetIntValue(config, "rateLimitPerMinute");
         _customSystemPrompt = GetStringValue(config, "customSystemPrompt");
-
-        // Provider-specific
         _ollamaApiUrl = GetStringValue(config, "apiUrl");
         _ollamaModel = GetStringValue(config, "model");
         _openaiModel = GetStringValue(config, "model");
@@ -420,56 +386,36 @@
     {
         var config = new Dictionary<string, object?>();
 
-        // Add rate limit if set
         if (_rateLimitPerMinute.HasValue)
             config["rateLimitPerMinute"] = _rateLimitPerMinute.Value;
-
-        // Add custom system prompt if set
         if (!string.IsNullOrWhiteSpace(_customSystemPrompt))
             config["customSystemPrompt"] = _customSystemPrompt;
 
-        // Provider-specific config
         switch (Provider.Name.ToLowerInvariant())
         {
             case "ollama":
-                if (!string.IsNullOrWhiteSpace(_ollamaApiUrl))
-                    config["apiUrl"] = _ollamaApiUrl;
-                if (!string.IsNullOrWhiteSpace(_ollamaModel))
-                    config["model"] = _ollamaModel;
+                if (!string.IsNullOrWhiteSpace(_ollamaApiUrl)) config["apiUrl"] = _ollamaApiUrl;
+                if (!string.IsNullOrWhiteSpace(_ollamaModel)) config["model"] = _ollamaModel;
                 break;
-
             case "openai":
-                if (!string.IsNullOrWhiteSpace(_openaiModel))
-                    config["model"] = _openaiModel;
+                if (!string.IsNullOrWhiteSpace(_openaiModel)) config["model"] = _openaiModel;
                 break;
-
             case "claude":
-                if (!string.IsNullOrWhiteSpace(_claudeModel))
-                    config["model"] = _claudeModel;
+                if (!string.IsNullOrWhiteSpace(_claudeModel)) config["model"] = _claudeModel;
                 break;
-
             case "azureopenai":
-                if (!string.IsNullOrWhiteSpace(_azureEndpoint))
-                    config["endpoint"] = _azureEndpoint;
-                if (!string.IsNullOrWhiteSpace(_azureDeploymentName))
-                    config["deploymentName"] = _azureDeploymentName;
+                if (!string.IsNullOrWhiteSpace(_azureEndpoint)) config["endpoint"] = _azureEndpoint;
+                if (!string.IsNullOrWhiteSpace(_azureDeploymentName)) config["deploymentName"] = _azureDeploymentName;
                 break;
-
             case "azuretranslator":
-                if (!string.IsNullOrWhiteSpace(_azureRegion))
-                    config["region"] = _azureRegion;
-                if (!string.IsNullOrWhiteSpace(_azureEndpoint))
-                    config["endpoint"] = _azureEndpoint;
+                if (!string.IsNullOrWhiteSpace(_azureRegion)) config["region"] = _azureRegion;
+                if (!string.IsNullOrWhiteSpace(_azureEndpoint)) config["endpoint"] = _azureEndpoint;
                 break;
-
             case "lingva":
-                if (!string.IsNullOrWhiteSpace(_lingvaInstanceUrl))
-                    config["instanceUrl"] = _lingvaInstanceUrl;
+                if (!string.IsNullOrWhiteSpace(_lingvaInstanceUrl)) config["instanceUrl"] = _lingvaInstanceUrl;
                 break;
-
             case "libretranslate":
-                if (!string.IsNullOrWhiteSpace(_libreApiUrl))
-                    config["apiUrl"] = _libreApiUrl;
+                if (!string.IsNullOrWhiteSpace(_libreApiUrl)) config["apiUrl"] = _libreApiUrl;
                 break;
         }
 
@@ -488,16 +434,11 @@
                 ProviderName = Provider.Name,
                 ApiKey = !string.IsNullOrEmpty(_apiKey) ? _apiKey : null!
             };
-
             _testResult = await TranslationService.TestApiKeyAsync(request);
         }
         catch (Exception ex)
         {
-            _testResult = new TestApiKeyResponse
-            {
-                IsValid = false,
-                Error = ex.Message
-            };
+            _testResult = new TestApiKeyResponse { IsValid = false, Error = ex.Message };
         }
         finally
         {
@@ -538,17 +479,17 @@
 
             if (result.IsSuccess)
             {
-                Snackbar.Add($"{Provider.DisplayName} configuration saved successfully", Severity.Success);
-                MudDialog.Close(DialogResult.Ok(true));
+                NotificationService.Notify(NotificationSeverity.Success, "Saved", $"{Provider.DisplayName} configuration saved");
+                DialogService.Close(true);
             }
             else
             {
-                Snackbar.Add(result.ErrorMessage ?? "Failed to save configuration", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to save");
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to save: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to save: {ex.Message}");
         }
         finally
         {
@@ -558,60 +499,52 @@
 
     private void Cancel()
     {
-        MudDialog.Cancel();
+        DialogService.Close(null);
     }
 
     private bool IsValid()
     {
-        // If provider requires API key, must have one (either new, existing at this level, or inherited)
         if (Provider.RequiresApiKey)
         {
             var hasKeyAtThisLevel = !string.IsNullOrEmpty(_apiKey) || _existingConfig?.HasApiKey == true;
             var hasInheritedKey = _inheritedKeySource != null;
-
-            // Need either a key at this level OR an inherited key (options-only save is OK with inherited key)
-            if (!hasKeyAtThisLevel && !hasInheritedKey)
-                return false;
+            if (!hasKeyAtThisLevel && !hasInheritedKey) return false;
         }
 
-        // Provider-specific validation (only if setting config at this level)
         return Provider.Name.ToLowerInvariant() switch
         {
-            // Azure OpenAI requires endpoint and deployment only if user is entering them
             "azureopenai" when !string.IsNullOrEmpty(_apiKey) =>
                 !string.IsNullOrWhiteSpace(_azureEndpoint) && !string.IsNullOrWhiteSpace(_azureDeploymentName),
             _ => true
         };
     }
 
-    private bool HasConfigOptions(string provider) => provider.ToLowerInvariant() switch
+    private static bool HasConfigOptions(string provider) => provider.ToLowerInvariant() switch
     {
         "ollama" or "openai" or "claude" or "azureopenai" or "azuretranslator" or "lingva" or "libretranslate" => true,
         _ => false
     };
 
-    private Color GetLevelColor() => Level.ToLowerInvariant() switch
+    private static BadgeStyle GetLevelBadgeStyle(string level) => level.ToLowerInvariant() switch
     {
-        "user" => Color.Primary,
-        "organization" => Color.Secondary,
-        "project" => Color.Success,
-        _ => Color.Default
+        "user" => BadgeStyle.Primary,
+        "organization" => BadgeStyle.Secondary,
+        "project" => BadgeStyle.Success,
+        _ => BadgeStyle.Light
     };
 
-    private string GetLevelDisplayName() => Level.ToLowerInvariant() switch
+    private static string GetLevelDisplayName(string level) => level.ToLowerInvariant() switch
     {
         "user" => "User Level",
         "organization" => "Organization Level",
         "project" => "Project Level",
-        _ => Level
+        _ => level
     };
 
     private string GetApiKeyPlaceholder()
     {
-        if (_existingConfig?.HasApiKey == true)
-            return "(leave blank to keep current)";
-        if (_inheritedKeySource != null)
-            return $"(optional - using {_inheritedKeySource} key)";
+        if (_existingConfig?.HasApiKey == true) return "(leave blank to keep current)";
+        if (_inheritedKeySource != null) return $"(optional - using {_inheritedKeySource} key)";
         return "Enter your API key...";
     }
 
@@ -630,17 +563,14 @@
     private static string? GetStringValue(Dictionary<string, object?> config, string key)
     {
         if (config.TryGetValue(key, out var value) && value != null)
-        {
             return value.ToString();
-        }
         return null;
     }
 
     private static int? GetIntValue(Dictionary<string, object?> config, string key)
     {
         var str = GetStringValue(config, key);
-        if (str != null && int.TryParse(str, out var val))
-            return val;
+        if (str != null && int.TryParse(str, out var val)) return val;
         return null;
     }
 }

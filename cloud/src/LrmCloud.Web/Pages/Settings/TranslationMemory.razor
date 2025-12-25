@@ -2,122 +2,120 @@
 @using LrmCloud.Shared.DTOs.TranslationMemory
 @using LrmCloud.Web.Services
 @inject TranslationMemoryService TmService
-@inject ISnackbar Snackbar
-@inject IDialogService DialogService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 @attribute [Authorize]
 
 <PageTitle>Translation Memory - LRM Cloud</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-2">
-    <MudIcon Icon="@Icons.Material.Filled.Memory" Class="mr-2" Style="vertical-align: middle;" />
-    Translation Memory
-</MudText>
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+    <RadzenIcon Icon="memory" />
+    <RadzenText TextStyle="TextStyle.H4">Translation Memory</RadzenText>
+</RadzenStack>
+<RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-4">
     Your personal translation memory stores past translations for reuse. Get exact and fuzzy matches automatically.
-</MudText>
+</RadzenText>
 
 @if (_isLoading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="height: 4px;" />
 }
 else if (_stats == null)
 {
-    <MudAlert Severity="Severity.Error">Failed to load Translation Memory statistics.</MudAlert>
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">Failed to load Translation Memory statistics.</RadzenAlert>
 }
 else
 {
-    <MudGrid>
+    <RadzenRow Gap="1rem">
         @* Stats Overview *@
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-4">
-                    <MudIcon Icon="@Icons.Material.Filled.Analytics" Class="mr-2" Style="vertical-align: middle;" />
-                    Statistics
-                </MudText>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-4">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+                    <RadzenIcon Icon="analytics" />
+                    <RadzenText TextStyle="TextStyle.H6">Statistics</RadzenText>
+                </RadzenStack>
 
-                <MudStack Spacing="3">
-                    <MudStack Row="true" Justify="Justify.SpaceBetween">
-                        <MudText>Total Entries</MudText>
-                        <MudText Typo="Typo.h6">@_stats.TotalEntries.ToString("N0")</MudText>
-                    </MudStack>
+                <RadzenStack Gap="1rem">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenText>Total Entries</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H6">@_stats.TotalEntries.ToString("N0")</RadzenText>
+                    </RadzenStack>
 
-                    <MudStack Row="true" Justify="Justify.SpaceBetween">
-                        <MudText>Total Uses</MudText>
-                        <MudText Typo="Typo.h6" Color="Color.Success">@_stats.TotalUseCount.ToString("N0")</MudText>
-                    </MudStack>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenText>Total Uses</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H6" Style="color: var(--rz-success);">@_stats.TotalUseCount.ToString("N0")</RadzenText>
+                    </RadzenStack>
 
-                    <MudStack Row="true" Justify="Justify.SpaceBetween">
-                        <MudText>Language Pairs</MudText>
-                        <MudText Typo="Typo.h6">@_stats.LanguagePairs.Count</MudText>
-                    </MudStack>
-                </MudStack>
-            </MudPaper>
-        </MudItem>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenText>Language Pairs</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H6">@_stats.LanguagePairs.Count</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
 
         @* Actions *@
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-4">
-                    <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" Style="vertical-align: middle;" />
-                    Actions
-                </MudText>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-4">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+                    <RadzenIcon Icon="settings" />
+                    <RadzenText TextStyle="TextStyle.H6">Actions</RadzenText>
+                </RadzenStack>
 
-                <MudStack Spacing="2">
-                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                <RadzenStack Gap="0.5rem">
+                    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" class="rz-mb-2">
                         Translation Memory automatically stores translations as you work.
                         Suggestions appear when you translate similar content.
-                    </MudAlert>
+                    </RadzenAlert>
 
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Error"
-                               StartIcon="@Icons.Material.Filled.DeleteForever"
-                               OnClick="ConfirmClearAll"
-                               Disabled="@(_stats.TotalEntries == 0)">
-                        Clear All TM Data
-                    </MudButton>
-                </MudStack>
-            </MudPaper>
-        </MudItem>
+                    <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Danger" Icon="delete_forever" Text="Clear All TM Data" Click="@ConfirmClearAll" Disabled="@(_stats.TotalEntries == 0)" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
 
         @* Language Pairs *@
         @if (_stats.LanguagePairs.Any())
         {
-            <MudItem xs="12">
-                <MudPaper Class="pa-4" Elevation="2">
-                    <MudText Typo="Typo.h6" Class="mb-4">
-                        <MudIcon Icon="@Icons.Material.Filled.Language" Class="mr-2" Style="vertical-align: middle;" />
-                        Language Pairs
-                    </MudText>
+            <RadzenColumn Size="12">
+                <RadzenCard class="rz-p-4">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+                        <RadzenIcon Icon="language" />
+                        <RadzenText TextStyle="TextStyle.H6">Language Pairs</RadzenText>
+                    </RadzenStack>
 
-                    <MudTable Items="_stats.LanguagePairs" Hover="true" Dense="true">
-                        <HeaderContent>
-                            <MudTh>Source</MudTh>
-                            <MudTh>Target</MudTh>
-                            <MudTh Style="text-align: right">Entries</MudTh>
-                            <MudTh Style="text-align: right">Uses</MudTh>
-                            <MudTh>Actions</MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd>
-                                <MudChip T="string" Size="Size.Small">@context.SourceLanguage.ToUpperInvariant()</MudChip>
-                            </MudTd>
-                            <MudTd>
-                                <MudChip T="string" Size="Size.Small">@context.TargetLanguage.ToUpperInvariant()</MudChip>
-                            </MudTd>
-                            <MudTd Style="text-align: right">@context.EntryCount.ToString("N0")</MudTd>
-                            <MudTd Style="text-align: right">@context.UseCount.ToString("N0")</MudTd>
-                            <MudTd>
-                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                               Size="Size.Small"
-                                               Color="Color.Error"
-                                               OnClick="@(() => ConfirmClearPair(context))" />
-                            </MudTd>
-                        </RowTemplate>
-                    </MudTable>
-                </MudPaper>
-            </MudItem>
+                    <RadzenDataGrid TItem="TmLanguagePairStats" Data="@_stats.LanguagePairs" Density="Density.Compact" AllowSorting="false" AllowPaging="false">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="TmLanguagePairStats" Property="SourceLanguage" Title="Source">
+                                <Template Context="pair">
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@pair.SourceLanguage.ToUpperInvariant()" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="TmLanguagePairStats" Property="TargetLanguage" Title="Target">
+                                <Template Context="pair">
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@pair.TargetLanguage.ToUpperInvariant()" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="TmLanguagePairStats" Property="EntryCount" Title="Entries" TextAlign="TextAlign.Right">
+                                <Template Context="pair">
+                                    @pair.EntryCount.ToString("N0")
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="TmLanguagePairStats" Property="UseCount" Title="Uses" TextAlign="TextAlign.Right">
+                                <Template Context="pair">
+                                    @pair.UseCount.ToString("N0")
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="TmLanguagePairStats" Title="Actions" Width="80px">
+                                <Template Context="pair">
+                                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Radzen.Variant.Text" Size="ButtonSize.Small" Click="@(() => ConfirmClearPair(pair))" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenCard>
+            </RadzenColumn>
         }
-    </MudGrid>
+    </RadzenRow>
 }
 
 @code {
@@ -141,12 +139,12 @@ else
             }
             else
             {
-                Snackbar.Add(result.ErrorMessage ?? "Failed to load TM stats", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to load TM stats");
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
         finally
         {
@@ -156,13 +154,12 @@ else
 
     private async Task ConfirmClearAll()
     {
-        var result = await DialogService.ShowMessageBox(
-            "Clear Translation Memory",
+        var confirmed = await DialogService.Confirm(
             "Are you sure you want to delete all Translation Memory entries? This cannot be undone.",
-            yesText: "Delete All",
-            cancelText: "Cancel");
+            "Clear Translation Memory",
+            new ConfirmOptions { OkButtonText = "Delete All", CancelButtonText = "Cancel" });
 
-        if (result == true)
+        if (confirmed == true)
         {
             await ClearAllAsync();
         }
@@ -173,24 +170,23 @@ else
         var result = await TmService.ClearAsync();
         if (result.IsSuccess)
         {
-            Snackbar.Add($"Cleared {result.Data} TM entries", Severity.Success);
+            NotificationService.Notify(NotificationSeverity.Success, "Success", $"Cleared {result.Data} TM entries");
             await LoadStatsAsync();
         }
         else
         {
-            Snackbar.Add(result.ErrorMessage ?? "Failed to clear TM", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to clear TM");
         }
     }
 
     private async Task ConfirmClearPair(TmLanguagePairStats pair)
     {
-        var result = await DialogService.ShowMessageBox(
-            "Clear Language Pair",
+        var confirmed = await DialogService.Confirm(
             $"Delete all {pair.EntryCount} entries for {pair.SourceLanguage.ToUpperInvariant()} -> {pair.TargetLanguage.ToUpperInvariant()}?",
-            yesText: "Delete",
-            cancelText: "Cancel");
+            "Clear Language Pair",
+            new ConfirmOptions { OkButtonText = "Delete", CancelButtonText = "Cancel" });
 
-        if (result == true)
+        if (confirmed == true)
         {
             await ClearPairAsync(pair);
         }
@@ -201,12 +197,12 @@ else
         var result = await TmService.ClearAsync(pair.SourceLanguage, pair.TargetLanguage);
         if (result.IsSuccess)
         {
-            Snackbar.Add($"Cleared {result.Data} entries for {pair.SourceLanguage} -> {pair.TargetLanguage}", Severity.Success);
+            NotificationService.Notify(NotificationSeverity.Success, "Success", $"Cleared {result.Data} entries for {pair.SourceLanguage} -> {pair.TargetLanguage}");
             await LoadStatsAsync();
         }
         else
         {
-            Snackbar.Add(result.ErrorMessage ?? "Failed to clear language pair", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to clear language pair");
         }
     }
 }

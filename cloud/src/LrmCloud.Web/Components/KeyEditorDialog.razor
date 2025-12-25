@@ -2,350 +2,257 @@
 @using LrmCloud.Web.Services
 @using LrmCloud.Shared.DTOs.TranslationMemory
 @inject TranslationMemoryService TmService
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 @inject IJSRuntime JS
 
-<MudDialog>
-    <TitleContent>
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
-            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                <MudIcon Icon="@Icons.Material.Filled.Edit" />
-                <MudText Typo="Typo.h6">@Row.KeyName</MudText>
-                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
-                               Size="Size.Small"
-                               OnClick="CopyKeyName" />
-            </MudStack>
-            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(Row.Status)">
-                    @Row.Status
-                </MudChip>
-                @if (Row.IsPlural)
+<RadzenStack Gap="1rem">
+    @* Key Type Toggle *@
+    @if (SupportsPluralKeys)
+    {
+        <RadzenCard>
+            <RadzenStack Gap="0.5rem">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenText TextStyle="TextStyle.Body2">Key Type</RadzenText>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem">
+                        <RadzenButton Text="Single" Size="ButtonSize.Small"
+                                      ButtonStyle="@(!_displayIsPlural ? ButtonStyle.Primary : ButtonStyle.Light)"
+                                      Variant="@(!_displayIsPlural ? Radzen.Variant.Filled : Radzen.Variant.Outlined)"
+                                      Click="@(() => OnKeyTypeToggled(false))" />
+                        <RadzenButton Text="Plural" Size="ButtonSize.Small"
+                                      ButtonStyle="@(_displayIsPlural ? ButtonStyle.Primary : ButtonStyle.Light)"
+                                      Variant="@(_displayIsPlural ? Radzen.Variant.Filled : Radzen.Variant.Outlined)"
+                                      Click="@(() => OnKeyTypeToggled(true))" />
+                    </RadzenStack>
+                </RadzenStack>
+
+                @if (_showConversionConfirm)
                 {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Info">Plural</MudChip>
-                }
-            </MudStack>
-        </MudStack>
-    </TitleContent>
-
-    <DialogContent>
-        <MudStack Spacing="4">
-            @* Key Type Toggle *@
-            @if (SupportsPluralKeys)
-            {
-                <MudPaper Outlined="true" Class="pa-3">
-                    <MudStack Spacing="2">
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                            <MudText Typo="Typo.body2">Key Type</MudText>
-                            <MudToggleGroup T="bool" Value="@_displayIsPlural" ValueChanged="@OnKeyTypeToggled" Color="Color.Primary" Size="Size.Small">
-                                <MudToggleItem Value="false" Text="Single" />
-                                <MudToggleItem Value="true" Text="Plural" />
-                            </MudToggleGroup>
-                        </MudStack>
-
-                        @* Show conversion confirmation inline *@
-                        @if (_showConversionConfirm)
-                        {
-                            @if (_pendingIsPlural)
-                            {
-                                <MudAlert Severity="Severity.Info" Dense="true">
-                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                                        <MudText Typo="Typo.body2">
-                                            Convert to plural? Current value becomes "other" form.
-                                        </MudText>
-                                        <MudStack Row="true" Spacing="1">
-                                            <MudButton Size="Size.Small" OnClick="@CancelConversion">Cancel</MudButton>
-                                            <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled" OnClick="@ConfirmConversion">Convert</MudButton>
-                                        </MudStack>
-                                    </MudStack>
-                                </MudAlert>
-                            }
-                            else
-                            {
-                                <MudAlert Severity="Severity.Warning" Dense="true">
-                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                                        <MudText Typo="Typo.body2">
-                                            Convert to single? Only "other" form will be kept.
-                                        </MudText>
-                                        <MudStack Row="true" Spacing="1">
-                                            <MudButton Size="Size.Small" OnClick="@CancelConversion">Cancel</MudButton>
-                                            <MudButton Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled" OnClick="@ConfirmConversion">Convert</MudButton>
-                                        </MudStack>
-                                    </MudStack>
-                                </MudAlert>
-                            }
-                        }
-                    </MudStack>
-                </MudPaper>
-            }
-
-            @* Comment Field *@
-            <MudTextField T="string"
-                          Value="@Row.Comment"
-                          ValueChanged="@OnCommentChanged"
-                          Label="Comment (for translators)"
-                          Variant="Variant.Outlined"
-                          Lines="2"
-                          Placeholder="Description to help translators"
-                          HelperText="@($"{Row.Comment?.Length ?? 0}/1000 characters")"
-                          MaxLength="1000" />
-
-            @* Translations Section *@
-            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                <MudText Typo="Typo.h6">Translations</MudText>
-                <MudStack Row="true" Spacing="2">
-                    @if (Row.IsPlural)
-                    {
-                        var availableForms = GetAvailablePluralForms();
-                        @if (availableForms.Any())
-                        {
-                            <MudMenu Label="+ Add Form" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Dense="true">
-                                @foreach (var form in availableForms)
+                    <RadzenAlert AlertStyle="@(_pendingIsPlural ? AlertStyle.Info : AlertStyle.Warning)" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                            <RadzenText TextStyle="TextStyle.Body2">
+                                @if (_pendingIsPlural)
                                 {
-                                    var f = form;
-                                    <MudMenuItem OnClick="@(() => AddPluralForm(f))">
-                                        @f - @GetPluralFormDescription(f)
-                                    </MudMenuItem>
-                                }
-                            </MudMenu>
-                        }
-                    }
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Success"
-                               Size="Size.Small"
-                               StartIcon="@Icons.Material.Filled.Memory"
-                               OnClick="@CheckTmForAllLanguages"
-                               Disabled="@(!HasAnySourceText())">
-                        Check TM
-                    </MudButton>
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Primary"
-                               Size="Size.Small"
-                               StartIcon="@Icons.Material.Filled.Translate"
-                               OnClick="@HandleTranslate"
-                               Disabled="@(!HasAnySourceText() || _isTranslating)">
-                        @if (_isTranslating)
-                        {
-                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
-                        }
-                        Translate
-                    </MudButton>
-                </MudStack>
-            </MudStack>
-
-            @* Translations Table *@
-            <MudPaper Outlined="true" Class="pa-0">
-                <MudSimpleTable Dense="true" Hover="true" Style="overflow-x: auto;">
-                    <thead>
-                        <tr>
-                            <th style="width: 80px;">Lang</th>
-                            @if (Row.IsPlural)
-                            {
-                                @foreach (var form in GetActivePluralForms())
-                                {
-                                    <th style="min-width: 200px;">
-                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0">
-                                            <span>@form</span>
-                                            @if (form != PluralForms.Other)
-                                            {
-                                                <MudIconButton Icon="@Icons.Material.Filled.Close"
-                                                               Size="Size.Small"
-                                                               Color="Color.Error"
-                                                               OnClick="@(() => RemovePluralForm(form))"
-                                                               Style="padding: 2px;" />
-                                            }
-                                        </MudStack>
-                                    </th>
-                                }
-                            }
-                            else
-                            {
-                                <th style="min-width: 300px;">Value</th>
-                            }
-                            <th style="width: 60px; text-align: center;">TM</th>
-                            <th style="width: 60px; text-align: center;">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var lang in Languages)
-                        {
-                            var isDefault = lang == DefaultLanguage;
-                            var langStatus = GetLanguageStatus(lang);
-
-                            <tr>
-                                <td>
-                                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                                        <MudText Typo="Typo.body2" Style="font-weight: 500;">
-                                            @lang.ToUpperInvariant()
-                                        </MudText>
-                                        @if (isDefault)
-                                        {
-                                            <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Warning" />
-                                        }
-                                    </MudStack>
-                                </td>
-
-                                @if (Row.IsPlural)
-                                {
-                                    @foreach (var pluralForm in GetActivePluralForms())
-                                    {
-                                        var pf = pluralForm;
-                                        var key = TranslationGridRow.GetKey(lang, pf);
-                                        var cell = Row.Translations.GetValueOrDefault(key);
-                                        var isDirty = cell?.IsDirty ?? false;
-                                        var tmMatch = _tmSuggestions.GetValueOrDefault(key);
-
-                                        <td class="@(isDirty ? "dirty-cell" : "")">
-                                            <MudStack Spacing="1">
-                                                @if (tmMatch != null)
-                                                {
-                                                    <MudPaper Class="pa-2" Style="background-color: rgba(76, 175, 80, 0.1);">
-                                                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
-                                                            <MudText Typo="Typo.caption" Style="font-style: italic; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">
-                                                                "@tmMatch.TranslatedText"
-                                                            </MudText>
-                                                            <MudStack Row="true" Spacing="0">
-                                                                <MudIconButton Icon="@Icons.Material.Filled.Check"
-                                                                               Size="Size.Small"
-                                                                               Color="Color.Success"
-                                                                               OnClick="@(() => ApplyTmSuggestion(key, tmMatch))" />
-                                                                <MudIconButton Icon="@Icons.Material.Filled.Close"
-                                                                               Size="Size.Small"
-                                                                               OnClick="@(() => DismissTmSuggestion(key))" />
-                                                            </MudStack>
-                                                        </MudStack>
-                                                    </MudPaper>
-                                                }
-                                                @if (cell != null)
-                                                {
-                                                    <MudTextField T="string"
-                                                                  Value="@cell.Value"
-                                                                  ValueChanged="@(v => OnValueChanged(cell, v))"
-                                                                  Variant="Variant.Outlined"
-                                                                  Margin="Margin.Dense"
-                                                                  Lines="2"
-                                                                  Placeholder="@GetPluralPlaceholder(pf, isDefault)"
-                                                                  Immediate="true" />
-                                                }
-                                            </MudStack>
-                                        </td>
-                                    }
+                                    <span>Convert to plural? Current value becomes "other" form.</span>
                                 }
                                 else
                                 {
-                                    var cell = Row.Translations.GetValueOrDefault(lang);
-                                    var isDirty = cell?.IsDirty ?? false;
-                                    var tmMatch = _tmSuggestions.GetValueOrDefault(lang);
-
-                                    <td class="@(isDirty ? "dirty-cell" : "")">
-                                        <MudStack Spacing="1">
-                                            @if (tmMatch != null)
-                                            {
-                                                <MudPaper Class="pa-2" Style="background-color: rgba(76, 175, 80, 0.1);">
-                                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
-                                                        <MudText Typo="Typo.caption" Style="font-style: italic; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
-                                                            "@tmMatch.TranslatedText"
-                                                        </MudText>
-                                                        <MudStack Row="true" Spacing="0">
-                                                            <MudIconButton Icon="@Icons.Material.Filled.Check"
-                                                                           Size="Size.Small"
-                                                                           Color="Color.Success"
-                                                                           OnClick="@(() => ApplyTmSuggestion(lang, tmMatch))" />
-                                                            <MudIconButton Icon="@Icons.Material.Filled.Close"
-                                                                           Size="Size.Small"
-                                                                           OnClick="@(() => DismissTmSuggestion(lang))" />
-                                                        </MudStack>
-                                                    </MudStack>
-                                                </MudPaper>
-                                            }
-                                            @if (cell != null)
-                                            {
-                                                <MudTextField T="string"
-                                                              Value="@cell.Value"
-                                                              ValueChanged="@(v => OnValueChanged(cell, v))"
-                                                              Variant="Variant.Outlined"
-                                                              Margin="Margin.Dense"
-                                                              Lines="2"
-                                                              Placeholder="@(isDefault ? "Enter source text" : "Enter translation")"
-                                                              Immediate="true" />
-                                            }
-                                        </MudStack>
-                                    </td>
+                                    <span>Convert to single? Only "other" form will be kept.</span>
                                 }
-
-                                <td style="text-align: center;">
-                                    @if (!isDefault)
-                                    {
-                                        var hasTm = HasTmForLanguage(lang);
-                                        @if (hasTm)
-                                        {
-                                            <MudIcon Icon="@Icons.Material.Filled.Memory" Size="Size.Small" Color="Color.Success" />
-                                        }
-                                        else
-                                        {
-                                            <MudIconButton Icon="@Icons.Material.Outlined.Memory"
-                                                           Size="Size.Small"
-                                                           Color="Color.Default"
-                                                           OnClick="@(() => CheckTmForLanguage(lang))"
-                                                           Disabled="@(!HasAnySourceText())" />
-                                        }
-                                    }
-                                </td>
-
-                                <td style="text-align: center;">
-                                    @switch (langStatus)
-                                    {
-                                        case TranslationStatus.Complete:
-                                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" />
-                                            break;
-                                        case TranslationStatus.Partial:
-                                            <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" />
-                                            break;
-                                        case TranslationStatus.Missing:
-                                            <MudIcon Icon="@Icons.Material.Filled.Error" Size="Size.Small" Color="Color.Error" />
-                                            break;
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </MudSimpleTable>
-            </MudPaper>
-
-            @if (HasChanges)
-            {
-                <MudAlert Severity="Severity.Warning" Dense="true">
-                    You have unsaved changes
-                </MudAlert>
-            }
-        </MudStack>
-    </DialogContent>
-
-    <DialogActions>
-        <MudButton OnClick="Cancel" Disabled="@_isSaving">Cancel</MudButton>
-        <MudButton Color="Color.Primary"
-                   Variant="Variant.Filled"
-                   OnClick="Save"
-                   Disabled="@(!HasChanges || _isSaving)">
-            @if (_isSaving)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Save Changes
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-
-<style>
-    .dirty-cell {
-        background-color: rgba(255, 193, 7, 0.1) !important;
+                            </RadzenText>
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem">
+                                <RadzenButton Size="ButtonSize.Small" Variant="Radzen.Variant.Text" Text="Cancel" Click="CancelConversion" />
+                                <RadzenButton Size="ButtonSize.Small" ButtonStyle="@(_pendingIsPlural ? ButtonStyle.Primary : ButtonStyle.Warning)"
+                                              Text="Convert" Click="ConfirmConversion" />
+                            </RadzenStack>
+                        </RadzenStack>
+                    </RadzenAlert>
+                }
+            </RadzenStack>
+        </RadzenCard>
     }
-</style>
+
+    @* Comment Field *@
+    <RadzenFormField Text="Comment (for translators)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+        <ChildContent>
+            <RadzenTextArea Value="@Row.Comment" Change="@OnCommentChanged" Rows="2"
+                            Placeholder="Description to help translators" Style="width: 100%;" MaxLength="1000" />
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@($"{Row.Comment?.Length ?? 0}/1000 characters")</RadzenText>
+        </Helper>
+    </RadzenFormField>
+
+    @* Translations Section *@
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+        <RadzenText TextStyle="TextStyle.H6">Translations</RadzenText>
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+            @if (Row.IsPlural)
+            {
+                var availableForms = GetAvailablePluralForms().ToList();
+                @if (availableForms.Any())
+                {
+                    <RadzenDropDown @bind-Value="_selectedPluralForm" Placeholder="+ Add Form" Style="width: 120px;"
+                                    Data="@availableForms" Change="@OnPluralFormSelected" />
+                }
+            }
+            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small"
+                          Icon="memory" Text="Check TM" Click="CheckTmForAllLanguages" Disabled="@(!HasAnySourceText())" />
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                          Icon="translate" Text="Translate" Click="HandleTranslate"
+                          Disabled="@(!HasAnySourceText() || _isTranslating)" IsBusy="@_isTranslating" />
+        </RadzenStack>
+    </RadzenStack>
+
+    @* Translations Table *@
+    <RadzenCard Style="padding: 0; overflow-x: auto;">
+        <table class="rz-data-grid" style="width: 100%; table-layout: fixed;">
+            <thead>
+                <tr>
+                    <th style="width: 70px;">Lang</th>
+                    @if (Row.IsPlural)
+                    {
+                        @foreach (var form in GetActivePluralForms())
+                        {
+                            <th style="width: auto;">
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0">
+                                    <span>@form</span>
+                                    @if (form != PluralForms.Other)
+                                    {
+                                        <RadzenButton Icon="close" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                                      ButtonStyle="ButtonStyle.Danger" Click="@(() => RemovePluralForm(form))" />
+                                    }
+                                </RadzenStack>
+                            </th>
+                        }
+                    }
+                    else
+                    {
+                        <th style="width: auto;">Value</th>
+                    }
+                    <th style="width: 50px; text-align: center;">TM</th>
+                    <th style="width: 50px; text-align: center;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var lang in Languages)
+                {
+                    var isDefault = lang == DefaultLanguage;
+                    var langStatus = GetLanguageStatus(lang);
+
+                    <tr>
+                        <td>
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem" AlignItems="Radzen.AlignItems.Center">
+                                <RadzenText TextStyle="TextStyle.Body2" Style="font-weight: 500;">@lang.ToUpperInvariant()</RadzenText>
+                                @if (isDefault)
+                                {
+                                    <RadzenIcon Icon="star" Style="font-size: 1rem; color: var(--rz-warning);" />
+                                }
+                            </RadzenStack>
+                        </td>
+
+                        @if (Row.IsPlural)
+                        {
+                            @foreach (var pluralForm in GetActivePluralForms())
+                            {
+                                var pf = pluralForm;
+                                var key = TranslationGridRow.GetKey(lang, pf);
+                                var cell = Row.Translations.GetValueOrDefault(key);
+                                var isDirty = cell?.IsDirty ?? false;
+                                var tmMatch = _tmSuggestions.GetValueOrDefault(key);
+
+                                <td style="@(isDirty ? "background-color: rgba(255, 193, 7, 0.1);" : "")">
+                                    <RadzenStack Gap="0.25rem">
+                                        @if (tmMatch != null)
+                                        {
+                                            <RadzenCard Style="background-color: rgba(76, 175, 80, 0.1); padding: 0.5rem;">
+                                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
+                                                    <RadzenText TextStyle="TextStyle.Caption" Style="font-style: italic; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">
+                                                        "@tmMatch.TranslatedText"
+                                                    </RadzenText>
+                                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0">
+                                                        <RadzenButton Icon="check" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                                                      ButtonStyle="ButtonStyle.Success" Click="@(() => ApplyTmSuggestion(key, tmMatch))" />
+                                                        <RadzenButton Icon="close" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                                                      Click="@(() => DismissTmSuggestion(key))" />
+                                                    </RadzenStack>
+                                                </RadzenStack>
+                                            </RadzenCard>
+                                        }
+                                        @if (cell != null)
+                                        {
+                                            <RadzenTextArea Value="@cell.Value" Change="@(args => OnValueChanged(cell, args))"
+                                                            Rows="2" Placeholder="@GetPluralPlaceholder(pf, isDefault)" Style="width: 100%;" />
+                                        }
+                                    </RadzenStack>
+                                </td>
+                            }
+                        }
+                        else
+                        {
+                            var cell = Row.Translations.GetValueOrDefault(lang);
+                            var isDirty = cell?.IsDirty ?? false;
+                            var tmMatch = _tmSuggestions.GetValueOrDefault(lang);
+
+                            <td style="@(isDirty ? "background-color: rgba(255, 193, 7, 0.1);" : "")">
+                                <RadzenStack Gap="0.25rem">
+                                    @if (tmMatch != null)
+                                    {
+                                        <RadzenCard Style="background-color: rgba(76, 175, 80, 0.1); padding: 0.5rem;">
+                                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
+                                                <RadzenText TextStyle="TextStyle.Caption" Style="font-style: italic; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
+                                                    "@tmMatch.TranslatedText"
+                                                </RadzenText>
+                                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0">
+                                                    <RadzenButton Icon="check" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                                                  ButtonStyle="ButtonStyle.Success" Click="@(() => ApplyTmSuggestion(lang, tmMatch))" />
+                                                    <RadzenButton Icon="close" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                                                  Click="@(() => DismissTmSuggestion(lang))" />
+                                                </RadzenStack>
+                                            </RadzenStack>
+                                        </RadzenCard>
+                                    }
+                                    @if (cell != null)
+                                    {
+                                        <RadzenTextArea Value="@cell.Value" Change="@(args => OnValueChanged(cell, args))"
+                                                        Rows="2" Placeholder="@(isDefault ? "Enter source text" : "Enter translation")" Style="width: 100%;" />
+                                    }
+                                </RadzenStack>
+                            </td>
+                        }
+
+                        <td style="text-align: center;">
+                            @if (!isDefault)
+                            {
+                                var hasTm = HasTmForLanguage(lang);
+                                @if (hasTm)
+                                {
+                                    <RadzenIcon Icon="memory" Style="font-size: 1rem; color: var(--rz-success);" />
+                                }
+                                else
+                                {
+                                    <RadzenButton Icon="memory" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                                  Click="@(() => CheckTmForLanguage(lang))" Disabled="@(!HasAnySourceText())" />
+                                }
+                            }
+                        </td>
+
+                        <td style="text-align: center;">
+                            @switch (langStatus)
+                            {
+                                case TranslationStatus.Complete:
+                                    <RadzenIcon Icon="check_circle" Style="font-size: 1rem; color: var(--rz-success);" />
+                                    break;
+                                case TranslationStatus.Partial:
+                                    <RadzenIcon Icon="warning" Style="font-size: 1rem; color: var(--rz-warning);" />
+                                    break;
+                                case TranslationStatus.Missing:
+                                    <RadzenIcon Icon="error" Style="font-size: 1rem; color: var(--rz-danger);" />
+                                    break;
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </RadzenCard>
+
+    @if (HasChanges)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+            You have unsaved changes
+        </RadzenAlert>
+    }
+
+    @* Dialog Actions *@
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+        <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="Cancel" Disabled="@_isSaving" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Save Changes"
+                      Click="Save" Disabled="@(!HasChanges || _isSaving)" IsBusy="@_isSaving" />
+    </RadzenStack>
+</RadzenStack>
 
 @code {
-    [CascadingParameter]
-    private IMudDialogInstance MudDialog { get; set; } = null!;
-
     [Parameter]
     public required TranslationGridRow Row { get; set; }
 
@@ -368,7 +275,8 @@
     private bool _isTranslating;
     private bool _showConversionConfirm;
     private bool _pendingIsPlural;
-    private bool _displayIsPlural; // What the toggle shows (changes immediately, but Row.IsPlural only changes on confirm)
+    private bool _displayIsPlural;
+    private string? _selectedPluralForm;
     private HashSet<string> _activePluralForms = new();
     private Dictionary<string, TmMatchDto> _tmSuggestions = new();
 
@@ -385,42 +293,39 @@
     private void RefreshActivePluralForms()
     {
         _activePluralForms = GetExistingPluralForms();
-
         if (Row.IsPlural && !_activePluralForms.Contains(PluralForms.Other))
-        {
             _activePluralForms.Add(PluralForms.Other);
-        }
-
         if (Row.IsPlural && _activePluralForms.Count == 1)
-        {
             _activePluralForms.Add(PluralForms.One);
-        }
     }
 
     private HashSet<string> GetExistingPluralForms()
     {
         if (!Row.IsPlural) return new HashSet<string>();
-
         return Row.Translations.Values
             .Where(t => !string.IsNullOrEmpty(t.PluralForm))
             .Select(t => t.PluralForm)
             .ToHashSet();
     }
 
-    private IEnumerable<string> GetActivePluralForms()
-    {
-        return PluralForms.All.Where(pf => _activePluralForms.Contains(pf));
-    }
+    private IEnumerable<string> GetActivePluralForms() =>
+        PluralForms.All.Where(pf => _activePluralForms.Contains(pf));
 
-    private IEnumerable<string> GetAvailablePluralForms()
+    private IEnumerable<string> GetAvailablePluralForms() =>
+        PluralForms.All.Where(pf => !_activePluralForms.Contains(pf));
+
+    private void OnPluralFormSelected(object value)
     {
-        return PluralForms.All.Where(pf => !_activePluralForms.Contains(pf));
+        if (value is string form && !string.IsNullOrEmpty(form))
+        {
+            AddPluralForm(form);
+            _selectedPluralForm = null;
+        }
     }
 
     private void AddPluralForm(string pluralForm)
     {
         _activePluralForms.Add(pluralForm);
-
         foreach (var lang in Languages)
         {
             var key = TranslationGridRow.GetKey(lang, pluralForm);
@@ -436,20 +341,18 @@
                 };
             }
         }
-
-        Snackbar.Add($"Added '{pluralForm}' plural form", Severity.Info);
+        NotificationService.Notify(NotificationSeverity.Info, "Added", $"Added '{pluralForm}' plural form");
     }
 
     private void RemovePluralForm(string pluralForm)
     {
         if (pluralForm == PluralForms.Other)
         {
-            Snackbar.Add("Cannot remove 'other' form - it's required", Severity.Warning);
+            NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Cannot remove 'other' form - it's required");
             return;
         }
 
         _activePluralForms.Remove(pluralForm);
-
         foreach (var lang in Languages)
         {
             var key = TranslationGridRow.GetKey(lang, pluralForm);
@@ -459,8 +362,7 @@
                 cell.IsDirty = true;
             }
         }
-
-        Snackbar.Add($"Removed '{pluralForm}' plural form", Severity.Info);
+        NotificationService.Notify(NotificationSeverity.Info, "Removed", $"Removed '{pluralForm}' plural form");
     }
 
     private static string GetPluralPlaceholder(string pluralForm, bool isDefault) => pluralForm switch
@@ -474,17 +376,6 @@
         _ => isDefault ? $"Enter {pluralForm}" : $"Translate {pluralForm}"
     };
 
-    private static string GetPluralFormDescription(string pluralForm) => pluralForm switch
-    {
-        "zero" => "0 items",
-        "one" => "1 item",
-        "two" => "exactly 2",
-        "few" => "2-4 items",
-        "many" => "5+ items",
-        "other" => "default",
-        _ => ""
-    };
-
     #endregion
 
     #region Type Conversion
@@ -493,22 +384,20 @@
     {
         if (isPlural == Row.IsPlural)
         {
-            // If toggling back to current state, just hide confirmation
             _showConversionConfirm = false;
             _displayIsPlural = Row.IsPlural;
             return;
         }
 
-        // Show inline confirmation
         _pendingIsPlural = isPlural;
-        _displayIsPlural = isPlural; // Update toggle display immediately
+        _displayIsPlural = isPlural;
         _showConversionConfirm = true;
     }
 
     private void CancelConversion()
     {
         _showConversionConfirm = false;
-        _displayIsPlural = Row.IsPlural; // Reset toggle to actual state
+        _displayIsPlural = Row.IsPlural;
     }
 
     private void ConfirmConversion()
@@ -517,7 +406,6 @@
 
         if (_pendingIsPlural)
         {
-            // Single → Plural
             var keysToMove = Row.Translations.Keys.ToList();
             foreach (var oldKey in keysToMove)
             {
@@ -565,7 +453,6 @@
         }
         else
         {
-            // Plural → Single
             var keysToProcess = Row.Translations.Keys.ToList();
             foreach (var oldKey in keysToProcess)
             {
@@ -582,12 +469,11 @@
                     Row.Translations.Remove(oldKey);
                 }
             }
-
             _activePluralForms.Clear();
         }
 
         Row.IsPlural = _pendingIsPlural;
-        Snackbar.Add($"Converted to {(_pendingIsPlural ? "plural" : "single")} key", Severity.Success);
+        NotificationService.Notify(NotificationSeverity.Success, "Converted", $"Converted to {(_pendingIsPlural ? "plural" : "single")} key");
     }
 
     #endregion
@@ -613,7 +499,6 @@
     {
         if (Row.IsPlural)
         {
-            // For plural keys, use the specified form or fall back to "other"
             var pf = !string.IsNullOrEmpty(pluralForm) ? pluralForm : PluralForms.Other;
             var key = TranslationGridRow.GetKey(DefaultLanguage, pf);
             return Row.Translations.GetValueOrDefault(key)?.Value;
@@ -621,9 +506,6 @@
         return Row.Translations.GetValueOrDefault(DefaultLanguage)?.Value;
     }
 
-    /// <summary>
-    /// Check if any source text exists for plural keys (any form has text)
-    /// </summary>
     private bool HasAnySourceText()
     {
         if (Row.IsPlural)
@@ -641,10 +523,7 @@
     private bool HasTmForLanguage(string lang)
     {
         if (Row.IsPlural)
-        {
-            return GetActivePluralForms().Any(pf =>
-                _tmSuggestions.ContainsKey(TranslationGridRow.GetKey(lang, pf)));
-        }
+            return GetActivePluralForms().Any(pf => _tmSuggestions.ContainsKey(TranslationGridRow.GetKey(lang, pf)));
         return _tmSuggestions.ContainsKey(lang);
     }
 
@@ -653,9 +532,7 @@
         if (Row.IsPlural)
         {
             foreach (var pf in GetActivePluralForms())
-            {
                 await CheckTmForLanguageAndForm(targetLanguage, pf);
-            }
         }
         else
         {
@@ -682,9 +559,7 @@
         if (result.IsSuccess && result.Data?.Matches.Any() == true)
         {
             var match = result.Data.Matches.First();
-            var key = string.IsNullOrEmpty(pluralForm)
-                ? targetLanguage
-                : TranslationGridRow.GetKey(targetLanguage, pluralForm);
+            var key = string.IsNullOrEmpty(pluralForm) ? targetLanguage : TranslationGridRow.GetKey(targetLanguage, pluralForm);
             _tmSuggestions[key] = match;
         }
 
@@ -746,13 +621,9 @@
         }
 
         if (foundCount > 0)
-        {
-            Snackbar.Add($"Found {foundCount} TM match(es)", Severity.Success);
-        }
+            NotificationService.Notify(NotificationSeverity.Success, "TM", $"Found {foundCount} TM match(es)");
         else
-        {
-            Snackbar.Add("No TM matches found", Severity.Info);
-        }
+            NotificationService.Notify(NotificationSeverity.Info, "TM", "No TM matches found");
 
         StateHasChanged();
     }
@@ -764,7 +635,7 @@
             cell.Value = suggestion.TranslatedText;
             cell.IsDirty = true;
             _ = TmService.IncrementUseCountAsync(suggestion.Id);
-            Snackbar.Add("TM suggestion applied", Severity.Success);
+            NotificationService.Notify(NotificationSeverity.Success, "Applied", "TM suggestion applied");
         }
 
         _tmSuggestions.Remove(key);
@@ -813,23 +684,9 @@
         }
     }
 
-    private static Color GetStatusColor(TranslationStatus status) => status switch
-    {
-        TranslationStatus.Complete => Color.Success,
-        TranslationStatus.Partial => Color.Warning,
-        TranslationStatus.Missing => Color.Error,
-        _ => Color.Default
-    };
-
     #endregion
 
     #region Actions
-
-    private async Task CopyKeyName()
-    {
-        await JS.InvokeVoidAsync("navigator.clipboard.writeText", Row.KeyName);
-        Snackbar.Add("Key name copied!", Severity.Success);
-    }
 
     private async Task HandleTranslate()
     {
@@ -851,13 +708,13 @@
 
     private void Cancel()
     {
-        MudDialog.Cancel();
+        DialogService.Close(null);
     }
 
     private void Save()
     {
         _isSaving = true;
-        MudDialog.Close(DialogResult.Ok(Row));
+        DialogService.Close(Row);
     }
 
     #endregion

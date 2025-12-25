@@ -3,106 +3,104 @@
 
 @if (Type == LoadingSkeletonType.Card)
 {
-    <MudCard Elevation="2">
-        <MudCardHeader>
-            <CardHeaderContent>
-                <MudSkeleton Width="60%" Height="24px" />
-                <MudSkeleton Width="40%" Height="16px" Class="mt-1" />
-            </CardHeaderContent>
-            <CardHeaderActions>
-                <MudSkeleton SkeletonType="SkeletonType.Circle" Width="32px" Height="32px" />
-            </CardHeaderActions>
-        </MudCardHeader>
-        <MudCardContent>
-            <MudSkeleton Width="100%" Height="16px" />
-            <MudSkeleton Width="80%" Height="16px" Class="mt-2" />
-            <MudSkeleton Width="100%" Height="8px" Class="mt-4" />
-        </MudCardContent>
-        <MudCardActions>
-            <MudSkeleton Width="60px" Height="32px" />
-            <MudSkeleton Width="80px" Height="32px" Class="ml-2" />
-        </MudCardActions>
-    </MudCard>
+    <RadzenCard>
+        <RadzenStack Gap="0.5rem">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
+                <RadzenStack Gap="0.25rem" Style="flex: 1;">
+                    <div style="background: var(--rz-base-300); width: 60%; height: 24px; border-radius: 4px;"></div>
+                    <div style="background: var(--rz-base-300); width: 40%; height: 16px; border-radius: 4px;"></div>
+                </RadzenStack>
+                <div style="background: var(--rz-base-300); width: 32px; height: 32px; border-radius: 50%;"></div>
+            </RadzenStack>
+            <div style="background: var(--rz-base-300); width: 100%; height: 16px; border-radius: 4px;"></div>
+            <div style="background: var(--rz-base-300); width: 80%; height: 16px; border-radius: 4px;"></div>
+            <div style="background: var(--rz-base-300); width: 100%; height: 8px; border-radius: 4px; margin-top: 0.5rem;"></div>
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" class="rz-mt-2">
+                <div style="background: var(--rz-base-300); width: 60px; height: 32px; border-radius: 4px;"></div>
+                <div style="background: var(--rz-base-300); width: 80px; height: 32px; border-radius: 4px;"></div>
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
 }
 else if (Type == LoadingSkeletonType.Table)
 {
-    <MudPaper Elevation="2" Class="pa-4">
-        <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-4">
-            <MudSkeleton Width="200px" Height="40px" />
-            <MudSkeleton Width="120px" Height="40px" />
-        </MudStack>
+    <RadzenCard>
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+            <div style="background: var(--rz-base-300); width: 200px; height: 40px; border-radius: 4px;"></div>
+            <div style="background: var(--rz-base-300); width: 120px; height: 40px; border-radius: 4px;"></div>
+        </RadzenStack>
         @for (int i = 0; i < Rows; i++)
         {
-            <MudStack Row="true" Class="mb-2">
-                <MudSkeleton Width="40px" Height="24px" />
-                <MudSkeleton Width="30%" Height="24px" Class="ml-2" />
-                <MudSkeleton Width="20%" Height="24px" Class="ml-2" />
-                <MudSkeleton Width="25%" Height="24px" Class="ml-2" />
-                <MudSkeleton Width="15%" Height="24px" Class="ml-2" />
-            </MudStack>
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" class="rz-mb-2">
+                <div style="background: var(--rz-base-300); width: 40px; height: 24px; border-radius: 4px;"></div>
+                <div style="background: var(--rz-base-300); width: 30%; height: 24px; border-radius: 4px;"></div>
+                <div style="background: var(--rz-base-300); width: 20%; height: 24px; border-radius: 4px;"></div>
+                <div style="background: var(--rz-base-300); width: 25%; height: 24px; border-radius: 4px;"></div>
+                <div style="background: var(--rz-base-300); width: 15%; height: 24px; border-radius: 4px;"></div>
+            </RadzenStack>
         }
-    </MudPaper>
+    </RadzenCard>
 }
 else if (Type == LoadingSkeletonType.Form)
 {
-    <MudStack Spacing="4">
+    <RadzenStack Gap="1rem">
         @for (int i = 0; i < Rows; i++)
         {
             <div>
-                <MudSkeleton Width="120px" Height="16px" Class="mb-1" />
-                <MudSkeleton Width="100%" Height="40px" />
+                <div style="background: var(--rz-base-300); width: 120px; height: 16px; border-radius: 4px; margin-bottom: 0.25rem;"></div>
+                <div style="background: var(--rz-base-300); width: 100%; height: 40px; border-radius: 4px;"></div>
             </div>
         }
-        <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-4">
-            <MudSkeleton Width="80px" Height="36px" />
-            <MudSkeleton Width="100px" Height="36px" Class="ml-2" />
-        </MudStack>
-    </MudStack>
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+            <div style="background: var(--rz-base-300); width: 80px; height: 36px; border-radius: 4px;"></div>
+            <div style="background: var(--rz-base-300); width: 100px; height: 36px; border-radius: 4px;"></div>
+        </RadzenStack>
+    </RadzenStack>
 }
 else if (Type == LoadingSkeletonType.Stats)
 {
-    <MudGrid>
+    <RadzenRow Gap="1rem">
         @for (int i = 0; i < Count; i++)
         {
-            <MudItem xs="12" sm="6" md="3">
-                <MudPaper Class="pa-4" Elevation="2">
-                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                <RadzenCard>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
                         <div>
-                            <MudSkeleton Width="80px" Height="16px" />
-                            <MudSkeleton Width="60px" Height="32px" Class="mt-2" />
+                            <div style="background: var(--rz-base-300); width: 80px; height: 16px; border-radius: 4px;"></div>
+                            <div style="background: var(--rz-base-300); width: 60px; height: 32px; border-radius: 4px; margin-top: 0.5rem;"></div>
                         </div>
-                        <MudSkeleton SkeletonType="SkeletonType.Circle" Width="48px" Height="48px" />
-                    </MudStack>
-                </MudPaper>
-            </MudItem>
+                        <div style="background: var(--rz-base-300); width: 48px; height: 48px; border-radius: 50%;"></div>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
         }
-    </MudGrid>
+    </RadzenRow>
 }
 else if (Type == LoadingSkeletonType.List)
 {
-    <MudStack Spacing="2">
+    <RadzenStack Gap="0.5rem">
         @for (int i = 0; i < Rows; i++)
         {
-            <MudPaper Elevation="1" Class="pa-3">
-                <MudStack Row="true" AlignItems="AlignItems.Center">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
                     @if (ShowAvatar)
                     {
-                        <MudSkeleton SkeletonType="SkeletonType.Circle" Width="40px" Height="40px" />
+                        <div style="background: var(--rz-base-300); width: 40px; height: 40px; border-radius: 50%;"></div>
                     }
-                    <MudStack Spacing="1" Class="flex-grow-1">
-                        <MudSkeleton Width="60%" Height="20px" />
-                        <MudSkeleton Width="40%" Height="16px" />
-                    </MudStack>
-                    <MudSkeleton Width="80px" Height="32px" />
-                </MudStack>
-            </MudPaper>
+                    <RadzenStack Gap="0.25rem" Style="flex: 1;">
+                        <div style="background: var(--rz-base-300); width: 60%; height: 20px; border-radius: 4px;"></div>
+                        <div style="background: var(--rz-base-300); width: 40%; height: 16px; border-radius: 4px;"></div>
+                    </RadzenStack>
+                    <div style="background: var(--rz-base-300); width: 80px; height: 32px; border-radius: 4px;"></div>
+                </RadzenStack>
+            </RadzenCard>
         }
-    </MudStack>
+    </RadzenStack>
 }
 else
 {
     @* Default: Rectangle *@
-    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="@Height" Width="@Width" />
+    <div style="background: var(--rz-base-300); height: @Height; width: @Width; border-radius: 4px;"></div>
 }
 
 @code {

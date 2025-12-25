@@ -6,12 +6,12 @@
                     <RedirectToLogin />
                 </NotAuthorized>
                 <Authorizing>
-                    <MudContainer Class="d-flex align-center justify-center" Style="min-height: 100vh;">
-                        <MudStack AlignItems="AlignItems.Center" Spacing="4">
-                            <MudProgressCircular Size="Size.Large" Indeterminate="true" />
-                            <MudText>Loading...</MudText>
-                        </MudStack>
-                    </MudContainer>
+                    <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+                        <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Large" />
+                            <RadzenText>Loading...</RadzenText>
+                        </RadzenStack>
+                    </div>
                 </Authorizing>
             </AuthorizeRouteView>
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />
@@ -19,13 +19,13 @@
         <NotFound>
             <PageTitle>Not found</PageTitle>
             <LayoutView Layout="@typeof(MainLayout)">
-                <MudContainer Class="mt-16">
-                    <MudText Typo="Typo.h3" Align="Align.Center" GutterBottom="true">404 - Not Found</MudText>
-                    <MudText Align="Align.Center">Sorry, there's nothing at this address.</MudText>
-                    <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="">Go Home</MudButton>
-                    </MudStack>
-                </MudContainer>
+                <div style="margin-top: 4rem;">
+                    <RadzenText TextStyle="TextStyle.H3" TextAlign="TextAlign.Center" class="rz-mb-4">404 - Not Found</RadzenText>
+                    <RadzenText TextAlign="TextAlign.Center">Sorry, there's nothing at this address.</RadzenText>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.Center" class="rz-mt-4">
+                        <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Text="Go Home" Click="@(() => { })" />
+                    </RadzenStack>
+                </div>
             </LayoutView>
         </NotFound>
     </Router>

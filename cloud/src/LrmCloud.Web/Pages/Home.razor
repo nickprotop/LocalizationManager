@@ -2,175 +2,169 @@
 @attribute [Authorize]
 @using LrmCloud.Shared.DTOs.Usage
 @using LrmCloud.Web.Helpers
+@using LrmCloud.Web.Components
 @inject ProjectService ProjectService
 @inject UsageService UsageService
 @inject OrganizationContextService OrgContext
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 @implements IDisposable
 
 <PageTitle>Dashboard - LRM Cloud</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Dashboard</MudText>
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.H4" Style="margin: 0;">Dashboard</RadzenText>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Filter:</RadzenText>
+        <OrgSelector />
+    </RadzenStack>
+</RadzenStack>
 
 @if (_isLoading)
 {
-    <MudGrid>
+    <RadzenRow Gap="1rem">
         @for (int i = 0; i < 4; i++)
         {
-            <MudItem xs="12" sm="6" md="3">
-                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="100px" />
-            </MudItem>
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                <RadzenCard Style="height: 100px;">
+                    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+                </RadzenCard>
+            </RadzenColumn>
         }
-    </MudGrid>
+    </RadzenRow>
 }
 else
 {
-    <MudGrid>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+    <RadzenRow Gap="1rem">
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
                     <div>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Projects</MudText>
-                        <MudText Typo="Typo.h4">@_stats.ProjectCount</MudText>
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">Projects</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H4">@_stats.ProjectCount</RadzenText>
                     </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Size="Size.Large" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <RadzenIcon Icon="folder" Style="font-size: 2rem; color: var(--rz-primary);" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
                     <div>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Total Keys</MudText>
-                        <MudText Typo="Typo.h4">@_stats.TotalKeys</MudText>
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">Total Keys</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H4">@_stats.TotalKeys</RadzenText>
                     </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Key" Color="Color.Info" Size="Size.Large" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <RadzenIcon Icon="key" Style="font-size: 2rem; color: var(--rz-info);" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
                     <div>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Avg. Completion</MudText>
-                        <MudText Typo="Typo.h4">@(_stats.AverageCompletion.ToString("F0"))%</MudText>
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">Avg. Completion</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H4">@(_stats.AverageCompletion.ToString("F0"))%</RadzenText>
                     </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Translate" Color="Color.Success" Size="Size.Large" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <RadzenIcon Icon="translate" Style="font-size: 2rem; color: var(--rz-success);" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
                     <div>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">LRM Usage</MudText>
-                        <MudText Typo="Typo.h4">@FormatLrmUsage()</MudText>
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">LRM Usage</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H4">@FormatLrmUsage()</RadzenText>
                         @if (_usageStats?.ByokCharsUsed > 0)
                         {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                 + @UiHelpers.FormatCharacters(_usageStats.ByokCharsUsed) other
-                            </MudText>
+                            </RadzenText>
                         }
                     </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Warning" Size="Size.Large" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+                    <RadzenIcon Icon="star" Style="font-size: 2rem; color: var(--rz-warning);" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
 }
 
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-6 mb-4">
-    <MudText Typo="Typo.h5">Recent Projects</MudText>
-    <MudStack Row="true" Spacing="2">
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Upload" OnClick="@OpenImportDialog">
-            Import
-        </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreateDialog">
-            New Project
-        </MudButton>
-    </MudStack>
-</MudStack>
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mt-6 rz-mb-4">
+    <RadzenText TextStyle="TextStyle.H5">Recent Projects</RadzenText>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="upload" Text="Import" Click="@OpenImportDialog" />
+        <RadzenButton Variant="Radzen.Variant.Filled" Icon="add" Text="New Project" Click="@OpenCreateDialog" />
+    </RadzenStack>
+</RadzenStack>
 
 @if (_isLoading)
 {
-    <MudGrid>
+    <RadzenRow Gap="1rem">
         @for (int i = 0; i < 3; i++)
         {
-            <MudItem xs="12" sm="6" md="4">
-                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="180px" />
-            </MudItem>
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
+                <RadzenCard Style="height: 180px;">
+                    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+                </RadzenCard>
+            </RadzenColumn>
         }
-    </MudGrid>
+    </RadzenRow>
 }
 else if (_filteredProjects.Count == 0)
 {
-    <MudPaper Class="pa-4" Elevation="2">
-        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="py-8">
-            <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Size="Size.Large" Color="Color.Secondary" />
-            <MudText Typo="Typo.subtitle1" Color="Color.Secondary">No projects yet</MudText>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreateDialog" Class="mt-2">
-                Create Your First Project
-            </MudButton>
-        </MudStack>
-    </MudPaper>
+    <RadzenCard>
+        <RadzenStack AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.Center" class="rz-py-8">
+            <RadzenIcon Icon="folder_open" Style="font-size: 3rem; color: var(--rz-text-secondary-color);" />
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-color-secondary">No projects yet</RadzenText>
+            <RadzenButton Variant="Radzen.Variant.Filled" Icon="add" Text="Create Your First Project" Click="@OpenCreateDialog" class="rz-mt-2" />
+        </RadzenStack>
+    </RadzenCard>
 }
 else
 {
-    <MudGrid>
+    <RadzenRow Gap="1rem">
         @foreach (var project in _filteredProjects.Take(6))
         {
-            <MudItem xs="12" sm="6" md="4">
-                <MudCard Elevation="2" Class="cursor-pointer" @onclick="@(() => NavigateToProject(project.Id))">
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">@project.Name</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
+                <RadzenCard Style="cursor: pointer;" @onclick="@(() => NavigateToProject(project.Id))">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
+                        <div>
+                            <RadzenText TextStyle="TextStyle.H6">@project.Name</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
                                 @(project.OrganizationName ?? "Personal")
-                            </MudText>
-                        </CardHeaderContent>
-                        <CardHeaderActions>
-                            <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetFormatColor(project.Format)">@project.Format</MudChip>
-                        </CardHeaderActions>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        @if (!string.IsNullOrEmpty(project.Description))
-                        {
-                            <MudText Typo="Typo.body2" Class="mb-2" Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                @project.Description
-                            </MudText>
-                        }
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-2">
-                            <MudText Typo="Typo.caption">@project.KeyCount keys</MudText>
-                            <MudText Typo="Typo.caption">@project.CompletionPercentage.ToString("F0")% complete</MudText>
-                        </MudStack>
-                        <MudProgressLinear Value="@project.CompletionPercentage" Color="@UiHelpers.GetCompletionColor(project.CompletionPercentage)" Class="mt-2" />
-                    </MudCardContent>
-                    <MudCardActions>
-                        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => NavigateToEditor(project.Id))" ClickPropagation="false">
-                            Edit
-                        </MudButton>
-                        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="@(() => NavigateToSettings(project.Id))" ClickPropagation="false">
-                            Settings
-                        </MudButton>
-                    </MudCardActions>
-                </MudCard>
-            </MudItem>
+                            </RadzenText>
+                        </div>
+                        <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(project.Format)" Text="@project.Format" />
+                    </RadzenStack>
+                    @if (!string.IsNullOrEmpty(project.Description))
+                    {
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-2" Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            @project.Description
+                        </RadzenText>
+                    }
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mt-2">
+                        <RadzenText TextStyle="TextStyle.Caption">@project.KeyCount keys</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption">@project.CompletionPercentage.ToString("F0")% complete</RadzenText>
+                    </RadzenStack>
+                    <RadzenProgressBar Value="@project.CompletionPercentage" ShowValue="false" ProgressBarStyle="@UiHelpers.GetCompletionProgressStyle(project.CompletionPercentage)" class="rz-mt-2" Style="height: 4px;" />
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" class="rz-mt-3">
+                        <RadzenButton Variant="Radzen.Variant.Text" Text="Edit" Click="@(() => NavigateToEditor(project.Id))" @onclick:stopPropagation="true" />
+                        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Secondary" Text="Settings" Click="@(() => NavigateToSettings(project.Id))" @onclick:stopPropagation="true" />
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
         }
-    </MudGrid>
+    </RadzenRow>
 
     @if (_filteredProjects.Count > 6)
     {
-        <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
-            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="projects">
-                View All Projects (@_filteredProjects.Count)
-            </MudButton>
-        </MudStack>
+        <RadzenStack JustifyContent="JustifyContent.Center" class="rz-mt-4">
+            <RadzenLink Path="projects" Text="@($"View All Projects ({_filteredProjects.Count})")" />
+        </RadzenStack>
     }
 }
 
-<CreateProjectDialog @ref="_createDialog" OnProjectCreated="OnProjectCreated" />
-<ImportProjectDialog @ref="_importDialog" OnProjectImported="OnProjectCreated" OrganizationId="@OrgContext.SelectedOrganizationId" />
 
 @code {
     private List<ProjectDto> _projects = new();
@@ -178,8 +172,6 @@ else
     private DashboardStats _stats = new();
     private UsageStatsDto? _usageStats;
     private bool _isLoading = true;
-    private CreateProjectDialog? _createDialog;
-    private ImportProjectDialog? _importDialog;
 
     protected override async Task OnInitializedAsync()
     {
@@ -206,7 +198,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error loading dashboard: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error loading dashboard: {ex.Message}");
         }
         finally
         {
@@ -219,12 +211,10 @@ else
         var selectedOrgId = OrgContext.SelectedOrganizationId;
         if (selectedOrgId.HasValue)
         {
-            // Show only projects from the selected organization
             _filteredProjects = _projects.Where(p => p.OrganizationId == selectedOrgId.Value).ToList();
         }
         else
         {
-            // Personal context: show personal projects (no org) and all org projects
             _filteredProjects = _projects.ToList();
         }
     }
@@ -234,9 +224,16 @@ else
         OrgContext.OnOrganizationChanged -= OnOrgContextChanged;
     }
 
-    private void OpenCreateDialog()
+    private async Task OpenCreateDialog()
     {
-        _createDialog?.Open();
+        var result = await DialogService.OpenAsync<CreateProjectDialog>("Create Project",
+            null,
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result is ProjectDto project)
+        {
+            await OnProjectCreated(project);
+        }
     }
 
     private void NavigateToSettings(int projectId)
@@ -244,9 +241,21 @@ else
         Navigation.NavigateTo($"projects/{projectId}/settings");
     }
 
-    private void OpenImportDialog()
+    private async Task OpenImportDialog()
     {
-        _importDialog?.Open();
+        var parameters = new Dictionary<string, object>
+        {
+            { "OrganizationId", OrgContext.SelectedOrganizationId }
+        };
+
+        var result = await DialogService.OpenAsync<ImportProjectDialog>("Import Project",
+            parameters,
+            new Radzen.DialogOptions { Width = "600px" });
+
+        if (result is ProjectDto project)
+        {
+            await OnProjectCreated(project);
+        }
     }
 
     private async Task OnProjectCreated(ProjectDto project)
@@ -280,5 +289,4 @@ else
             return $"{used / 1000}K / {limit / 1000}K";
         return $"{used} / {limit / 1000}K";
     }
-
 }

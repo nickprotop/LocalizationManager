@@ -6,101 +6,107 @@
 
 <PageTitle>Logs - LRM Cloud Admin</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-2">
-    <MudIcon Icon="@Icons.Material.Filled.Article" Class="mr-2" Style="vertical-align: middle;" />
-    Application Logs
-</MudText>
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+    <RadzenIcon Icon="article" />
+    <RadzenText TextStyle="TextStyle.H4">Application Logs</RadzenText>
+</RadzenStack>
+<RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-4">
     View and filter application logs for debugging and monitoring.
-</MudText>
+</RadzenText>
 
 @* Filters *@
-<MudPaper Class="pa-4 mb-4" Elevation="2">
-    <MudGrid>
-        <MudItem xs="12" md="3">
-            <MudSelect T="string" @bind-Value="_levelFilter" Label="Log Level" Clearable="true">
-                <MudSelectItem Value="@("INF")">Info</MudSelectItem>
-                <MudSelectItem Value="@("WRN")">Warning</MudSelectItem>
-                <MudSelectItem Value="@("ERR")">Error</MudSelectItem>
-            </MudSelect>
-        </MudItem>
-        <MudItem xs="12" md="5">
-            <MudTextField @bind-Value="_search" Label="Search" Placeholder="Search in log messages..."
-                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
-        </MudItem>
-        <MudItem xs="12" md="2">
-            <MudDatePicker @bind-Date="_fromDate" Label="From Date" Clearable="true" />
-        </MudItem>
-        <MudItem xs="12" md="2">
-            <MudDatePicker @bind-Date="_toDate" Label="To Date" Clearable="true" />
-        </MudItem>
-    </MudGrid>
-    <div class="d-flex justify-end mt-2">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadLogsAsync" StartIcon="@Icons.Material.Filled.Search">
-            Search
-        </MudButton>
-    </div>
-</MudPaper>
+<RadzenCard class="rz-mb-4">
+    <RadzenRow Gap="1rem" AlignItems="Radzen.AlignItems.End">
+        <RadzenColumn Size="12" SizeMD="3">
+            <RadzenFormField Text="Log Level" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenDropDown @bind-Value="_levelFilter" AllowClear="true" Placeholder="All Levels" Style="width: 100%;"
+                                    Data="@_levelOptions" TextProperty="Text" ValueProperty="Value" />
+                </ChildContent>
+            </RadzenFormField>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="5">
+            <RadzenFormField Text="Search" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="_search" Placeholder="Search in log messages..." Style="width: 100%;" />
+                </ChildContent>
+            </RadzenFormField>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="2">
+            <RadzenFormField Text="From Date" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenDatePicker @bind-Value="_fromDate" DateFormat="yyyy-MM-dd" Style="width: 100%;" />
+                </ChildContent>
+            </RadzenFormField>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="2">
+            <RadzenFormField Text="To Date" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenDatePicker @bind-Value="_toDate" DateFormat="yyyy-MM-dd" Style="width: 100%;" />
+                </ChildContent>
+            </RadzenFormField>
+        </RadzenColumn>
+    </RadzenRow>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" class="rz-mt-2">
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Icon="search" Text="Search" Click="LoadLogsAsync" />
+    </RadzenStack>
+</RadzenCard>
 
 @if (_isLoading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
 }
 else if (_logs == null || _logs.Count == 0)
 {
-    <MudAlert Severity="Severity.Info">No logs found matching the criteria.</MudAlert>
+    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">No logs found matching the criteria.</RadzenAlert>
 }
 else
 {
-    <MudPaper Elevation="2">
-        <MudTable Items="@_logs" Dense="true" Hover="true" FixedHeader="true" Height="calc(100vh - 400px)">
-            <HeaderContent>
-                <MudTh Style="width: 180px;">Timestamp</MudTh>
-                <MudTh Style="width: 80px;">Level</MudTh>
-                <MudTh>Message</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Timestamp">
-                    <MudText Typo="Typo.caption" Style="font-family: monospace;">
-                        @context.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")
-                    </MudText>
-                </MudTd>
-                <MudTd DataLabel="Level">
-                    <MudChip T="string" Size="Size.Small" Color="@GetLevelColor(context.Level)">
-                        @context.Level
-                    </MudChip>
-                </MudTd>
-                <MudTd DataLabel="Message">
-                    <MudText Typo="Typo.body2" Style="font-family: monospace; word-break: break-word;">
-                        @context.Message
-                    </MudText>
-                    @if (!string.IsNullOrEmpty(context.Exception))
-                    {
-                        <MudExpansionPanels Dense="true" Class="mt-1">
-                            <MudExpansionPanel Text="Exception Details" Dense="true" MaxHeight="200">
-                                <pre style="font-size: 0.75rem; overflow: auto; white-space: pre-wrap; margin: 0;">@context.Exception</pre>
-                            </MudExpansionPanel>
-                        </MudExpansionPanels>
-                    }
-                </MudTd>
-            </RowTemplate>
-        </MudTable>
-    </MudPaper>
+    <RadzenCard Style="max-height: calc(100vh - 400px); overflow: auto;">
+        <RadzenDataGrid TItem="LogEntryDto" Data="@_logs" Density="Density.Compact" AllowSorting="false">
+            <Columns>
+                <RadzenDataGridColumn TItem="LogEntryDto" Title="Timestamp" Width="180px">
+                    <Template Context="log">
+                        <RadzenText TextStyle="TextStyle.Caption" Style="font-family: monospace;">
+                            @log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")
+                        </RadzenText>
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="LogEntryDto" Title="Level" Width="80px">
+                    <Template Context="log">
+                        <RadzenBadge BadgeStyle="@GetLevelBadgeStyle(log.Level)" Text="@log.Level" />
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="LogEntryDto" Title="Message">
+                    <Template Context="log">
+                        <RadzenText TextStyle="TextStyle.Body2" Style="font-family: monospace; word-break: break-word;">
+                            @log.Message
+                        </RadzenText>
+                        @if (!string.IsNullOrEmpty(log.Exception))
+                        {
+                            <details style="margin-top: 0.5rem;">
+                                <summary style="cursor: pointer; color: var(--rz-danger);">Exception Details</summary>
+                                <pre style="font-size: 0.75rem; overflow: auto; white-space: pre-wrap; margin: 0.5rem 0 0 0; padding: 0.5rem; background: var(--rz-base-200); border-radius: 4px; max-height: 200px;">@log.Exception</pre>
+                            </details>
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
 
     @* Pagination *@
-    <div class="d-flex justify-space-between align-center mt-2">
-        <MudText Typo="Typo.caption" Color="Color.Secondary">
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mt-2">
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
             Showing @_logs.Count logs (Page @_page)
-        </MudText>
-        <div class="d-flex gap-2">
-            <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(_page <= 1)" OnClick="PreviousPage">
-                Previous
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(_logs.Count < _pageSize)" OnClick="NextPage">
-                Next
-            </MudButton>
-        </div>
-    </div>
+        </RadzenText>
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+            <RadzenButton Variant="Radzen.Variant.Outlined" Size="ButtonSize.Small" Text="Previous"
+                          Disabled="@(_page <= 1)" Click="PreviousPage" />
+            <RadzenButton Variant="Radzen.Variant.Outlined" Size="ButtonSize.Small" Text="Next"
+                          Disabled="@(_logs.Count < _pageSize)" Click="NextPage" />
+        </RadzenStack>
+    </RadzenStack>
 }
 
 @code {
@@ -112,6 +118,13 @@ else
     private DateTime? _toDate;
     private int _page = 1;
     private int _pageSize = 100;
+
+    private readonly List<object> _levelOptions = new()
+    {
+        new { Value = "INF", Text = "Info" },
+        new { Value = "WRN", Text = "Warning" },
+        new { Value = "ERR", Text = "Error" }
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -155,13 +168,13 @@ else
         }
     }
 
-    private static Color GetLevelColor(string level) => level.ToUpper() switch
+    private static BadgeStyle GetLevelBadgeStyle(string level) => level.ToUpper() switch
     {
-        "ERR" or "ERROR" or "FTL" or "FATAL" => Color.Error,
-        "WRN" or "WARNING" or "WARN" => Color.Warning,
-        "INF" or "INFO" => Color.Info,
-        "DBG" or "DEBUG" => Color.Default,
-        "VRB" or "VERBOSE" => Color.Secondary,
-        _ => Color.Default
+        "ERR" or "ERROR" or "FTL" or "FATAL" => BadgeStyle.Danger,
+        "WRN" or "WARNING" or "WARN" => BadgeStyle.Warning,
+        "INF" or "INFO" => BadgeStyle.Info,
+        "DBG" or "DEBUG" => BadgeStyle.Light,
+        "VRB" or "VERBOSE" => BadgeStyle.Secondary,
+        _ => BadgeStyle.Light
     };
 }

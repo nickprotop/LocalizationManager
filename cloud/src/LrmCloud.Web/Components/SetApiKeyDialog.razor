@@ -1,0 +1,163 @@
+@using LrmCloud.Shared.DTOs.Translation
+@inject TranslationService TranslationService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<RadzenTemplateForm TItem="object" Data="@(new object())" Submit="@SaveKey">
+    <RadzenStack Gap="1rem">
+        <RadzenFormField Text="API Key" Variant="Radzen.Variant.Outlined">
+            <ChildContent>
+                <RadzenPassword @bind-Value="_newApiKey" Name="ApiKey" Style="width: 100%;" Placeholder="Enter your API key" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Your API key will be encrypted and stored securely</RadzenText>
+                <RadzenRequiredValidator Component="ApiKey" Text="API key is required" />
+            </Helper>
+        </RadzenFormField>
+
+        @if (Provider?.Name == "azureopenai")
+        {
+            <RadzenFormField Text="Azure Endpoint (Optional)" Variant="Radzen.Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="_azureEndpoint" Placeholder="https://your-resource.openai.azure.com/" Style="width: 100%;" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Required for Azure OpenAI deployments</RadzenText>
+                </Helper>
+            </RadzenFormField>
+        }
+
+        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">
+            You can test the key before saving to verify it's valid.
+        </RadzenAlert>
+
+        @if (!string.IsNullOrEmpty(_testResult))
+        {
+            <RadzenAlert AlertStyle="@(_testSuccess ? AlertStyle.Success : AlertStyle.Danger)" Shade="Shade.Lighter" AllowClose="false">
+                @_testResult
+            </RadzenAlert>
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
+                @_errorMessage
+            </RadzenAlert>
+        }
+
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" Disabled="@(_saving || _testing)" />
+            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Info" Text="Test Key" Click="@TestKey" Disabled="@_testing" IsBusy="@_testing" />
+            <RadzenButton ButtonType="Radzen.ButtonType.Submit" ButtonStyle="ButtonStyle.Primary" Text="Save Key" Disabled="@_saving" IsBusy="@_saving" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter]
+    public int OrganizationId { get; set; }
+
+    [Parameter]
+    public TranslationProviderDto? Provider { get; set; }
+
+    private string _newApiKey = "";
+    private string _azureEndpoint = "";
+    private bool _saving;
+    private bool _testing;
+    private string? _testResult;
+    private bool _testSuccess;
+    private string? _errorMessage;
+
+    private async Task TestKey()
+    {
+        if (string.IsNullOrWhiteSpace(_newApiKey) || Provider == null)
+            return;
+
+        _testing = true;
+        _testResult = null;
+        _errorMessage = null;
+
+        try
+        {
+            var request = new TestApiKeyRequest
+            {
+                ProviderName = Provider.Name,
+                ApiKey = _newApiKey
+            };
+
+            if (!string.IsNullOrEmpty(_azureEndpoint))
+            {
+                request.AdditionalConfig = new Dictionary<string, string>
+                {
+                    ["endpoint"] = _azureEndpoint
+                };
+            }
+
+            var result = await TranslationService.TestApiKeyAsync(request);
+            _testSuccess = result.IsValid;
+            _testResult = result.IsValid
+                ? result.ProviderMessage ?? "Key is valid!"
+                : result.Error ?? "Key validation failed";
+        }
+        catch (Exception ex)
+        {
+            _testSuccess = false;
+            _testResult = $"Test failed: {ex.Message}";
+        }
+        finally
+        {
+            _testing = false;
+        }
+    }
+
+    private async Task SaveKey()
+    {
+        if (string.IsNullOrWhiteSpace(_newApiKey) || Provider == null)
+            return;
+
+        _saving = true;
+        _errorMessage = null;
+
+        try
+        {
+            var request = new SetApiKeyRequest
+            {
+                ProviderName = Provider.Name,
+                ApiKey = _newApiKey
+            };
+
+            if (!string.IsNullOrEmpty(_azureEndpoint))
+            {
+                request.AdditionalConfig = new Dictionary<string, string>
+                {
+                    ["endpoint"] = _azureEndpoint
+                };
+            }
+
+            var result = await TranslationService.SetOrganizationApiKeyAsync(OrganizationId, request);
+
+            if (result.IsSuccess)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"{Provider.DisplayName} API key saved");
+                DialogService.Close(true);
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage ?? "Failed to save API key";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(false);
+    }
+}

@@ -41,16 +41,19 @@ public static class OrganizationRole
     /// <summary>
     /// Check if a role has admin privileges (owner or admin)
     /// </summary>
-    public static bool IsAdminOrOwner(string role)
+    public static bool IsAdminOrOwner(string? role)
     {
-        return role == Owner || role == Admin;
+        if (string.IsNullOrEmpty(role)) return false;
+        return string.Equals(role, Owner, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(role, Admin, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
     /// Check if a role is owner
     /// </summary>
-    public static bool IsOwner(string role)
+    public static bool IsOwner(string? role)
     {
-        return role == Owner;
+        if (string.IsNullOrEmpty(role)) return false;
+        return string.Equals(role, Owner, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -5,57 +5,54 @@
 @inject GlossaryService GlossaryService
 @inject ProjectService ProjectService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
-@inject IDialogService DialogService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 @attribute [Authorize]
 
 <PageTitle>Glossary - LRM Cloud</PageTitle>
 
-<MudBreadcrumbs Items="_breadcrumbs" Class="mb-2 pa-0" />
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+    <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" Size="ButtonSize.Small" />
+    <RadzenBreadCrumb>
+        <RadzenBreadCrumbItem Path="" Text="Projects" />
+        <RadzenBreadCrumbItem Path="@($"projects/{ProjectId}")" Text="@_projectName" />
+        <RadzenBreadCrumbItem Text="Glossary" />
+    </RadzenBreadCrumb>
+</RadzenStack>
 
-<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
-    <div>
-        <MudText Typo="Typo.h4">
-            <MudIcon Icon="@Icons.Material.Filled.Book" Class="mr-2" Style="vertical-align: middle;" />
-            Project Glossary
-        </MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+    <RadzenStack Gap="0">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="book" Style="vertical-align: middle;" />
+            <RadzenText TextStyle="TextStyle.H4">Project Glossary</RadzenText>
+        </RadzenStack>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
             Define terms that should be translated consistently. Project terms override organization terms.
-        </MudText>
-    </div>
-    <MudButton Variant="Variant.Filled"
-               Color="Color.Primary"
-               StartIcon="@Icons.Material.Filled.Add"
-               OnClick="OpenAddDialog">
-        Add Term
-    </MudButton>
-</MudStack>
+        </RadzenText>
+    </RadzenStack>
+    <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Icon="add" Text="Add Term" Click="@OpenAddDialog" />
+</RadzenStack>
 
 @if (_isLoading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
 }
 else if (_glossary == null)
 {
-    <MudAlert Severity="Severity.Error">Failed to load glossary.</MudAlert>
+    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">Failed to load glossary.</RadzenAlert>
 }
 else
 {
-    @* Organization Glossary Inheritance Toggle *@
     @if (_project?.OrganizationId != null)
     {
-        <MudPaper Class="pa-4 mb-4" Elevation="1">
-            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                <div>
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudSwitch T="bool"
-                                   Value="_inheritOrgGlossary"
-                                   ValueChanged="OnInheritanceChanged"
-                                   Color="Color.Primary"
-                                   Disabled="_isSavingInheritance" />
-                        <MudText Typo="Typo.body1">Inherit organization glossary</MudText>
-                    </MudStack>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-12">
+        <RadzenCard class="rz-mb-4">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                <RadzenStack Gap="0.25rem">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <RadzenSwitch @bind-Value="_inheritOrgGlossary" Change="@OnInheritanceChanged" Disabled="@_isSavingInheritance" />
+                        <RadzenText TextStyle="TextStyle.Body1">Inherit organization glossary</RadzenText>
+                    </RadzenStack>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" Style="margin-left: 3rem;">
                         @if (_inheritOrgGlossary)
                         {
                             <span>Organization glossary terms are included. Project terms override organization terms if both exist.</span>
@@ -64,87 +61,60 @@ else
                         {
                             <span>Only project-specific glossary terms are used.</span>
                         }
-                    </MudText>
-                </div>
+                    </RadzenText>
+                </RadzenStack>
                 @if (_isSavingInheritance)
                 {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    <RadzenProgressBarCircular ShowValue="false" Size="ProgressBarCircularSize.Small" Mode="ProgressBarMode.Indeterminate" />
                 }
-            </MudStack>
-        </MudPaper>
+            </RadzenStack>
+        </RadzenCard>
     }
 
-    <MudGrid>
-        @* Stats *@
-        <MudItem xs="12" md="4">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Spacing="2">
-                    <MudStack Row="true" Justify="Justify.SpaceBetween">
-                        <MudText>Total Terms</MudText>
-                        <MudText Typo="Typo.h6">@_glossary.TotalCount</MudText>
-                    </MudStack>
-                    <MudStack Row="true" Justify="Justify.SpaceBetween">
-                        <MudText>Project Terms</MudText>
-                        <MudText Typo="Typo.h6">@_glossary.ProjectTermsCount</MudText>
-                    </MudStack>
+    <RadzenRow Gap="1rem">
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard>
+                <RadzenStack Gap="0.5rem">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenText>Total Terms</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H6">@_glossary.TotalCount</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenText>Project Terms</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H6">@_glossary.ProjectTermsCount</RadzenText>
+                    </RadzenStack>
                     @if (_glossary.InheritedTermsCount > 0)
                     {
-                        <MudStack Row="true" Justify="Justify.SpaceBetween">
-                            <MudText>
-                                <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Small" Class="mr-1" />
-                                Inherited (Org)
-                            </MudText>
-                            <MudText Typo="Typo.h6" Color="Color.Info">@_glossary.InheritedTermsCount</MudText>
-                        </MudStack>
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                <RadzenIcon Icon="business" Style="font-size: 1rem;" />
+                                <RadzenText>Inherited (Org)</RadzenText>
+                            </RadzenStack>
+                            <RadzenText TextStyle="TextStyle.H6" Style="color: var(--rz-info);">@_glossary.InheritedTermsCount</RadzenText>
+                        </RadzenStack>
                     }
-                </MudStack>
-            </MudPaper>
-        </MudItem>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
 
-        @* Filter *@
-        <MudItem xs="12" md="8">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                    <MudTextField @bind-Value="_searchTerm"
-                                  Placeholder="Search terms..."
-                                  Adornment="Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Filled.Search"
-                                  Immediate="true"
-                                  DebounceInterval="300"
-                                  Style="max-width: 300px" />
-
-                    <MudSelect @bind-Value="_scopeFilter"
-                               Label="Scope"
-                               Style="max-width: 150px"
-                               Margin="Margin.Dense">
-                        <MudSelectItem Value="@("all")">All</MudSelectItem>
-                        <MudSelectItem Value="@("project")">Project Only</MudSelectItem>
-                        <MudSelectItem Value="@("organization")">Organization Only</MudSelectItem>
-                    </MudSelect>
-
+        <RadzenColumn Size="12" SizeMD="8">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenTextBox @bind-Value="_searchTerm" Placeholder="Search terms..." Style="max-width: 300px;" />
+                    <RadzenDropDown @bind-Value="_scopeFilter" Data="@_scopeOptions" TextProperty="Text" ValueProperty="Value" Style="max-width: 150px;" />
                     @if (_glossary.Languages.Count > 0)
                     {
-                        <MudSelect @bind-Value="_languageFilter"
-                                   Label="Language"
-                                   Style="max-width: 150px"
-                                   Margin="Margin.Dense">
-                            <MudSelectItem Value="@("")">All Languages</MudSelectItem>
-                            @foreach (var lang in _glossary.Languages)
-                            {
-                                <MudSelectItem Value="@lang">@lang.ToUpperInvariant()</MudSelectItem>
-                            }
-                        </MudSelect>
+                        <RadzenDropDown @bind-Value="_languageFilter" Data="@GetLanguageOptions()" TextProperty="Text" ValueProperty="Value" Style="max-width: 150px;" />
                     }
-                </MudStack>
-            </MudPaper>
-        </MudItem>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
 
-        @* Terms Table *@
-        <MudItem xs="12">
-            <MudPaper Elevation="2">
+        <RadzenColumn Size="12">
+            <RadzenCard>
                 @if (FilteredTerms.Count == 0)
                 {
-                    <MudAlert Severity="Severity.Info" Class="ma-4">
+                    <RadzenAlert AlertStyle="AlertStyle.Info" AllowClose="false">
                         @if (_glossary.TotalCount == 0)
                         {
                             <span>No glossary terms defined yet. Click "Add Term" to create one.</span>
@@ -153,140 +123,83 @@ else
                         {
                             <span>No terms match your filters.</span>
                         }
-                    </MudAlert>
+                    </RadzenAlert>
                 }
                 else
                 {
-                    <MudTable Items="FilteredTerms" Hover="true" Dense="true">
-                        <HeaderContent>
-                            <MudTh>Term</MudTh>
-                            <MudTh>Source</MudTh>
-                            <MudTh>Translations</MudTh>
-                            <MudTh>Scope</MudTh>
-                            <MudTh Style="width: 120px">Actions</MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd>
-                                <MudStack Spacing="0">
-                                    <MudText Typo="Typo.body1" Style="font-weight: 500">@context.SourceTerm</MudText>
-                                    @if (!string.IsNullOrEmpty(context.Description))
+                    <RadzenDataGrid TItem="GlossaryTermDto" Data="@FilteredTerms" Density="Density.Compact" AllowSorting="false" AllowPaging="false">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="GlossaryTermDto" Title="Term">
+                                <Template Context="term">
+                                    <RadzenStack Gap="0">
+                                        <RadzenText TextStyle="TextStyle.Body1" Style="font-weight: 500;">@term.SourceTerm</RadzenText>
+                                        @if (!string.IsNullOrEmpty(term.Description))
+                                        {
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@term.Description</RadzenText>
+                                        }
+                                    </RadzenStack>
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="GlossaryTermDto" Title="Source" Width="80px">
+                                <Template Context="term">
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@term.SourceLanguage.ToUpperInvariant()" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="GlossaryTermDto" Title="Translations">
+                                <Template Context="term">
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem" Wrap="FlexWrap.Wrap">
+                                        @foreach (var (lang, translation) in term.Translations.Take(3))
+                                        {
+                                            <span title="@translation">
+                                                <RadzenBadge BadgeStyle="BadgeStyle.Light" Variant="Radzen.Variant.Outlined"
+                                                             Text="@($"{lang.ToUpperInvariant()}: {TruncateText(translation, 20)}")" />
+                                            </span>
+                                        }
+                                        @if (term.Translations.Count > 3)
+                                        {
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"+{term.Translations.Count - 3}")" />
+                                        }
+                                    </RadzenStack>
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="GlossaryTermDto" Title="Scope" Width="100px">
+                                <Template Context="term">
+                                    @if (term.Scope == "organization")
                                     {
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Description</MudText>
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Org" />
                                     }
-                                </MudStack>
-                            </MudTd>
-                            <MudTd>
-                                <MudChip T="string" Size="Size.Small">@context.SourceLanguage.ToUpperInvariant()</MudChip>
-                            </MudTd>
-                            <MudTd>
-                                <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
-                                    @foreach (var (lang, translation) in context.Translations.Take(3))
+                                    else
                                     {
-                                        <MudTooltip Text="@translation">
-                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
-                                                @lang.ToUpperInvariant(): @TruncateText(translation, 20)
-                                            </MudChip>
-                                        </MudTooltip>
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="Project" />
                                     }
-                                    @if (context.Translations.Count > 3)
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="GlossaryTermDto" Title="Actions" Width="120px">
+                                <Template Context="term">
+                                    @if (term.Scope == "project")
                                     {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Info">+@(context.Translations.Count - 3)</MudChip>
+                                        <RadzenButton Icon="edit" Variant="Radzen.Variant.Text" Size="ButtonSize.Small" Click="@(() => OpenEditDialog(term))" />
+                                        <RadzenButton Icon="delete" Variant="Radzen.Variant.Text" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Click="@(() => ConfirmDelete(term))" />
                                     }
-                                </MudStack>
-                            </MudTd>
-                            <MudTd>
-                                @if (context.Scope == "organization")
-                                {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.Business">Org</MudChip>
-                                }
-                                else
-                                {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Default">Project</MudChip>
-                                }
-                            </MudTd>
-                            <MudTd>
-                                @if (context.Scope == "project")
-                                {
-                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                                   Size="Size.Small"
-                                                   OnClick="@(() => OpenEditDialog(context))" />
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                   Size="Size.Small"
-                                                   Color="Color.Error"
-                                                   OnClick="@(() => ConfirmDelete(context))" />
-                                }
-                                else
-                                {
-                                    <MudTooltip Text="Organization terms can only be edited in organization settings">
-                                        <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Secondary" />
-                                    </MudTooltip>
-                                }
-                            </MudTd>
-                        </RowTemplate>
-                    </MudTable>
+                                    else
+                                    {
+                                        <span title="Organization terms can only be edited in organization settings">
+                                            <RadzenIcon Icon="lock" Style="font-size: 1rem;" class="rz-color-secondary" />
+                                        </span>
+                                    }
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
                 }
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
 
-    @* Info Alert *@
-    <MudAlert Severity="Severity.Info" Class="mt-4" Dense="true">
+    <RadzenAlert AlertStyle="AlertStyle.Info" AllowClose="false" Density="Density.Compact" class="rz-mt-4">
         Glossary terms are automatically applied when translating. The translation provider will use these terms consistently.
-    </MudAlert>
+    </RadzenAlert>
 }
-
-@* Add/Edit Dialog *@
-<MudDialog @bind-Visible="_showDialog" Options="new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true }">
-    <TitleContent>
-        <MudText Typo="Typo.h6">@(_editingTerm == null ? "Add Glossary Term" : "Edit Glossary Term")</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudStack Spacing="3">
-            <MudTextField @bind-Value="_formSourceTerm"
-                          Label="Source Term"
-                          Required="true"
-                          Placeholder="e.g., Dashboard"
-                          HelperText="The term in the source language" />
-
-            <MudSelect @bind-Value="_formSourceLanguage"
-                       Label="Source Language"
-                       Required="true">
-                @foreach (var lang in _availableLanguages)
-                {
-                    <MudSelectItem Value="@lang">@lang.ToUpperInvariant()</MudSelectItem>
-                }
-            </MudSelect>
-
-            <MudTextField @bind-Value="_formDescription"
-                          Label="Description (optional)"
-                          Lines="2"
-                          Placeholder="Context or usage notes" />
-
-            <MudCheckBox @bind-Value="_formCaseSensitive"
-                         Label="Case-sensitive matching"
-                         Color="Color.Primary" />
-
-            <MudDivider Class="my-2" />
-
-            <MudText Typo="Typo.subtitle1">Translations</MudText>
-            @foreach (var lang in _availableLanguages.Where(l => l != _formSourceLanguage))
-            {
-                <MudTextField @bind-Value="_formTranslations[lang]"
-                              Label="@($"Translation ({lang.ToUpperInvariant()})")"
-                              Placeholder="@($"Enter translation in {lang.ToUpperInvariant()}")" />
-            }
-        </MudStack>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="CloseDialog">Cancel</MudButton>
-        <MudButton Color="Color.Primary"
-                   Variant="Variant.Filled"
-                   OnClick="SaveTerm"
-                   Disabled="@(string.IsNullOrWhiteSpace(_formSourceTerm) || string.IsNullOrWhiteSpace(_formSourceLanguage))">
-            @(_editingTerm == null ? "Add" : "Save")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
 
 @code {
     [Parameter] public int ProjectId { get; set; }
@@ -303,7 +216,6 @@ else
     private bool _isSavingInheritance;
 
     // Dialog state
-    private bool _showDialog;
     private GlossaryTermDto? _editingTerm;
     private string _formSourceTerm = "";
     private string _formSourceLanguage = "en";
@@ -312,8 +224,14 @@ else
     private Dictionary<string, string> _formTranslations = new();
     private List<string> _availableLanguages = new() { "en", "fr", "de", "es", "it", "el", "pt", "nl", "pl", "ru", "ja", "zh", "ko" };
 
-    private List<BreadcrumbItem> _breadcrumbs = new();
     private string _projectName = "";
+
+    private List<(string Value, string Text)> _scopeOptions = new()
+    {
+        ("all", "All"),
+        ("project", "Project Only"),
+        ("organization", "Organization Only")
+    };
 
     private List<GlossaryTermDto> FilteredTerms => _glossary?.Terms
         .Where(t => string.IsNullOrEmpty(_searchTerm) ||
@@ -325,6 +243,16 @@ else
                     t.SourceLanguage == _languageFilter ||
                     t.Translations.ContainsKey(_languageFilter))
         .ToList() ?? new();
+
+    private List<(string Value, string Text)> GetLanguageOptions()
+    {
+        var options = new List<(string Value, string Text)> { ("", "All Languages") };
+        if (_glossary != null)
+        {
+            options.AddRange(_glossary.Languages.Select(l => (l, l.ToUpperInvariant())));
+        }
+        return options;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -339,40 +267,33 @@ else
         {
             _projectName = _project.Name;
             _inheritOrgGlossary = _project.InheritOrganizationGlossary;
-            _breadcrumbs = new()
-            {
-                new BreadcrumbItem("Projects", "projects"),
-                new BreadcrumbItem(_projectName, $"projects/{ProjectId}"),
-                new BreadcrumbItem("Glossary", null, disabled: true)
-            };
         }
     }
 
-    private async Task OnInheritanceChanged(bool value)
+    private async Task OnInheritanceChanged()
     {
         _isSavingInheritance = true;
         try
         {
             var request = new UpdateProjectRequest
             {
-                InheritOrganizationGlossary = value
+                InheritOrganizationGlossary = _inheritOrgGlossary
             };
 
             var result = await ProjectService.UpdateProjectAsync(ProjectId, request);
             if (result.IsSuccess)
             {
-                _inheritOrgGlossary = value;
-                Snackbar.Add(value ? "Organization glossary enabled" : "Organization glossary disabled", Severity.Success);
-                await LoadGlossaryAsync(); // Reload to reflect changes
+                NotificationService.Notify(NotificationSeverity.Success, "Success", _inheritOrgGlossary ? "Organization glossary enabled" : "Organization glossary disabled");
+                await LoadGlossaryAsync();
             }
             else
             {
-                Snackbar.Add($"Error: {result.ErrorMessage}", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to update setting");
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
         finally
         {
@@ -387,7 +308,6 @@ else
         {
             _glossary = await GlossaryService.GetProjectGlossaryAsync(ProjectId);
 
-            // Update available languages based on project languages
             if (_glossary?.Languages.Count > 0)
             {
                 _availableLanguages = _glossary.Languages
@@ -399,7 +319,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error loading glossary: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error loading glossary: {ex.Message}");
         }
         finally
         {
@@ -407,7 +327,7 @@ else
         }
     }
 
-    private void OpenAddDialog()
+    private async Task OpenAddDialog()
     {
         _editingTerm = null;
         _formSourceTerm = "";
@@ -419,10 +339,11 @@ else
         {
             _formTranslations[lang] = "";
         }
-        _showDialog = true;
+
+        await ShowTermDialog("Add Glossary Term");
     }
 
-    private void OpenEditDialog(GlossaryTermDto term)
+    private async Task OpenEditDialog(GlossaryTermDto term)
     {
         _editingTerm = term;
         _formSourceTerm = term.SourceTerm;
@@ -431,20 +352,66 @@ else
         _formCaseSensitive = term.CaseSensitive;
         _formTranslations = new Dictionary<string, string>(term.Translations);
 
-        // Ensure all languages have entries
         foreach (var lang in _availableLanguages.Where(l => l != term.SourceLanguage))
         {
             if (!_formTranslations.ContainsKey(lang))
                 _formTranslations[lang] = "";
         }
-        _showDialog = true;
+
+        await ShowTermDialog("Edit Glossary Term");
     }
 
-    private void CloseDialog()
+    private async Task ShowTermDialog(string title)
     {
-        _showDialog = false;
-        _editingTerm = null;
+        var result = await DialogService.OpenAsync(title, ds =>
+            @<RadzenStack Gap="1rem">
+                <RadzenFormField Text="Source Term" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <RadzenTextBox @bind-Value="_formSourceTerm" Placeholder="e.g., Dashboard" Style="width: 100%;" />
+                </RadzenFormField>
+
+                <RadzenFormField Text="Source Language" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <RadzenDropDown @bind-Value="_formSourceLanguage" Data="@_availableLanguages" Style="width: 100%;">
+                        <Template Context="lang">@lang.ToUpperInvariant()</Template>
+                    </RadzenDropDown>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Description (optional)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <RadzenTextArea @bind-Value="_formDescription" Rows="2" Placeholder="Context or usage notes" Style="width: 100%;" />
+                </RadzenFormField>
+
+                <RadzenCheckBox @bind-Value="_formCaseSensitive" TValue="bool">
+                    <Template>Case-sensitive matching</Template>
+                </RadzenCheckBox>
+
+                <hr />
+
+                <RadzenText TextStyle="TextStyle.Subtitle1">Translations</RadzenText>
+                @foreach (var lang in _availableLanguages.Where(l => l != _formSourceLanguage))
+                {
+                    <RadzenFormField Text="@($"Translation ({lang.ToUpperInvariant()})")" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <RadzenTextBox Value="@GetTranslation(lang)" ValueChanged="@(v => SetTranslation(lang, v))" Placeholder="@($"Enter translation in {lang.ToUpperInvariant()}")" Style="width: 100%;" />
+                    </RadzenFormField>
+                }
+
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+                    <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@(() => ds.Close(false))" />
+                    <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary"
+                                  Text="@(_editingTerm == null ? "Add" : "Save")"
+                                  Click="@(() => ds.Close(true))"
+                                  Disabled="@(string.IsNullOrWhiteSpace(_formSourceTerm) || string.IsNullOrWhiteSpace(_formSourceLanguage))" />
+                </RadzenStack>
+            </RadzenStack>,
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result == true)
+        {
+            await SaveTerm();
+        }
     }
+
+    private string GetTranslation(string lang) => _formTranslations.TryGetValue(lang, out var val) ? val : "";
+
+    private void SetTranslation(string lang, string value) => _formTranslations[lang] = value;
 
     private async Task SaveTerm()
     {
@@ -453,14 +420,12 @@ else
 
         try
         {
-            // Filter out empty translations
             var translations = _formTranslations
                 .Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
 
             if (_editingTerm == null)
             {
-                // Create new term
                 var request = new CreateGlossaryTermRequest
                 {
                     SourceTerm = _formSourceTerm,
@@ -471,11 +436,10 @@ else
                 };
 
                 await GlossaryService.CreateProjectTermAsync(ProjectId, request);
-                Snackbar.Add("Term added successfully", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Term added successfully");
             }
             else
             {
-                // Update existing term
                 var request = new UpdateGlossaryTermRequest
                 {
                     SourceTerm = _formSourceTerm,
@@ -486,37 +450,35 @@ else
                 };
 
                 await GlossaryService.UpdateProjectTermAsync(ProjectId, _editingTerm.Id, request);
-                Snackbar.Add("Term updated successfully", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Term updated successfully");
             }
 
-            CloseDialog();
             await LoadGlossaryAsync();
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
     }
 
     private async Task ConfirmDelete(GlossaryTermDto term)
     {
-        var result = await DialogService.ShowMessageBox(
-            "Delete Term",
+        var confirmed = await DialogService.Confirm(
             $"Are you sure you want to delete the term \"{term.SourceTerm}\"?",
-            yesText: "Delete",
-            cancelText: "Cancel");
+            "Delete Term",
+            new ConfirmOptions { OkButtonText = "Delete", CancelButtonText = "Cancel" });
 
-        if (result == true)
+        if (confirmed == true)
         {
             try
             {
                 await GlossaryService.DeleteProjectTermAsync(ProjectId, term.Id);
-                Snackbar.Add("Term deleted", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Term deleted");
                 await LoadGlossaryAsync();
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
             }
         }
     }

@@ -9,226 +9,129 @@
 @inject OrganizationService OrganizationService
 @inject LimitsService LimitsService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 
 <PageTitle>Organizations - LRM Cloud</PageTitle>
 
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">Organizations</MudText>
-    <MudTooltip Text="@_limitMessage" Disabled="@_canCreateOrg">
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="@OpenCreateDialog"
-                   Disabled="@(!_canCreateOrg)">
-            New Organization
-        </MudButton>
-    </MudTooltip>
-</MudStack>
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.H4">Organizations</RadzenText>
+    <RadzenButton Variant="Radzen.Variant.Filled" Icon="add" Text="New Organization" Click="@OpenCreateDialog" Disabled="@(!_canCreateOrg)" title="@_limitMessage" />
+</RadzenStack>
 
 @* Pending Invitations Section *@
 @if (_pendingInvitations.Any())
 {
-    <MudText Typo="Typo.h6" Class="mb-3">Pending Invitations</MudText>
-    <MudStack Spacing="2" Class="mb-6">
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">Pending Invitations</RadzenText>
+    <RadzenStack Gap="0.5rem" class="rz-mb-6">
         @foreach (var invitation in _pendingInvitations)
         {
-            <MudPaper Elevation="1" Class="pa-4">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
-                        <MudAvatar Color="Color.Primary" Size="Size.Medium">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Gap="1rem" Wrap="FlexWrap.Wrap">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
+                        <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--rz-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">
                             @UiHelpers.GetInitials(invitation.OrganizationName)
-                        </MudAvatar>
+                        </div>
                         <div>
-                            <MudText Typo="Typo.subtitle1">
+                            <RadzenText TextStyle="TextStyle.Subtitle1">
                                 <strong>@invitation.OrganizationName</strong> invited you as
-                                <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetRoleColor(invitation.Role)" Class="mx-1">@invitation.Role</MudChip>
-                            </MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                <RadzenBadge BadgeStyle="@UiHelpers.GetRoleBadgeStyle(invitation.Role)" Text="@invitation.Role" class="rz-mx-1" />
+                            </RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
                                 @if (!string.IsNullOrEmpty(invitation.InvitedByName))
                                 {
                                     <span>Invited by @invitation.InvitedByName</span>
                                 }
-                                <span class="mx-2">·</span>
+                                <span class="rz-mx-2">·</span>
                                 <span>Expires @GetExpiryText(invitation.ExpiresAt)</span>
-                            </MudText>
+                            </RadzenText>
                         </div>
-                    </MudStack>
-                    <MudStack Row="true" Spacing="2">
-                        <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Default"
-                                   Size="Size.Small"
-                                   OnClick="@(() => DeclineInvitation(invitation))"
-                                   Disabled="@_isProcessingInvitation">
-                            Decline
-                        </MudButton>
-                        <MudButton Variant="Variant.Filled"
-                                   Color="Color.Primary"
-                                   Size="Size.Small"
-                                   OnClick="@(() => AcceptInvitation(invitation))"
-                                   Disabled="@_isProcessingInvitation">
-                            @if (_processingInvitationId == int.Parse(invitation.Token))
-                            {
-                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
-                            }
-                            Accept
-                        </MudButton>
-                    </MudStack>
-                </MudStack>
-            </MudPaper>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+                        <RadzenButton Variant="Radzen.Variant.Outlined" Size="ButtonSize.Small" Text="Decline" Click="@(() => DeclineInvitation(invitation))" Disabled="@_isProcessingInvitation" />
+                        <RadzenButton ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" Text="Accept" Click="@(() => AcceptInvitation(invitation))" Disabled="@_isProcessingInvitation" IsBusy="@(_processingInvitationId == int.Parse(invitation.Token))" />
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
         }
-    </MudStack>
+    </RadzenStack>
 
-    <MudText Typo="Typo.h6" Class="mb-3">Your Organizations</MudText>
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">Your Organizations</RadzenText>
 }
 
 @if (_isLoading)
 {
-    <MudGrid>
+    <RadzenRow Gap="1rem">
         @for (int i = 0; i < 3; i++)
         {
-            <MudItem xs="12" sm="6" md="4">
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
                 <LoadingSkeleton Type="LoadingSkeletonType.Card" />
-            </MudItem>
+            </RadzenColumn>
         }
-    </MudGrid>
+    </RadzenRow>
 }
 else if (!_organizations.Any())
 {
-    <EmptyState Icon="@Icons.Material.Filled.Business"
+    <EmptyState Icon="business"
                 Title="No organizations yet"
                 Description="@(_canCreateOrg ? "Organizations let you collaborate with your team on translation projects. Create one to get started." : _limitMessage ?? "Organizations are not available on your current plan.")"
                 ShowAction="@_canCreateOrg"
                 ActionText="Create Organization"
-                ActionIcon="@Icons.Material.Filled.Add"
+                ActionIcon="add"
                 OnActionClick="@OpenCreateDialog" />
 }
 else
 {
-    <MudGrid>
+    <RadzenRow Gap="1rem">
         @foreach (var org in _organizations)
         {
-            <MudItem xs="12" sm="6" md="4">
-                <MudCard Elevation="2" Class="cursor-pointer" @onclick="@(() => NavigateToOrg(org.Id))">
-                    <MudCardHeader>
-                        <CardHeaderAvatar>
-                            <MudAvatar Color="@UiHelpers.GetHashColor(org.Name)" Size="Size.Large">
-                                @UiHelpers.GetInitials(org.Name)
-                            </MudAvatar>
-                        </CardHeaderAvatar>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">@org.Name</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">@org.Slug</MudText>
-                        </CardHeaderContent>
-                        <CardHeaderActions>
-                            <MudChip T="string" Size="Size.Small" Color="@UiHelpers.GetRoleColor(org.UserRole)">
-                                @org.UserRole
-                            </MudChip>
-                        </CardHeaderActions>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        @if (!string.IsNullOrEmpty(org.Description))
-                        {
-                            <MudText Typo="Typo.body2" Class="mb-3" Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                @org.Description
-                            </MudText>
-                        }
-                        <MudStack Row="true" Justify="Justify.SpaceBetween">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Color="Color.Secondary" />
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">@org.MemberCount members</MudText>
-                            </MudStack>
-                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@UiHelpers.GetPlanColor(org.Plan)">
-                                @org.Plan
-                            </MudChip>
-                        </MudStack>
-                    </MudCardContent>
-                    <MudCardActions>
-                        <MudButton Variant="Variant.Text"
-                                   Color="Color.Primary"
-                                   OnClick="@(() => NavigateToMembers(org.Id))"
-                                   ClickPropagation="false">
-                            Members
-                        </MudButton>
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
+                <RadzenCard Style="cursor: pointer;" @onclick="@(() => NavigateToOrg(org.Id))">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Start" Gap="0.75rem">
+                        <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--rz-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.25rem;">
+                            @UiHelpers.GetInitials(org.Name)
+                        </div>
+                        <RadzenStack Gap="0.25rem" Style="flex: 1; min-width: 0;">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                                <RadzenText TextStyle="TextStyle.H6" Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@org.Name</RadzenText>
+                                <RadzenBadge BadgeStyle="@UiHelpers.GetRoleBadgeStyle(org.UserRole)" Text="@org.UserRole" />
+                            </RadzenStack>
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">@org.Slug</RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                    @if (!string.IsNullOrEmpty(org.Description))
+                    {
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-my-3" Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            @org.Description
+                        </RadzenText>
+                    }
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mt-3">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                            <RadzenIcon Icon="people" Style="font-size: 1rem; color: var(--rz-text-secondary-color);" />
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">@org.MemberCount members</RadzenText>
+                        </RadzenStack>
+                        <RadzenBadge BadgeStyle="@UiHelpers.GetPlanBadgeStyle(org.Plan)" Text="@org.Plan" Variant="Radzen.Variant.Outlined" />
+                    </RadzenStack>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" class="rz-mt-3">
+                        <RadzenButton Variant="Radzen.Variant.Text" Text="Members" Click="@(() => NavigateToMembers(org.Id))" @onclick:stopPropagation="true" />
                         @if (OrganizationRole.IsAdminOrOwner(org.UserRole))
                         {
-                            <MudButton Variant="Variant.Text"
-                                       Color="Color.Secondary"
-                                       OnClick="@(() => NavigateToSettings(org.Id))"
-                                       ClickPropagation="false">
-                                Settings
-                            </MudButton>
+                            <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Secondary" Text="Settings" Click="@(() => NavigateToSettings(org.Id))" @onclick:stopPropagation="true" />
                         }
-                    </MudCardActions>
-                </MudCard>
-            </MudItem>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
         }
-    </MudGrid>
+    </RadzenRow>
 }
-
-<!-- Create Organization Dialog -->
-<MudDialog @bind-Visible="_createDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Business" />
-            <MudText Typo="Typo.h6">Create Organization</MudText>
-        </MudStack>
-    </TitleContent>
-    <DialogContent>
-        <MudForm @ref="_createForm" @bind-IsValid="_createFormValid">
-            <MudStack Spacing="3">
-                <MudTextField @bind-Value="_createRequest.Name"
-                              Label="Organization Name"
-                              Variant="Variant.Outlined"
-                              Required="true"
-                              RequiredError="Organization name is required"
-                              MaxLength="255"
-                              Counter="255"
-                              Immediate="true"
-                              HelperText="The display name for your organization" />
-
-                <MudTextField @bind-Value="_createRequest.Slug"
-                              Label="URL Slug (optional)"
-                              Variant="Variant.Outlined"
-                              MaxLength="255"
-                              Validation="@(new Func<string?, IEnumerable<string>>(ValidateSlug))"
-                              HelperText="Auto-generated from name if left empty. Use lowercase letters, numbers, and hyphens." />
-
-                <MudTextField @bind-Value="_createRequest.Description"
-                              Label="Description (optional)"
-                              Variant="Variant.Outlined"
-                              MaxLength="1000"
-                              Lines="3"
-                              Counter="1000" />
-            </MudStack>
-        </MudForm>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CloseCreateDialog">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   OnClick="@CreateOrganization"
-                   Disabled="@(!_createFormValid || _isCreating)">
-            @if (_isCreating)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Create
-        </MudButton>
-    </DialogActions>
-</MudDialog>
 
 @code {
     private List<OrganizationDto> _organizations = new();
     private List<PendingInvitationDto> _pendingInvitations = new();
     private bool _isLoading = true;
-    private bool _createDialogVisible;
-    private bool _createFormValid;
     private bool _isCreating;
     private bool _isProcessingInvitation;
     private int? _processingInvitationId;
-    private MudForm? _createForm;
-    private CreateOrganizationRequest _createRequest = new() { Name = "" };
     private bool _canCreateOrg = true;
     private string? _limitMessage;
 
@@ -259,7 +162,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load data: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load data: {ex.Message}");
         }
         finally
         {
@@ -280,14 +183,13 @@ else
 
             if (success)
             {
-                Snackbar.Add($"You've joined {invitation.OrganizationName}!", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"You've joined {invitation.OrganizationName}!");
                 _pendingInvitations.Remove(invitation);
-                // Reload organizations to include the new one
                 _organizations = await OrganizationService.GetOrganizationsAsync();
             }
             else
             {
-                Snackbar.Add(error ?? "Failed to accept invitation", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", error ?? "Failed to accept invitation");
             }
         }
         finally
@@ -310,12 +212,12 @@ else
 
             if (success)
             {
-                Snackbar.Add("Invitation declined", Severity.Info);
+                NotificationService.Notify(NotificationSeverity.Info, "Info", "Invitation declined");
                 _pendingInvitations.Remove(invitation);
             }
             else
             {
-                Snackbar.Add(error ?? "Failed to decline invitation", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", error ?? "Failed to decline invitation");
             }
         }
         finally
@@ -335,43 +237,15 @@ else
         return "soon";
     }
 
-    private void OpenCreateDialog()
+    private async Task OpenCreateDialog()
     {
-        _createRequest = new CreateOrganizationRequest { Name = "" };
-        _createDialogVisible = true;
-    }
+        var result = await DialogService.OpenAsync<CreateOrganizationDialog>("Create Organization",
+            options: new Radzen.DialogOptions { Width = "500px" });
 
-    private void CloseCreateDialog()
-    {
-        _createDialogVisible = false;
-    }
-
-    private async Task CreateOrganization()
-    {
-        if (_createForm != null)
-            await _createForm.Validate();
-
-        if (!_createFormValid) return;
-
-        _isCreating = true;
-        try
+        if (result is OrganizationDto org)
         {
-            var (success, org, error) = await OrganizationService.CreateOrganizationAsync(_createRequest);
-
-            if (success && org != null)
-            {
-                _organizations.Insert(0, org);
-                Snackbar.Add("Organization created successfully", Severity.Success);
-                CloseCreateDialog();
-            }
-            else
-            {
-                Snackbar.Add(error ?? "Failed to create organization", Severity.Error);
-            }
-        }
-        finally
-        {
-            _isCreating = false;
+            _organizations.Insert(0, org);
+            NotificationService.Notify(NotificationSeverity.Success, "Success", "Organization created successfully");
         }
     }
 
@@ -388,14 +262,5 @@ else
     private void NavigateToSettings(int id)
     {
         Navigation.NavigateTo($"organizations/{id}/settings");
-    }
-
-    private IEnumerable<string> ValidateSlug(string? slug)
-    {
-        if (!string.IsNullOrEmpty(slug))
-        {
-            if (!System.Text.RegularExpressions.Regex.IsMatch(slug, @"^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$"))
-                yield return "Slug must contain only lowercase letters, numbers, and hyphens";
-        }
     }
 }

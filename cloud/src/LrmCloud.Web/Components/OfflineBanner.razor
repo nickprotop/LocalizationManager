@@ -4,21 +4,12 @@
 
 @if (_isOffline)
 {
-    <MudAlert Severity="Severity.Warning"
-              Variant="Variant.Filled"
-              Class="offline-banner"
-              Dense="true"
-              Icon="@Icons.Material.Filled.WifiOff">
-        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="width: 100%;">
+    <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Style="width: 100%;">
             <span>You're offline. Some features may not be available.</span>
-            <MudButton Variant="Variant.Text"
-                       Color="Color.Inherit"
-                       Size="Size.Small"
-                       OnClick="@CheckConnection">
-                Retry
-            </MudButton>
-        </MudStack>
-    </MudAlert>
+            <RadzenButton Variant="Radzen.Variant.Text" Size="ButtonSize.Small" Text="Retry" Click="@CheckConnection" />
+        </RadzenStack>
+    </RadzenAlert>
 }
 
 @code {

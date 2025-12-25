@@ -4,303 +4,236 @@
 @using LrmCloud.Web.Services
 @using LrmCloud.Web.Helpers
 @inject TranslationService TranslationService
-@inject ISnackbar Snackbar
-@inject IDialogService DialogService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 @inject NavigationManager Navigation
 
 <PageTitle>Translation Providers - LRM Cloud</PageTitle>
 
-<MudStack Spacing="4">
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h5">Translation Providers</MudText>
-            <MudButton Variant="Variant.Outlined"
-                       StartIcon="@Icons.Material.Filled.Refresh"
-                       OnClick="LoadProvidersAsync"
-                       Disabled="_isLoading">
-                Refresh
-            </MudButton>
-        </MudStack>
+<RadzenStack Gap="1rem">
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+        <RadzenText TextStyle="TextStyle.H5">Translation Providers</RadzenText>
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="refresh" Text="Refresh" Click="@LoadProvidersAsync" Disabled="@_isLoading" />
+    </RadzenStack>
 
-        <!-- User Level Indicator -->
-        <MudPaper Class="pa-4" Elevation="0" Style="background-color: var(--mud-palette-background-grey); border-left: 4px solid var(--mud-palette-primary);">
-            <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="3">
-                <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" />
-                <MudStack Spacing="1">
-                    <MudText Typo="Typo.subtitle1">
-                        <strong>Your Personal Settings</strong> (User Level)
-                    </MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">
-                        Configure your personal API keys and provider options. These settings apply to all your projects
-                        unless overridden at the project level.
-                    </MudText>
-                </MudStack>
-            </MudStack>
-        </MudPaper>
+    <!-- User Level Indicator -->
+    <RadzenCard Variant="Radzen.Variant.Text" Style="border-left: 4px solid var(--rz-primary);">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Start" Gap="1rem">
+            <RadzenIcon Icon="person" Style="color: var(--rz-primary);" />
+            <RadzenStack Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1"><strong>Your Personal Settings</strong> (User Level)</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                    Configure your personal API keys and provider options. These settings apply to all your projects
+                    unless overridden at the project level.
+                </RadzenText>
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
 
-        <!-- Hierarchy Explanation -->
-        <MudExpansionPanels>
-            <MudExpansionPanel Text="How do translation providers work?">
-                <MudStack Spacing="3">
-                    <MudText Typo="Typo.body2">
+    <!-- Hierarchy Explanation -->
+    <RadzenAccordion>
+        <Items>
+            <RadzenAccordionItem Text="How do translation providers work?">
+                <RadzenStack Gap="1rem">
+                    <RadzenText TextStyle="TextStyle.Body2">
                         LRM Cloud offers two types of translation providers:
-                    </MudText>
+                    </RadzenText>
 
-                    <MudSimpleTable Dense="true" Hover="true">
-                        <thead>
-                            <tr>
-                                <th>Provider Type</th>
-                                <th>Description</th>
-                                <th>Limits</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr style="background-color: var(--mud-palette-warning-lighten);">
-                                <td>
-                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                        <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Warning" />
-                                        <strong>LRM Translation</strong>
-                                    </MudStack>
-                                </td>
-                                <td>Our managed translation service. No API key needed - we handle everything.</td>
-                                <td>Free: 10K/mo, Team: 100K/mo, Enterprise: Unlimited</td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                        <MudIcon Icon="@Icons.Material.Filled.CloudQueue" Size="Size.Small" Color="Color.Secondary" />
-                                        <strong>Other Providers</strong>
-                                    </MudStack>
-                                </td>
-                                <td>BYOK (your own API keys) + free community providers (MyMemory, Lingva).</td>
-                                <td>Free: 50K/mo, Team: 500K/mo, Enterprise: Unlimited</td>
-                            </tr>
-                        </tbody>
-                    </MudSimpleTable>
+                    <RadzenDataGrid TItem="ProviderTypeInfo" Data="@_providerTypeInfo" AllowSorting="false" AllowPaging="false" Density="Density.Compact">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="ProviderTypeInfo" Property="Type" Title="Provider Type">
+                                <Template Context="info">
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                        <RadzenIcon Icon="@info.Icon" Style="@($"color: {info.Color}; font-size: 1rem;")" />
+                                        <strong>@info.Type</strong>
+                                    </RadzenStack>
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="ProviderTypeInfo" Property="Description" Title="Description" />
+                            <RadzenDataGridColumn TItem="ProviderTypeInfo" Property="Limits" Title="Limits" />
+                        </Columns>
+                    </RadzenDataGrid>
 
-                    <MudDivider />
+                    <hr />
 
-                    <MudText Typo="Typo.subtitle2">API Key Configuration Hierarchy</MudText>
-                    <MudText Typo="Typo.body2">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">API Key Configuration Hierarchy</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2">
                         For BYOK providers, API keys can be configured at multiple levels. Higher priority overrides lower priority:
-                    </MudText>
+                    </RadzenText>
 
-                    <MudStack Spacing="2">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary"><strong>Personal Projects:</strong></MudText>
-                        <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Justify="Justify.Center">
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Success">Project</MudChip>
-                                <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary">User (You)</MudChip>
-                            </MudStack>
-                        </MudPaper>
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary"><strong>Personal Projects:</strong></RadzenText>
+                        <RadzenCard Variant="Radzen.Variant.Text" Style="text-align: center;">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" JustifyContent="JustifyContent.Center">
+                                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Project" />
+                                <RadzenIcon Icon="arrow_back" Style="font-size: 1rem;" />
+                                <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="User (You)" />
+                            </RadzenStack>
+                        </RadzenCard>
 
-                        <MudText Typo="Typo.caption" Color="Color.Secondary"><strong>Organization Projects:</strong></MudText>
-                        <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Justify="Justify.Center">
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Success">Project</MudChip>
-                                <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Secondary">Organization</MudChip>
-                            </MudStack>
-                        </MudPaper>
-                    </MudStack>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary"><strong>Organization Projects:</strong></RadzenText>
+                        <RadzenCard Variant="Radzen.Variant.Text" Style="text-align: center;">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" JustifyContent="JustifyContent.Center">
+                                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Project" />
+                                <RadzenIcon Icon="arrow_back" Style="font-size: 1rem;" />
+                                <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Text="Organization" />
+                            </RadzenStack>
+                        </RadzenCard>
+                    </RadzenStack>
 
-                    <MudAlert Severity="Severity.Info" Dense="true">
+                    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">
                         Your personal API keys are only used for your personal projects.
                         Organization projects use organization-level keys to ensure consistent billing.
-                    </MudAlert>
+                    </RadzenAlert>
+                </RadzenStack>
+            </RadzenAccordionItem>
+        </Items>
+    </RadzenAccordion>
 
-                    <MudSimpleTable Dense="true" Hover="true">
-                        <thead>
-                            <tr>
-                                <th>Level</th>
-                                <th>Where to Configure</th>
-                                <th>Used For</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr style="background-color: var(--mud-palette-primary-lighten);">
-                                <td><MudChip T="string" Size="Size.Small" Color="Color.Primary">User</MudChip></td>
-                                <td><strong>This page</strong></td>
-                                <td>Your personal projects only</td>
-                            </tr>
-                            <tr>
-                                <td><MudChip T="string" Size="Size.Small" Color="Color.Secondary">Organization</MudChip></td>
-                                <td>
-                                    <MudLink Href="organizations">Organizations</MudLink> &rarr; API Keys
-                                </td>
-                                <td>All projects in the organization</td>
-                            </tr>
-                            <tr>
-                                <td><MudChip T="string" Size="Size.Small" Color="Color.Success">Project</MudChip></td>
-                                <td>Projects &rarr; [Project] &rarr; Settings</td>
-                                <td>Overrides user/org keys for that project</td>
-                            </tr>
-                        </tbody>
-                    </MudSimpleTable>
-                </MudStack>
-            </MudExpansionPanel>
-        </MudExpansionPanels>
-
-        @if (_isLoading)
+    @if (_isLoading)
+    {
+        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="height: 4px;" />
+    }
+    else
+    {
+        @* LRM Managed Translation Service *@
+        @if (LrmProvider != null)
         {
-            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mt-4">
+                <RadzenIcon Icon="star" Style="color: var(--rz-warning);" />
+                <RadzenText TextStyle="TextStyle.H6">LRM Managed Translation</RadzenText>
+            </RadzenStack>
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-2">
+                Our managed translation service. Free tier: 10,000 characters/month. No API key required - we handle everything.
+            </RadzenText>
+
+            <RadzenRow Gap="1rem">
+                <RadzenColumn Size="12" SizeSM="6">
+                    <ProviderCard Provider="LrmProvider" OnConfigure="OpenConfigureDialog" />
+                </RadzenColumn>
+            </RadzenRow>
+
+            <hr class="rz-my-4" />
         }
-        else
-        {
-            @* LRM Managed Translation Service *@
-            @if (LrmProvider != null)
+
+        @* Free Community Providers *@
+        <RadzenText TextStyle="TextStyle.H6">Free Community Providers</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-2">
+            Open source and community-powered providers. No API key required, but may have rate limits.
+        </RadzenText>
+
+        <RadzenRow Gap="1rem">
+            @foreach (var provider in _providers.Where(p => !p.RequiresApiKey && !p.IsManagedProvider))
             {
-                <MudText Typo="Typo.h6" Class="mt-4">
-                    <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Warning" Size="Size.Small" Style="vertical-align: middle;" />
-                    LRM Managed Translation
-                </MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-                    Our managed translation service. Free tier: 10,000 characters/month. No API key required - we handle everything.
-                </MudText>
-
-                <MudGrid Spacing="2">
-                    <MudItem xs="12" sm="6">
-                        <ProviderCard Provider="LrmProvider" OnConfigure="OpenConfigureDialog" />
-                    </MudItem>
-                </MudGrid>
-
-                <MudDivider Class="my-4" />
+                <RadzenColumn Size="12" SizeSM="6">
+                    <ProviderCard Provider="provider" OnConfigure="OpenConfigureDialog" />
+                </RadzenColumn>
             }
+        </RadzenRow>
 
-            @* Free Community Providers *@
-            <MudText Typo="Typo.h6">Free Community Providers</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-                Open source and community-powered providers. No API key required, but may have rate limits.
-            </MudText>
+        <hr class="rz-my-4" />
 
-            <MudGrid Spacing="2">
-                @foreach (var provider in _providers.Where(p => !p.RequiresApiKey && !p.IsManagedProvider))
-                {
-                    <MudItem xs="12" sm="6">
-                        <ProviderCard Provider="provider" OnConfigure="OpenConfigureDialog" />
-                    </MudItem>
-                }
-            </MudGrid>
+        @* BYOK Providers *@
+        <RadzenText TextStyle="TextStyle.H6">Bring Your Own Key (BYOK)</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-2">
+            Add your own API keys for premium providers. You pay the provider directly for usage.
+        </RadzenText>
 
-            <MudDivider Class="my-4" />
+        <RadzenRow Gap="1rem">
+            @foreach (var provider in _providers.Where(p => p.RequiresApiKey))
+            {
+                <RadzenColumn Size="12" SizeSM="6">
+                    <ProviderCard Provider="provider" OnConfigure="OpenConfigureDialog" OnRemove="RemoveApiKey" />
+                </RadzenColumn>
+            }
+        </RadzenRow>
+    }
 
-            @* BYOK Providers *@
-            <MudText Typo="Typo.h6">Bring Your Own Key (BYOK)</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-                Add your own API keys for premium providers. You pay the provider directly for usage.
-            </MudText>
+    <hr class="rz-my-4" />
 
-            <MudGrid Spacing="2">
-                @foreach (var provider in _providers.Where(p => p.RequiresApiKey))
-                {
-                    <MudItem xs="12" sm="6">
-                        <ProviderCard Provider="provider" OnConfigure="OpenConfigureDialog" OnRemove="RemoveApiKey" />
-                    </MudItem>
-                }
-            </MudGrid>
-        }
-
-        <MudDivider Class="my-4" />
-
-        <MudText Typo="Typo.h6">Your Usage This Month</MudText>
-        @if (_usage != null)
-        {
-            <MudPaper Class="pa-4" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
-                <MudStack Spacing="3">
-                    <!-- LRM Translation Usage -->
-                    <MudStack Spacing="1">
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Warning" Size="Size.Small" />
-                                <MudText Typo="Typo.body1">
-                                    <strong>LRM Translation</strong>
-                                </MudText>
-                            </MudStack>
-                            @if (_usage.CharacterLimit.HasValue)
-                            {
-                                <MudText Typo="Typo.body2">
-                                    @_usage.CharactersUsed.ToString("N0") / @_usage.CharacterLimit.Value.ToString("N0") chars
-                                </MudText>
-                            }
-                        </MudStack>
+    <RadzenText TextStyle="TextStyle.H6">Your Usage This Month</RadzenText>
+    @if (_usage != null)
+    {
+        <RadzenCard class="rz-p-4">
+            <RadzenStack Gap="1rem">
+                <!-- LRM Translation Usage -->
+                <RadzenStack Gap="0.25rem">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="star" Style="color: var(--rz-warning); font-size: 1rem;" />
+                            <RadzenText TextStyle="TextStyle.Body1"><strong>LRM Translation</strong></RadzenText>
+                        </RadzenStack>
                         @if (_usage.CharacterLimit.HasValue)
                         {
-                            <MudProgressLinear Value="@_usage.UsagePercentage"
-                                               Color="@UiHelpers.GetUsageColor(_usage.UsagePercentage)"
-                                               Rounded="true"
-                                               Size="Size.Medium" />
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                Managed translation service - counts against your @_usage.Plan plan
-                            </MudText>
+                            <RadzenText TextStyle="TextStyle.Body2">@_usage.CharactersUsed.ToString("N0") / @_usage.CharacterLimit.Value.ToString("N0") chars</RadzenText>
                         }
-                    </MudStack>
+                    </RadzenStack>
+                    @if (_usage.CharacterLimit.HasValue)
+                    {
+                        <RadzenProgressBar Value="@_usage.UsagePercentage" ProgressBarStyle="@UiHelpers.GetUsageProgressBarStyle(_usage.UsagePercentage)" ShowValue="false" />
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            Managed translation service - counts against your @_usage.Plan plan
+                        </RadzenText>
+                    }
+                </RadzenStack>
 
-                    <!-- Other Providers Usage -->
-                    <MudDivider />
-                    <MudStack Spacing="1">
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                <MudIcon Icon="@Icons.Material.Filled.CloudQueue" Color="Color.Secondary" Size="Size.Small" />
-                                <MudText Typo="Typo.body1">
-                                    <strong>Other Providers</strong>
-                                </MudText>
-                            </MudStack>
-                            @if (_usage.OtherCharacterLimit.HasValue)
-                            {
-                                <MudText Typo="Typo.body2">
-                                    @_usage.OtherCharactersUsed.ToString("N0") / @_usage.OtherCharacterLimit.Value.ToString("N0") chars
-                                </MudText>
-                            }
-                            else
-                            {
-                                <MudText Typo="Typo.body2">
-                                    @_usage.OtherCharactersUsed.ToString("N0") chars
-                                </MudText>
-                            }
-                        </MudStack>
+                <!-- Other Providers Usage -->
+                <hr />
+                <RadzenStack Gap="0.25rem">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="cloud_queue" class="rz-color-secondary" Style="font-size: 1rem;" />
+                            <RadzenText TextStyle="TextStyle.Body1"><strong>Other Providers</strong></RadzenText>
+                        </RadzenStack>
                         @if (_usage.OtherCharacterLimit.HasValue)
                         {
-                            <MudProgressLinear Value="@_usage.OtherUsagePercentage"
-                                               Color="@UiHelpers.GetUsageColor(_usage.OtherUsagePercentage)"
-                                               Rounded="true"
-                                               Size="Size.Medium" />
+                            <RadzenText TextStyle="TextStyle.Body2">@_usage.OtherCharactersUsed.ToString("N0") / @_usage.OtherCharacterLimit.Value.ToString("N0") chars</RadzenText>
                         }
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            BYOK + free community providers (MyMemory, Lingva)
-                        </MudText>
-                    </MudStack>
-
-                    <!-- Reset Date -->
-                    @if (_usage.ResetsAt.HasValue)
+                        else
+                        {
+                            <RadzenText TextStyle="TextStyle.Body2">@_usage.OtherCharactersUsed.ToString("N0") chars</RadzenText>
+                        }
+                    </RadzenStack>
+                    @if (_usage.OtherCharacterLimit.HasValue)
                     {
-                        <MudDivider />
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Style="vertical-align: middle;" />
-                            Usage resets: @_usage.ResetsAt.Value.ToString("MMMM d, yyyy")
-                        </MudText>
+                        <RadzenProgressBar Value="@_usage.OtherUsagePercentage" ProgressBarStyle="@UiHelpers.GetUsageProgressBarStyle(_usage.OtherUsagePercentage)" ShowValue="false" />
                     }
-                </MudStack>
-            </MudPaper>
-        }
-        else
-        {
-            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="120px" />
-        }
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        BYOK + free community providers (MyMemory, Lingva)
+                    </RadzenText>
+                </RadzenStack>
 
-        <!-- Quick Links -->
-        <MudPaper Class="pa-4 mt-4" Elevation="0" Style="border: 1px dashed var(--mud-palette-lines-default);">
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                <MudIcon Icon="@Icons.Material.Filled.Lightbulb" Color="Color.Warning" />
-                <MudStack Spacing="0">
-                    <MudText Typo="Typo.body2">
-                        <strong>Tip:</strong> Configure shared API keys for your organization in
-                        <MudLink Href="organizations">Organization Settings</MudLink>.
-                        Override specific projects in Project Settings.
-                    </MudText>
-                </MudStack>
-            </MudStack>
-        </MudPaper>
-</MudStack>
+                <!-- Reset Date -->
+                @if (_usage.ResetsAt.HasValue)
+                {
+                    <hr />
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        <RadzenIcon Icon="schedule" Style="font-size: 1rem; vertical-align: middle;" />
+                        Usage resets: @_usage.ResetsAt.Value.ToString("MMMM d, yyyy")
+                    </RadzenText>
+                }
+            </RadzenStack>
+        </RadzenCard>
+    }
+    else
+    {
+        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="height: 4px;" />
+    }
+
+    <!-- Quick Links -->
+    <RadzenCard Variant="Radzen.Variant.Text" Style="border: 1px dashed var(--rz-base-400);">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="lightbulb" Style="color: var(--rz-warning);" />
+            <RadzenStack Gap="0">
+                <RadzenText TextStyle="TextStyle.Body2">
+                    <strong>Tip:</strong> Configure shared API keys for your organization in
+                    <RadzenLink Path="organizations" Text="Organization Settings" />.
+                    Override specific projects in Project Settings.
+                </RadzenText>
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
+</RadzenStack>
 
 @code {
     private List<TranslationProviderDto> _providers = new();
@@ -309,6 +242,22 @@
 
     // Computed property for the LRM managed provider
     private TranslationProviderDto? LrmProvider => _providers.FirstOrDefault(p => p.IsManagedProvider);
+
+    // Helper class for provider type info
+    private class ProviderTypeInfo
+    {
+        public string Type { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Limits { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string Color { get; set; } = "";
+    }
+
+    private readonly List<ProviderTypeInfo> _providerTypeInfo = new()
+    {
+        new() { Type = "LRM Translation", Description = "Our managed translation service. No API key needed - we handle everything.", Limits = "Free: 10K/mo, Team: 100K/mo, Enterprise: Unlimited", Icon = "star", Color = "var(--rz-warning)" },
+        new() { Type = "Other Providers", Description = "BYOK (your own API keys) + free community providers (MyMemory, Lingva).", Limits = "Free: 50K/mo, Team: 500K/mo, Enterprise: Unlimited", Icon = "cloud_queue", Color = "var(--rz-text-secondary-color)" }
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -325,7 +274,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load providers: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load providers: {ex.Message}");
         }
         finally
         {
@@ -341,28 +290,18 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load usage: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load usage: {ex.Message}");
         }
     }
 
     private async Task OpenConfigureDialog(TranslationProviderDto provider)
     {
-        var parameters = new DialogParameters
-        {
-            { nameof(ConfigureProviderDialog.Provider), provider }
-        };
+        var result = await DialogService.OpenAsync<ConfigureProviderDialog>(
+            $"Configure {provider.DisplayName}",
+            new Dictionary<string, object> { { "Provider", provider } },
+            new Radzen.DialogOptions { Width = "500px" });
 
-        var options = new DialogOptions
-        {
-            MaxWidth = MaxWidth.Small,
-            FullWidth = true,
-            CloseButton = true
-        };
-
-        var dialog = await DialogService.ShowAsync<ConfigureProviderDialog>($"Configure {provider.DisplayName}", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
+        if (result == true)
         {
             await LoadProvidersAsync();
         }
@@ -370,23 +309,22 @@
 
     private async Task RemoveApiKey(TranslationProviderDto provider)
     {
-        var confirmed = await DialogService.ShowMessageBox(
-            "Remove API Key",
+        var confirmed = await DialogService.Confirm(
             $"Are you sure you want to remove the API key for {provider.DisplayName}?",
-            yesText: "Remove",
-            cancelText: "Cancel");
+            "Remove API Key",
+            new ConfirmOptions { OkButtonText = "Remove", CancelButtonText = "Cancel" });
 
         if (confirmed == true)
         {
             var result = await TranslationService.RemoveUserApiKeyAsync(provider.Name);
             if (result.IsSuccess)
             {
-                Snackbar.Add("API key removed", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "API key removed");
                 await LoadProvidersAsync();
             }
             else
             {
-                Snackbar.Add(result.ErrorMessage ?? "Failed to remove API key", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to remove API key");
             }
         }
     }

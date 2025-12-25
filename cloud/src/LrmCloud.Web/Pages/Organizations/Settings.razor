@@ -8,290 +8,162 @@
 @using LrmCloud.Web.Helpers
 @inject OrganizationService OrganizationService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 
 <PageTitle>Settings - @(_organization?.Name ?? "Organization") - LRM Cloud</PageTitle>
 
 @if (_isLoading)
 {
-    <MudStack>
-        <MudSkeleton Width="300px" Height="40px" />
+    <RadzenStack Gap="1rem">
+        <div style="background: var(--rz-base-300); width: 300px; height: 40px; border-radius: 4px;"></div>
         <LoadingSkeleton Type="LoadingSkeletonType.Form" Rows="4" />
-    </MudStack>
+    </RadzenStack>
 }
 else if (_organization == null)
 {
-    <MudAlert Severity="Severity.Error">
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
         Organization not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="organizations">Back to Organizations</MudButton>
-    </MudAlert>
+        <RadzenLink Path="organizations" Text="Back to Organizations" class="rz-ms-2" />
+    </RadzenAlert>
 }
 else if (!OrganizationRole.IsAdminOrOwner(_organization.UserRole))
 {
-    <MudAlert Severity="Severity.Warning">
+    <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">
         You don't have permission to access organization settings.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"organizations/{OrganizationId}")">Back to Organization</MudButton>
-    </MudAlert>
+        <RadzenLink Path="@($"organizations/{OrganizationId}")" Text="Back to Organization" class="rz-ms-2" />
+    </RadzenAlert>
 }
 else
 {
-    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
-        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                       OnClick="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}"))"
-                       Size="Size.Small" />
-        <MudBreadcrumbs Items="_breadcrumbs" />
-    </MudStack>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+        <RadzenButton Variant="Radzen.Variant.Text" Icon="arrow_back" Click="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}"))" Size="ButtonSize.Small" />
+        <RadzenBreadCrumb>
+            <RadzenBreadCrumbItem Path="organizations" Text="Organizations" />
+            <RadzenBreadCrumbItem Path="@($"organizations/{OrganizationId}")" Text="@_organization.Name" />
+            <RadzenBreadCrumbItem Text="Settings" />
+        </RadzenBreadCrumb>
+    </RadzenStack>
 
-    <MudText Typo="Typo.h5" Class="mb-4">Organization Settings</MudText>
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-4">Organization Settings</RadzenText>
 
-        <!-- General Settings Card -->
-        <MudCard Class="mb-6">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudIcon Icon="@Icons.Material.Filled.Settings" />
-                        <MudText Typo="Typo.h6">General Settings</MudText>
-                    </MudStack>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudForm @ref="_settingsForm" @bind-IsValid="_settingsFormValid">
-                    <MudGrid Spacing="3">
-                        <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="_updateRequest.Name"
-                                          Label="Organization Name"
-                                          Variant="Variant.Outlined"
-                                          Required="true"
-                                          RequiredError="Name is required"
-                                          MaxLength="255" />
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudTextField Value="@_organization.Slug"
-                                          Label="URL Slug"
-                                          Variant="Variant.Outlined"
-                                          ReadOnly="true"
-                                          HelperText="Slug cannot be changed" />
-                        </MudItem>
-                        <MudItem xs="12">
-                            <MudTextField @bind-Value="_updateRequest.Description"
-                                          Label="Description"
-                                          Variant="Variant.Outlined"
-                                          MaxLength="1000"
-                                          Lines="3"
-                                          Counter="1000" />
-                        </MudItem>
-                    </MudGrid>
-                </MudForm>
-            </MudCardContent>
-            <MudCardActions Class="pa-4">
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           OnClick="@SaveSettings"
-                           Disabled="@(!_settingsFormValid || _isSaving)">
-                    @if (_isSaving)
-                    {
-                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                    }
-                    Save Changes
-                </MudButton>
-            </MudCardActions>
-        </MudCard>
+    <!-- General Settings Card -->
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+            <RadzenIcon Icon="settings" />
+            <RadzenText TextStyle="TextStyle.H6">General Settings</RadzenText>
+        </RadzenStack>
 
-        <!-- Organization Info Card -->
-        <MudCard Class="mb-6">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudIcon Icon="@Icons.Material.Filled.Info" />
-                        <MudText Typo="Typo.h6">Organization Information</MudText>
-                    </MudStack>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudSimpleTable Dense="true" Hover="true" Bordered="false" Striped="false" Class="rounded-lg">
-                    <tbody>
-                        <tr>
-                            <td style="width: 200px;"><MudText Typo="Typo.body2" Color="Color.Secondary">Organization ID</MudText></td>
-                            <td><MudText>@_organization.Id</MudText></td>
-                        </tr>
-                        <tr>
-                            <td><MudText Typo="Typo.body2" Color="Color.Secondary">Plan</MudText></td>
-                            <td>
-                                <MudChip T="string" Color="@UiHelpers.GetPlanColor(_organization.Plan)" Size="Size.Small">
-                                    @_organization.Plan.ToUpperInvariant()
-                                </MudChip>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td><MudText Typo="Typo.body2" Color="Color.Secondary">Members</MudText></td>
-                            <td>
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                    <MudText>@_organization.MemberCount</MudText>
-                                    <MudButton Variant="Variant.Text"
-                                               Color="Color.Primary"
-                                               Size="Size.Small"
-                                               Href="@($"organizations/{OrganizationId}/members")">
-                                        Manage
-                                    </MudButton>
-                                </MudStack>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td><MudText Typo="Typo.body2" Color="Color.Secondary">Your Role</MudText></td>
-                            <td>
-                                <MudChip T="string" Color="@UiHelpers.GetRoleColor(_organization.UserRole)" Size="Size.Small">
-                                    @_organization.UserRole
-                                </MudChip>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td><MudText Typo="Typo.body2" Color="Color.Secondary">Created</MudText></td>
-                            <td><MudText>@_organization.CreatedAt.ToString("MMMM d, yyyy")</MudText></td>
-                        </tr>
-                    </tbody>
-                </MudSimpleTable>
-            </MudCardContent>
-        </MudCard>
+        <RadzenTemplateForm TItem="UpdateOrganizationRequest" Data="@_updateRequest" Submit="@SaveSettings">
+            <RadzenRow Gap="1rem">
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Organization Name" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_updateRequest.Name" Name="Name" MaxLength="255" Style="width: 100%;" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenRequiredValidator Component="Name" Text="Name is required" />
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="URL Slug" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox Value="@_organization.Slug" ReadOnly="true" Style="width: 100%;" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Slug cannot be changed</RadzenText>
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12">
+                    <RadzenFormField Text="Description" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextArea @bind-Value="_updateRequest.Description" Rows="3" MaxLength="1000" Style="width: 100%;" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
 
-        <!-- Danger Zone (Owner Only) -->
-        @if (OrganizationRole.IsOwner(_organization.UserRole))
-        {
-            <MudCard>
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
-                            <MudText Typo="Typo.h6" Color="Color.Error">Danger Zone</MudText>
-                        </MudStack>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    <MudStack Spacing="4">
-                        <!-- Transfer Ownership -->
-                        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-lines-default);">
-                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                                <div>
-                                    <MudText Typo="Typo.subtitle1">Transfer Ownership</MudText>
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                        Transfer this organization to another member. You will become an admin.
-                                    </MudText>
-                                </div>
-                                <MudButton Variant="Variant.Outlined"
-                                           Color="Color.Warning"
-                                           OnClick="@OpenTransferDialog">
-                                    Transfer
-                                </MudButton>
-                            </MudStack>
-                        </MudPaper>
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" class="rz-mt-4">
+                <RadzenButton ButtonType="Radzen.ButtonType.Submit" ButtonStyle="ButtonStyle.Primary" Text="Save Changes" IsBusy="@_isSaving" />
+            </RadzenStack>
+        </RadzenTemplateForm>
+    </RadzenCard>
 
-                        <!-- Delete Organization -->
-                        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-error);">
-                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                                <div>
-                                    <MudText Typo="Typo.subtitle1" Color="Color.Error">Delete Organization</MudText>
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                        Permanently delete this organization and all its data. This cannot be undone.
-                                    </MudText>
-                                </div>
-                                <MudButton Variant="Variant.Outlined"
-                                           Color="Color.Error"
-                                           OnClick="@OpenDeleteDialog">
-                                    Delete
-                                </MudButton>
-                            </MudStack>
-                        </MudPaper>
-                    </MudStack>
-                </MudCardContent>
-            </MudCard>
-        }
+    <!-- Organization Info Card -->
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+            <RadzenIcon Icon="info" />
+            <RadzenText TextStyle="TextStyle.H6">Organization Information</RadzenText>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.75rem">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="width: 150px;">Organization ID</RadzenText>
+                <RadzenText>@_organization.Id</RadzenText>
+            </RadzenStack>
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem" AlignItems="Radzen.AlignItems.Center">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="width: 150px;">Plan</RadzenText>
+                <RadzenBadge BadgeStyle="@UiHelpers.GetPlanBadgeStyle(_organization.Plan)" Text="@_organization.Plan.ToUpperInvariant()" />
+            </RadzenStack>
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem" AlignItems="Radzen.AlignItems.Center">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="width: 150px;">Members</RadzenText>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    <RadzenText>@_organization.MemberCount</RadzenText>
+                    <RadzenButton Variant="Radzen.Variant.Text" Size="ButtonSize.Small" Text="Manage" Click="@(() => Navigation.NavigateTo($"organizations/{OrganizationId}/members"))" />
+                </RadzenStack>
+            </RadzenStack>
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem" AlignItems="Radzen.AlignItems.Center">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="width: 150px;">Your Role</RadzenText>
+                <RadzenBadge BadgeStyle="@UiHelpers.GetRoleBadgeStyle(_organization.UserRole)" Text="@_organization.UserRole" />
+            </RadzenStack>
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="width: 150px;">Created</RadzenText>
+                <RadzenText>@_organization.CreatedAt.ToString("MMMM d, yyyy")</RadzenText>
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
+
+    <!-- Danger Zone (Owner Only) -->
+    @if (OrganizationRole.IsOwner(_organization.UserRole))
+    {
+        <RadzenCard>
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+                <RadzenIcon Icon="warning" Style="color: var(--rz-danger);" />
+                <RadzenText TextStyle="TextStyle.H6" Style="color: var(--rz-danger);">Danger Zone</RadzenText>
+            </RadzenStack>
+
+            <RadzenStack Gap="1rem">
+                <!-- Transfer Ownership -->
+                <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="1rem">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Subtitle1">Transfer Ownership</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                                Transfer this organization to another member. You will become an admin.
+                            </RadzenText>
+                        </RadzenStack>
+                        <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Warning" Text="Transfer" Click="@OpenTransferDialog" />
+                    </RadzenStack>
+                </RadzenCard>
+
+                <!-- Delete Organization -->
+                <RadzenCard Style="border: 1px solid var(--rz-danger);">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="1rem">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Subtitle1" Style="color: var(--rz-danger);">Delete Organization</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                                Permanently delete this organization and all its data. This cannot be undone.
+                            </RadzenText>
+                        </RadzenStack>
+                        <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Danger" Text="Delete" Click="@OpenDeleteDialog" />
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenStack>
+        </RadzenCard>
+    }
 }
-
-<!-- Transfer Ownership Dialog -->
-<MudDialog @bind-Visible="_transferDialogVisible" Options="@(new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.SwapHoriz" Color="Color.Warning" />
-            <MudText Typo="Typo.h6">Transfer Ownership</MudText>
-        </MudStack>
-    </TitleContent>
-    <DialogContent>
-        @if (_isLoadingMembers)
-        {
-            <MudStack AlignItems="AlignItems.Center" Class="py-4">
-                <MudProgressCircular Indeterminate="true" />
-                <MudText>Loading members...</MudText>
-            </MudStack>
-        }
-        else if (!_eligibleMembers.Any())
-        {
-            <MudAlert Severity="Severity.Info">
-                There are no other members in this organization. Invite someone first before transferring ownership.
-            </MudAlert>
-        }
-        else
-        {
-            <MudText Class="mb-4">
-                Select a member to transfer ownership to. You will become an admin after the transfer.
-            </MudText>
-            <MudSelect T="int?" @bind-Value="_selectedNewOwnerId"
-                       Label="New Owner"
-                       Variant="Variant.Outlined"
-                       AnchorOrigin="Origin.BottomCenter">
-                @foreach (var member in _eligibleMembers)
-                {
-                    <MudSelectItem T="int?" Value="@member.UserId">
-                        @member.Email (@member.Role)
-                    </MudSelectItem>
-                }
-            </MudSelect>
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CloseTransferDialog">Cancel</MudButton>
-        <MudButton Color="Color.Warning"
-                   Variant="Variant.Filled"
-                   OnClick="@TransferOwnership"
-                   Disabled="@(!_selectedNewOwnerId.HasValue || _isTransferring)">
-            @if (_isTransferring)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Transfer Ownership
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-<!-- Delete Organization Dialog -->
-<MudDialog @bind-Visible="_deleteDialogVisible" Options="@(new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
-            <MudText Typo="Typo.h6">Delete Organization</MudText>
-        </MudStack>
-    </TitleContent>
-    <DialogContent>
-        <MudText Class="mb-4">
-            This action is <strong>permanent</strong> and cannot be undone. Type <code>@_organization?.Name</code> to confirm.
-        </MudText>
-        <MudTextField @bind-Value="_deleteConfirmation"
-                      Label="Organization Name"
-                      Variant="Variant.Outlined"
-                      Placeholder="@_organization?.Name" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CloseDeleteDialog">Cancel</MudButton>
-        <MudButton Color="Color.Error"
-                   Variant="Variant.Filled"
-                   OnClick="@DeleteOrganization"
-                   Disabled="@(_deleteConfirmation != _organization?.Name || _isDeleting)">
-            @if (_isDeleting)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Delete Organization
-        </MudButton>
-    </DialogActions>
-</MudDialog>
 
 @code {
     [Parameter]
@@ -300,24 +172,7 @@ else
     private OrganizationDto? _organization;
     private UpdateOrganizationRequest _updateRequest = new() { Name = "" };
     private bool _isLoading = true;
-    private List<BreadcrumbItem> _breadcrumbs = new();
-
-    // Settings form
-    private MudForm? _settingsForm;
-    private bool _settingsFormValid;
     private bool _isSaving;
-
-    // Delete dialog
-    private bool _deleteDialogVisible;
-    private bool _isDeleting;
-    private string _deleteConfirmation = "";
-
-    // Transfer dialog
-    private bool _transferDialogVisible;
-    private bool _isTransferring;
-    private bool _isLoadingMembers;
-    private int? _selectedNewOwnerId;
-    private List<OrganizationMemberDto> _eligibleMembers = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -337,18 +192,11 @@ else
                     Name = _organization.Name,
                     Description = _organization.Description
                 };
-
-                _breadcrumbs = new List<BreadcrumbItem>
-                {
-                    new("Organizations", "organizations"),
-                    new(_organization.Name, $"organizations/{OrganizationId}"),
-                    new("Settings", null, disabled: true)
-                };
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load organization: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load organization: {ex.Message}");
         }
         finally
         {
@@ -358,11 +206,6 @@ else
 
     private async Task SaveSettings()
     {
-        if (_settingsForm != null)
-            await _settingsForm.Validate();
-
-        if (!_settingsFormValid) return;
-
         _isSaving = true;
         try
         {
@@ -371,11 +214,11 @@ else
             if (success && org != null)
             {
                 _organization = org;
-                Snackbar.Add("Settings saved successfully", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Settings saved successfully");
             }
             else
             {
-                Snackbar.Add(error ?? "Failed to save settings", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", error ?? "Failed to save settings");
             }
         }
         finally
@@ -384,96 +227,31 @@ else
         }
     }
 
-    private void OpenDeleteDialog()
+    private async Task OpenDeleteDialog()
     {
-        _deleteConfirmation = "";
-        _deleteDialogVisible = true;
-    }
-
-    private void CloseDeleteDialog()
-    {
-        _deleteDialogVisible = false;
-    }
-
-    private async Task DeleteOrganization()
-    {
-        if (_deleteConfirmation != _organization?.Name) return;
-
-        _isDeleting = true;
-        try
-        {
-            var (success, error) = await OrganizationService.DeleteOrganizationAsync(OrganizationId);
-
-            if (success)
+        var result = await DialogService.OpenAsync<DeleteOrganizationDialog>("Delete Organization",
+            new Dictionary<string, object>
             {
-                Snackbar.Add("Organization deleted successfully", Severity.Success);
-                Navigation.NavigateTo("organizations");
-            }
-            else
-            {
-                Snackbar.Add(error ?? "Failed to delete organization", Severity.Error);
-            }
-        }
-        finally
+                { "OrganizationId", OrganizationId },
+                { "OrganizationName", _organization!.Name }
+            },
+            new Radzen.DialogOptions { Width = "450px" });
+
+        if (result == true)
         {
-            _isDeleting = false;
-            _deleteDialogVisible = false;
+            Navigation.NavigateTo("organizations");
         }
     }
 
     private async Task OpenTransferDialog()
     {
-        _selectedNewOwnerId = null;
-        _transferDialogVisible = true;
-        _isLoadingMembers = true;
+        var result = await DialogService.OpenAsync<TransferOwnershipDialog>("Transfer Ownership",
+            new Dictionary<string, object> { { "OrganizationId", OrganizationId } },
+            new Radzen.DialogOptions { Width = "450px" });
 
-        try
+        if (result == true)
         {
-            var members = await OrganizationService.GetMembersAsync(OrganizationId);
-            // Filter out the current owner - only show non-owners
-            _eligibleMembers = members.Where(m => m.Role != OrganizationRole.Owner).ToList();
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Failed to load members: {ex.Message}", Severity.Error);
-            _eligibleMembers = new();
-        }
-        finally
-        {
-            _isLoadingMembers = false;
+            await LoadDataAsync();
         }
     }
-
-    private void CloseTransferDialog()
-    {
-        _transferDialogVisible = false;
-    }
-
-    private async Task TransferOwnership()
-    {
-        if (!_selectedNewOwnerId.HasValue) return;
-
-        _isTransferring = true;
-        try
-        {
-            var (success, error) = await OrganizationService.TransferOwnershipAsync(OrganizationId, _selectedNewOwnerId.Value);
-
-            if (success)
-            {
-                Snackbar.Add("Ownership transferred successfully. You are now an admin.", Severity.Success);
-                _transferDialogVisible = false;
-                // Reload data to reflect the role change
-                await LoadDataAsync();
-            }
-            else
-            {
-                Snackbar.Add(error ?? "Failed to transfer ownership", Severity.Error);
-            }
-        }
-        finally
-        {
-            _isTransferring = false;
-        }
-    }
-
 }

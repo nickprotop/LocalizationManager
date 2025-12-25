@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.AspNetCore.Components.Authorization;
-using MudBlazor.Services;
+using Radzen;
 using Blazored.LocalStorage;
 using LrmCloud.Web;
 using LrmCloud.Web.Services;
@@ -10,8 +10,11 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// MudBlazor services
-builder.Services.AddMudServices();
+// Radzen services
+builder.Services.AddRadzenComponents();
+
+// Theme service (persistent theme selection)
+builder.Services.AddScoped<LrmThemeService>();
 
 // Local storage for token persistence
 builder.Services.AddBlazoredLocalStorage();

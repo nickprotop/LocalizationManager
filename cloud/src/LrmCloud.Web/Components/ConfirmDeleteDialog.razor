@@ -1,82 +1,74 @@
-<MudDialog @bind-Visible="_visible" Options="_dialogOptions">
-    <TitleContent>
-        <MudText Typo="Typo.h6">
-            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Class="mr-2" />
-            @_title
-        </MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudStack Spacing="3">
-            <MudText>@_message</MudText>
+@inject Radzen.DialogService DialogService
 
-            @if (_items.Any())
+<RadzenStack Gap="1rem">
+    <RadzenText>@_message</RadzenText>
+
+    @if (_items.Any())
+    {
+        <RadzenCard Style="max-height: 200px; overflow-y: auto; background: var(--rz-base-200);">
+            @foreach (var item in _items.Take(10))
             {
-                <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-surface); max-height: 200px; overflow-y: auto;">
-                    <MudList T="string" Dense="true">
-                        @foreach (var item in _items.Take(10))
-                        {
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.Remove">
-                                <MudText Typo="Typo.body2">@item</MudText>
-                            </MudListItem>
-                        }
-                        @if (_items.Count > 10)
-                        {
-                            <MudListItem T="string">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    ...and @(_items.Count - 10) more
-                                </MudText>
-                            </MudListItem>
-                        }
-                    </MudList>
-                </MudPaper>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" Style="padding: 0.25rem 0;">
+                    <RadzenIcon Icon="remove" Style="font-size: 1rem;" />
+                    <RadzenText TextStyle="TextStyle.Body2">@item</RadzenText>
+                </RadzenStack>
             }
+            @if (_items.Count > 10)
+            {
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    ...and @(_items.Count - 10) more
+                </RadzenText>
+            }
+        </RadzenCard>
+    }
 
-            <MudAlert Severity="Severity.Warning" Dense="true">
-                This action cannot be undone.
-            </MudAlert>
-        </MudStack>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="Close">Cancel</MudButton>
-        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Confirm">
-            Delete
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+    <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+        This action cannot be undone.
+    </RadzenAlert>
+
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+        <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Close" />
+        <RadzenButton ButtonStyle="ButtonStyle.Danger" Text="Delete" Click="@Confirm" />
+    </RadzenStack>
+</RadzenStack>
 
 @code {
     [Parameter]
     public EventCallback OnConfirmed { get; set; }
 
-    private bool _visible;
     private string _title = "Confirm Delete";
     private string _message = "Are you sure you want to delete this item?";
     private List<string> _items = new();
 
-    private readonly DialogOptions _dialogOptions = new()
+    [Parameter]
+    public string? Title
     {
-        MaxWidth = MaxWidth.Small,
-        FullWidth = true,
-        CloseOnEscapeKey = true
-    };
+        get => _title;
+        set => _title = value ?? "Confirm Delete";
+    }
 
-    public void Open(string? title = null, string? message = null, List<string>? items = null)
+    [Parameter]
+    public string? Message
     {
-        _title = title ?? "Confirm Delete";
-        _message = message ?? "Are you sure you want to delete this item?";
-        _items = items ?? new List<string>();
-        _visible = true;
-        StateHasChanged();
+        get => _message;
+        set => _message = value ?? "Are you sure you want to delete this item?";
+    }
+
+    [Parameter]
+    public List<string>? Items
+    {
+        get => _items;
+        set => _items = value ?? new List<string>();
     }
 
     private void Close()
     {
-        _visible = false;
+        DialogService.Close(false);
     }
 
     private async Task Confirm()
     {
         await OnConfirmed.InvokeAsync();
-        Close();
+        DialogService.Close(true);
     }
 }

@@ -1,108 +1,100 @@
 @using LrmCloud.Shared.DTOs.Translation
 
-<MudStack Spacing="4">
-    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Justify="Justify.Center">
+<RadzenStack Gap="1rem">
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" JustifyContent="JustifyContent.Center">
         @if (Result.Success)
         {
-            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
-            <MudText Typo="Typo.h6" Color="Color.Success">Translation Complete</MudText>
+            <RadzenIcon Icon="check_circle" Style="font-size: 2rem; color: var(--rz-success);" />
+            <RadzenText TextStyle="TextStyle.H6" Style="color: var(--rz-success);">Translation Complete</RadzenText>
         }
         else
         {
-            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Large" />
-            <MudText Typo="Typo.h6" Color="Color.Warning">Translation Completed with Issues</MudText>
+            <RadzenIcon Icon="warning" Style="font-size: 2rem; color: var(--rz-warning);" />
+            <RadzenText TextStyle="TextStyle.H6" Style="color: var(--rz-warning);">Translation Completed with Issues</RadzenText>
         }
-    </MudStack>
+    </RadzenStack>
 
-    <MudDivider />
+    <hr />
 
-    <MudGrid Spacing="2">
-        <MudItem xs="3">
-            <MudPaper Class="pa-3 text-center" Elevation="0" Style="background-color: var(--mud-palette-success-lighten);">
-                <MudText Typo="Typo.h5" Color="Color.Success">@Result.TranslatedCount</MudText>
-                <MudText Typo="Typo.caption">Translated</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="3">
-            <MudPaper Class="pa-3 text-center" Elevation="0" Style="background-color: rgba(76, 175, 80, 0.15);">
-                <MudStack Row="true" Justify="Justify.Center" AlignItems="AlignItems.Center" Spacing="1">
-                    <MudIcon Icon="@Icons.Material.Filled.Memory" Size="Size.Small" Color="Color.Success" />
-                    <MudText Typo="Typo.h5" Color="Color.Success">@TmCount</MudText>
-                </MudStack>
-                <MudText Typo="Typo.caption">From TM</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="3">
-            <MudPaper Class="pa-3 text-center" Elevation="0" Style="background-color: var(--mud-palette-warning-lighten);">
-                <MudText Typo="Typo.h5" Color="Color.Warning">@Result.SkippedCount</MudText>
-                <MudText Typo="Typo.caption">Skipped</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="3">
-            <MudPaper Class="pa-3 text-center" Elevation="0" Style="background-color: var(--mud-palette-error-lighten);">
-                <MudText Typo="Typo.h5" Color="Color.Error">@Result.FailedCount</MudText>
-                <MudText Typo="Typo.caption">Failed</MudText>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+    <RadzenRow Gap="0.5rem">
+        <RadzenColumn Size="3">
+            <RadzenCard Style="text-align: center; background: rgba(76, 175, 80, 0.15);">
+                <RadzenText TextStyle="TextStyle.H5" Style="color: var(--rz-success);">@Result.TranslatedCount</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption">Translated</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="3">
+            <RadzenCard Style="text-align: center; background: rgba(76, 175, 80, 0.1);">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.Center" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                    <RadzenIcon Icon="memory" Style="font-size: 1rem; color: var(--rz-success);" />
+                    <RadzenText TextStyle="TextStyle.H5" Style="color: var(--rz-success);">@TmCount</RadzenText>
+                </RadzenStack>
+                <RadzenText TextStyle="TextStyle.Caption">From TM</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="3">
+            <RadzenCard Style="text-align: center; background: rgba(255, 193, 7, 0.15);">
+                <RadzenText TextStyle="TextStyle.H5" Style="color: var(--rz-warning);">@Result.SkippedCount</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption">Skipped</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="3">
+            <RadzenCard Style="text-align: center; background: rgba(244, 67, 54, 0.15);">
+                <RadzenText TextStyle="TextStyle.H5" Style="color: var(--rz-danger);">@Result.FailedCount</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption">Failed</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
 
     @if (TmCount > 0)
     {
-        <MudAlert Severity="Severity.Success" Dense="true" Icon="@Icons.Material.Filled.Memory">
+        <RadzenAlert AlertStyle="AlertStyle.Success" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
             @TmCount translation(s) reused from Translation Memory (no API cost)
-        </MudAlert>
+        </RadzenAlert>
     }
 
-    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-2">
-        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-            <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Small" />
-            <MudText Typo="Typo.body2">@FormatElapsedTime(Result.ElapsedMs)</MudText>
-        </MudStack>
-        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-            <MudIcon Icon="@Icons.Material.Filled.TextFields" Size="Size.Small" />
-            <MudText Typo="Typo.body2">@Result.CharactersTranslated.ToString("N0") characters</MudText>
-        </MudStack>
-        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@Result.Provider</MudChip>
-    </MudStack>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mt-2">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" AlignItems="Radzen.AlignItems.Center">
+            <RadzenIcon Icon="timer" Style="font-size: 1rem;" />
+            <RadzenText TextStyle="TextStyle.Body2">@FormatElapsedTime(Result.ElapsedMs)</RadzenText>
+        </RadzenStack>
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" AlignItems="Radzen.AlignItems.Center">
+            <RadzenIcon Icon="text_fields" Style="font-size: 1rem;" />
+            <RadzenText TextStyle="TextStyle.Body2">@Result.CharactersTranslated.ToString("N0") characters</RadzenText>
+        </RadzenStack>
+        <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Text="@Result.Provider" />
+    </RadzenStack>
 
     @if (Result.Errors.Any())
     {
-        <MudAlert Severity="Severity.Error" Dense="true">
-            <MudText Typo="Typo.body2">@string.Join(", ", Result.Errors.Take(3))</MudText>
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+            <RadzenText TextStyle="TextStyle.Body2">@string.Join(", ", Result.Errors.Take(3))</RadzenText>
             @if (Result.Errors.Count > 3)
             {
-                <MudText Typo="Typo.caption">...and @(Result.Errors.Count - 3) more errors</MudText>
+                <RadzenText TextStyle="TextStyle.Caption">...and @(Result.Errors.Count - 3) more errors</RadzenText>
             }
-        </MudAlert>
+        </RadzenAlert>
     }
 
     @if (Result.Results.Any(r => !r.Success))
     {
-        <MudExpansionPanels>
-            <MudExpansionPanel Text="@($"Failed Translations ({Result.Results.Count(r => !r.Success)})")">
-                <MudSimpleTable Dense="true" Striped="true" Style="max-height: 200px; overflow-y: auto;">
-                    <thead>
-                        <tr>
-                            <th>Key</th>
-                            <th>Language</th>
-                            <th>Error</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var failed in Result.Results.Where(r => !r.Success).Take(10))
-                        {
-                            <tr>
-                                <td>@failed.Key</td>
-                                <td>@failed.TargetLanguage</td>
-                                <td><MudText Typo="Typo.caption" Color="Color.Error">@failed.Error</MudText></td>
-                            </tr>
-                        }
-                    </tbody>
-                </MudSimpleTable>
-            </MudExpansionPanel>
-        </MudExpansionPanels>
+        <details>
+            <summary style="cursor: pointer; font-weight: 500;">Failed Translations (@Result.Results.Count(r => !r.Success))</summary>
+            <RadzenDataGrid TItem="TranslationResultDto" Data="@Result.Results.Where(r => !r.Success).Take(10)"
+                            Density="Density.Compact" Style="max-height: 200px; margin-top: 0.5rem;">
+                <Columns>
+                    <RadzenDataGridColumn TItem="TranslationResultDto" Property="Key" Title="Key" Width="120px" />
+                    <RadzenDataGridColumn TItem="TranslationResultDto" Property="TargetLanguage" Title="Language" Width="80px" />
+                    <RadzenDataGridColumn TItem="TranslationResultDto" Title="Error">
+                        <Template Context="failed">
+                            <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-danger);">@failed.Error</RadzenText>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </details>
     }
-</MudStack>
+</RadzenStack>
 
 @code {
     [Parameter, EditorRequired]

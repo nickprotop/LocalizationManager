@@ -1,40 +1,39 @@
 @page "/verify-email"
 @layout AuthLayout
 @inject AuthService AuthService
+@inject NavigationManager Navigation
 
 <PageTitle>Verify Email - LRM Cloud</PageTitle>
 
-<MudPaper Class="pa-8" Elevation="3" Style="max-width: 400px; margin: auto;">
-    <MudStack Spacing="4" AlignItems="AlignItems.Center">
+<RadzenCard Style="max-width: 400px; margin: auto; padding: 2rem;">
+    <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
         @if (_isLoading)
         {
-            <MudProgressCircular Size="Size.Large" Indeterminate="true" />
-            <MudText Typo="Typo.h6">Verifying your email...</MudText>
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Large" />
+            <RadzenText TextStyle="TextStyle.H6">Verifying your email...</RadzenText>
         }
         else if (_isSuccess)
         {
-            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Color="Color.Success" />
-            <MudText Typo="Typo.h5">Email Verified!</MudText>
-            <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+            <RadzenIcon Icon="check_circle" Style="font-size: 4rem; color: var(--rz-success);" />
+            <RadzenText TextStyle="TextStyle.H5">Email Verified!</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary" TextAlign="TextAlign.Center">
                 Your email has been verified successfully. You can now log in to your account.
-            </MudText>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="login" FullWidth="true">
-                Go to Login
-            </MudButton>
+            </RadzenText>
+            <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Text="Go to Login"
+                          Style="width: 100%;" Click="@(() => Navigation.NavigateTo("login"))" />
         }
         else
         {
-            <MudIcon Icon="@Icons.Material.Filled.Error" Size="Size.Large" Color="Color.Error" />
-            <MudText Typo="Typo.h5">Verification Failed</MudText>
-            <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+            <RadzenIcon Icon="error" Style="font-size: 4rem; color: var(--rz-danger);" />
+            <RadzenText TextStyle="TextStyle.H5">Verification Failed</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary" TextAlign="TextAlign.Center">
                 @_errorMessage
-            </MudText>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="login" FullWidth="true">
-                Go to Login
-            </MudButton>
+            </RadzenText>
+            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary" Text="Go to Login"
+                          Style="width: 100%;" Click="@(() => Navigation.NavigateTo("login"))" />
         }
-    </MudStack>
-</MudPaper>
+    </RadzenStack>
+</RadzenCard>
 
 @code {
     [Parameter]

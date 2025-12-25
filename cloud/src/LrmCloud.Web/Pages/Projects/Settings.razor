@@ -12,690 +12,531 @@
 @inject TranslationService TranslationService
 @inject OrganizationService OrganizationService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
-@inject IDialogService DialogService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 
 <PageTitle>Settings - @(_project?.Name ?? "Project") - LRM Cloud</PageTitle>
 
 @if (_isLoading)
 {
-    <MudStack Spacing="4">
-        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" />
-        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" />
-    </MudStack>
+    <RadzenStack Gap="1rem">
+        <RadzenSkeleton Style="height: 60px;" />
+        <RadzenSkeleton Style="height: 400px;" />
+    </RadzenStack>
 }
 else if (_project == null)
 {
-    <MudAlert Severity="Severity.Error">
+    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">
         Project not found or you don't have access to it.
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="">Go to Dashboard</MudButton>
-    </MudAlert>
+        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Primary" Text="Go to Dashboard" Click="@(() => Navigation.NavigateTo(""))" />
+    </RadzenAlert>
 }
 else
 {
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                           OnClick="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))"
-                           Size="Size.Small" />
-            <MudText Typo="Typo.h4">Project Settings</MudText>
-            <MudText Typo="Typo.h6" Color="Color.Secondary">@_project.Name</MudText>
-        </MudStack>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                          Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" />
+            <RadzenText TextStyle="TextStyle.H4">Project Settings</RadzenText>
+            <RadzenText TextStyle="TextStyle.H6" class="rz-color-secondary">@_project.Name</RadzenText>
+        </RadzenStack>
 
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.Save"
-                   OnClick="@HandleSubmit"
-                   Disabled="_isSubmitting">
-            @if (_isSubmitting)
-            {
-                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                <MudText Class="ms-2">Saving...</MudText>
-            }
-            else
-            {
-                <MudText>Save Changes</MudText>
-            }
-        </MudButton>
-    </MudStack>
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Icon="save" Text="@(_isSubmitting ? "Saving..." : "Save Changes")"
+                      Click="@HandleSubmit" Disabled="_isSubmitting" IsBusy="_isSubmitting" />
+    </RadzenStack>
 
     @if (!string.IsNullOrEmpty(_errorMessage))
     {
-        <MudAlert Severity="Severity.Error" Class="mb-4" Variant="Variant.Filled">@_errorMessage</MudAlert>
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="true" class="rz-mb-4">@_errorMessage</RadzenAlert>
     }
 
-    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4" @bind-ActivePanelIndex="_activeTabIndex">
-        <MudTabPanel Text="General" Icon="@Icons.Material.Filled.Settings">
-            <EditForm Model="_model" OnValidSubmit="HandleSubmit">
-                <DataAnnotationsValidator />
-                <MudGrid>
-                    <MudItem xs="12" md="6">
-                        <MudStack Spacing="3">
-                            <MudTextField @bind-Value="_model.Name"
-                                          Label="Project Name"
-                                          Variant="Variant.Outlined"
-                                          For="@(() => _model.Name)"
-                                          Disabled="_isSubmitting"
-                                          Required="true" />
+    <RadzenTabs @bind-SelectedIndex="_activeTabIndex" RenderMode="TabRenderMode.Server">
+        <Tabs>
+            <RadzenTabsItem Text="General" Icon="settings">
+                <RadzenTemplateForm TItem="UpdateProjectRequest" Data="_model" Submit="HandleSubmit">
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="12" SizeMD="6">
+                            <RadzenStack Gap="1rem">
+                                <RadzenFormField Text="Project Name" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                    <ChildContent>
+                                        <RadzenTextBox @bind-Value="_model.Name" Name="Name" Disabled="_isSubmitting" Style="width: 100%;" />
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenRequiredValidator Component="Name" Text="Project name is required" />
+                                    </Helper>
+                                </RadzenFormField>
 
-                            <MudTextField @bind-Value="_model.Description"
-                                          Label="Description"
-                                          Variant="Variant.Outlined"
-                                          Lines="3"
-                                          For="@(() => _model.Description)"
-                                          Disabled="_isSubmitting" />
+                                <RadzenFormField Text="Description" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                    <ChildContent>
+                                        <RadzenTextArea @bind-Value="_model.Description" Rows="3" Disabled="_isSubmitting" Style="width: 100%;" />
+                                    </ChildContent>
+                                </RadzenFormField>
 
-                            <MudTextField Value="@GetFormatDisplayName(_model.Format)"
-                                          Label="Format"
-                                          Variant="Variant.Outlined"
-                                          Disabled="true"
-                                          ReadOnly="true"
-                                          HelperText="Format cannot be changed after project creation" />
+                                <RadzenFormField Text="Format" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                    <ChildContent>
+                                        <RadzenTextBox Value="@GetFormatDisplayName(_model.Format)" Disabled="true" ReadOnly="true" Style="width: 100%;" />
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Format cannot be changed after project creation</RadzenText>
+                                    </Helper>
+                                </RadzenFormField>
 
-                            <MudTextField Value="@_model.DefaultLanguage"
-                                          Label="Default Language"
-                                          Variant="Variant.Outlined"
-                                          Disabled="true"
-                                          ReadOnly="true"
-                                          HelperText="Default language cannot be changed after project creation" />
+                                <RadzenFormField Text="Default Language" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                    <ChildContent>
+                                        <RadzenTextBox Value="@_model.DefaultLanguage" Disabled="true" ReadOnly="true" Style="width: 100%;" />
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Default language cannot be changed after project creation</RadzenText>
+                                    </Helper>
+                                </RadzenFormField>
 
-                            <MudDivider Class="my-2" />
+                                <hr />
 
-                            <MudText Typo="Typo.subtitle2" Class="mb-2">Project Ownership</MudText>
-                            <MudSelect @bind-Value="_selectedOrganizationId"
-                                       Label="Organization"
-                                       Variant="Variant.Outlined"
-                                       Disabled="_isSubmitting || _loadingOrganizations"
-                                       HelperText="Assign this project to an organization or keep as personal">
-                                <MudSelectItem Value="@((int?)null)">Personal Project</MudSelectItem>
-                                @foreach (var org in _organizations.Where(o => o.UserRole is "owner" or "admin"))
-                                {
-                                    <MudSelectItem Value="@((int?)org.Id)">@org.Name</MudSelectItem>
-                                }
-                            </MudSelect>
-                        </MudStack>
-                    </MudItem>
-                    <MudItem xs="12" md="6">
-                        <MudPaper Class="pa-4" Elevation="0" Style="background: var(--mud-palette-background-gray);">
-                            <MudText Typo="Typo.subtitle2" Class="mb-2">Project Info</MudText>
-                            <MudStack Spacing="2">
-                                <div>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Created</MudText>
-                                    <MudText>@_project.CreatedAt.ToString("MMMM dd, yyyy")</MudText>
-                                </div>
-                                <div>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Last Updated</MudText>
-                                    <MudText>@_project.UpdatedAt.ToString("MMMM dd, yyyy HH:mm")</MudText>
-                                </div>
-                                <div>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Current Organization</MudText>
-                                    <MudText>@(_project.OrganizationName ?? "Personal")</MudText>
-                                </div>
-                            </MudStack>
-                        </MudPaper>
-                    </MudItem>
-                </MudGrid>
-            </EditForm>
-        </MudTabPanel>
+                                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-2">Project Ownership</RadzenText>
+                                <RadzenFormField Text="Organization" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                    <ChildContent>
+                                        <RadzenDropDown @bind-Value="_selectedOrganizationId" Data="@GetOrganizationOptions()"
+                                                        TextProperty="Name" ValueProperty="Id"
+                                                        Disabled="@(_isSubmitting || _loadingOrganizations)" Style="width: 100%;"
+                                                        Placeholder="Personal Project" AllowClear="true" />
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Assign this project to an organization or keep as personal</RadzenText>
+                                    </Helper>
+                                </RadzenFormField>
+                            </RadzenStack>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="6">
+                            <RadzenCard>
+                                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-2">Project Info</RadzenText>
+                                <RadzenStack Gap="0.5rem">
+                                    <div>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Created</RadzenText>
+                                        <RadzenText>@_project.CreatedAt.ToString("MMMM dd, yyyy")</RadzenText>
+                                    </div>
+                                    <div>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Last Updated</RadzenText>
+                                        <RadzenText>@_project.UpdatedAt.ToString("MMMM dd, yyyy HH:mm")</RadzenText>
+                                    </div>
+                                    <div>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Current Organization</RadzenText>
+                                        <RadzenText>@(_project.OrganizationName ?? "Personal")</RadzenText>
+                                    </div>
+                                </RadzenStack>
+                            </RadzenCard>
+                        </RadzenColumn>
+                    </RadzenRow>
+                </RadzenTemplateForm>
+            </RadzenTabsItem>
 
-        <MudTabPanel Text="Languages" Icon="@Icons.Material.Filled.Language" OnClick="LoadLanguages">
-            @if (_loadingLanguages)
-            {
-                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-            }
-            else
-            {
-                <MudStack Spacing="3">
-                    <div class="d-flex justify-space-between align-center">
-                        <MudText Typo="Typo.subtitle1">Project Languages</MudText>
-                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
-                                   StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddLanguageDialog">
-                            Add Language
-                        </MudButton>
-                    </div>
+            <RadzenTabsItem Text="Languages" Icon="language">
+                @if (_loadingLanguages)
+                {
+                    <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+                }
+                else
+                {
+                    <RadzenStack Gap="1rem">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                            <RadzenText TextStyle="TextStyle.Subtitle1">Project Languages</RadzenText>
+                            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                                          Icon="add" Text="Add Language" Click="OpenAddLanguageDialog" />
+                        </RadzenStack>
 
-                    @if (_languages.Count == 0)
-                    {
-                        <MudAlert Severity="Severity.Info">
-                            No languages in this project yet. Add resource keys first, then add languages.
-                        </MudAlert>
-                    }
-                    else
-                    {
-                        <MudTable Items="@_languages" Dense="true" Hover="true" Elevation="0">
-                            <HeaderContent>
-                                <MudTh>Language</MudTh>
-                                <MudTh>Completion</MudTh>
-                                <MudTh>Last Updated</MudTh>
-                                <MudTh Style="width: 80px">Actions</MudTh>
-                            </HeaderContent>
-                            <RowTemplate>
-                                <MudTd DataLabel="Language">
-                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                        <MudText>@context.LanguageCode</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">(@context.DisplayName)</MudText>
-                                        @if (context.IsDefault)
-                                        {
-                                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">Default</MudChip>
-                                        }
-                                    </MudStack>
-                                </MudTd>
-                                <MudTd DataLabel="Completion">
-                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                        <MudProgressLinear Value="@context.CompletionPercentage" Color="@UiHelpers.GetCompletionColor(context.CompletionPercentage)"
-                                                           Style="width: 100px;" Size="Size.Small" Rounded="true" />
-                                        <MudText Typo="Typo.caption">@context.CompletionPercentage%</MudText>
-                                    </MudStack>
-                                </MudTd>
-                                <MudTd DataLabel="Last Updated">
-                                    @if (context.LastUpdated.HasValue)
-                                    {
-                                        @context.LastUpdated.Value.ToString("g")
-                                    }
-                                    else
-                                    {
-                                        <MudText Color="Color.Secondary">Never</MudText>
-                                    }
-                                </MudTd>
-                                <MudTd DataLabel="Actions">
-                                    @if (!context.IsDefault)
-                                    {
-                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
-                                                       OnClick="@(() => ConfirmRemoveLanguage(context))" />
-                                    }
-                                </MudTd>
-                            </RowTemplate>
-                        </MudTable>
-                    }
-                </MudStack>
-            }
-        </MudTabPanel>
-
-        <MudTabPanel Text="GitHub" Icon="@Icons.Custom.Brands.GitHub">
-            <MudGrid>
-                <MudItem xs="12" md="6">
-                    <MudStack Spacing="3">
-                        <MudTextField @bind-Value="_model.GitHubRepo"
-                                      Label="GitHub Repository"
-                                      Variant="Variant.Outlined"
-                                      For="@(() => _model.GitHubRepo)"
-                                      Disabled="_isSubmitting"
-                                      HelperText="e.g., owner/repo" />
-
-                        <MudTextField @bind-Value="_model.GitHubDefaultBranch"
-                                      Label="Default Branch"
-                                      Variant="Variant.Outlined"
-                                      For="@(() => _model.GitHubDefaultBranch)"
-                                      Disabled="_isSubmitting"
-                                      HelperText="e.g., main" />
-                    </MudStack>
-                </MudItem>
-                <MudItem xs="12" md="6">
-                    <MudAlert Severity="Severity.Info">
-                        Link a GitHub repository to enable automatic sync with your source code.
-                    </MudAlert>
-                </MudItem>
-            </MudGrid>
-        </MudTabPanel>
-
-        <MudTabPanel Text="Translation" Icon="@Icons.Material.Filled.Translate" OnClick="LoadTranslationProviders">
-            @if (_loadingProviders)
-            {
-                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-            }
-            else
-            {
-                <MudStack Spacing="3">
-                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
-                        <strong>Key Hierarchy:</strong> Project keys override Organization and User-level keys.
-                        @if (_project?.OrganizationId != null)
+                        @if (_languages.Count == 0)
                         {
-                            <span>Keys configured here will only be used for this project.</span>
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">
+                                No languages in this project yet. Add resource keys first, then add languages.
+                            </RadzenAlert>
                         }
-                    </MudAlert>
+                        else
+                        {
+                            <RadzenDataGrid TItem="ProjectLanguageDto" Data="@_languages" Density="Density.Compact" AllowSorting="false">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="ProjectLanguageDto" Title="Language">
+                                        <Template Context="lang">
+                                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                                <RadzenText>@lang.LanguageCode</RadzenText>
+                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">(@lang.DisplayName)</RadzenText>
+                                                @if (lang.IsDefault)
+                                                {
+                                                    <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="Default" />
+                                                }
+                                            </RadzenStack>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="ProjectLanguageDto" Title="Completion" Width="180px">
+                                        <Template Context="lang">
+                                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                                <RadzenProgressBar Value="@lang.CompletionPercentage" Max="100"
+                                                                   ProgressBarStyle="@UiHelpers.GetCompletionProgressStyle(lang.CompletionPercentage)"
+                                                                   Style="width: 100px; height: 6px;" ShowValue="false" />
+                                                <RadzenText TextStyle="TextStyle.Caption">@lang.CompletionPercentage%</RadzenText>
+                                            </RadzenStack>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="ProjectLanguageDto" Title="Last Updated" Width="160px">
+                                        <Template Context="lang">
+                                            @if (lang.LastUpdated.HasValue)
+                                            {
+                                                @lang.LastUpdated.Value.ToString("g")
+                                            }
+                                            else
+                                            {
+                                                <RadzenText class="rz-color-secondary">Never</RadzenText>
+                                            }
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="ProjectLanguageDto" Title="Actions" Width="80px" TextAlign="TextAlign.Center">
+                                        <Template Context="lang">
+                                            @if (!lang.IsDefault)
+                                            {
+                                                <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Radzen.Variant.Text"
+                                                              Size="ButtonSize.Small" Click="@(() => ConfirmRemoveLanguage(lang))" />
+                                            }
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        }
+                    </RadzenStack>
+                }
+            </RadzenTabsItem>
 
-                    @if (!_translationProviders.Any())
-                    {
-                        <MudAlert Severity="Severity.Warning">
-                            No translation providers available. Configure your API keys in Settings.
-                        </MudAlert>
-                    }
-                    else
-                    {
-                        <MudGrid>
-                            @foreach (var provider in _translationProviders)
+            <RadzenTabsItem Text="GitHub" Icon="code">
+                <RadzenRow Gap="1rem">
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenStack Gap="1rem">
+                            <RadzenFormField Text="GitHub Repository" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                <ChildContent>
+                                    <RadzenTextBox @bind-Value="_model.GitHubRepo" Disabled="_isSubmitting" Style="width: 100%;" />
+                                </ChildContent>
+                                <Helper>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">e.g., owner/repo</RadzenText>
+                                </Helper>
+                            </RadzenFormField>
+
+                            <RadzenFormField Text="Default Branch" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                <ChildContent>
+                                    <RadzenTextBox @bind-Value="_model.GitHubDefaultBranch" Disabled="_isSubmitting" Style="width: 100%;" />
+                                </ChildContent>
+                                <Helper>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">e.g., main</RadzenText>
+                                </Helper>
+                            </RadzenFormField>
+                        </RadzenStack>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">
+                            Link a GitHub repository to enable automatic sync with your source code.
+                        </RadzenAlert>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenTabsItem>
+
+            <RadzenTabsItem Text="Translation" Icon="translate">
+                @if (_loadingProviders)
+                {
+                    <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+                }
+                else
+                {
+                    <RadzenStack Gap="1rem">
+                        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                            <strong>Key Hierarchy:</strong> Project keys override Organization and User-level keys.
+                            @if (_project?.OrganizationId != null)
                             {
-                                <MudItem xs="12" md="6">
-                                    <MudPaper Elevation="1" Class="pa-3">
-                                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                                <MudIcon Icon="@GetProviderIcon(provider.Name)" />
-                                                <MudStack Spacing="0">
-                                                    <MudText Typo="Typo.subtitle2">@provider.DisplayName</MudText>
+                                <span> Keys configured here will only be used for this project.</span>
+                            }
+                        </RadzenAlert>
+
+                        @if (!_translationProviders.Any())
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">
+                                No translation providers available. Configure your API keys in Settings.
+                            </RadzenAlert>
+                        }
+                        else
+                        {
+                            <RadzenRow Gap="1rem">
+                                @foreach (var provider in _translationProviders)
+                                {
+                                    <RadzenColumn Size="12" SizeMD="6">
+                                        <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                                    <RadzenIcon Icon="@GetProviderIcon(provider.Name)" />
+                                                    <RadzenStack Gap="0">
+                                                        <RadzenText TextStyle="TextStyle.Subtitle2">@provider.DisplayName</RadzenText>
+                                                        @if (provider.IsConfigured)
+                                                        {
+                                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                                Using: @GetKeySourceLabel(provider.ApiKeySource)
+                                                            </RadzenText>
+                                                        }
+                                                    </RadzenStack>
+                                                </RadzenStack>
+                                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
                                                     @if (provider.IsConfigured)
                                                     {
-                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                            Using: @GetKeySourceLabel(provider.ApiKeySource)
-                                                        </MudText>
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Configured" />
                                                     }
-                                                </MudStack>
-                                            </MudStack>
-                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                                @if (provider.IsConfigured)
-                                                {
-                                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Configured</MudChip>
-                                                }
-                                                @if (provider.ApiKeySource == "project")
-                                                {
-                                                    <MudButton Size="Size.Small" Color="Color.Primary"
-                                                               OnClick="@(() => OpenSetProviderKeyDialog(provider))">
-                                                        Update
-                                                    </MudButton>
-                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
-                                                                   OnClick="@(() => ConfirmRemoveProviderKey(provider))" />
-                                                }
-                                                else
-                                                {
-                                                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined"
-                                                               OnClick="@(() => OpenSetProviderKeyDialog(provider))">
-                                                        Override
-                                                    </MudButton>
-                                                }
-                                            </MudStack>
-                                        </MudStack>
-                                    </MudPaper>
-                                </MudItem>
-                            }
-                        </MudGrid>
-                    }
-                </MudStack>
-            }
-        </MudTabPanel>
-
-        <MudTabPanel Text="Workflow" Icon="@Icons.Material.Filled.RateReview" OnClick="LoadWorkflowSettings">
-            @if (_loadingWorkflow)
-            {
-                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-            }
-            else if (_workflowSettings != null)
-            {
-                <MudStack Spacing="4">
-                    <MudAlert Severity="Severity.Info" Dense="true">
-                        <strong>Review Workflow:</strong> Enable to require translations to be reviewed and approved before export.
-                        This is useful for teams that need quality assurance.
-                    </MudAlert>
-
-                    @* Enable/Disable Workflow *@
-                    <MudPaper Elevation="1" Class="pa-4">
-                        <MudStack Spacing="2">
-                            <MudText Typo="Typo.subtitle1">Workflow Settings</MudText>
-                            <MudSwitch @bind-Value="_workflowSettings.ReviewWorkflowEnabled"
-                                       Color="Color.Primary"
-                                       Label="Enable Review Workflow"
-                                       LabelPosition="LabelPosition.Start" />
-
-                            @if (_workflowSettings.ReviewWorkflowEnabled)
-                            {
-                                <MudDivider Class="my-2" />
-                                <MudSwitch @bind-Value="_workflowSettings.RequireReviewBeforeExport"
-                                           Color="Color.Primary"
-                                           Label="Require Review Before Export"
-                                           LabelPosition="LabelPosition.Start"
-                                           Disabled="!_workflowSettings.ReviewWorkflowEnabled" />
-                                <MudSwitch @bind-Value="_workflowSettings.RequireApprovalBeforeExport"
-                                           Color="Color.Primary"
-                                           Label="Require Approval Before Export"
-                                           LabelPosition="LabelPosition.Start"
-                                           Disabled="!_workflowSettings.ReviewWorkflowEnabled" />
-                                @if (_project?.OrganizationId != null)
-                                {
-                                    <MudSwitch @bind-Value="_workflowSettings.InheritOrganizationReviewers"
-                                               Color="Color.Primary"
-                                               Label="Inherit Organization Reviewers"
-                                               LabelPosition="LabelPosition.Start"
-                                               Disabled="!_workflowSettings.ReviewWorkflowEnabled" />
-                                }
-                            }
-
-                            <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
-                                <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                           OnClick="SaveWorkflowSettings" Disabled="_savingWorkflow">
-                                    @if (_savingWorkflow)
-                                    {
-                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                                    }
-                                    Save Workflow Settings
-                                </MudButton>
-                            </MudStack>
-                        </MudStack>
-                    </MudPaper>
-
-                    @* Status Statistics *@
-                    @if (_workflowSettings.ReviewWorkflowEnabled && _workflowSettings.Stats != null)
-                    {
-                        <MudPaper Elevation="1" Class="pa-4">
-                            <MudText Typo="Typo.subtitle1" Class="mb-3">Translation Status Overview</MudText>
-                            <MudGrid>
-                                <MudItem xs="6" sm="3">
-                                    <MudStack AlignItems="AlignItems.Center">
-                                        <MudText Typo="Typo.h4" Color="Color.Default">@_workflowSettings.Stats.PendingCount</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Pending</MudText>
-                                    </MudStack>
-                                </MudItem>
-                                <MudItem xs="6" sm="3">
-                                    <MudStack AlignItems="AlignItems.Center">
-                                        <MudText Typo="Typo.h4" Color="Color.Info">@_workflowSettings.Stats.TranslatedCount</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Translated</MudText>
-                                    </MudStack>
-                                </MudItem>
-                                <MudItem xs="6" sm="3">
-                                    <MudStack AlignItems="AlignItems.Center">
-                                        <MudText Typo="Typo.h4" Color="Color.Warning">@_workflowSettings.Stats.ReviewedCount</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Reviewed</MudText>
-                                    </MudStack>
-                                </MudItem>
-                                <MudItem xs="6" sm="3">
-                                    <MudStack AlignItems="AlignItems.Center">
-                                        <MudText Typo="Typo.h4" Color="Color.Success">@_workflowSettings.Stats.ApprovedCount</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Approved</MudText>
-                                    </MudStack>
-                                </MudItem>
-                            </MudGrid>
-                        </MudPaper>
-                    }
-
-                    @* Reviewers Management *@
-                    @if (_workflowSettings.ReviewWorkflowEnabled)
-                    {
-                        <MudPaper Elevation="1" Class="pa-4">
-                            <MudStack Spacing="3">
-                                <div class="d-flex justify-space-between align-center">
-                                    <MudText Typo="Typo.subtitle1">Project Reviewers</MudText>
-                                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
-                                               StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="OpenAddReviewerDialog">
-                                        Add Reviewer
-                                    </MudButton>
-                                </div>
-
-                                @if (_workflowSettings.Reviewers?.Any() == true || _workflowSettings.InheritedReviewers?.Any() == true)
-                                {
-                                    <MudTable Items="@GetAllReviewers()" Dense="true" Hover="true" Elevation="0">
-                                        <HeaderContent>
-                                            <MudTh>User</MudTh>
-                                            <MudTh>Role</MudTh>
-                                            <MudTh>Languages</MudTh>
-                                            <MudTh>Source</MudTh>
-                                            <MudTh Style="width: 80px">Actions</MudTh>
-                                        </HeaderContent>
-                                        <RowTemplate>
-                                            <MudTd DataLabel="User">
-                                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                                    @if (!string.IsNullOrEmpty(context.AvatarUrl))
+                                                    @if (provider.ApiKeySource == "project")
                                                     {
-                                                        <MudAvatar Size="Size.Small">
-                                                            <MudImage Src="@context.AvatarUrl" />
-                                                        </MudAvatar>
+                                                        <RadzenButton Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Variant="Radzen.Variant.Text"
+                                                                      Text="Update" Click="@(() => OpenSetProviderKeyDialog(provider))" />
+                                                        <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Radzen.Variant.Text"
+                                                                      Size="ButtonSize.Small" Click="@(() => ConfirmRemoveProviderKey(provider))" />
                                                     }
                                                     else
                                                     {
-                                                        <MudAvatar Size="Size.Small" Color="Color.Primary">
-                                                            @(context.Username?.FirstOrDefault().ToString().ToUpper() ?? "?")
-                                                        </MudAvatar>
+                                                        <RadzenButton Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Variant="Radzen.Variant.Outlined"
+                                                                      Text="Override" Click="@(() => OpenSetProviderKeyDialog(provider))" />
                                                     }
-                                                    <MudStack Spacing="0">
-                                                        <MudText Typo="Typo.body2">@(context.DisplayName ?? context.Username)</MudText>
-                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@@@context.Username</MudText>
-                                                    </MudStack>
-                                                </MudStack>
-                                            </MudTd>
-                                            <MudTd DataLabel="Role">
-                                                <MudChip T="string" Size="Size.Small"
-                                                         Color="@(context.Role == "approver" ? Color.Success : Color.Info)">
-                                                    @(context.Role == "approver" ? "Approver" : "Reviewer")
-                                                </MudChip>
-                                            </MudTd>
-                                            <MudTd DataLabel="Languages">
-                                                @if (context.LanguageCodes?.Any() == true)
-                                                {
-                                                    <MudStack Row="true" Spacing="1">
-                                                        @foreach (var lang in context.LanguageCodes.Take(3))
-                                                        {
-                                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@lang</MudChip>
-                                                        }
-                                                        @if (context.LanguageCodes.Length > 3)
-                                                        {
-                                                            <MudText Typo="Typo.caption">+@(context.LanguageCodes.Length - 3) more</MudText>
-                                                        }
-                                                    </MudStack>
-                                                }
-                                                else
-                                                {
-                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">All languages</MudText>
-                                                }
-                                            </MudTd>
-                                            <MudTd DataLabel="Source">
-                                                @if (context.IsInherited)
-                                                {
-                                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Secondary">
-                                                        Organization
-                                                    </MudChip>
-                                                }
-                                                else
-                                                {
-                                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
-                                                        Project
-                                                    </MudChip>
-                                                }
-                                            </MudTd>
-                                            <MudTd DataLabel="Actions">
-                                                @if (!context.IsInherited)
-                                                {
-                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
-                                                                   OnClick="@(() => ConfirmRemoveReviewer(context))" />
-                                                }
-                                            </MudTd>
-                                        </RowTemplate>
-                                    </MudTable>
+                                                </RadzenStack>
+                                            </RadzenStack>
+                                        </RadzenCard>
+                                    </RadzenColumn>
                                 }
-                                else
+                            </RadzenRow>
+                        }
+                    </RadzenStack>
+                }
+            </RadzenTabsItem>
+
+            <RadzenTabsItem Text="Workflow" Icon="rate_review">
+                @if (_loadingWorkflow)
+                {
+                    <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+                }
+                else if (_workflowSettings == null)
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">
+                        Could not load workflow settings. Please try refreshing the page.
+                    </RadzenAlert>
+                }
+                else
+                {
+                    <RadzenStack Gap="1rem">
+                        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                            <strong>Review Workflow:</strong> Enable to require translations to be reviewed and approved before export.
+                            This is useful for teams that need quality assurance.
+                        </RadzenAlert>
+
+                        @* Enable/Disable Workflow *@
+                        <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                            <RadzenStack Gap="0.5rem">
+                                <RadzenText TextStyle="TextStyle.Subtitle1">Workflow Settings</RadzenText>
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                                    <RadzenText>Enable Review Workflow</RadzenText>
+                                    <RadzenSwitch @bind-Value="_workflowSettings.ReviewWorkflowEnabled" />
+                                </RadzenStack>
+
+                                @if (_workflowSettings.ReviewWorkflowEnabled)
                                 {
-                                    <MudAlert Severity="Severity.Info" Dense="true">
-                                        No reviewers assigned. Project owners and organization admins can always review and approve.
-                                    </MudAlert>
+                                    <hr />
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                                        <RadzenText>Require Review Before Export</RadzenText>
+                                        <RadzenSwitch @bind-Value="_workflowSettings.RequireReviewBeforeExport" Disabled="@(!_workflowSettings.ReviewWorkflowEnabled)" />
+                                    </RadzenStack>
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                                        <RadzenText>Require Approval Before Export</RadzenText>
+                                        <RadzenSwitch @bind-Value="_workflowSettings.RequireApprovalBeforeExport" Disabled="@(!_workflowSettings.ReviewWorkflowEnabled)" />
+                                    </RadzenStack>
+                                    @if (_project?.OrganizationId != null)
+                                    {
+                                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                                            <RadzenText>Inherit Organization Reviewers</RadzenText>
+                                            <RadzenSwitch @bind-Value="_workflowSettings.InheritOrganizationReviewers" Disabled="@(!_workflowSettings.ReviewWorkflowEnabled)" />
+                                        </RadzenStack>
+                                    }
                                 }
-                            </MudStack>
-                        </MudPaper>
-                    }
-                </MudStack>
-            }
-        </MudTabPanel>
 
-        <MudTabPanel Text="Danger Zone" Icon="@Icons.Material.Filled.Warning" BadgeColor="Color.Error">
-            <MudPaper Class="pa-4" Elevation="0" Style="border: 2px solid var(--mud-palette-error);">
-                <MudStack Spacing="3">
-                    <MudText Typo="Typo.h6" Color="Color.Error">Danger Zone</MudText>
-                    <MudAlert Severity="Severity.Warning">
-                        <MudText Typo="Typo.body2">
-                            Deleting this project will permanently remove all localization keys and translations.
-                            This action cannot be undone.
-                        </MudText>
-                    </MudAlert>
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" class="rz-mt-2">
+                                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Save Workflow Settings"
+                                                  Click="SaveWorkflowSettings" Disabled="_savingWorkflow" IsBusy="_savingWorkflow" />
+                                </RadzenStack>
+                            </RadzenStack>
+                        </RadzenCard>
 
-                    @if (!_showDeleteConfirm)
-                    {
-                        <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Error"
-                                   StartIcon="@Icons.Material.Filled.Delete"
-                                   OnClick="@(() => _showDeleteConfirm = true)"
-                                   Disabled="_isSubmitting">
-                            Delete Project
-                        </MudButton>
-                    }
-                    else
-                    {
-                        <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-error-lighten);">
-                            <MudStack Spacing="2">
-                                <MudText Typo="Typo.body2">
-                                    Type <strong>@_project.Name</strong> to confirm deletion:
-                                </MudText>
-                                <MudTextField @bind-Value="_deleteConfirmText"
-                                              Variant="Variant.Outlined"
-                                              Placeholder="@_project.Name"
-                                              Disabled="_isDeleting" />
-                                <MudStack Row="true" Spacing="2">
-                                    <MudButton Variant="Variant.Text"
-                                               OnClick="@(() => { _showDeleteConfirm = false; _deleteConfirmText = string.Empty; })"
-                                               Disabled="_isDeleting">
-                                        Cancel
-                                    </MudButton>
-                                    <MudButton Variant="Variant.Filled"
-                                               Color="Color.Error"
-                                               OnClick="HandleDelete"
-                                               Disabled="@(_deleteConfirmText != _project.Name || _isDeleting)">
-                                        @if (_isDeleting)
-                                        {
-                                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                                            <MudText Class="ms-2">Deleting...</MudText>
-                                        }
-                                        else
-                                        {
-                                            <MudText>Delete Forever</MudText>
-                                        }
-                                    </MudButton>
-                                </MudStack>
-                            </MudStack>
-                        </MudPaper>
-                    }
-                </MudStack>
-            </MudPaper>
-        </MudTabPanel>
-    </MudTabs>
+                        @* Status Statistics *@
+                        @if (_workflowSettings.ReviewWorkflowEnabled && _workflowSettings.Stats != null)
+                        {
+                            <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-mb-3">Translation Status Overview</RadzenText>
+                                <RadzenRow>
+                                    <RadzenColumn Size="6" SizeSM="3">
+                                        <RadzenStack AlignItems="Radzen.AlignItems.Center">
+                                            <RadzenText TextStyle="TextStyle.H4">@_workflowSettings.Stats.PendingCount</RadzenText>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Pending</RadzenText>
+                                        </RadzenStack>
+                                    </RadzenColumn>
+                                    <RadzenColumn Size="6" SizeSM="3">
+                                        <RadzenStack AlignItems="Radzen.AlignItems.Center">
+                                            <RadzenText TextStyle="TextStyle.H4" Style="color: var(--rz-info);">@_workflowSettings.Stats.TranslatedCount</RadzenText>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Translated</RadzenText>
+                                        </RadzenStack>
+                                    </RadzenColumn>
+                                    <RadzenColumn Size="6" SizeSM="3">
+                                        <RadzenStack AlignItems="Radzen.AlignItems.Center">
+                                            <RadzenText TextStyle="TextStyle.H4" Style="color: var(--rz-warning);">@_workflowSettings.Stats.ReviewedCount</RadzenText>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Reviewed</RadzenText>
+                                        </RadzenStack>
+                                    </RadzenColumn>
+                                    <RadzenColumn Size="6" SizeSM="3">
+                                        <RadzenStack AlignItems="Radzen.AlignItems.Center">
+                                            <RadzenText TextStyle="TextStyle.H4" Style="color: var(--rz-success);">@_workflowSettings.Stats.ApprovedCount</RadzenText>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Approved</RadzenText>
+                                        </RadzenStack>
+                                    </RadzenColumn>
+                                </RadzenRow>
+                            </RadzenCard>
+                        }
+
+                        @* Reviewers Management *@
+                        @if (_workflowSettings.ReviewWorkflowEnabled)
+                        {
+                            <RadzenCard Style="border: 1px solid var(--rz-base-400);">
+                                <RadzenStack Gap="1rem">
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1">Project Reviewers</RadzenText>
+                                        <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                                                      Icon="person_add" Text="Add Reviewer" Click="OpenAddReviewerDialog" />
+                                    </RadzenStack>
+
+                                    @if (_workflowSettings.Reviewers?.Any() == true || _workflowSettings.InheritedReviewers?.Any() == true)
+                                    {
+                                        <RadzenDataGrid TItem="ReviewerDto" Data="@GetAllReviewers()" Density="Density.Compact" AllowSorting="false">
+                                            <Columns>
+                                                <RadzenDataGridColumn TItem="ReviewerDto" Title="User">
+                                                    <Template Context="reviewer">
+                                                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                                            @if (!string.IsNullOrEmpty(reviewer.AvatarUrl))
+                                                            {
+                                                                <RadzenImage Path="@reviewer.AvatarUrl" Style="width: 24px; height: 24px; border-radius: 50%;" />
+                                                            }
+                                                            else
+                                                            {
+                                                                <div style="width: 24px; height: 24px; border-radius: 50%; background: var(--rz-primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 12px;">
+                                                                    @(reviewer.Username?.FirstOrDefault().ToString().ToUpper() ?? "?")
+                                                                </div>
+                                                            }
+                                                            <RadzenStack Gap="0">
+                                                                <RadzenText TextStyle="TextStyle.Body2">@(reviewer.DisplayName ?? reviewer.Username)</RadzenText>
+                                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@@@reviewer.Username</RadzenText>
+                                                            </RadzenStack>
+                                                        </RadzenStack>
+                                                    </Template>
+                                                </RadzenDataGridColumn>
+                                                <RadzenDataGridColumn TItem="ReviewerDto" Title="Role" Width="120px">
+                                                    <Template Context="reviewer">
+                                                        <RadzenBadge BadgeStyle="@(reviewer.Role == "approver" ? BadgeStyle.Success : BadgeStyle.Info)"
+                                                                     Text="@(reviewer.Role == "approver" ? "Approver" : "Reviewer")" />
+                                                    </Template>
+                                                </RadzenDataGridColumn>
+                                                <RadzenDataGridColumn TItem="ReviewerDto" Title="Languages">
+                                                    <Template Context="reviewer">
+                                                        @if (reviewer.LanguageCodes?.Any() == true)
+                                                        {
+                                                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem" Style="flex-wrap: wrap;">
+                                                                @foreach (var lang in reviewer.LanguageCodes.Take(3))
+                                                                {
+                                                                    <RadzenBadge Variant="Radzen.Variant.Outlined" Text="@lang" />
+                                                                }
+                                                                @if (reviewer.LanguageCodes.Length > 3)
+                                                                {
+                                                                    <RadzenText TextStyle="TextStyle.Caption">+@(reviewer.LanguageCodes.Length - 3) more</RadzenText>
+                                                                }
+                                                            </RadzenStack>
+                                                        }
+                                                        else
+                                                        {
+                                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">All languages</RadzenText>
+                                                        }
+                                                    </Template>
+                                                </RadzenDataGridColumn>
+                                                <RadzenDataGridColumn TItem="ReviewerDto" Title="Source" Width="120px">
+                                                    <Template Context="reviewer">
+                                                        @if (reviewer.IsInherited)
+                                                        {
+                                                            <RadzenBadge Variant="Radzen.Variant.Outlined" BadgeStyle="BadgeStyle.Secondary" Text="Organization" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <RadzenBadge Variant="Radzen.Variant.Outlined" Text="Project" />
+                                                        }
+                                                    </Template>
+                                                </RadzenDataGridColumn>
+                                                <RadzenDataGridColumn TItem="ReviewerDto" Title="Actions" Width="80px" TextAlign="TextAlign.Center">
+                                                    <Template Context="reviewer">
+                                                        @if (!reviewer.IsInherited)
+                                                        {
+                                                            <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Radzen.Variant.Text"
+                                                                          Size="ButtonSize.Small" Click="@(() => ConfirmRemoveReviewer(reviewer))" />
+                                                        }
+                                                    </Template>
+                                                </RadzenDataGridColumn>
+                                            </Columns>
+                                        </RadzenDataGrid>
+                                    }
+                                    else
+                                    {
+                                        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                                            No reviewers assigned. Project owners and organization admins can always review and approve.
+                                        </RadzenAlert>
+                                    }
+                                </RadzenStack>
+                            </RadzenCard>
+                        }
+                    </RadzenStack>
+                }
+            </RadzenTabsItem>
+
+            <RadzenTabsItem Text="Danger Zone" Icon="warning">
+                <RadzenCard Variant="Radzen.Variant.Text" Style="border: 2px solid var(--rz-danger);">
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.H6" Style="color: var(--rz-danger);">Danger Zone</RadzenText>
+                        <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">
+                            <RadzenText TextStyle="TextStyle.Body2">
+                                Deleting this project will permanently remove all localization keys and translations.
+                                This action cannot be undone.
+                            </RadzenText>
+                        </RadzenAlert>
+
+                        @if (!_showDeleteConfirm)
+                        {
+                            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Danger"
+                                          Icon="delete" Text="Delete Project"
+                                          Click="@(() => _showDeleteConfirm = true)" Disabled="_isSubmitting" />
+                        }
+                        else
+                        {
+                            <RadzenCard Variant="Radzen.Variant.Text" Style="background-color: var(--rz-danger-lighter);">
+                                <RadzenStack Gap="0.5rem">
+                                    <RadzenText TextStyle="TextStyle.Body2">
+                                        Type <strong>@_project.Name</strong> to confirm deletion:
+                                    </RadzenText>
+                                    <RadzenTextBox @bind-Value="_deleteConfirmText" Placeholder="@_project.Name"
+                                                   Disabled="_isDeleting" Style="width: 100%;" />
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+                                        <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel"
+                                                      Click="@(() => { _showDeleteConfirm = false; _deleteConfirmText = string.Empty; })"
+                                                      Disabled="_isDeleting" />
+                                        <RadzenButton ButtonStyle="ButtonStyle.Danger"
+                                                      Text="@(_isDeleting ? "Deleting..." : "Delete Forever")"
+                                                      Click="HandleDelete"
+                                                      Disabled="@(_deleteConfirmText != _project.Name || _isDeleting)"
+                                                      IsBusy="_isDeleting" />
+                                    </RadzenStack>
+                                </RadzenStack>
+                            </RadzenCard>
+                        }
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenTabsItem>
+        </Tabs>
+    </RadzenTabs>
 }
-
-@* Add Language Dialog *@
-<MudDialog @bind-Visible="_addLanguageDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Add Language</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudTextField @bind-Value="_newLanguageCode" Label="Language Code" Placeholder="e.g., fr, de, es"
-                      HelperText="Use ISO 639-1 codes (en, fr, de) or with region (en-US, pt-BR)"
-                      Variant="Variant.Outlined" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _addLanguageDialogVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddLanguage" Disabled="_addingLanguage || string.IsNullOrWhiteSpace(_newLanguageCode)">
-            @if (_addingLanguage)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Add
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-@* Remove Language Confirmation *@
-<MudDialog @bind-Visible="_removeLanguageDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Remove Language?</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudText>
-            Are you sure you want to remove <strong>@_languageToRemove?.DisplayName</strong> (@_languageToRemove?.LanguageCode)?
-        </MudText>
-        <MudText Color="Color.Error" Class="mt-2">
-            This will permanently delete all translations for this language.
-        </MudText>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _removeLanguageDialogVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="RemoveLanguage" Disabled="_removingLanguage">
-            @if (_removingLanguage)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Remove
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-@* Remove Provider Key Confirmation *@
-<MudDialog @bind-Visible="_removeProviderKeyDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Remove API Key?</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudText>
-            Remove the <strong>@_selectedProvider?.DisplayName</strong> API key override for this project?
-        </MudText>
-        <MudText Color="Color.Secondary" Class="mt-2">
-            The project will fall back to organization or user-level keys.
-        </MudText>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _removeProviderKeyDialogVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="RemoveProviderKey" Disabled="_removingProviderKey">
-            @if (_removingProviderKey)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Remove
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-@* Add Reviewer Dialog *@
-<MudDialog @bind-Visible="_addReviewerDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Add Reviewer</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudStack Spacing="3">
-            <MudTextField @bind-Value="_newReviewerUserId" Label="User ID" InputType="InputType.Number"
-                          HelperText="Enter the user ID of the reviewer to add"
-                          Variant="Variant.Outlined" />
-            <MudSelect @bind-Value="_newReviewerRole" Label="Role" Variant="Variant.Outlined">
-                <MudSelectItem Value="@("reviewer")">Reviewer (can mark as reviewed)</MudSelectItem>
-                <MudSelectItem Value="@("approver")">Approver (can review and approve)</MudSelectItem>
-            </MudSelect>
-            <MudTextField @bind-Value="_newReviewerLanguages" Label="Languages (optional)"
-                          HelperText="Comma-separated language codes (e.g., fr, de, es). Leave empty for all languages."
-                          Variant="Variant.Outlined" />
-        </MudStack>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _addReviewerDialogVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddReviewer" Disabled="_addingReviewer || _newReviewerUserId <= 0">
-            @if (_addingReviewer)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Add
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-@* Remove Reviewer Confirmation *@
-<MudDialog @bind-Visible="_removeReviewerDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Remove Reviewer?</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudText>
-            Remove <strong>@(_reviewerToRemove?.DisplayName ?? _reviewerToRemove?.Username)</strong> as a reviewer?
-        </MudText>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _removeReviewerDialogVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="RemoveReviewer" Disabled="_removingReviewer">
-            @if (_removingReviewer)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-            }
-            Remove
-        </MudButton>
-    </DialogActions>
-</MudDialog>
 
 @code {
     [Parameter]
@@ -722,16 +563,6 @@ else
     private bool _loadingLanguages;
     private bool _languagesLoaded;
 
-    // Add language
-    private bool _addLanguageDialogVisible;
-    private string _newLanguageCode = "";
-    private bool _addingLanguage;
-
-    // Remove language
-    private bool _removeLanguageDialogVisible;
-    private ProjectLanguageDto? _languageToRemove;
-    private bool _removingLanguage;
-
     // Translation providers
     private List<TranslationProviderDto> _translationProviders = new();
     private bool _loadingProviders;
@@ -740,31 +571,26 @@ else
     // Provider key management
     private TranslationProviderDto? _selectedProvider;
 
-    // Remove provider key
-    private bool _removeProviderKeyDialogVisible;
-    private bool _removingProviderKey;
-
     // Workflow
     private ReviewWorkflowSettingsDto? _workflowSettings;
     private bool _loadingWorkflow;
     private bool _workflowLoaded;
     private bool _savingWorkflow;
 
-    // Add reviewer
-    private bool _addReviewerDialogVisible;
-    private int _newReviewerUserId;
-    private string _newReviewerRole = "reviewer";
-    private string _newReviewerLanguages = "";
-    private bool _addingReviewer;
-
-    // Remove reviewer
-    private bool _removeReviewerDialogVisible;
-    private ReviewerDto? _reviewerToRemove;
-    private bool _removingReviewer;
-
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(LoadProjectAsync(), LoadOrganizationsAsync());
+        await LoadProjectAsync();
+
+        if (_project != null)
+        {
+            // Load all tab data in parallel after project is loaded
+            await Task.WhenAll(
+                LoadOrganizationsAsync(),
+                LoadLanguages(),
+                LoadTranslationProviders(),
+                LoadWorkflowSettings()
+            );
+        }
     }
 
     private async Task LoadProjectAsync()
@@ -791,7 +617,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error loading project: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error loading project: {ex.Message}");
         }
         finally
         {
@@ -816,6 +642,13 @@ else
         }
     }
 
+    private IEnumerable<object> GetOrganizationOptions()
+    {
+        return _organizations
+            .Where(o => o.UserRole is "owner" or "admin")
+            .Select(o => new { o.Id, o.Name });
+    }
+
     private async Task HandleSubmit()
     {
         if (_project == null) return;
@@ -837,9 +670,9 @@ else
             if (result.IsSuccess && result.Data != null)
             {
                 _project = result.Data;
-                _originalOrganizationId = _selectedOrganizationId; // Update the original to reflect saved state
-                _model.UpdateOrganization = false; // Reset flag
-                Snackbar.Add($"Project '{result.Data.Name}' updated successfully!", Severity.Success);
+                _originalOrganizationId = _selectedOrganizationId;
+                _model.UpdateOrganization = false;
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Project '{result.Data.Name}' updated successfully!");
             }
             else
             {
@@ -868,7 +701,7 @@ else
 
             if (result.IsSuccess)
             {
-                Snackbar.Add($"Project '{_project.Name}' deleted.", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Deleted", $"Project '{_project.Name}' deleted.");
                 Navigation.NavigateTo("");
             }
             else
@@ -896,76 +729,103 @@ else
             _languages = await ResourceService.GetProjectLanguagesAsync(_project.Id);
             _languagesLoaded = true;
         }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load languages: {ex.Message}");
+        }
         finally
         {
             _loadingLanguages = false;
         }
     }
 
-    private void OpenAddLanguageDialog()
+    private async Task OpenAddLanguageDialog()
     {
-        _newLanguageCode = "";
-        _addLanguageDialogVisible = true;
+        var newLanguageCode = "";
+        var result = await DialogService.OpenAsync("Add Language", ds =>
+            @<RadzenStack Gap="1rem">
+                <RadzenFormField Text="Language Code" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="newLanguageCode" Placeholder="e.g., fr, de, es" Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Use ISO 639-1 codes (en, fr, de) or with region (en-US, pt-BR)</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                    <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@(() => ds.Close(null))" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Add" Click="@(() => ds.Close(newLanguageCode))"
+                                  Disabled="@string.IsNullOrWhiteSpace(newLanguageCode)" />
+                </RadzenStack>
+            </RadzenStack>,
+            new Radzen.DialogOptions { Width = "400px" });
+
+        if (result is string languageCode && !string.IsNullOrWhiteSpace(languageCode))
+        {
+            await AddLanguage(languageCode);
+        }
     }
 
-    private async Task AddLanguage()
+    private async Task AddLanguage(string languageCode)
     {
-        if (_project == null || string.IsNullOrWhiteSpace(_newLanguageCode)) return;
+        if (_project == null) return;
 
-        _addingLanguage = true;
         try
         {
-            var request = new AddLanguageRequest { LanguageCode = _newLanguageCode.Trim().ToLowerInvariant() };
+            var request = new AddLanguageRequest { LanguageCode = languageCode.Trim().ToLowerInvariant() };
             var result = await ResourceService.AddLanguageAsync(_project.Id, request);
 
             if (result.IsSuccess && result.Data != null)
             {
                 _languages.Add(result.Data);
                 _languages = _languages.OrderBy(l => !l.IsDefault).ThenBy(l => l.LanguageCode).ToList();
-                Snackbar.Add($"Language '{result.Data.DisplayName}' added", Severity.Success);
-                _addLanguageDialogVisible = false;
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Language '{result.Data.DisplayName}' added");
             }
             else
             {
-                Snackbar.Add(result.ErrorMessage ?? "Failed to add language", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to add language");
             }
         }
-        finally
+        catch (Exception ex)
         {
-            _addingLanguage = false;
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
     }
 
-    private void ConfirmRemoveLanguage(ProjectLanguageDto language)
+    private async Task ConfirmRemoveLanguage(ProjectLanguageDto language)
     {
-        _languageToRemove = language;
-        _removeLanguageDialogVisible = true;
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to remove {language.DisplayName} ({language.LanguageCode})?\n\nThis will permanently delete all translations for this language.",
+            "Remove Language?",
+            new ConfirmOptions { OkButtonText = "Remove", CancelButtonText = "Cancel" });
+
+        if (confirmed == true)
+        {
+            await RemoveLanguage(language);
+        }
     }
 
-    private async Task RemoveLanguage()
+    private async Task RemoveLanguage(ProjectLanguageDto language)
     {
-        if (_project == null || _languageToRemove == null) return;
+        if (_project == null) return;
 
-        _removingLanguage = true;
         try
         {
-            var result = await ResourceService.RemoveLanguageAsync(_project.Id, _languageToRemove.LanguageCode);
+            var result = await ResourceService.RemoveLanguageAsync(_project.Id, language.LanguageCode);
 
             if (result.IsSuccess)
             {
-                _languages.RemoveAll(l => l.LanguageCode == _languageToRemove.LanguageCode);
-                Snackbar.Add($"Language '{_languageToRemove.DisplayName}' removed", Severity.Success);
-                _removeLanguageDialogVisible = false;
-                _languageToRemove = null;
+                _languages.RemoveAll(l => l.LanguageCode == language.LanguageCode);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Language '{language.DisplayName}' removed");
             }
             else
             {
-                Snackbar.Add(result.ErrorMessage ?? "Failed to remove language", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to remove language");
             }
         }
-        finally
+        catch (Exception ex)
         {
-            _removingLanguage = false;
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
     }
 
@@ -980,6 +840,10 @@ else
             _translationProviders = await TranslationService.GetProvidersAsync(projectId: _project.Id);
             _providersLoaded = true;
         }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load translation providers: {ex.Message}");
+        }
         finally
         {
             _loadingProviders = false;
@@ -990,75 +854,72 @@ else
     {
         if (_project == null) return;
 
-        var parameters = new DialogParameters
-        {
-            { nameof(ConfigureProviderDialog.Provider), provider },
-            { nameof(ConfigureProviderDialog.Level), "project" },
-            { nameof(ConfigureProviderDialog.EntityId), _project.Id }
-        };
+        var result = await DialogService.OpenAsync<ConfigureProviderDialog>($"Configure {provider.DisplayName}",
+            new Dictionary<string, object>
+            {
+                { "Provider", provider },
+                { "Level", "project" },
+                { "EntityId", _project.Id }
+            },
+            new Radzen.DialogOptions { Width = "500px" });
 
-        var options = new DialogOptions
-        {
-            MaxWidth = MaxWidth.Small,
-            FullWidth = true,
-            CloseButton = true
-        };
-
-        var dialog = await DialogService.ShowAsync<ConfigureProviderDialog>($"Configure {provider.DisplayName}", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
+        if (result is true)
         {
             _providersLoaded = false;
             await LoadTranslationProviders();
         }
     }
 
-    private void ConfirmRemoveProviderKey(TranslationProviderDto provider)
+    private async Task ConfirmRemoveProviderKey(TranslationProviderDto provider)
     {
-        _selectedProvider = provider;
-        _removeProviderKeyDialogVisible = true;
+        var confirmed = await DialogService.Confirm(
+            $"Remove the {provider.DisplayName} API key override for this project?\n\nThe project will fall back to organization or user-level keys.",
+            "Remove API Key?",
+            new ConfirmOptions { OkButtonText = "Remove", CancelButtonText = "Cancel" });
+
+        if (confirmed == true)
+        {
+            await RemoveProviderKey(provider);
+        }
     }
 
-    private async Task RemoveProviderKey()
+    private async Task RemoveProviderKey(TranslationProviderDto provider)
     {
-        if (_project == null || _selectedProvider == null) return;
+        if (_project == null) return;
 
-        _removingProviderKey = true;
         try
         {
-            var result = await TranslationService.RemoveProjectApiKeyAsync(_project.Id, _selectedProvider.Name);
+            var result = await TranslationService.RemoveProjectApiKeyAsync(_project.Id, provider.Name);
 
             if (result.IsSuccess)
             {
-                Snackbar.Add($"{_selectedProvider.DisplayName} API key removed", Severity.Success);
-                _removeProviderKeyDialogVisible = false;
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"{provider.DisplayName} API key removed");
                 _providersLoaded = false;
                 await LoadTranslationProviders();
             }
             else
             {
-                Snackbar.Add(result.ErrorMessage ?? "Failed to remove API key", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to remove API key");
             }
         }
-        finally
+        catch (Exception ex)
         {
-            _removingProviderKey = false;
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
     }
 
     private static string GetProviderIcon(string provider) => provider.ToLowerInvariant() switch
     {
-        "google" => Icons.Material.Filled.Translate,
-        "deepl" => Icons.Material.Filled.Translate,
-        "openai" => Icons.Material.Filled.Psychology,
-        "claude" => Icons.Material.Filled.Psychology,
-        "azuretranslator" => Icons.Material.Filled.Cloud,
-        "azureopenai" => Icons.Material.Filled.Cloud,
-        "ollama" => Icons.Material.Filled.Computer,
-        "libretranslate" => Icons.Material.Filled.Public,
-        "mymemory" => Icons.Material.Filled.Memory,
-        _ => Icons.Material.Filled.Api
+        "google" => "g_translate",
+        "deepl" => "translate",
+        "openai" => "psychology",
+        "claude" => "auto_awesome",
+        "azuretranslator" => "cloud",
+        "azureopenai" => "cloud",
+        "ollama" => "computer",
+        "libretranslate" => "public",
+        "mymemory" => "memory",
+        _ => "api"
     };
 
     private static string GetKeySourceLabel(string? source) => source switch
@@ -1093,7 +954,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load workflow settings: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load workflow settings: {ex.Message}");
         }
         finally
         {
@@ -1120,16 +981,16 @@ else
             if (result != null)
             {
                 _workflowSettings = result;
-                Snackbar.Add("Workflow settings saved", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Workflow settings saved");
             }
             else
             {
-                Snackbar.Add("Failed to save workflow settings", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to save workflow settings");
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to save workflow settings: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to save workflow settings: {ex.Message}");
         }
         finally
         {
@@ -1147,28 +1008,65 @@ else
         return reviewers.OrderBy(r => r.IsInherited).ThenBy(r => r.Username);
     }
 
-    private void OpenAddReviewerDialog()
+    private async Task OpenAddReviewerDialog()
     {
-        _newReviewerUserId = 0;
-        _newReviewerRole = "reviewer";
-        _newReviewerLanguages = "";
-        _addReviewerDialogVisible = true;
+        int newReviewerUserId = 0;
+        string newReviewerRole = "reviewer";
+        string newReviewerLanguages = "";
+
+        var result = await DialogService.OpenAsync("Add Reviewer", ds =>
+            @<RadzenStack Gap="1rem">
+                <RadzenFormField Text="User ID" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="newReviewerUserId" Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Enter the user ID of the reviewer to add</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+                <RadzenFormField Text="Role" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="newReviewerRole" Style="width: 100%;"
+                                        Data="@(new[] { new { Value = "reviewer", Text = "Reviewer (can mark as reviewed)" }, new { Value = "approver", Text = "Approver (can review and approve)" } })"
+                                        TextProperty="Text" ValueProperty="Value" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Languages (optional)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="newReviewerLanguages" Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Comma-separated language codes (e.g., fr, de, es). Leave empty for all languages.</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                    <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@(() => ds.Close(null))" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Add"
+                                  Click="@(() => ds.Close(new { UserId = newReviewerUserId, Role = newReviewerRole, Languages = newReviewerLanguages }))"
+                                  Disabled="@(newReviewerUserId <= 0)" />
+                </RadzenStack>
+            </RadzenStack>,
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result != null)
+        {
+            await AddReviewer((int)result.UserId, (string)result.Role, (string)result.Languages);
+        }
     }
 
-    private async Task AddReviewer()
+    private async Task AddReviewer(int userId, string role, string languages)
     {
-        if (_project == null || _newReviewerUserId <= 0) return;
+        if (_project == null || userId <= 0) return;
 
-        _addingReviewer = true;
         try
         {
             var request = new AddReviewerRequest
             {
-                UserId = _newReviewerUserId,
-                Role = _newReviewerRole,
-                LanguageCodes = string.IsNullOrWhiteSpace(_newReviewerLanguages)
+                UserId = userId,
+                Role = role,
+                LanguageCodes = string.IsNullOrWhiteSpace(languages)
                     ? null
-                    : _newReviewerLanguages.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    : languages.Split(',', StringSplitOptions.RemoveEmptyEntries)
                         .Select(l => l.Trim().ToLowerInvariant())
                         .ToArray()
             };
@@ -1177,57 +1075,52 @@ else
             if (result != null)
             {
                 _workflowSettings?.Reviewers?.Add(result);
-                Snackbar.Add($"Reviewer added", Severity.Success);
-                _addReviewerDialogVisible = false;
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Reviewer added");
             }
             else
             {
-                Snackbar.Add("Failed to add reviewer", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to add reviewer");
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to add reviewer: {ex.Message}", Severity.Error);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to add reviewer: {ex.Message}");
         }
-        finally
+    }
+
+    private async Task ConfirmRemoveReviewer(ReviewerDto reviewer)
+    {
+        var confirmed = await DialogService.Confirm(
+            $"Remove {reviewer.DisplayName ?? reviewer.Username} as a reviewer?",
+            "Remove Reviewer?",
+            new ConfirmOptions { OkButtonText = "Remove", CancelButtonText = "Cancel" });
+
+        if (confirmed == true)
         {
-            _addingReviewer = false;
+            await RemoveReviewer(reviewer);
         }
     }
 
-    private void ConfirmRemoveReviewer(ReviewerDto reviewer)
+    private async Task RemoveReviewer(ReviewerDto reviewer)
     {
-        _reviewerToRemove = reviewer;
-        _removeReviewerDialogVisible = true;
-    }
+        if (_project == null) return;
 
-    private async Task RemoveReviewer()
-    {
-        if (_project == null || _reviewerToRemove == null) return;
-
-        _removingReviewer = true;
         try
         {
-            var result = await WorkflowService.RemoveProjectReviewerAsync(_project.Id, _reviewerToRemove.UserId);
+            var result = await WorkflowService.RemoveProjectReviewerAsync(_project.Id, reviewer.UserId);
             if (result)
             {
-                _workflowSettings?.Reviewers?.RemoveAll(r => r.UserId == _reviewerToRemove.UserId);
-                Snackbar.Add("Reviewer removed", Severity.Success);
-                _removeReviewerDialogVisible = false;
-                _reviewerToRemove = null;
+                _workflowSettings?.Reviewers?.RemoveAll(r => r.UserId == reviewer.UserId);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Reviewer removed");
             }
             else
             {
-                Snackbar.Add("Failed to remove reviewer", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove reviewer");
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to remove reviewer: {ex.Message}", Severity.Error);
-        }
-        finally
-        {
-            _removingReviewer = false;
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to remove reviewer: {ex.Message}");
         }
     }
 }

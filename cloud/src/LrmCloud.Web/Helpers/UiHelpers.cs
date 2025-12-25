@@ -1,4 +1,4 @@
-using MudBlazor;
+using Radzen;
 
 namespace LrmCloud.Web.Helpers;
 
@@ -57,52 +57,6 @@ public static class UiHelpers
         return percentage.ToString($"F{decimals}") + "%";
     }
 
-    // ==========================================================================
-    // Color Helpers for Project/Format/Completion
-    // ==========================================================================
-
-    /// <summary>
-    /// Gets color based on resource file format.
-    /// </summary>
-    public static Color GetFormatColor(string format) => format?.ToLower() switch
-    {
-        "resx" => Color.Primary,
-        "json" => Color.Info,
-        "jsonlocalization" => Color.Info,
-        "i18next" => Color.Secondary,
-        _ => Color.Default
-    };
-
-    /// <summary>
-    /// Gets color based on translation completion percentage.
-    /// </summary>
-    public static Color GetCompletionColor(double percentage) => percentage switch
-    {
-        >= 90 => Color.Success,
-        >= 50 => Color.Warning,
-        _ => Color.Error
-    };
-
-    /// <summary>
-    /// Gets color based on usage percentage (for limits/quotas).
-    /// </summary>
-    public static Color GetUsageColor(double percentage) => percentage switch
-    {
-        >= 90 => Color.Error,
-        >= 70 => Color.Warning,
-        _ => Color.Success
-    };
-
-    /// <summary>
-    /// Gets color based on usage values.
-    /// </summary>
-    public static Color GetUsageColor(long used, long limit)
-    {
-        if (limit <= 0) return Color.Success;
-        var percentage = (double)used / limit * 100;
-        return GetUsageColor(percentage);
-    }
-
     /// <summary>
     /// Calculates usage percentage with capping at 100.
     /// </summary>
@@ -110,51 +64,6 @@ public static class UiHelpers
     {
         if (limit <= 0) return 0;
         return Math.Min(100, (double)used / limit * 100);
-    }
-
-    // ==========================================================================
-    // Plan/Subscription Colors
-    // ==========================================================================
-
-    /// <summary>
-    /// Gets color based on subscription plan.
-    /// </summary>
-    public static Color GetPlanColor(string plan) => plan?.ToLower() switch
-    {
-        "free" => Color.Default,
-        "team" => Color.Secondary,
-        "enterprise" => Color.Primary,
-        _ => Color.Default
-    };
-
-    // ==========================================================================
-    // Organization/Role Colors
-    // ==========================================================================
-
-    /// <summary>
-    /// Gets color based on organization role.
-    /// </summary>
-    public static Color GetRoleColor(string role) => role switch
-    {
-        "owner" => Color.Error,
-        "Owner" => Color.Error,
-        "admin" => Color.Warning,
-        "Admin" => Color.Warning,
-        "member" => Color.Primary,
-        "Member" => Color.Primary,
-        "viewer" => Color.Default,
-        "Viewer" => Color.Default,
-        _ => Color.Default
-    };
-
-    /// <summary>
-    /// Gets consistent color based on string (for avatars, etc.).
-    /// </summary>
-    public static Color GetHashColor(string text)
-    {
-        var hash = text?.GetHashCode() ?? 0;
-        var colors = new[] { Color.Primary, Color.Secondary, Color.Info, Color.Success, Color.Warning };
-        return colors[Math.Abs(hash) % colors.Length];
     }
 
     // ==========================================================================
@@ -216,4 +125,80 @@ public static class UiHelpers
 
         return $"{(int)(diff.TotalDays / 365)} year{((int)(diff.TotalDays / 365) != 1 ? "s" : "")} ago";
     }
+
+    // ==========================================================================
+    // Radzen-specific Helpers
+    // ==========================================================================
+
+    /// <summary>
+    /// Gets Radzen BadgeStyle based on resource file format.
+    /// </summary>
+    public static BadgeStyle GetFormatBadgeStyle(string format) => format?.ToLower() switch
+    {
+        "resx" => BadgeStyle.Primary,
+        "json" => BadgeStyle.Info,
+        "jsonlocalization" => BadgeStyle.Info,
+        "i18next" => BadgeStyle.Secondary,
+        "android" => BadgeStyle.Success,
+        "ios" => BadgeStyle.Warning,
+        _ => BadgeStyle.Light
+    };
+
+    /// <summary>
+    /// Gets Radzen ProgressBarStyle based on completion percentage.
+    /// </summary>
+    public static ProgressBarStyle GetCompletionProgressStyle(double percentage) => percentage switch
+    {
+        >= 90 => ProgressBarStyle.Success,
+        >= 50 => ProgressBarStyle.Warning,
+        _ => ProgressBarStyle.Danger
+    };
+
+    /// <summary>
+    /// Gets Radzen ProgressBarStyle based on usage percentage (inverted - high usage is bad).
+    /// </summary>
+    public static ProgressBarStyle GetUsageProgressStyle(double percentage) => percentage switch
+    {
+        >= 90 => ProgressBarStyle.Danger,
+        >= 70 => ProgressBarStyle.Warning,
+        _ => ProgressBarStyle.Success
+    };
+
+    /// <summary>
+    /// Gets Radzen ProgressBarStyle based on usage percentage (alias for consistency).
+    /// </summary>
+    public static ProgressBarStyle GetUsageProgressBarStyle(double percentage) => GetUsageProgressStyle(percentage);
+
+    /// <summary>
+    /// Gets CSS color value string based on usage percentage.
+    /// </summary>
+    public static string GetUsageColorValue(double percentage) => percentage switch
+    {
+        >= 90 => "var(--rz-danger)",
+        >= 70 => "var(--rz-warning)",
+        _ => "var(--rz-success)"
+    };
+
+    /// <summary>
+    /// Gets Radzen BadgeStyle based on subscription plan.
+    /// </summary>
+    public static BadgeStyle GetPlanBadgeStyle(string plan) => plan?.ToLower() switch
+    {
+        "free" => BadgeStyle.Light,
+        "team" => BadgeStyle.Secondary,
+        "enterprise" => BadgeStyle.Primary,
+        _ => BadgeStyle.Light
+    };
+
+    /// <summary>
+    /// Gets Radzen BadgeStyle based on organization role.
+    /// </summary>
+    public static BadgeStyle GetRoleBadgeStyle(string role) => role switch
+    {
+        "owner" or "Owner" => BadgeStyle.Danger,
+        "admin" or "Admin" => BadgeStyle.Warning,
+        "member" or "Member" => BadgeStyle.Primary,
+        "viewer" or "Viewer" => BadgeStyle.Light,
+        _ => BadgeStyle.Light
+    };
 }

@@ -1,0 +1,44 @@
+@inject IJSRuntime JSRuntime
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<RadzenStack Gap="1rem">
+    <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">
+        Make sure to copy your API key now. You won't be able to see it again!
+    </RadzenAlert>
+
+    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-2">Your new API key:</RadzenText>
+    <RadzenCard Variant="Radzen.Variant.Text" Style="background-color: var(--rz-base-100);">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+            <code style="word-break: break-all; flex: 1;">@ApiKey</code>
+            <RadzenButton Icon="content_copy" Variant="Radzen.Variant.Text" Click="@CopyKeyToClipboard" title="Copy to clipboard" />
+        </RadzenStack>
+    </RadzenCard>
+
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" class="rz-mt-4">
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="I've Copied My Key" Click="@Close" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public string ApiKey { get; set; } = "";
+
+    private async Task CopyKeyToClipboard()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", ApiKey);
+            NotificationService.Notify(NotificationSeverity.Success, "Copied", "API key copied to clipboard");
+        }
+        catch
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to copy to clipboard");
+        }
+    }
+
+    private void Close()
+    {
+        DialogService.Close(true);
+    }
+}

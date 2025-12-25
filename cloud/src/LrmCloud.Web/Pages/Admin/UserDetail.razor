@@ -1,241 +1,267 @@
 @page "/admin/users/{UserId:int}"
 @using LrmCloud.Shared.DTOs.Admin
 @using LrmCloud.Web.Services
+@using LrmCloud.Web.Helpers
 @inject AdminService AdminService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
-@inject IDialogService DialogService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 @attribute [Authorize]
 
 <PageTitle>User Details - LRM Cloud Admin</PageTitle>
 
-<MudBreadcrumbs Items="_breadcrumbs" Class="mb-4" />
+<RadzenBreadCrumb class="rz-mb-4">
+    <RadzenBreadCrumbItem Path="admin" Text="Admin" />
+    <RadzenBreadCrumbItem Path="admin/users" Text="Users" />
+    <RadzenBreadCrumbItem Text="User Details" />
+</RadzenBreadCrumb>
 
 @if (_isLoading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
 }
 else if (_user == null)
 {
-    <MudAlert Severity="Severity.Error">User not found.</MudAlert>
+    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">User not found.</RadzenAlert>
 }
 else
 {
-    <MudGrid>
+    <RadzenRow Gap="1rem">
         @* User Profile Card *@
-        <MudItem xs="12" md="4">
-            <MudPaper Class="pa-4" Elevation="2">
-                <div class="d-flex flex-column align-center">
-                    <MudAvatar Size="Size.Large" Class="mb-2" Style="width: 80px; height: 80px;">
-                        @if (!string.IsNullOrEmpty(_user.AvatarUrl))
-                        {
-                            <MudImage Src="@_user.AvatarUrl" />
-                        }
-                        else
-                        {
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard>
+                <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    @if (!string.IsNullOrEmpty(_user.AvatarUrl))
+                    {
+                        <RadzenImage Path="@_user.AvatarUrl" Style="width: 80px; height: 80px; border-radius: 50%;" />
+                    }
+                    else
+                    {
+                        <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--rz-primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold;">
                             @_user.Email[0].ToString().ToUpper()
-                        }
-                    </MudAvatar>
-                    <MudText Typo="Typo.h5">@(_user.DisplayName ?? _user.Username)</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">@_user.Email</MudText>
-                    <div class="mt-2 d-flex gap-1">
-                        <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(_user.Plan)">@_user.Plan.ToUpper()</MudChip>
+                        </div>
+                    }
+                    <RadzenText TextStyle="TextStyle.H5">@(_user.DisplayName ?? _user.Username)</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">@_user.Email</RadzenText>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem" class="rz-mt-2">
+                        <RadzenBadge BadgeStyle="@GetPlanBadgeStyle(_user.Plan)" Text="@_user.Plan.ToUpper()" />
                         @if (_user.IsSuperAdmin)
                         {
-                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Star">Superadmin</MudChip>
+                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Superadmin" />
                         }
                         @if (_user.EmailVerified)
                         {
-                            <MudChip T="string" Size="Size.Small" Color="Color.Success">Verified</MudChip>
+                            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Verified" />
                         }
-                    </div>
-                </div>
-                <MudDivider Class="my-4" />
-                <MudList T="string" Dense="true">
-                    <MudListItem T="string" Icon="@GetAuthTypeIcon(_user.AuthType)">
-                        Auth: @_user.AuthType
-                    </MudListItem>
-                    <MudListItem T="string" Icon="@Icons.Material.Filled.DateRange">
-                        Joined: @_user.CreatedAt.ToString("MMM d, yyyy")
-                    </MudListItem>
-                    <MudListItem T="string" Icon="@Icons.Material.Filled.Login">
-                        Last Login: @(_user.LastLoginAt?.ToString("MMM d, yyyy HH:mm") ?? "Never")
-                    </MudListItem>
-                </MudList>
-            </MudPaper>
-        </MudItem>
+                    </RadzenStack>
+                </RadzenStack>
+                <hr class="rz-my-4" />
+                <RadzenStack Gap="0.5rem">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="@GetAuthTypeIcon(_user.AuthType)" Style="font-size: 1rem;" />
+                        <RadzenText>Auth: @_user.AuthType</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="date_range" Style="font-size: 1rem;" />
+                        <RadzenText>Joined: @_user.CreatedAt.ToString("MMM d, yyyy")</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="login" Style="font-size: 1rem;" />
+                        <RadzenText>Last Login: @(_user.LastLoginAt?.ToString("MMM d, yyyy HH:mm") ?? "Never")</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
 
         @* Details & Settings *@
-        <MudItem xs="12" md="8">
-            <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" Class="mb-4">
-                @* Subscription & Billing Tab *@
-                <MudTabPanel Text="Subscription" Icon="@Icons.Material.Filled.CreditCard">
-                    <MudPaper Class="pa-4" Elevation="0">
-                        <MudText Typo="Typo.h6" Class="mb-4">Subscription Details</MudText>
-                        <MudGrid>
-                            <MudItem xs="12" md="6">
-                                <MudSelect T="string" @bind-Value="_editPlan" Label="Plan" HelperText="User's subscription plan">
-                                    <MudSelectItem Value="@("free")">Free</MudSelectItem>
-                                    <MudSelectItem Value="@("team")">Team</MudSelectItem>
-                                    <MudSelectItem Value="@("enterprise")">Enterprise</MudSelectItem>
-                                </MudSelect>
-                            </MudItem>
-                            <MudItem xs="12" md="6">
-                                <MudSelect T="string" @bind-Value="_editSubscriptionStatus" Label="Subscription Status">
-                                    <MudSelectItem Value="@("none")">None</MudSelectItem>
-                                    <MudSelectItem Value="@("active")">Active</MudSelectItem>
-                                    <MudSelectItem Value="@("canceled")">Canceled</MudSelectItem>
-                                    <MudSelectItem Value="@("past_due")">Past Due</MudSelectItem>
-                                </MudSelect>
-                            </MudItem>
-                        </MudGrid>
-                        @if (!string.IsNullOrEmpty(_user.PaymentProvider))
-                        {
-                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-4">
-                                Payment Provider: @_user.PaymentProvider
-                                @if (!string.IsNullOrEmpty(_user.PaymentCustomerId))
-                                {
-                                    <text> (Customer: @_user.PaymentCustomerId)</text>
-                                }
-                            </MudText>
-                        }
-                        @if (_user.SubscriptionCurrentPeriodEnd.HasValue)
-                        {
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                Current Period Ends: @_user.SubscriptionCurrentPeriodEnd.Value.ToString("MMM d, yyyy")
-                                @if (_user.CancelAtPeriodEnd)
-                                {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ml-2">Cancels at end</MudChip>
-                                }
-                            </MudText>
-                        }
-                    </MudPaper>
-                </MudTabPanel>
-
-                @* Usage & Limits Tab *@
-                <MudTabPanel Text="Usage" Icon="@Icons.Material.Filled.DataUsage">
-                    <MudPaper Class="pa-4" Elevation="0">
-                        <div class="d-flex justify-space-between align-center mb-4">
-                            <MudText Typo="Typo.h6">Usage & Limits</MudText>
-                            <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small"
-                                       StartIcon="@Icons.Material.Filled.Refresh" OnClick="ResetUsageAsync">
-                                Reset Usage
-                            </MudButton>
-                        </div>
-                        <MudGrid>
-                            @* LRM Translation *@
-                            <MudItem xs="12" md="6">
-                                <MudText Typo="Typo.subtitle2" Class="mb-2">LRM Translation</MudText>
-                                <MudProgressLinear Value="@GetUsagePercent(_user.TranslationCharsUsed, _user.TranslationCharsLimit)"
-                                                  Color="@GetUsageColor(_user.TranslationCharsUsed, _user.TranslationCharsLimit)"
-                                                  Size="Size.Medium" Rounded="true" Class="mb-1" />
-                                <MudText Typo="Typo.caption">
-                                    @_user.TranslationCharsUsed.ToString("N0") / @_user.TranslationCharsLimit.ToString("N0") chars
-                                </MudText>
-                                <MudNumericField T="int" @bind-Value="_editTranslationLimit" Label="Limit Override" Class="mt-2"
-                                                HelperText="Set custom limit (0 = use plan default)" />
-                            </MudItem>
-                            @* Other Providers *@
-                            <MudItem xs="12" md="6">
-                                <MudText Typo="Typo.subtitle2" Class="mb-2">Other Providers</MudText>
-                                <MudProgressLinear Value="@GetUsagePercent(_user.OtherCharsUsed, _user.OtherCharsLimit)"
-                                                  Color="@GetUsageColor(_user.OtherCharsUsed, _user.OtherCharsLimit)"
-                                                  Size="Size.Medium" Rounded="true" Class="mb-1" />
-                                <MudText Typo="Typo.caption">
-                                    @_user.OtherCharsUsed.ToString("N0") / @_user.OtherCharsLimit.ToString("N0") chars
-                                </MudText>
-                                <MudNumericField T="long" @bind-Value="_editOtherLimit" Label="Limit Override" Class="mt-2"
-                                                HelperText="Set custom limit (0 = use plan default)" />
-                            </MudItem>
-                        </MudGrid>
-                        @if (_user.TranslationCharsResetAt.HasValue)
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-                                Usage resets: @_user.TranslationCharsResetAt.Value.ToString("MMM d, yyyy")
-                            </MudText>
-                        }
-                    </MudPaper>
-                </MudTabPanel>
-
-                @* Security Tab *@
-                <MudTabPanel Text="Security" Icon="@Icons.Material.Filled.Security">
-                    <MudPaper Class="pa-4" Elevation="0">
-                        <MudText Typo="Typo.h6" Class="mb-4">Security Settings</MudText>
-                        <MudGrid>
-                            <MudItem xs="12" md="6">
-                                <MudSwitch T="bool" @bind-Value="_editIsSuperAdmin" Color="Color.Warning" Label="Superadmin Access" />
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    Grant full administrative access to the system
-                                </MudText>
-                            </MudItem>
-                            <MudItem xs="12" md="6">
-                                <MudSwitch T="bool" @bind-Value="_editEmailVerified" Color="Color.Success" Label="Email Verified" />
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    Mark user's email as verified
-                                </MudText>
-                            </MudItem>
-                        </MudGrid>
-                        <MudDivider Class="my-4" />
-                        <MudText Typo="Typo.subtitle2" Class="mb-2">Login Security</MudText>
-                        <MudList T="string" Dense="true">
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.Warning">
-                                Failed Login Attempts: @_user.FailedLoginAttempts
-                            </MudListItem>
-                            @if (_user.LockedUntil.HasValue && _user.LockedUntil > DateTime.UtcNow)
+        <RadzenColumn Size="12" SizeMD="8">
+            <RadzenTabs @bind-SelectedIndex="_selectedTab" RenderMode="TabRenderMode.Client" class="rz-mb-4">
+                <Tabs>
+                    @* Subscription & Billing Tab *@
+                    <RadzenTabsItem Text="Subscription" Icon="credit_card">
+                        <RadzenStack Gap="1rem" class="rz-p-4">
+                            <RadzenText TextStyle="TextStyle.H6">Subscription Details</RadzenText>
+                            <RadzenRow Gap="1rem">
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenFormField Text="Plan" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                        <ChildContent>
+                                            <RadzenDropDown @bind-Value="_editPlan" Style="width: 100%;"
+                                                            Data="@(new[] { "free", "team", "enterprise" })" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">User's subscription plan</RadzenText>
+                                        </Helper>
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenFormField Text="Subscription Status" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                        <ChildContent>
+                                            <RadzenDropDown @bind-Value="_editSubscriptionStatus" Style="width: 100%;"
+                                                            Data="@(new[] { "none", "active", "canceled", "past_due" })" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            @if (!string.IsNullOrEmpty(_user.PaymentProvider))
                             {
-                                <MudListItem T="string" Icon="@Icons.Material.Filled.Lock">
-                                    Locked Until: @_user.LockedUntil.Value.ToString("MMM d, yyyy HH:mm")
-                                </MudListItem>
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                                    Payment Provider: @_user.PaymentProvider
+                                    @if (!string.IsNullOrEmpty(_user.PaymentCustomerId))
+                                    {
+                                        <text> (Customer: @_user.PaymentCustomerId)</text>
+                                    }
+                                </RadzenText>
                             }
-                        </MudList>
-                    </MudPaper>
-                </MudTabPanel>
+                            @if (_user.SubscriptionCurrentPeriodEnd.HasValue)
+                            {
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                                        Current Period Ends: @_user.SubscriptionCurrentPeriodEnd.Value.ToString("MMM d, yyyy")
+                                    </RadzenText>
+                                    @if (_user.CancelAtPeriodEnd)
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Cancels at end" />
+                                    }
+                                </RadzenStack>
+                            }
+                        </RadzenStack>
+                    </RadzenTabsItem>
 
-                @* Stats Tab *@
-                <MudTabPanel Text="Stats" Icon="@Icons.Material.Filled.BarChart">
-                    <MudPaper Class="pa-4" Elevation="0">
-                        <MudText Typo="Typo.h6" Class="mb-4">Account Statistics</MudText>
-                        <MudGrid>
-                            <MudItem xs="6" md="3">
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">Projects</MudText>
-                                <MudText Typo="Typo.h4">@_user.ProjectCount</MudText>
-                            </MudItem>
-                            <MudItem xs="6" md="3">
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">Organizations</MudText>
-                                <MudText Typo="Typo.h4">@_user.OrganizationCount</MudText>
-                            </MudItem>
-                        </MudGrid>
-                    </MudPaper>
-                </MudTabPanel>
-            </MudTabs>
+                    @* Usage & Limits Tab *@
+                    <RadzenTabsItem Text="Usage" Icon="data_usage">
+                        <RadzenStack Gap="1rem" class="rz-p-4">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                                <RadzenText TextStyle="TextStyle.H6">Usage & Limits</RadzenText>
+                                <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Warning" Size="ButtonSize.Small"
+                                              Icon="refresh" Text="Reset Usage" Click="ResetUsageAsync" />
+                            </RadzenStack>
+                            <RadzenRow Gap="1rem">
+                                @* LRM Translation *@
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-2">LRM Translation</RadzenText>
+                                    <RadzenProgressBar Value="@GetUsagePercent(_user.TranslationCharsUsed, _user.TranslationCharsLimit)"
+                                                       ProgressBarStyle="@GetUsageProgressStyle(_user.TranslationCharsUsed, _user.TranslationCharsLimit)"
+                                                       ShowValue="false" Style="height: 8px;" class="rz-mb-1" />
+                                    <RadzenText TextStyle="TextStyle.Caption">
+                                        @_user.TranslationCharsUsed.ToString("N0") / @_user.TranslationCharsLimit.ToString("N0") chars
+                                    </RadzenText>
+                                    <RadzenFormField Text="Limit Override" Variant="Radzen.Variant.Outlined" Style="width: 100%;" class="rz-mt-2">
+                                        <ChildContent>
+                                            <RadzenNumeric @bind-Value="_editTranslationLimit" Style="width: 100%;" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Set custom limit (0 = use plan default)</RadzenText>
+                                        </Helper>
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                                @* Other Providers *@
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-2">Other Providers</RadzenText>
+                                    <RadzenProgressBar Value="@GetUsagePercent(_user.OtherCharsUsed, _user.OtherCharsLimit)"
+                                                       ProgressBarStyle="@GetUsageProgressStyle(_user.OtherCharsUsed, _user.OtherCharsLimit)"
+                                                       ShowValue="false" Style="height: 8px;" class="rz-mb-1" />
+                                    <RadzenText TextStyle="TextStyle.Caption">
+                                        @_user.OtherCharsUsed.ToString("N0") / @_user.OtherCharsLimit.ToString("N0") chars
+                                    </RadzenText>
+                                    <RadzenFormField Text="Limit Override" Variant="Radzen.Variant.Outlined" Style="width: 100%;" class="rz-mt-2">
+                                        <ChildContent>
+                                            <RadzenNumeric @bind-Value="_editOtherLimit" Style="width: 100%;" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Set custom limit (0 = use plan default)</RadzenText>
+                                        </Helper>
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            @if (_user.TranslationCharsResetAt.HasValue)
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                    Usage resets: @_user.TranslationCharsResetAt.Value.ToString("MMM d, yyyy")
+                                </RadzenText>
+                            }
+                        </RadzenStack>
+                    </RadzenTabsItem>
+
+                    @* Security Tab *@
+                    <RadzenTabsItem Text="Security" Icon="security">
+                        <RadzenStack Gap="1rem" class="rz-p-4">
+                            <RadzenText TextStyle="TextStyle.H6">Security Settings</RadzenText>
+                            <RadzenRow Gap="1rem">
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                                        <RadzenText>Superadmin Access</RadzenText>
+                                        <RadzenSwitch @bind-Value="_editIsSuperAdmin" />
+                                    </RadzenStack>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        Grant full administrative access to the system
+                                    </RadzenText>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                                        <RadzenText>Email Verified</RadzenText>
+                                        <RadzenSwitch @bind-Value="_editEmailVerified" />
+                                    </RadzenStack>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        Mark user's email as verified
+                                    </RadzenText>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <hr />
+                            <RadzenText TextStyle="TextStyle.Subtitle2">Login Security</RadzenText>
+                            <RadzenStack Gap="0.5rem">
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                    <RadzenIcon Icon="warning" Style="font-size: 1rem;" />
+                                    <RadzenText>Failed Login Attempts: @_user.FailedLoginAttempts</RadzenText>
+                                </RadzenStack>
+                                @if (_user.LockedUntil.HasValue && _user.LockedUntil > DateTime.UtcNow)
+                                {
+                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                        <RadzenIcon Icon="lock" Style="font-size: 1rem;" />
+                                        <RadzenText>Locked Until: @_user.LockedUntil.Value.ToString("MMM d, yyyy HH:mm")</RadzenText>
+                                    </RadzenStack>
+                                }
+                            </RadzenStack>
+                        </RadzenStack>
+                    </RadzenTabsItem>
+
+                    @* Stats Tab *@
+                    <RadzenTabsItem Text="Stats" Icon="bar_chart">
+                        <RadzenStack Gap="1rem" class="rz-p-4">
+                            <RadzenText TextStyle="TextStyle.H6">Account Statistics</RadzenText>
+                            <RadzenRow>
+                                <RadzenColumn Size="6" SizeMD="3">
+                                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Projects</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.H4">@_user.ProjectCount</RadzenText>
+                                </RadzenColumn>
+                                <RadzenColumn Size="6" SizeMD="3">
+                                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Organizations</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.H4">@_user.OrganizationCount</RadzenText>
+                                </RadzenColumn>
+                            </RadzenRow>
+                        </RadzenStack>
+                    </RadzenTabsItem>
+                </Tabs>
+            </RadzenTabs>
 
             @* Action Buttons *@
-            <MudPaper Class="pa-4" Elevation="2">
-                <div class="d-flex justify-space-between">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="@(() => Navigation.NavigateTo("admin/users"))">
-                        Cancel
-                    </MudButton>
-                    <div class="d-flex gap-2">
+            <RadzenCard>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenButton Variant="Radzen.Variant.Outlined" Text="Cancel"
+                                  Click="@(() => Navigation.NavigateTo("admin/users"))" />
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
                         @if (_user.DeletedAt == null)
                         {
-                            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
-                                       OnClick="DeleteUserAsync">
-                                Delete User
-                            </MudButton>
+                            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Danger"
+                                          Icon="delete" Text="Delete User" Click="DeleteUserAsync" />
                         }
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
-                                   OnClick="SaveChangesAsync" Disabled="@_isSaving">
-                            @if (_isSaving)
-                            {
-                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                            }
-                            Save Changes
-                        </MudButton>
-                    </div>
-                </div>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+                        <RadzenButton ButtonStyle="ButtonStyle.Primary" Icon="save"
+                                      Text="@(_isSaving ? "Saving..." : "Save Changes")"
+                                      Click="SaveChangesAsync" Disabled="_isSaving" IsBusy="_isSaving" />
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
 }
 
 @code {
@@ -245,6 +271,7 @@ else
     private bool _isLoading = true;
     private bool _isSaving;
     private AdminUserDetailDto? _user;
+    private int _selectedTab;
 
     // Edit fields
     private string _editPlan = "free";
@@ -253,13 +280,6 @@ else
     private long _editOtherLimit;
     private bool _editIsSuperAdmin;
     private bool _editEmailVerified;
-
-    private List<BreadcrumbItem> _breadcrumbs = new()
-    {
-        new BreadcrumbItem("Admin", href: "admin"),
-        new BreadcrumbItem("Users", href: "admin/users"),
-        new BreadcrumbItem("User Details", href: null, disabled: true)
-    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -307,11 +327,11 @@ else
             if (success && updatedUser != null)
             {
                 _user = updatedUser;
-                Snackbar.Add("User updated successfully", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "User updated successfully");
             }
             else
             {
-                Snackbar.Add($"Failed to update user: {error}", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to update user: {error}");
             }
         }
         finally
@@ -322,72 +342,72 @@ else
 
     private async Task ResetUsageAsync()
     {
-        var result = await DialogService.ShowMessageBox(
-            "Reset Usage",
+        var confirmed = await DialogService.Confirm(
             "Are you sure you want to reset this user's usage counters? This action cannot be undone.",
-            yesText: "Reset", cancelText: "Cancel");
+            "Reset Usage",
+            new ConfirmOptions { OkButtonText = "Reset", CancelButtonText = "Cancel" });
 
-        if (result == true)
+        if (confirmed == true)
         {
             var (success, error, updatedUser) = await AdminService.ResetUserUsageAsync(UserId);
             if (success && updatedUser != null)
             {
                 _user = updatedUser;
-                Snackbar.Add("Usage counters reset successfully", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Usage counters reset successfully");
             }
             else
             {
-                Snackbar.Add($"Failed to reset usage: {error}", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to reset usage: {error}");
             }
         }
     }
 
     private async Task DeleteUserAsync()
     {
-        var result = await DialogService.ShowMessageBox(
-            "Delete User",
+        var confirmed = await DialogService.Confirm(
             "Are you sure you want to delete this user? This action will soft-delete the user.",
-            yesText: "Delete", cancelText: "Cancel");
+            "Delete User",
+            new ConfirmOptions { OkButtonText = "Delete", CancelButtonText = "Cancel" });
 
-        if (result == true)
+        if (confirmed == true)
         {
             var (success, error) = await AdminService.DeleteUserAsync(UserId);
             if (success)
             {
-                Snackbar.Add("User deleted successfully", Severity.Success);
+                NotificationService.Notify(NotificationSeverity.Success, "Deleted", "User deleted successfully");
                 Navigation.NavigateTo("admin/users");
             }
             else
             {
-                Snackbar.Add($"Failed to delete user: {error}", Severity.Error);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to delete user: {error}");
             }
         }
     }
 
-    private static Color GetPlanColor(string plan) => plan.ToLower() switch
+    private static BadgeStyle GetPlanBadgeStyle(string plan) => plan.ToLower() switch
     {
-        "enterprise" => Color.Success,
-        "team" => Color.Primary,
-        _ => Color.Default
+        "enterprise" => BadgeStyle.Success,
+        "team" => BadgeStyle.Primary,
+        _ => BadgeStyle.Light
     };
 
     private static string GetAuthTypeIcon(string authType) => authType.ToLower() switch
     {
-        "github" => Icons.Custom.Brands.GitHub,
-        _ => Icons.Material.Filled.Email
+        "github" => "code",
+        _ => "email"
     };
 
     private static double GetUsagePercent(long used, long limit) =>
         limit > 0 ? Math.Min(100, used * 100.0 / limit) : 0;
 
-    private static Color GetUsageColor(long used, long limit)
+    private static ProgressBarStyle GetUsageProgressStyle(long used, long limit)
     {
         var percent = GetUsagePercent(used, limit);
         return percent switch
         {
-            >= 90 => Color.Error,
-            >= 75 => Color.Warning,
-            _ => Color.Primary
+            >= 90 => ProgressBarStyle.Danger,
+            >= 75 => ProgressBarStyle.Warning,
+            _ => ProgressBarStyle.Primary
         };
     }
 }

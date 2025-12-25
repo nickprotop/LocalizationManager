@@ -1,0 +1,118 @@
+@using LrmCloud.Shared.DTOs.Billing
+@using LrmCloud.Web.Helpers
+@inject BillingService BillingService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<RadzenStack Gap="1rem">
+    @if (Subscription?.BillingEnabled == true)
+    {
+        <RadzenText>
+            You'll be redirected to our secure payment page powered by Stripe.
+        </RadzenText>
+        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">
+            @if (SelectedPlan == "team")
+            {
+                <span><strong>Team plan:</strong> $@(Subscription?.PlanLimits?.Team.Price ?? 9)/month with @UiHelpers.FormatNumber(Subscription?.PlanLimits?.Team.TranslationChars ?? 50000) LRM translation characters and up to @(Subscription?.PlanLimits?.Team.MaxTeamMembers ?? 10) team members.</span>
+            }
+            else if (SelectedPlan == "enterprise")
+            {
+                <span><strong>Enterprise plan:</strong> $@(Subscription?.PlanLimits?.Enterprise.Price ?? 29)/month with @UiHelpers.FormatNumber(Subscription?.PlanLimits?.Enterprise.TranslationChars ?? 500000) LRM translation characters and unlimited team members.</span>
+            }
+        </RadzenAlert>
+    }
+    else
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">
+            Billing integration coming soon! Contact us to upgrade your plan.
+        </RadzenAlert>
+        <RadzenText>
+            For now, please contact our sales team to upgrade your organization's plan.
+        </RadzenText>
+        <RadzenFormField Text="Email" Variant="Radzen.Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox Value="sales@lrmcloud.com" ReadOnly="true" Style="width: 100%;" />
+            </ChildContent>
+        </RadzenFormField>
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
+            @_errorMessage
+        </RadzenAlert>
+    }
+
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+        <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" Disabled="@_isProcessing" />
+        @if (Subscription?.BillingEnabled == true)
+        {
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Proceed to Payment" Click="@StartCheckout" Disabled="@_isProcessing" IsBusy="@_isProcessing" />
+        }
+        else
+        {
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Contact Sales" Click="@ContactSales" />
+        }
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public int OrganizationId { get; set; }
+
+    [Parameter]
+    public string SelectedPlan { get; set; } = "team";
+
+    [Parameter]
+    public SubscriptionDto? Subscription { get; set; }
+
+    private bool _isProcessing;
+    private string? _errorMessage;
+
+    private async Task StartCheckout()
+    {
+        _isProcessing = true;
+        _errorMessage = null;
+
+        try
+        {
+            var baseUrl = Navigation.BaseUri.TrimEnd('/');
+            var result = await BillingService.CreateCheckoutAsync(
+                SelectedPlan,
+                $"{baseUrl}/organizations/{OrganizationId}/billing?success=true",
+                $"{baseUrl}/organizations/{OrganizationId}/billing?canceled=true"
+            );
+
+            if (result?.SessionUrl != null)
+            {
+                await JS.InvokeVoidAsync("open", result.SessionUrl, "_self");
+                DialogService.Close(true);
+            }
+            else
+            {
+                _errorMessage = "Failed to create checkout session";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task ContactSales()
+    {
+        await JS.InvokeVoidAsync("open", "mailto:sales@lrmcloud.com?subject=LRM Cloud Plan Upgrade", "_self");
+        DialogService.Close(false);
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(false);
+    }
+}

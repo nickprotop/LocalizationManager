@@ -1,0 +1,74 @@
+@using LrmCloud.Shared.DTOs.Auth
+@inject AuthService AuthService
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<RadzenStack Gap="1rem">
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+        <RadzenIcon Icon="warning" Style="color: var(--rz-danger);" />
+        <RadzenText>This action is <strong>permanent</strong> and cannot be undone.</RadzenText>
+    </RadzenStack>
+
+    <RadzenText>Enter your password to confirm account deletion.</RadzenText>
+
+    <RadzenFormField Text="Password" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+        <ChildContent>
+            <RadzenPassword @bind-Value="_deletePassword" Style="width: 100%;" autocomplete="current-password" />
+        </ChildContent>
+    </RadzenFormField>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
+            @_errorMessage
+        </RadzenAlert>
+    }
+
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+        <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" Disabled="@_isDeleting" />
+        <RadzenButton ButtonStyle="ButtonStyle.Danger" Text="Delete My Account" Click="@DeleteAccountAsync" Disabled="@(string.IsNullOrEmpty(_deletePassword) || _isDeleting)" IsBusy="@_isDeleting" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    private string _deletePassword = string.Empty;
+    private bool _isDeleting;
+    private string? _errorMessage;
+
+    private async Task DeleteAccountAsync()
+    {
+        if (string.IsNullOrEmpty(_deletePassword)) return;
+
+        _isDeleting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var request = new DeleteAccountRequest { Password = _deletePassword };
+            var result = await AuthService.DeleteAccountAsync(request);
+
+            if (result.IsSuccess)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Account deleted successfully");
+                DialogService.Close(true);
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage ?? "Failed to delete account";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isDeleting = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(false);
+    }
+}

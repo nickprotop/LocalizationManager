@@ -1,192 +1,109 @@
 @using LrmCloud.Web.Models
 
-<MudStack Spacing="3">
+<RadzenStack Gap="1rem">
     @* Key Name *@
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
-        <MudStack Spacing="0">
-            <MudText Typo="Typo.overline" Color="Color.Secondary">Key Name</MudText>
-            <MudText Typo="Typo.h6" Style="word-break: break-all;">@Row.KeyName</MudText>
-        </MudStack>
-        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
-                       Size="Size.Small"
-                       OnClick="@CopyKeyName" />
-    </MudStack>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
+        <RadzenStack Gap="0">
+            <RadzenText TextStyle="TextStyle.Overline" class="rz-color-secondary">Key Name</RadzenText>
+            <RadzenText TextStyle="TextStyle.H6" Style="word-break: break-all;">@Row.KeyName</RadzenText>
+        </RadzenStack>
+        <RadzenButton Icon="content_copy" Variant="Radzen.Variant.Text" Size="ButtonSize.Small" Click="@CopyKeyName" />
+    </RadzenStack>
 
     @* Status & Type *@
-    <MudStack Row="true" Spacing="2">
-        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(Row.Status)">
-            @Row.Status
-        </MudChip>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+        <RadzenBadge BadgeStyle="@GetStatusBadgeStyle(Row.Status)" Text="@Row.Status.ToString()" />
         @if (Row.IsPlural)
         {
-            <MudChip T="string" Size="Size.Small" Color="Color.Info">
-                Plural (@GetPluralFormCount() forms)
-            </MudChip>
+            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"Plural ({GetPluralFormCount()} forms)")" />
         }
-    </MudStack>
+    </RadzenStack>
 
     @* Comment Preview *@
     @if (!string.IsNullOrEmpty(Row.Comment))
     {
-        <MudStack Spacing="0">
-            <MudText Typo="Typo.overline" Color="Color.Secondary">Comment</MudText>
-            <MudText Typo="Typo.body2" Style="font-style: italic;">
+        <RadzenStack Gap="0">
+            <RadzenText TextStyle="TextStyle.Overline" class="rz-color-secondary">Comment</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" Style="font-style: italic;">
                 @Row.Comment
-            </MudText>
-        </MudStack>
+            </RadzenText>
+        </RadzenStack>
     }
 
-    <MudDivider />
+    <hr />
 
     @* Translations Preview *@
-    <MudText Typo="Typo.subtitle2">Translations</MudText>
+    <RadzenText TextStyle="TextStyle.Subtitle2">Translations</RadzenText>
 
-    <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
-        <tbody>
-            @foreach (var lang in Languages)
+    <RadzenDataGrid TItem="TranslationPreviewRow" Data="@GetTranslationPreviewRows()" Density="Density.Compact" AllowSorting="false">
+        <Columns>
+            <RadzenDataGridColumn TItem="TranslationPreviewRow" Title="Lang" Width="70px">
+                <Template Context="row">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                        <RadzenText TextStyle="TextStyle.Body2" Style="font-weight: 500;">@row.Language.ToUpperInvariant()</RadzenText>
+                        @if (row.IsDefault)
+                        {
+                            <RadzenIcon Icon="star" Style="font-size: 1rem; color: var(--rz-warning);" />
+                        }
+                    </RadzenStack>
+                </Template>
+            </RadzenDataGridColumn>
+            @if (Row.IsPlural)
             {
-                var isDefault = lang == DefaultLanguage;
-                var status = GetLanguageStatus(lang);
-
-                @if (Row.IsPlural)
-                {
-                    @* For plural keys, show each form *@
-                    var pluralForms = GetPluralFormsForLanguage(lang);
-                    var isFirst = true;
-                    @foreach (var (form, value) in pluralForms)
-                    {
-                        <tr>
-                            <td style="width: 70px; vertical-align: top; padding: 8px 4px;">
-                                @if (isFirst)
-                                {
-                                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                                        <MudText Typo="Typo.body2" Style="font-weight: 500;">
-                                            @lang.ToUpperInvariant()
-                                        </MudText>
-                                        @if (isDefault)
-                                        {
-                                            <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Warning" />
-                                        }
-                                    </MudStack>
-                                    isFirst = false;
-                                }
-                            </td>
-                            <td style="width: 50px; vertical-align: top; padding: 8px 4px;">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">@form</MudText>
-                            </td>
-                            <td style="vertical-align: top; padding: 8px 4px;">
-                                @if (string.IsNullOrEmpty(value))
-                                {
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Style="font-style: italic;">
-                                        (empty)
-                                    </MudText>
-                                }
-                                else
-                                {
-                                    <MudText Typo="Typo.body2" Style="word-break: break-word;">
-                                        @TruncateText(value, 80)
-                                    </MudText>
-                                }
-                            </td>
-                            <td style="width: 30px; text-align: center; vertical-align: top; padding: 8px 4px;">
-                                @if (isFirst || pluralForms.Count == 1)
-                                {
-                                    @switch (status)
-                                    {
-                                        case TranslationStatus.Complete:
-                                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" />
-                                            break;
-                                        case TranslationStatus.Partial:
-                                            <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" />
-                                            break;
-                                        case TranslationStatus.Missing:
-                                            <MudIcon Icon="@Icons.Material.Filled.Error" Size="Size.Small" Color="Color.Error" />
-                                            break;
-                                    }
-                                }
-                            </td>
-                        </tr>
-                    }
-                }
-                else
-                {
-                    @* For single keys, show one row *@
-                    var value = GetTranslationPreview(lang);
-                    <tr>
-                        <td style="width: 70px; vertical-align: top; padding: 8px 4px;">
-                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                                <MudText Typo="Typo.body2" Style="font-weight: 500;">
-                                    @lang.ToUpperInvariant()
-                                </MudText>
-                                @if (isDefault)
-                                {
-                                    <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Warning" />
-                                }
-                            </MudStack>
-                        </td>
-                        <td style="vertical-align: top; padding: 8px 4px;" colspan="2">
-                            @if (string.IsNullOrEmpty(value))
-                            {
-                                <MudText Typo="Typo.body2" Color="Color.Secondary" Style="font-style: italic;">
-                                    (empty)
-                                </MudText>
-                            }
-                            else
-                            {
-                                <MudText Typo="Typo.body2" Style="word-break: break-word;">
-                                    @TruncateText(value, 100)
-                                </MudText>
-                            }
-                        </td>
-                        <td style="width: 30px; text-align: center; vertical-align: top; padding: 8px 4px;">
-                            @switch (status)
-                            {
-                                case TranslationStatus.Complete:
-                                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" />
-                                    break;
-                                case TranslationStatus.Partial:
-                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" />
-                                    break;
-                                case TranslationStatus.Missing:
-                                    <MudIcon Icon="@Icons.Material.Filled.Error" Size="Size.Small" Color="Color.Error" />
-                                    break;
-                            }
-                        </td>
-                    </tr>
-                }
+                <RadzenDataGridColumn TItem="TranslationPreviewRow" Title="Form" Width="50px">
+                    <Template Context="row">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@row.PluralForm</RadzenText>
+                    </Template>
+                </RadzenDataGridColumn>
             }
-        </tbody>
-    </MudSimpleTable>
+            <RadzenDataGridColumn TItem="TranslationPreviewRow" Title="Value">
+                <Template Context="row">
+                    @if (string.IsNullOrEmpty(row.Value))
+                    {
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="font-style: italic;">(empty)</RadzenText>
+                    }
+                    else
+                    {
+                        <RadzenText TextStyle="TextStyle.Body2" Style="word-break: break-word;">@TruncateText(row.Value, 80)</RadzenText>
+                    }
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="TranslationPreviewRow" Width="30px">
+                <Template Context="row">
+                    @if (row.ShowStatus)
+                    {
+                        @switch (row.Status)
+                        {
+                            case TranslationStatus.Complete:
+                                <RadzenIcon Icon="check_circle" Style="font-size: 1rem; color: var(--rz-success);" />
+                                break;
+                            case TranslationStatus.Partial:
+                                <RadzenIcon Icon="warning" Style="font-size: 1rem; color: var(--rz-warning);" />
+                                break;
+                            case TranslationStatus.Missing:
+                                <RadzenIcon Icon="error" Style="font-size: 1rem; color: var(--rz-danger);" />
+                                break;
+                        }
+                    }
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
 
-    <MudDivider Class="my-2" />
+    <hr />
 
     @* Actions *@
-    <MudStack Row="true" Justify="Justify.SpaceBetween">
-        <MudButton Variant="Variant.Outlined"
-                   Color="Color.Error"
-                   Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.Delete"
-                   OnClick="@HandleDelete">
-            Delete
-        </MudButton>
-        <MudStack Row="true" Spacing="2">
-            <MudButton Variant="Variant.Outlined"
-                       Color="Color.Primary"
-                       Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Translate"
-                       OnClick="@HandleTranslateAll">
-                Translate
-            </MudButton>
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Edit"
-                       OnClick="@HandleEdit">
-                Edit
-            </MudButton>
-        </MudStack>
-    </MudStack>
-</MudStack>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+        <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Danger"
+                      Size="ButtonSize.Small" Icon="delete" Text="Delete" Click="@HandleDelete" />
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary"
+                          Size="ButtonSize.Small" Icon="translate" Text="Translate" Click="@HandleTranslateAll" />
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                          Icon="edit" Text="Edit" Click="@HandleEdit" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenStack>
 
 @code {
     [Parameter]
@@ -208,7 +125,7 @@
     public EventCallback<TranslationGridRow> OnDelete { get; set; }
 
     [Inject]
-    private ISnackbar Snackbar { get; set; } = default!;
+    private NotificationService NotificationService { get; set; } = default!;
 
     [Inject]
     private IJSRuntime JS { get; set; } = default!;
@@ -224,32 +141,51 @@
             .Count();
     }
 
-    private string? GetTranslationPreview(string lang)
+    private List<TranslationPreviewRow> GetTranslationPreviewRows()
     {
-        if (Row.IsPlural)
-        {
-            // For plural keys, show the "other" form or first available
-            var otherKey = TranslationGridRow.GetKey(lang, PluralForms.Other);
-            var otherCell = Row.Translations.GetValueOrDefault(otherKey);
-            if (!string.IsNullOrEmpty(otherCell?.Value))
-                return otherCell.Value;
+        var rows = new List<TranslationPreviewRow>();
 
-            // Fall back to any plural form with a value
-            return Row.Translations.Values
-                .Where(t => t.LanguageCode == lang && !string.IsNullOrEmpty(t.Value))
-                .Select(t => t.Value)
-                .FirstOrDefault();
-        }
-        else
+        foreach (var lang in Languages)
         {
-            return Row.Translations.GetValueOrDefault(lang)?.Value;
+            var isDefault = lang == DefaultLanguage;
+            var status = GetLanguageStatus(lang);
+
+            if (Row.IsPlural)
+            {
+                var pluralForms = GetPluralFormsForLanguage(lang);
+                var isFirst = true;
+                foreach (var (form, value) in pluralForms)
+                {
+                    rows.Add(new TranslationPreviewRow
+                    {
+                        Language = isFirst ? lang : "",
+                        PluralForm = form,
+                        Value = value,
+                        IsDefault = isDefault && isFirst,
+                        Status = status,
+                        ShowStatus = isFirst
+                    });
+                    isFirst = false;
+                }
+            }
+            else
+            {
+                var value = Row.Translations.GetValueOrDefault(lang)?.Value;
+                rows.Add(new TranslationPreviewRow
+                {
+                    Language = lang,
+                    PluralForm = "",
+                    Value = value,
+                    IsDefault = isDefault,
+                    Status = status,
+                    ShowStatus = true
+                });
+            }
         }
+
+        return rows;
     }
 
-    /// <summary>
-    /// Gets all plural forms with their values for a language.
-    /// Returns forms in standard order (one, other, zero, two, few, many).
-    /// </summary>
     private List<(string Form, string? Value)> GetPluralFormsForLanguage(string lang)
     {
         var result = new List<(string Form, string? Value)>();
@@ -263,7 +199,6 @@
             }
         }
 
-        // If no forms found, return at least "other" as empty
         if (result.Count == 0)
         {
             result.Add((PluralForms.Other, null));
@@ -305,18 +240,18 @@
         return text[..maxLength] + "...";
     }
 
-    private static Color GetStatusColor(TranslationStatus status) => status switch
+    private static BadgeStyle GetStatusBadgeStyle(TranslationStatus status) => status switch
     {
-        TranslationStatus.Complete => Color.Success,
-        TranslationStatus.Partial => Color.Warning,
-        TranslationStatus.Missing => Color.Error,
-        _ => Color.Default
+        TranslationStatus.Complete => BadgeStyle.Success,
+        TranslationStatus.Partial => BadgeStyle.Warning,
+        TranslationStatus.Missing => BadgeStyle.Danger,
+        _ => BadgeStyle.Light
     };
 
     private async Task CopyKeyName()
     {
         await JS.InvokeVoidAsync("navigator.clipboard.writeText", Row.KeyName);
-        Snackbar.Add("Key name copied!", Severity.Success);
+        NotificationService.Notify(NotificationSeverity.Success, "Copied", "Key name copied!");
     }
 
     private async Task HandleEdit()
@@ -332,5 +267,15 @@
     private async Task HandleDelete()
     {
         await OnDelete.InvokeAsync(Row);
+    }
+
+    private class TranslationPreviewRow
+    {
+        public string Language { get; set; } = "";
+        public string PluralForm { get; set; } = "";
+        public string? Value { get; set; }
+        public bool IsDefault { get; set; }
+        public TranslationStatus Status { get; set; }
+        public bool ShowStatus { get; set; }
     }
 }

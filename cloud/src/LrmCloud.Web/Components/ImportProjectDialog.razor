@@ -2,141 +2,134 @@
 @using LrmCloud.Shared.DTOs.Sync
 @using LrmCloud.Web.Services
 @inject ProjectService ProjectService
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
 @inject NavigationManager Navigation
+@inject Radzen.DialogService DialogService
 
-<MudDialog @bind-Visible="_visible" Options="_dialogOptions">
-    <TitleContent>
-        <MudText Typo="Typo.h6">
-            <MudIcon Icon="@Icons.Material.Filled.Upload" Class="mr-2" />
-            Import Project
-        </MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudTabs @bind-ActivePanelIndex="_currentStep" Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-3">
-            <MudTabPanel Text="1. Upload" Disabled="@(_currentStep > 0)">
-                <MudStack Spacing="3">
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+<RadzenStack Gap="1rem">
+    <RadzenTabs @bind-SelectedIndex="_currentStep" RenderMode="TabRenderMode.Client">
+        <Tabs>
+            <RadzenTabsItem Text="1. Upload" Disabled="@(_currentStep > 0)">
+                <RadzenStack Gap="1rem" Style="padding: 1rem;">
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
                         Upload your localization files to create a new project. Supported formats:
-                    </MudText>
-                    <MudStack Row="true" Spacing="2" Class="mb-2">
-                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">.resx</MudChip>
-                        <MudChip T="string" Size="Size.Small" Color="Color.Info">.json</MudChip>
-                        <MudChip T="string" Size="Size.Small" Color="Color.Success">.xml (Android)</MudChip>
-                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">.strings (iOS)</MudChip>
-                    </MudStack>
+                    </RadzenText>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                        <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text=".resx" />
+                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text=".json" />
+                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text=".xml (Android)" />
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text=".strings (iOS)" />
+                    </RadzenStack>
 
-                    <MudFileUpload T="IReadOnlyList<IBrowserFile>"
-                                   FilesChanged="OnFilesChanged"
-                                   Accept=".resx,.json,.xml,.strings,.stringsdict"
-                                   MaximumFileCount="50"
-                                   Class="mt-0">
-                        <ActivatorContent>
-                            <MudPaper Outlined="true" Class="pa-8 d-flex flex-column align-center justify-center cursor-pointer"
-                                      Style="border-style: dashed; min-height: 150px;">
-                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Secondary" />
-                                <MudText Typo="Typo.body1" Class="mt-2">Drop files here or click to browse</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    .resx, .json, .xml (Android), .strings (iOS) files (max 50 files)
-                                </MudText>
-                            </MudPaper>
-                        </ActivatorContent>
-                    </MudFileUpload>
+                    <RadzenCard Style="border: 2px dashed var(--rz-base-400); padding: 2rem; text-align: center; cursor: pointer;">
+                        <InputFile OnChange="OnFilesChanged" multiple accept=".resx,.json,.xml,.strings,.stringsdict"
+                                   style="position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer;" />
+                        <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="cloud_upload" Style="font-size: 3rem; color: var(--rz-secondary);" />
+                            <RadzenText TextStyle="TextStyle.Body1">Drop files here or click to browse</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                .resx, .json, .xml (Android), .strings (iOS) files (max 50 files)
+                            </RadzenText>
+                        </RadzenStack>
+                    </RadzenCard>
 
                     @if (_uploadedFiles.Any())
                     {
-                        <MudText Typo="Typo.subtitle2" Class="mt-4">Selected Files (@_uploadedFiles.Count)</MudText>
-                        <MudList T="string" Dense="true">
-                            @foreach (var file in _uploadedFiles)
-                            {
-                                <MudListItem Icon="@GetFileIcon(file.Name)">
-                                    <div class="d-flex justify-space-between align-center" style="width: 100%;">
-                                        <MudText>@file.Name</MudText>
-                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                @FormatFileSize(file.Size)
-                                            </MudText>
-                                            <MudIconButton Icon="@Icons.Material.Filled.Close"
-                                                           Size="Size.Small"
-                                                           OnClick="@(() => RemoveFile(file))" />
-                                        </MudStack>
-                                    </div>
-                                </MudListItem>
-                            }
-                        </MudList>
+                        <RadzenText TextStyle="TextStyle.Subtitle2">Selected Files (@_uploadedFiles.Count)</RadzenText>
+                        <RadzenDataGrid TItem="IBrowserFile" Data="@_uploadedFiles" Density="Density.Compact" AllowSorting="false">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="IBrowserFile" Title="File">
+                                    <Template Context="file">
+                                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                            <RadzenIcon Icon="@GetFileIcon(file.Name)" />
+                                            <RadzenText TextStyle="TextStyle.Body2">@file.Name</RadzenText>
+                                        </RadzenStack>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="IBrowserFile" Title="Size" Width="80px">
+                                    <Template Context="file">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@FormatFileSize(file.Size)</RadzenText>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="IBrowserFile" Width="40px">
+                                    <Template Context="file">
+                                        <RadzenButton Icon="close" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                                      Click="@(() => RemoveFile(file))" />
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
+
+                        <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Next: Configure"
+                                      Click="@(() => _currentStep = 1)" />
                     }
+                </RadzenStack>
+            </RadzenTabsItem>
 
-                    @if (_uploadedFiles.Any())
-                    {
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => _currentStep = 1)" Class="mt-4">
-                            Next: Configure
-                        </MudButton>
-                    }
-                </MudStack>
-            </MudTabPanel>
+            <RadzenTabsItem Text="2. Configure" Disabled="@(_currentStep < 1)">
+                <RadzenStack Gap="1rem" Style="padding: 1rem;">
+                    <RadzenFormField Text="Project ID" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_projectSlug" Style="width: 100%;" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">URL-friendly ID (lowercase, no spaces, e.g., my-project)</RadzenText>
+                        </Helper>
+                    </RadzenFormField>
 
-            <MudTabPanel Text="2. Configure" Disabled="@(_currentStep < 1)">
-                <MudStack Spacing="3">
-                    <MudTextField @bind-Value="_projectSlug"
-                                  Label="Project ID"
-                                  Variant="Variant.Outlined"
-                                  Required="true"
-                                  RequiredError="Project ID is required"
-                                  HelperText="URL-friendly ID (lowercase, no spaces, e.g., my-project)" />
+                    <RadzenFormField Text="Display Name" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_projectName" Style="width: 100%;" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Human-readable name for display</RadzenText>
+                        </Helper>
+                    </RadzenFormField>
 
-                    <MudTextField @bind-Value="_projectName"
-                                  Label="Display Name"
-                                  Variant="Variant.Outlined"
-                                  Required="true"
-                                  RequiredError="Display name is required"
-                                  HelperText="Human-readable name for display" />
+                    <RadzenFormField Text="Description (optional)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextArea @bind-Value="_projectDescription" Rows="2" Style="width: 100%;" />
+                        </ChildContent>
+                    </RadzenFormField>
 
-                    <MudTextField @bind-Value="_projectDescription"
-                                  Label="Description (optional)"
-                                  Variant="Variant.Outlined"
-                                  Lines="2" />
+                    <RadzenFormField Text="Format" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenDropDown @bind-Value="_detectedFormat" Style="width: 100%;"
+                                            Data="@_formatOptions" TextProperty="Text" ValueProperty="Value" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Auto-detected from files</RadzenText>
+                        </Helper>
+                    </RadzenFormField>
 
-                    <MudSelect @bind-Value="_detectedFormat"
-                               Label="Format"
-                               Variant="Variant.Outlined"
-                               Required="true"
-                               HelperText="Auto-detected from files">
-                        <MudSelectItem Value="@("resx")">.resx (C#/.NET)</MudSelectItem>
-                        <MudSelectItem Value="@("json")">JSON Localization</MudSelectItem>
-                        <MudSelectItem Value="@("i18next")">i18next (JS/React)</MudSelectItem>
-                        <MudSelectItem Value="@("android")">Android strings.xml</MudSelectItem>
-                        <MudSelectItem Value="@("ios")">iOS .strings/.stringsdict</MudSelectItem>
-                    </MudSelect>
-
-                    <MudTextField @bind-Value="_defaultLanguage"
-                                  Label="Default Language"
-                                  Variant="Variant.Outlined"
-                                  Required="true"
-                                  HelperText="e.g., en, en-US (auto-detected)" />
+                    <RadzenFormField Text="Default Language" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_defaultLanguage" Style="width: 100%;" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">e.g., en, en-US (auto-detected)</RadzenText>
+                        </Helper>
+                    </RadzenFormField>
 
                     @if (_detectedLanguages.Any())
                     {
-                        <MudText Typo="Typo.subtitle2">Detected Languages</MudText>
-                        <MudStack Row="true" Spacing="1" Class="flex-wrap">
-                            @foreach (var lang in _detectedLanguages)
-                            {
-                                <MudChip T="string" Size="Size.Small"
-                                         Color="@(lang == _defaultLanguage ? Color.Primary : Color.Default)">
-                                    @lang
-                                    @if (lang == _defaultLanguage)
-                                    {
-                                        <MudText Typo="Typo.caption" Class="ml-1">(default)</MudText>
-                                    }
-                                </MudChip>
-                            }
-                        </MudStack>
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenText TextStyle="TextStyle.Subtitle2">Detected Languages</RadzenText>
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                                @foreach (var lang in _detectedLanguages)
+                                {
+                                    <RadzenBadge BadgeStyle="@(lang == _defaultLanguage ? BadgeStyle.Primary : BadgeStyle.Light)"
+                                                 Text="@(lang == _defaultLanguage ? $"{lang} (default)" : lang)" />
+                                }
+                            </RadzenStack>
+                        </RadzenStack>
                     }
 
                     @if (_parseErrors.Any())
                     {
-                        <MudAlert Severity="Severity.Warning" Dense="true">
-                            <MudText Typo="Typo.body2">Some files had issues:</MudText>
-                            <ul class="mb-0">
+                        <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                            <RadzenText TextStyle="TextStyle.Body2">Some files had issues:</RadzenText>
+                            <ul style="margin: 0; padding-left: 1.5rem;">
                                 @foreach (var error in _parseErrors.Take(5))
                                 {
                                     <li>@error</li>
@@ -146,114 +139,93 @@
                                     <li>...and @(_parseErrors.Count - 5) more</li>
                                 }
                             </ul>
-                        </MudAlert>
+                        </RadzenAlert>
                     }
 
-                    <MudStack Row="true" Spacing="2" Class="mt-4">
-                        <MudButton Variant="Variant.Outlined" OnClick="@(() => _currentStep = 0)">
-                            Back
-                        </MudButton>
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                   Disabled="@(string.IsNullOrWhiteSpace(_projectName))"
-                                   OnClick="@(() => _currentStep = 2)">
-                            Next: Review
-                        </MudButton>
-                    </MudStack>
-                </MudStack>
-            </MudTabPanel>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+                        <RadzenButton Variant="Radzen.Variant.Outlined" Text="Back" Click="@(() => _currentStep = 0)" />
+                        <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Next: Review"
+                                      Disabled="@(string.IsNullOrWhiteSpace(_projectName))"
+                                      Click="@(() => _currentStep = 2)" />
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenTabsItem>
 
-            <MudTabPanel Text="3. Import" Disabled="@(_currentStep < 2)">
-                @if (_isImporting)
-                {
-                    <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="py-4">
-                        <MudProgressCircular Indeterminate="true" Size="Size.Large" />
-                        <MudText>Importing project...</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            Processing @_uploadedFiles.Count files
-                        </MudText>
-                    </MudStack>
-                }
-                else if (_importComplete)
-                {
-                    <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="py-4">
-                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success"
-                                 Style="font-size: 4rem;" />
-                        <MudText Typo="Typo.h6">Import Complete!</MudText>
-                        <MudText Color="Color.Secondary">
-                            Created project "@_projectName" with @_importedKeyCount keys
-                            in @_detectedLanguages.Count languages.
-                        </MudText>
+            <RadzenTabsItem Text="3. Import" Disabled="@(_currentStep < 2)">
+                <RadzenStack Gap="1rem" Style="padding: 1rem;">
+                    @if (_isImporting)
+                    {
+                        <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                            <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Large" />
+                            <RadzenText TextStyle="TextStyle.H6">Importing project...</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Processing @_uploadedFiles.Count files
+                            </RadzenText>
+                        </RadzenStack>
+                    }
+                    else if (_importComplete)
+                    {
+                        <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                            <RadzenIcon Icon="check_circle" Style="font-size: 4rem; color: var(--rz-success);" />
+                            <RadzenText TextStyle="TextStyle.H6">Import Complete!</RadzenText>
+                            <RadzenText class="rz-color-secondary">
+                                Created project "@_projectName" with @_importedKeyCount keys
+                                in @_detectedLanguages.Count languages.
+                            </RadzenText>
 
-                        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-4">
-                            <MudText Typo="Typo.body2">
-                                <strong>Sync with CLI:</strong> Use this command to keep your local files in sync:
-                            </MudText>
-                            <MudText Typo="Typo.body2" Class="mt-1" Style="font-family: monospace;">
-                                lrm cloud sync --project @_createdProject?.Id
-                            </MudText>
-                        </MudAlert>
-                    </MudStack>
-                }
-                else
-                {
-                    <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="py-4">
-                        <MudText Typo="Typo.body1">Ready to import:</MudText>
-                        <MudSimpleTable Dense="true" Bordered="true">
-                            <tbody>
-                                <tr>
-                                    <td><strong>Project Name</strong></td>
-                                    <td>@_projectName</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Format</strong></td>
-                                    <td>@_detectedFormat</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Files</strong></td>
-                                    <td>@_uploadedFiles.Count</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Languages</strong></td>
-                                    <td>@string.Join(", ", _detectedLanguages)</td>
-                                </tr>
-                            </tbody>
-                        </MudSimpleTable>
-                    </MudStack>
-                }
-            </MudTabPanel>
-        </MudTabs>
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+                                <RadzenText TextStyle="TextStyle.Body2">
+                                    <strong>Sync with CLI:</strong> Use this command to keep your local files in sync:
+                                </RadzenText>
+                                <RadzenText TextStyle="TextStyle.Body2" Style="font-family: monospace; margin-top: 0.5rem;">
+                                    lrm cloud sync --project @_createdProject?.Id
+                                </RadzenText>
+                            </RadzenAlert>
+                        </RadzenStack>
+                    }
+                    else
+                    {
+                        <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                            <RadzenText TextStyle="TextStyle.Body1">Ready to import:</RadzenText>
+                            <RadzenDataGrid TItem="KeyValuePair<string, string>" Data="@GetSummaryItems()"
+                                            Density="Density.Compact" AllowSorting="false">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="KeyValuePair<string, string>" Property="Key" Title="Property" />
+                                    <RadzenDataGridColumn TItem="KeyValuePair<string, string>" Property="Value" Title="Value" />
+                                </Columns>
+                            </RadzenDataGrid>
+                        </RadzenStack>
+                    }
+                </RadzenStack>
+            </RadzenTabsItem>
+        </Tabs>
+    </RadzenTabs>
 
-        @if (!string.IsNullOrEmpty(_errorMessage))
-        {
-            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-4">@_errorMessage</MudAlert>
-        }
-    </DialogContent>
-    <DialogActions>
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+            @_errorMessage
+        </RadzenAlert>
+    }
+
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
         @if (_importComplete)
         {
-            <MudButton OnClick="Close">Close</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled"
-                       OnClick="@(() => GoToProject(_createdProject?.Id ?? 0))">
-                Open Project
-            </MudButton>
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Close" Click="@Close" />
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Open Project"
+                          Click="@(() => GoToProject(_createdProject?.Id ?? 0))" />
         }
         else
         {
-            <MudButton OnClick="Close" Disabled="_isImporting">Cancel</MudButton>
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Close" Disabled="@_isImporting" />
             @if (_currentStep == 2)
             {
-                <MudButton Color="Color.Primary" Variant="Variant.Filled"
-                           OnClick="ImportProject" Disabled="_isImporting">
-                    @if (_isImporting)
-                    {
-                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                    }
-                    Import
-                </MudButton>
+                <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="@(_isImporting ? "Importing..." : "Import")"
+                              Click="@ImportProject" Disabled="@_isImporting" IsBusy="@_isImporting" />
             }
         }
-    </DialogActions>
-</MudDialog>
+    </RadzenStack>
+</RadzenStack>
 
 @code {
     [Parameter]
@@ -262,7 +234,6 @@
     [Parameter]
     public int? OrganizationId { get; set; }
 
-    private bool _visible;
     private int _currentStep = 0;
 
     // Step 1: File upload
@@ -284,46 +255,23 @@
     private ProjectDto? _createdProject;
     private string? _errorMessage;
 
-    private readonly DialogOptions _dialogOptions = new()
+    private readonly List<object> _formatOptions = new()
     {
-        MaxWidth = MaxWidth.Medium,
-        FullWidth = true,
-        CloseOnEscapeKey = true
+        new { Value = "resx", Text = ".resx (C#/.NET)" },
+        new { Value = "json", Text = "JSON Localization" },
+        new { Value = "i18next", Text = "i18next (JS/React)" },
+        new { Value = "android", Text = "Android strings.xml" },
+        new { Value = "ios", Text = "iOS .strings/.stringsdict" }
     };
-
-    public void Open()
-    {
-        Reset();
-        _visible = true;
-        StateHasChanged();
-    }
-
-    private void Reset()
-    {
-        _currentStep = 0;
-        _uploadedFiles = new();
-        _projectSlug = "";
-        _projectName = "";
-        _projectDescription = "";
-        _detectedFormat = "resx";
-        _defaultLanguage = "en";
-        _detectedLanguages = new();
-        _parseErrors = new();
-        _isImporting = false;
-        _importComplete = false;
-        _importedKeyCount = 0;
-        _createdProject = null;
-        _errorMessage = null;
-    }
 
     private void Close()
     {
-        _visible = false;
+        DialogService.Close(null);
     }
 
-    private void OnFilesChanged(IReadOnlyList<IBrowserFile> files)
+    private void OnFilesChanged(InputFileChangeEventArgs e)
     {
-        _uploadedFiles = files.ToList();
+        _uploadedFiles = e.GetMultipleFiles(50).ToList();
         AnalyzeFiles();
         StateHasChanged();
     }
@@ -341,7 +289,6 @@
 
         if (!_uploadedFiles.Any()) return;
 
-        // Detect format from file extensions
         var hasResx = _uploadedFiles.Any(f => f.Name.EndsWith(".resx", StringComparison.OrdinalIgnoreCase));
         var hasJson = _uploadedFiles.Any(f => f.Name.EndsWith(".json", StringComparison.OrdinalIgnoreCase));
 
@@ -360,17 +307,15 @@
             _parseErrors.Add("Mixed file types detected. Please upload only .resx OR .json files.");
         }
 
-        // Auto-generate project name from first file
         if (string.IsNullOrEmpty(_projectName) && _uploadedFiles.Any())
         {
             var firstFile = _uploadedFiles.First().Name;
             var baseName = System.IO.Path.GetFileNameWithoutExtension(firstFile);
-            // Remove language suffix if present
             var dotIndex = baseName.LastIndexOf('.');
             if (dotIndex > 0)
             {
                 var possibleLang = baseName[(dotIndex + 1)..];
-                if (possibleLang.Length <= 5) // e.g., "en", "en-US"
+                if (possibleLang.Length <= 5)
                 {
                     baseName = baseName[..dotIndex];
                 }
@@ -384,12 +329,10 @@
         foreach (var file in _uploadedFiles)
         {
             var fileName = System.IO.Path.GetFileNameWithoutExtension(file.Name);
-
-            // Parse language from filename: Resources.en.resx, Resources.resx
             var parts = fileName.Split('.');
             if (parts.Length >= 2)
             {
-                var lang = parts[^1]; // Last part
+                var lang = parts[^1];
                 if (lang.Length <= 5 && !lang.Equals("resx", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!_detectedLanguages.Contains(lang))
@@ -398,7 +341,6 @@
             }
             else
             {
-                // Default language file (no suffix)
                 if (!_detectedLanguages.Contains(_defaultLanguage))
                     _detectedLanguages.Insert(0, _defaultLanguage);
             }
@@ -414,15 +356,13 @@
         {
             var fileName = System.IO.Path.GetFileNameWithoutExtension(file.Name);
 
-            // Common patterns: en.json, strings.en.json, locales/en.json
-            if (fileName.Length <= 5) // Direct language file: en.json, fr.json
+            if (fileName.Length <= 5)
             {
                 if (!_detectedLanguages.Contains(fileName))
                     _detectedLanguages.Add(fileName);
             }
             else
             {
-                // Try to extract language: strings.en.json
                 var parts = fileName.Split('.');
                 if (parts.Length >= 2)
                 {
@@ -439,7 +379,6 @@
         if (!_detectedLanguages.Any())
             _detectedLanguages.Add(_defaultLanguage);
 
-        // Set default language to first detected
         if (_detectedLanguages.Any())
             _defaultLanguage = _detectedLanguages.First();
     }
@@ -453,7 +392,6 @@
 
         try
         {
-            // Create the project first
             var createRequest = new CreateProjectRequest
             {
                 Slug = _projectSlug.Trim().ToLowerInvariant(),
@@ -473,13 +411,11 @@
 
             _createdProject = createResult.Data;
 
-            // Read file contents and create FileDtos
             var fileDtos = new List<FileDto>();
             foreach (var file in _uploadedFiles)
             {
                 try
                 {
-                    // Read file content (max 10MB per file)
                     await using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
                     using var reader = new StreamReader(stream);
                     var content = await reader.ReadToEndAsync();
@@ -496,7 +432,6 @@
                 }
             }
 
-            // Import files if we have any
             if (fileDtos.Count > 0)
             {
                 var importResult = await ProjectService.ImportFilesAsync(_createdProject.Id, fileDtos);
@@ -510,7 +445,6 @@
                 }
             }
 
-            // Refresh project data to get updated counts
             var updatedProject = await ProjectService.GetProjectAsync(_createdProject.Id);
             if (updatedProject != null)
             {
@@ -521,7 +455,7 @@
             _importComplete = true;
 
             await OnProjectImported.InvokeAsync(_createdProject);
-            Snackbar.Add($"Project '{_projectName}' created with {_importedKeyCount} keys!", Severity.Success);
+            NotificationService.Notify(NotificationSeverity.Success, "Success", $"Project '{_projectName}' created with {_importedKeyCount} keys!");
         }
         catch (Exception ex)
         {
@@ -535,14 +469,14 @@
 
     private void GoToProject(int projectId)
     {
-        Close();
+        DialogService.Close(true);
         Navigation.NavigateTo($"projects/{projectId}");
     }
 
     private static string GetFileIcon(string fileName) =>
         fileName.EndsWith(".resx", StringComparison.OrdinalIgnoreCase)
-            ? Icons.Material.Filled.Code
-            : Icons.Material.Filled.DataObject;
+            ? "code"
+            : "data_object";
 
     private static string FormatFileSize(long bytes)
     {
@@ -550,4 +484,12 @@
         if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
         return $"{bytes / (1024.0 * 1024):F1} MB";
     }
+
+    private List<KeyValuePair<string, string>> GetSummaryItems() => new()
+    {
+        new("Project Name", _projectName),
+        new("Format", _detectedFormat),
+        new("Files", _uploadedFiles.Count.ToString()),
+        new("Languages", string.Join(", ", _detectedLanguages))
+    };
 }

@@ -1,61 +1,52 @@
 @* Global error boundary component - catches and displays unhandled errors gracefully *@
 @inherits ErrorBoundary
-@inject ISnackbar Snackbar
+@inject NotificationService NotificationService
 @inject ILogger<GlobalErrorBoundary> Logger
 
 @if (CurrentException != null)
 {
-    <MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
-        <MudPaper Elevation="3" Class="pa-6">
-            <MudStack AlignItems="AlignItems.Center" Spacing="4">
-                <MudIcon Icon="@Icons.Material.Filled.Error"
-                         Color="Color.Error"
-                         Style="font-size: 5rem;" />
+    <div style="display: flex; justify-content: center; padding: 2rem;">
+        <RadzenCard Style="max-width: 500px; width: 100%;">
+            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                <RadzenIcon Icon="error" Style="font-size: 5rem; color: var(--rz-danger);" />
 
-                <MudText Typo="Typo.h5" Align="Align.Center">
+                <RadzenText TextStyle="TextStyle.H5" TextAlign="TextAlign.Center">
                     Something went wrong
-                </MudText>
+                </RadzenText>
 
-                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+                <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary" TextAlign="TextAlign.Center">
                     We're sorry, but an unexpected error occurred. Please try again.
-                </MudText>
+                </RadzenText>
 
                 @if (ShowDetails)
                 {
-                    <MudExpansionPanels Class="mud-width-full">
-                        <MudExpansionPanel Text="Error Details">
-                            <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="font-family: monospace; white-space: pre-wrap; word-break: break-word;">
+                    <details style="width: 100%; margin-top: 1rem;">
+                        <summary style="cursor: pointer; font-weight: 500;">Error Details</summary>
+                        <RadzenCard Style="margin-top: 0.5rem; background: var(--rz-base-200);">
+                            <RadzenText TextStyle="TextStyle.Body2" Style="font-family: monospace; white-space: pre-wrap; word-break: break-word;">
                                 @CurrentException.Message
-                            </MudText>
+                            </RadzenText>
                             @if (CurrentException.InnerException != null)
                             {
-                                <MudDivider Class="my-2" />
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Inner Exception:</MudText>
-                                <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="font-family: monospace; white-space: pre-wrap; word-break: break-word;">
+                                <hr style="margin: 0.5rem 0;" />
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Inner Exception:</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Body2" Style="font-family: monospace; white-space: pre-wrap; word-break: break-word;">
                                     @CurrentException.InnerException.Message
-                                </MudText>
+                                </RadzenText>
                             }
-                        </MudExpansionPanel>
-                    </MudExpansionPanels>
+                        </RadzenCard>
+                    </details>
                 }
 
-                <MudStack Row="true" Spacing="2">
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.Refresh"
-                               OnClick="@Recover">
-                        Try Again
-                    </MudButton>
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.Home"
-                               Href="/app">
-                        Go to Dashboard
-                    </MudButton>
-                </MudStack>
-            </MudStack>
-        </MudPaper>
-    </MudContainer>
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Style="margin-top: 1rem;">
+                    <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary"
+                                  Icon="refresh" Text="Try Again" Click="@Recover" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary"
+                                  Icon="home" Text="Go to Dashboard" Click="@(() => NavigateHome())" />
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenCard>
+    </div>
 }
 else
 {
@@ -65,6 +56,9 @@ else
 @code {
     [Parameter]
     public bool ShowDetails { get; set; }
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = null!;
 
 #if DEBUG
     protected override void OnInitialized()
@@ -76,7 +70,12 @@ else
     protected override Task OnErrorAsync(Exception exception)
     {
         Logger.LogError(exception, "Unhandled error caught by GlobalErrorBoundary");
-        Snackbar.Add("An unexpected error occurred", Severity.Error);
+        NotificationService.Notify(NotificationSeverity.Error, "Error", "An unexpected error occurred");
         return Task.CompletedTask;
+    }
+
+    private void NavigateHome()
+    {
+        Navigation.NavigateTo("/app");
     }
 }
