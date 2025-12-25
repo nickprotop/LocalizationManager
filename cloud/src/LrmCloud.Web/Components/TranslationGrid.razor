@@ -88,10 +88,8 @@
                 ShowPagingSummary="true"
                 PagingSummaryFormat="Showing {0} to {1} of {2} items"
                 Density="Density.Compact"
-                SelectionMode="DataGridSelectionMode.Multiple"
                 AllowRowSelectOnRowClick="false"
                 RowClick="@OnRowClick"
-                @bind-Value="_selectedItems"
                 EditMode="Radzen.DataGridEditMode.Single"
                 Style="height: calc(100vh - 320px);"
                 RowStyle="cursor: pointer;">
@@ -440,6 +438,7 @@
         {
             _selectedItems.Clear();
         }
+        StateHasChanged();
     }
 
     private void OnRowSelectionChanged(TranslationGridRow row, bool selected)
@@ -454,6 +453,7 @@
             _selectedItems.Remove(row);
         }
         _selectAll = _selectedItems.Count == _data.Count() && _data.Any();
+        StateHasChanged();
     }
 
     private void OnCellValueChanged(TranslationGridRow row, string languageCode, string value, string? pluralForm)
