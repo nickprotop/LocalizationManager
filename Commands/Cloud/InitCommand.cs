@@ -360,8 +360,8 @@ public class CloudInitCommand : Command<CloudInitCommandSettings>
         var projectChoices = projects.Select(p =>
         {
             var owner = p.OrganizationName ?? $"@{username}";
-            var format = !string.IsNullOrEmpty(p.Format) ? $" [{p.Format}]" : "";
-            return $"{p.Name} ({owner}/{p.Name}){format}";
+            var format = !string.IsNullOrEmpty(p.Format) ? $" ({p.Format})" : "";
+            return $"{p.Name} - {owner}/{p.Name}{format}";
         }).ToList();
 
         var selectedChoice = AnsiConsole.Prompt(
