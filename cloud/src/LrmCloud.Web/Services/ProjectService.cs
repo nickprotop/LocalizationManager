@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using LrmCloud.Shared.Api;
 using LrmCloud.Shared.DTOs;
 using LrmCloud.Shared.DTOs.Projects;
@@ -12,10 +13,12 @@ namespace LrmCloud.Web.Services;
 public class ProjectService
 {
     private readonly HttpClient _httpClient;
+    private readonly JsonSerializerOptions _jsonOptions;
 
-    public ProjectService(HttpClient httpClient)
+    public ProjectService(HttpClient httpClient, JsonSerializerOptions jsonOptions)
     {
         _httpClient = httpClient;
+        _jsonOptions = jsonOptions;
     }
 
     public async Task<List<ProjectDto>> GetProjectsAsync(int? organizationId = null)
@@ -84,7 +87,7 @@ public class ProjectService
     {
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("projects", request);
+            var response = await _httpClient.PostAsJsonAsync("projects", request, _jsonOptions);
 
             if (response.IsSuccessStatusCode)
             {
@@ -108,7 +111,7 @@ public class ProjectService
     {
         try
         {
-            var response = await _httpClient.PutAsJsonAsync($"projects/{id}", request);
+            var response = await _httpClient.PutAsJsonAsync($"projects/{id}", request, _jsonOptions);
 
             if (response.IsSuccessStatusCode)
             {
@@ -215,14 +218,40 @@ public class ProjectService
         try
         {
             var content = await response.Content.ReadAsStringAsync();
-            if (content.Contains("\"detail\""))
+            var doc = JsonDocument.Parse(content);
+
+            // Check for "detail" (custom API error message)
+            if (doc.RootElement.TryGetProperty("detail", out var detail))
             {
-                var problem = System.Text.Json.JsonDocument.Parse(content);
-                if (problem.RootElement.TryGetProperty("detail", out var detail))
+                return detail.GetString() ?? "An error occurred";
+            }
+
+            // Check for "errors" (validation errors)
+            if (doc.RootElement.TryGetProperty("errors", out var errors))
+            {
+                var errorMessages = new List<string>();
+                foreach (var field in errors.EnumerateObject())
                 {
-                    return detail.GetString() ?? "An error occurred";
+                    if (field.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var msg in field.Value.EnumerateArray())
+                        {
+                            errorMessages.Add(msg.GetString() ?? field.Name);
+                        }
+                    }
+                }
+                if (errorMessages.Count > 0)
+                {
+                    return string.Join(". ", errorMessages);
                 }
             }
+
+            // Check for "title" (general error title)
+            if (doc.RootElement.TryGetProperty("title", out var title))
+            {
+                return title.GetString() ?? "An error occurred";
+            }
+
             return content.Length < 200 ? content : "An error occurred";
         }
         catch

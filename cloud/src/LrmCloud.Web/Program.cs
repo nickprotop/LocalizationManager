@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -32,6 +33,10 @@ builder.Services.AddScoped<TokenStorageService>();
 builder.Services.AddScoped<LrmAuthStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<LrmAuthStateProvider>());
 builder.Services.AddAuthorizationCore();
+
+// JSON serialization options - use Web defaults (camelCase) to match API
+var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+builder.Services.AddSingleton(jsonOptions);
 
 // Configure HttpClient with API base URL and auth handler
 // Use the origin (scheme + host + port) with /api/ path, not relative to Blazor's /app/ base
