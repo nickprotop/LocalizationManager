@@ -1,0 +1,348 @@
+@page "/projects/{ProjectId:int}/validation"
+@using LrmCloud.Shared.DTOs.Resources
+@inject ResourceService ResourceService
+@inject ProjectService ProjectService
+@inject NavigationManager Navigation
+@inject NotificationService NotificationService
+@attribute [Authorize]
+
+<PageTitle>Validation - LRM Cloud</PageTitle>
+
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+    <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" Size="ButtonSize.Small" />
+    <RadzenBreadCrumb>
+        <RadzenBreadCrumbItem Path="" Text="Projects" />
+        <RadzenBreadCrumbItem Path="@($"projects/{ProjectId}")" Text="@_projectName" />
+        <RadzenBreadCrumbItem Text="Validation" />
+    </RadzenBreadCrumb>
+</RadzenStack>
+
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+    <RadzenStack Gap="0">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="verified" Style="vertical-align: middle;" />
+            <RadzenText TextStyle="TextStyle.H4">Validation Report</RadzenText>
+        </RadzenStack>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+            Identify duplicates, missing translations, empty values, and placeholder mismatches.
+        </RadzenText>
+    </RadzenStack>
+    <RadzenButton Variant="Radzen.Variant.Outlined" Icon="refresh" Text="Refresh"
+                  Click="@RefreshValidation" Disabled="@_isValidating" />
+</RadzenStack>
+
+@if (_isLoading)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+}
+else if (_validation == null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">Failed to load validation results.</RadzenAlert>
+}
+else
+{
+    @* Summary Cards *@
+    <RadzenRow Gap="1rem" class="rz-mb-4">
+        <RadzenColumn Size="12" SizeMD="3">
+            <RadzenCard Style="@(_validation.Summary.Errors > 0 ? "border-left: 4px solid var(--rz-danger);" : "")">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Errors</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H4" Style="color: var(--rz-danger);">@_validation.Summary.Errors</RadzenText>
+                    </RadzenStack>
+                    <RadzenIcon Icon="error" Style="font-size: 2rem; color: var(--rz-danger);" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="3">
+            <RadzenCard Style="@(_validation.Summary.Warnings > 0 ? "border-left: 4px solid var(--rz-warning);" : "")">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Warnings</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H4" Style="color: var(--rz-warning);">@_validation.Summary.Warnings</RadzenText>
+                    </RadzenStack>
+                    <RadzenIcon Icon="warning" Style="font-size: 2rem; color: var(--rz-warning);" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="3">
+            <RadzenCard Style="@(_validation.Summary.Info > 0 ? "border-left: 4px solid var(--rz-info);" : "")">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Info</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H4" Style="color: var(--rz-info);">@_validation.Summary.Info</RadzenText>
+                    </RadzenStack>
+                    <RadzenIcon Icon="info" Style="font-size: 2rem; color: var(--rz-info);" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="3">
+            <RadzenCard Style="@(_validation.IsValid ? "border-left: 4px solid var(--rz-success);" : "")">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Status</RadzenText>
+                        <RadzenText TextStyle="TextStyle.H6" Style="@($"color: var(--rz-{(_validation.IsValid ? "success" : "danger")});")">
+                            @(_validation.IsValid ? "Valid" : "Issues Found")
+                        </RadzenText>
+                    </RadzenStack>
+                    <RadzenIcon Icon="@(_validation.IsValid ? "check_circle" : "cancel")"
+                                Style="@($"font-size: 2rem; color: var(--rz-{(_validation.IsValid ? "success" : "danger")});")" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    @* Timestamp *@
+    @if (_validation.ValidatedAt.HasValue)
+    {
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mb-4">
+            Last validated: @_validation.ValidatedAt.Value.ToString("MMM dd, yyyy HH:mm:ss") UTC
+            @if (_validation.IsCached)
+            {
+                <span> (cached)</span>
+            }
+        </RadzenText>
+    }
+
+    @if (_validation.Summary.TotalIssues == 0)
+    {
+        <RadzenCard class="rz-p-6">
+            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                <RadzenIcon Icon="check_circle" Style="font-size: 4rem; color: var(--rz-success);" />
+                <RadzenText TextStyle="TextStyle.H5">All validations passed!</RadzenText>
+                <RadzenText class="rz-color-secondary">Your project has no duplicate keys, missing translations, empty values, or placeholder mismatches.</RadzenText>
+            </RadzenStack>
+        </RadzenCard>
+    }
+    else
+    {
+        @* Filter *@
+        <RadzenCard class="rz-mb-4">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap">
+                <RadzenTextBox @bind-Value="_searchTerm" Placeholder="Search by key name..." Style="max-width: 300px;" />
+                <RadzenDropDown @bind-Value="_categoryFilter" Data="@GetCategoryOptions()" TextProperty="Text" ValueProperty="Value"
+                                Style="min-width: 180px;" AllowClear="true" Placeholder="All categories" />
+                <RadzenDropDown @bind-Value="_severityFilter" Data="@_severityOptions" TextProperty="Text" ValueProperty="Value"
+                                Style="min-width: 150px;" AllowClear="true" Placeholder="All severities" />
+            </RadzenStack>
+        </RadzenCard>
+
+        @* Issues by Category *@
+        @if (_validation.Summary.DuplicateKeys > 0 && MatchesCategoryFilter(ValidationCategory.Duplicate))
+        {
+            @IssueSection(("Duplicate Keys", "content_copy", _validation.Summary.DuplicateKeys,
+                BadgeStyle.Danger, GetIssuesByCategory(ValidationCategory.Duplicate)))
+        }
+
+        @if (_validation.Summary.MissingTranslations > 0 && MatchesCategoryFilter(ValidationCategory.Missing))
+        {
+            @IssueSection(("Missing Translations", "translate", _validation.Summary.MissingTranslations,
+                BadgeStyle.Warning, GetIssuesByCategory(ValidationCategory.Missing)))
+        }
+
+        @if (_validation.Summary.EmptyValues > 0 && MatchesCategoryFilter(ValidationCategory.Empty))
+        {
+            @IssueSection(("Empty Values", "text_fields", _validation.Summary.EmptyValues,
+                BadgeStyle.Warning, GetIssuesByCategory(ValidationCategory.Empty)))
+        }
+
+        @if (_validation.Summary.PlaceholderMismatches > 0 && MatchesCategoryFilter(ValidationCategory.Placeholder))
+        {
+            @IssueSection(("Placeholder Mismatches", "code", _validation.Summary.PlaceholderMismatches,
+                BadgeStyle.Warning, GetIssuesByCategory(ValidationCategory.Placeholder)))
+        }
+
+        @if (_validation.Summary.PendingReview > 0 && MatchesCategoryFilter(ValidationCategory.Pending))
+        {
+            @IssueSection(("Pending Review", "rate_review", _validation.Summary.PendingReview,
+                BadgeStyle.Info, GetIssuesByCategory(ValidationCategory.Pending)))
+        }
+    }
+}
+
+@code {
+    [Parameter] public int ProjectId { get; set; }
+
+    private string _projectName = "";
+    private ValidationResultDto? _validation;
+    private bool _isLoading = true;
+    private bool _isValidating = false;
+    private string _searchTerm = "";
+    private string? _categoryFilter;
+    private string? _severityFilter;
+
+    private List<SelectOption> _severityOptions = new()
+    {
+        new("error", "Errors only"),
+        new("warning", "Warnings only"),
+        new("info", "Info only")
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var project = await ProjectService.GetProjectAsync(ProjectId);
+            if (project != null)
+            {
+                _projectName = project.Name;
+            }
+            _validation = await ResourceService.ValidateProjectAsync(ProjectId);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error loading validation: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task RefreshValidation()
+    {
+        _isValidating = true;
+        try
+        {
+            _validation = await ResourceService.ValidateProjectAsync(ProjectId, forceRefresh: true);
+            NotificationService.Notify(NotificationSeverity.Success, "Refreshed", "Validation complete");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Validation failed: {ex.Message}");
+        }
+        finally
+        {
+            _isValidating = false;
+        }
+    }
+
+    private List<SelectOption> GetCategoryOptions()
+    {
+        var options = new List<SelectOption>();
+        if (_validation?.Summary.DuplicateKeys > 0)
+            options.Add(new(ValidationCategory.Duplicate, $"Duplicates ({_validation.Summary.DuplicateKeys})"));
+        if (_validation?.Summary.MissingTranslations > 0)
+            options.Add(new(ValidationCategory.Missing, $"Missing ({_validation.Summary.MissingTranslations})"));
+        if (_validation?.Summary.EmptyValues > 0)
+            options.Add(new(ValidationCategory.Empty, $"Empty ({_validation.Summary.EmptyValues})"));
+        if (_validation?.Summary.PlaceholderMismatches > 0)
+            options.Add(new(ValidationCategory.Placeholder, $"Placeholders ({_validation.Summary.PlaceholderMismatches})"));
+        if (_validation?.Summary.PendingReview > 0)
+            options.Add(new(ValidationCategory.Pending, $"Pending ({_validation.Summary.PendingReview})"));
+        return options;
+    }
+
+    private bool MatchesCategoryFilter(string category)
+    {
+        return string.IsNullOrEmpty(_categoryFilter) || _categoryFilter == category;
+    }
+
+    private List<ValidationIssue> GetIssuesByCategory(string category)
+    {
+        if (_validation == null) return new();
+
+        return _validation.Issues
+            .Where(i => i.Category == category)
+            .Where(i => string.IsNullOrEmpty(_searchTerm) ||
+                        (i.KeyName?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
+            .Where(i => string.IsNullOrEmpty(_severityFilter) || i.Severity == _severityFilter)
+            .ToList();
+    }
+
+    private record SelectOption(string Value, string Text);
+}
+
+@* Issue Section Component *@
+@code {
+    private RenderFragment<(string Title, string Icon, int Count, BadgeStyle BadgeStyle, List<ValidationIssue> Issues)> IssueSection => context =>
+        @<RadzenCard class="rz-mb-4">
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="@context.Icon" />
+                        <RadzenText TextStyle="TextStyle.H6">@context.Title</RadzenText>
+                        <RadzenBadge BadgeStyle="@context.BadgeStyle" Text="@context.Count.ToString()" />
+                    </RadzenStack>
+                </RadzenStack>
+
+                @if (context.Issues.Count == 0)
+                {
+                    <RadzenText class="rz-color-secondary">No matching issues found.</RadzenText>
+                }
+                else
+                {
+                    <RadzenDataGrid TItem="ValidationIssue" Data="@context.Issues" Density="Density.Compact"
+                                    AllowSorting="true" AllowPaging="true" PageSize="10">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="ValidationIssue" Property="KeyName" Title="Key" Width="250px">
+                                <Template Context="issue">
+                                    @if (!string.IsNullOrEmpty(issue.KeyName))
+                                    {
+                                        <RadzenLink Path="@($"projects/{ProjectId}/editor?key={Uri.EscapeDataString(issue.KeyName)}")"
+                                                    Text="@issue.KeyName" Style="font-family: monospace;" />
+                                    }
+                                    else
+                                    {
+                                        <span class="rz-color-secondary">-</span>
+                                    }
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="ValidationIssue" Property="LanguageCode" Title="Language" Width="100px">
+                                <Template Context="issue">
+                                    @if (!string.IsNullOrEmpty(issue.LanguageCode))
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@issue.LanguageCode.ToUpperInvariant()" />
+                                    }
+                                    else
+                                    {
+                                        <span class="rz-color-secondary">-</span>
+                                    }
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="ValidationIssue" Property="Message" Title="Message" />
+                            <RadzenDataGridColumn TItem="ValidationIssue" Property="Details" Title="Details" Width="200px">
+                                <Template Context="issue">
+                                    @if (!string.IsNullOrEmpty(issue.Details))
+                                    {
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" title="@issue.Details">
+                                            @TruncateText(issue.Details, 50)
+                                        </RadzenText>
+                                    }
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="ValidationIssue" Property="Severity" Title="Severity" Width="100px">
+                                <Template Context="issue">
+                                    @switch (issue.Severity)
+                                    {
+                                        case "error":
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="Error" />
+                                            break;
+                                        case "warning":
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Warning" />
+                                            break;
+                                        default:
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Info" />
+                                            break;
+                                    }
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                }
+            </RadzenStack>
+        </RadzenCard>;
+
+    private static string TruncateText(string text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+            return text;
+        return text[..maxLength] + "...";
+    }
+}

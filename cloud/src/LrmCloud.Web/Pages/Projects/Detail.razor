@@ -3,6 +3,7 @@
 @using LrmCloud.Web.Components
 @using LrmCloud.Web.Helpers
 @using LrmCloud.Shared.DTOs.Translation
+@using LrmCloud.Shared.DTOs.Resources
 @inject ProjectService ProjectService
 @inject ResourceService ResourceService
 @inject TranslationService TranslationService
@@ -125,6 +126,107 @@ else
         </RadzenCard>
     }
 
+    @* Validation Summary Card *@
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mt-6 rz-mb-3">
+        <RadzenText TextStyle="TextStyle.H6">Validation Status</RadzenText>
+        @if (_validation != null)
+        {
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                @if (_validation.IsCached && _validation.ValidatedAt.HasValue)
+                {
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        Updated @GetRelativeTime(_validation.ValidatedAt.Value)
+                    </RadzenText>
+                }
+                <RadzenButton Icon="refresh" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                              Click="@RefreshValidation" Disabled="@_isValidating"
+                              title="Refresh validation" />
+            </RadzenStack>
+        }
+    </RadzenStack>
+    <RadzenCard>
+        @if (_isValidating)
+        {
+            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="height: 4px;" />
+        }
+        else if (_validation == null)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false" Shade="Shade.Lighter">
+                Unable to load validation results.
+            </RadzenAlert>
+        }
+        else if (_validation.Summary.TotalIssues == 0)
+        {
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="check_circle" Style="font-size: 1.5rem; color: var(--rz-success);" />
+                <RadzenText TextStyle="TextStyle.Body1">All validations passed. No issues found.</RadzenText>
+            </RadzenStack>
+        }
+        else
+        {
+            <RadzenStack Gap="1rem">
+                @* Summary row *@
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
+                    @if (_validation.Summary.Errors > 0)
+                    {
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                            <RadzenIcon Icon="error" Style="color: var(--rz-danger);" />
+                            <RadzenText><strong>@_validation.Summary.Errors</strong> errors</RadzenText>
+                        </RadzenStack>
+                    }
+                    @if (_validation.Summary.Warnings > 0)
+                    {
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                            <RadzenIcon Icon="warning" Style="color: var(--rz-warning);" />
+                            <RadzenText><strong>@_validation.Summary.Warnings</strong> warnings</RadzenText>
+                        </RadzenStack>
+                    }
+                    @if (_validation.Summary.Info > 0)
+                    {
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                            <RadzenIcon Icon="info" Style="color: var(--rz-info);" />
+                            <RadzenText><strong>@_validation.Summary.Info</strong> info</RadzenText>
+                        </RadzenStack>
+                    }
+                </RadzenStack>
+
+                @* Category breakdown *@
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                    @if (_validation.Summary.DuplicateKeys > 0)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Danger" Variant="Radzen.Variant.Outlined"
+                                     Text="@($"{_validation.Summary.DuplicateKeys} duplicate{(_validation.Summary.DuplicateKeys != 1 ? "s" : "")}")" />
+                    }
+                    @if (_validation.Summary.MissingTranslations > 0)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Variant="Radzen.Variant.Outlined"
+                                     Text="@($"{_validation.Summary.MissingTranslations} missing")" />
+                    }
+                    @if (_validation.Summary.EmptyValues > 0)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Variant="Radzen.Variant.Outlined"
+                                     Text="@($"{_validation.Summary.EmptyValues} empty")" />
+                    }
+                    @if (_validation.Summary.PlaceholderMismatches > 0)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Variant="Radzen.Variant.Outlined"
+                                     Text="@($"{_validation.Summary.PlaceholderMismatches} placeholder{(_validation.Summary.PlaceholderMismatches != 1 ? "s" : "")}")" />
+                    }
+                    @if (_validation.Summary.PendingReview > 0)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Variant="Radzen.Variant.Outlined"
+                                     Text="@($"{_validation.Summary.PendingReview} pending review")" />
+                    }
+                </RadzenStack>
+
+                @* View details link *@
+                <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                              Icon="open_in_new" Text="View Full Report"
+                              Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/validation"))" />
+            </RadzenStack>
+        }
+    </RadzenCard>
+
     <RadzenText TextStyle="TextStyle.H6" class="rz-mt-6 rz-mb-3">Project Details</RadzenText>
     <RadzenCard>
         <RadzenRow Gap="1rem">
@@ -180,6 +282,8 @@ else
                       Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/history"))" />
         <RadzenButton Variant="Radzen.Variant.Outlined" Icon="book" Text="Glossary"
                       Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/glossary"))" />
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="verified" Text="Validation"
+                      Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/validation"))" />
         <RadzenButton Variant="Radzen.Variant.Outlined" Icon="translate" Text="Translate All Missing"
                       Click="@OpenTranslateDialog" />
         <RadzenButton Variant="Radzen.Variant.Outlined" Icon="file_download" Text="Export"
@@ -195,7 +299,9 @@ else
 
     private ProjectDto? _project;
     private ProjectStatsDto? _stats;
+    private ValidationResultDto? _validation;
     private bool _isLoading = true;
+    private bool _isValidating = false;
 
     // Export dialog state
     private string _exportFormat = "json";
@@ -213,7 +319,12 @@ else
             _project = await ProjectService.GetProjectAsync(ProjectId);
             if (_project != null)
             {
-                _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
+                // Load stats and validation in parallel
+                var statsTask = ResourceService.GetProjectStatsAsync(ProjectId);
+                var validationTask = ResourceService.ValidateProjectAsync(ProjectId);
+                await Task.WhenAll(statsTask, validationTask);
+                _stats = await statsTask;
+                _validation = await validationTask;
             }
         }
         catch (Exception ex)
@@ -223,6 +334,23 @@ else
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task RefreshValidation()
+    {
+        _isValidating = true;
+        try
+        {
+            _validation = await ResourceService.ValidateProjectAsync(ProjectId, forceRefresh: true);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Validation failed: {ex.Message}");
+        }
+        finally
+        {
+            _isValidating = false;
         }
     }
 
@@ -325,5 +453,19 @@ else
         {
             NotificationService.Notify(NotificationSeverity.Info, "CLI Command", command);
         }
+    }
+
+    private static string GetRelativeTime(DateTime dateTime)
+    {
+        var diff = DateTime.UtcNow - dateTime;
+        if (diff.TotalSeconds < 60)
+            return "just now";
+        if (diff.TotalMinutes < 60)
+            return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours < 24)
+            return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 7)
+            return $"{(int)diff.TotalDays}d ago";
+        return dateTime.ToString("MMM dd");
     }
 }

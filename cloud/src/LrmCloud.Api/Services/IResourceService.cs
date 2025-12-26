@@ -80,8 +80,20 @@ public interface IResourceService
 
     /// <summary>
     /// Validates all resources in a project.
+    /// Returns cached result if available and fresh, otherwise computes and caches.
     /// </summary>
     Task<ValidationResultDto> ValidateProjectAsync(int projectId, int userId);
+
+    /// <summary>
+    /// Forces a fresh validation, ignoring cache.
+    /// </summary>
+    Task<ValidationResultDto> ValidateProjectAsync(int projectId, int userId, bool forceRefresh);
+
+    /// <summary>
+    /// Invalidates the validation cache for a project.
+    /// Call this after push/save operations.
+    /// </summary>
+    Task InvalidateValidationCacheAsync(int projectId);
 
     // ============================================================
     // Language Management

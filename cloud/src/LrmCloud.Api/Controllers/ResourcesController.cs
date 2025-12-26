@@ -261,15 +261,18 @@ public class ResourcesController : ApiControllerBase
 
     /// <summary>
     /// Validates all resources in a project.
+    /// Returns cached result if fresh, otherwise computes and caches.
     /// </summary>
     /// <param name="projectId">Project ID</param>
-    /// <returns>Validation results</returns>
+    /// <param name="refresh">Force fresh validation (ignore cache)</param>
+    /// <returns>Validation results with issue summary</returns>
     [HttpGet("validate")]
     [ProducesResponseType(typeof(ApiResponse<ValidationResultDto>), 200)]
-    public async Task<ActionResult<ApiResponse<ValidationResultDto>>> ValidateProject(int projectId)
+    public async Task<ActionResult<ApiResponse<ValidationResultDto>>> ValidateProject(
+        int projectId, [FromQuery] bool refresh = false)
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var result = await _resourceService.ValidateProjectAsync(projectId, userId);
+        var result = await _resourceService.ValidateProjectAsync(projectId, userId, refresh);
         return Success(result);
     }
 
