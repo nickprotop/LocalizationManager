@@ -88,7 +88,8 @@ else
                              CanReview="@_canReview"
                              CanApprove="@_canApprove"
                              OnReviewClicked="@OnReviewSelected"
-                             OnApproveClicked="@OnApproveSelected" />
+                             OnApproveClicked="@OnApproveSelected"
+                             ValidationIssues="@_validationIssuesByKey" />
         </div>
 
         @if (_drawerOpen && _selectedRow != null)
@@ -138,6 +139,9 @@ else
     private bool _canReview;
     private bool _canApprove;
 
+    // Validation
+    private Dictionary<string, List<ValidationIssue>>? _validationIssuesByKey;
+
     private bool SupportsPluralKeys => _project?.Format?.ToLowerInvariant() switch
     {
         "json" => true,
@@ -166,13 +170,29 @@ else
             _project = await ProjectService.GetProjectAsync(ProjectId);
             if (_project != null)
             {
-                _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
+                // Load stats and validation in parallel
+                var statsTask = ResourceService.GetProjectStatsAsync(ProjectId);
+                var validationTask = ResourceService.ValidateProjectAsync(ProjectId);
+
+                await Task.WhenAll(statsTask, validationTask);
+
+                _stats = await statsTask;
                 _languages = _stats?.Languages.Keys.ToList() ?? new List<string> { _project.DefaultLanguage };
 
                 if (_languages.Contains(_project.DefaultLanguage))
                 {
                     _languages.Remove(_project.DefaultLanguage);
                     _languages.Insert(0, _project.DefaultLanguage);
+                }
+
+                // Convert validation issues to dictionary by key name
+                var validation = await validationTask;
+                if (validation?.Issues != null)
+                {
+                    _validationIssuesByKey = validation.Issues
+                        .Where(i => !string.IsNullOrEmpty(i.KeyName))
+                        .GroupBy(i => i.KeyName!)
+                        .ToDictionary(g => g.Key, g => g.ToList());
                 }
 
                 await LoadWorkflowAsync();

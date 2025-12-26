@@ -1,4 +1,5 @@
 @using LrmCloud.Web.Models
+@using LrmCloud.Shared.DTOs.Resources
 @inject NotificationService NotificationService
 
 @* Toolbar *@
@@ -146,10 +147,34 @@
         </RadzenDataGridColumn>
 
         @* Key name *@
-        <RadzenDataGridColumn TItem="TranslationGridRow" Property="KeyName" Title="Key" Width="220px" Frozen="true">
+        <RadzenDataGridColumn TItem="TranslationGridRow" Property="KeyName" Title="Key" Width="250px" Frozen="true">
             <Template Context="row">
+                @{
+                    var keyIssues = GetKeyValidationIssues(row.KeyName);
+                    var hasDuplicate = keyIssues.Any(i => i.Category == ValidationCategory.Duplicate);
+                    var hasPlaceholder = keyIssues.Any(i => i.Category == ValidationCategory.Placeholder);
+                    var issueTooltip = keyIssues.Any() ? string.Join("\n", keyIssues.Select(i => $"• {i.Message}")) : null;
+                }
                 <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
                     <RadzenText TextStyle="TextStyle.Body2" Style="flex: 1;">@row.KeyName</RadzenText>
+                    @if (hasDuplicate)
+                    {
+                        <span title="Duplicate key detected">
+                            <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="DUP" Style="font-size: 0.6rem;" />
+                        </span>
+                    }
+                    @if (hasPlaceholder)
+                    {
+                        <span title="@(keyIssues.FirstOrDefault(i => i.Category == ValidationCategory.Placeholder)?.Details ?? "Placeholder mismatch")">
+                            <RadzenIcon Icon="code_off" Style="font-size: 0.875rem; color: var(--rz-warning);" />
+                        </span>
+                    }
+                    @if (keyIssues.Any(i => i.Category != ValidationCategory.Duplicate && i.Category != ValidationCategory.Placeholder))
+                    {
+                        <span title="@issueTooltip">
+                            <RadzenIcon Icon="warning_amber" Style="font-size: 0.875rem; color: var(--rz-warning);" />
+                        </span>
+                    }
                     @if (row.IsPlural)
                     {
                         <span title="Plural key">
@@ -273,6 +298,18 @@
 
     [Parameter]
     public EventCallback<IEnumerable<TranslationGridRow>> OnApproveClicked { get; set; }
+
+    /// <summary>
+    /// Validation issues grouped by key name.
+    /// </summary>
+    [Parameter]
+    public Dictionary<string, List<ValidationIssue>>? ValidationIssues { get; set; }
+
+    /// <summary>
+    /// Whether to show validation filter options.
+    /// </summary>
+    [Parameter]
+    public bool ShowValidationFilter { get; set; }
 
     private string _searchText = string.Empty;
     private TranslationStatus? _statusFilter;
@@ -512,5 +549,16 @@
         {
             await _dataGrid.Reload();
         }
+    }
+
+    /// <summary>
+    /// Gets validation issues for a specific key.
+    /// </summary>
+    private List<ValidationIssue> GetKeyValidationIssues(string keyName)
+    {
+        if (ValidationIssues == null || string.IsNullOrEmpty(keyName))
+            return new List<ValidationIssue>();
+
+        return ValidationIssues.TryGetValue(keyName, out var issues) ? issues : new List<ValidationIssue>();
     }
 }

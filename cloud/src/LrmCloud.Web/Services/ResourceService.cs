@@ -230,11 +230,15 @@ public class ResourceService
     /// <summary>
     /// Gets validation results for a project
     /// </summary>
-    public async Task<ValidationResultDto?> ValidateProjectAsync(int projectId)
+    public async Task<ValidationResultDto?> ValidateProjectAsync(int projectId, bool forceRefresh = false)
     {
         try
         {
-            var response = await _httpClient.GetAsync($"projects/{projectId}/validate");
+            var url = $"projects/{projectId}/validate";
+            if (forceRefresh)
+                url += "?refresh=true";
+
+            var response = await _httpClient.GetAsync(url);
             if (!response.IsSuccessStatusCode)
                 return null;
 
