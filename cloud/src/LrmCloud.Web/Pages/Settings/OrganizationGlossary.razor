@@ -1,5 +1,6 @@
 @page "/settings/glossary"
 @using LrmCloud.Shared.DTOs.Glossary
+@using LrmCloud.Shared.DTOs.Organizations
 @using LrmCloud.Web.Services
 @inject GlossaryService GlossaryService
 @inject OrganizationContextService OrgContext
@@ -20,16 +21,26 @@
             Terms shared across ALL projects in your organization. Individual projects can override these.
         </RadzenText>
     </RadzenStack>
-    @if (_canManage)
-    {
-        <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Icon="add" Text="Add Term" Click="@OpenAddDialog" Disabled="@(_organizationId == null)" />
-    }
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" AlignItems="Radzen.AlignItems.Center">
+        <RadzenDropDown TValue="int?"
+                        @bind-Value="_organizationId"
+                        Data="@_organizations"
+                        TextProperty="Name"
+                        ValueProperty="Id"
+                        Placeholder="Select organization..."
+                        Style="min-width: 200px;"
+                        Change="@OnOrganizationChanged" />
+        @if (_canManage && _organizationId != null)
+        {
+            <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Icon="add" Text="Add Term" Click="@OpenAddDialog" />
+        }
+    </RadzenStack>
 </RadzenStack>
 
 @if (_organizationId == null)
 {
-    <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">
-        No organization selected. Please select an organization to manage its glossary.
+    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">
+        Select an organization above to manage its glossary terms.
     </RadzenAlert>
 }
 else if (_isLoading)
@@ -151,6 +162,7 @@ else
 
 @code {
     private int? _organizationId;
+    private List<OrganizationDto> _organizations = new();
     private GlossaryListResponse? _glossary;
     private bool _isLoading = true;
     private bool _canManage = false;
@@ -178,9 +190,21 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // Load organizations first
+        try
+        {
+            _organizations = await OrganizationService.GetOrganizationsAsync();
+        }
+        catch
+        {
+            _organizations = new List<OrganizationDto>();
+        }
+
+        // Check if there's a previously selected org
         await OrgContext.InitializeAsync();
         _organizationId = OrgContext.SelectedOrganizationId;
 
+        // If no org selected but user has orgs, don't auto-select
         if (_organizationId.HasValue)
         {
             await CheckPermissionsAsync();
@@ -190,15 +214,13 @@ else
         {
             _isLoading = false;
         }
-
-        OrgContext.OnOrganizationChanged += OnOrgChanged;
     }
 
-    private async void OnOrgChanged()
+    private async Task OnOrganizationChanged()
     {
-        _organizationId = OrgContext.SelectedOrganizationId;
         if (_organizationId.HasValue)
         {
+            await OrgContext.SetOrganizationAsync(_organizationId);
             await CheckPermissionsAsync();
             await LoadGlossaryAsync();
         }
@@ -206,8 +228,8 @@ else
         {
             _glossary = null;
             _isLoading = false;
+            _canManage = false;
         }
-        await InvokeAsync(StateHasChanged);
     }
 
     private async Task CheckPermissionsAsync()
@@ -323,8 +345,4 @@ else
         return text[..maxLength] + "...";
     }
 
-    public void Dispose()
-    {
-        OrgContext.OnOrganizationChanged -= OnOrgChanged;
-    }
 }
