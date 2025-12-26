@@ -1,3 +1,4 @@
+using LrmCloud.Shared.DTOs.Projects;
 using Radzen;
 
 namespace LrmCloud.Web.Helpers;
@@ -201,4 +202,17 @@ public static class UiHelpers
         "viewer" or "Viewer" => BadgeStyle.Light,
         _ => BadgeStyle.Light
     };
+
+    /// <summary>
+    /// Gets a tooltip string describing validation issues for a project.
+    /// </summary>
+    public static string GetValidationTooltip(ProjectDto project)
+    {
+        var parts = new List<string>();
+        if (project.ValidationErrors > 0)
+            parts.Add($"{project.ValidationErrors} error{(project.ValidationErrors != 1 ? "s" : "")}");
+        if (project.ValidationWarnings > 0)
+            parts.Add($"{project.ValidationWarnings} warning{(project.ValidationWarnings != 1 ? "s" : "")}");
+        return string.Join(", ", parts);
+    }
 }

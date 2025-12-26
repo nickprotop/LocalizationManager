@@ -49,4 +49,14 @@ public class ProjectDto
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Number of validation errors (from cached validation).
+    /// </summary>
+    public int ValidationErrors { get; set; }
+
+    /// <summary>
+    /// Number of validation warnings (from cached validation).
+    /// </summary>
+    public int ValidationWarnings { get; set; }
 }

@@ -1,8 +1,10 @@
+using System.Text.Json;
 using LrmCloud.Api.Data;
 using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.Constants;
 using LrmCloud.Shared.DTOs;
 using LrmCloud.Shared.DTOs.Projects;
+using LrmCloud.Shared.DTOs.Resources;
 using LrmCloud.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -703,6 +705,25 @@ public class ProjectService : IProjectService
                 : 0;
         }
 
+        // Parse validation cache if available
+        int validationErrors = 0, validationWarnings = 0;
+        if (!string.IsNullOrEmpty(project.ValidationCacheJson))
+        {
+            try
+            {
+                var validationCache = JsonSerializer.Deserialize<ValidationResultDto>(project.ValidationCacheJson);
+                if (validationCache?.Summary != null)
+                {
+                    validationErrors = validationCache.Summary.Errors;
+                    validationWarnings = validationCache.Summary.Warnings;
+                }
+            }
+            catch
+            {
+                // Ignore parse errors - cache may be corrupted
+            }
+        }
+
         return new ProjectDto
         {
             Id = project.Id,
@@ -727,7 +748,9 @@ public class ProjectService : IProjectService
             TranslationCount = translationCount,
             CompletionPercentage = completionPercentage,
             CreatedAt = project.CreatedAt,
-            UpdatedAt = project.UpdatedAt
+            UpdatedAt = project.UpdatedAt,
+            ValidationErrors = validationErrors,
+            ValidationWarnings = validationWarnings
         };
     }
 
