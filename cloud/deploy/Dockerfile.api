@@ -42,7 +42,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
 # Install ICU for globalization support, curl for health checks, su-exec for dropping privileges,
 # and ca-certificates for HTTPS/TLS (email, external APIs)
 # ICU is required for CultureInfo.GetCultureInfo() to work correctly
-RUN apk add --no-cache curl su-exec icu-libs ca-certificates
+RUN apk add --no-cache curl su-exec icu-libs ca-certificates && update-ca-certificates
 
 # Disable invariant globalization mode (enable ICU)
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
