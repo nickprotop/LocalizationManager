@@ -4,9 +4,11 @@ using LrmCloud.Shared.DTOs;
 using LrmCloud.Shared.DTOs.Resources;
 using LrmCloud.Shared.DTOs.Sync;
 using LrmCloud.Shared.Entities;
+using LocalizationManager.Core.Validation;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace LrmCloud.Api.Services;
 
@@ -575,41 +577,151 @@ public class ResourceService : IResourceService
 
     public async Task<ValidationResultDto> ValidateProjectAsync(int projectId, int userId)
     {
+        return await ValidateProjectAsync(projectId, userId, forceRefresh: false);
+    }
+
+    public async Task<ValidationResultDto> ValidateProjectAsync(int projectId, int userId, bool forceRefresh)
+    {
         // Check permission
         if (!await _projectService.CanViewProjectAsync(projectId, userId))
         {
             return new ValidationResultDto { IsValid = false };
         }
 
-        var result = new ValidationResultDto { IsValid = true };
-
-        var project = await _db.Projects
-            .Include(p => p.ResourceKeys)
-                .ThenInclude(k => k.Translations)
-            .FirstOrDefaultAsync(p => p.Id == projectId);
-
+        var project = await _db.Projects.FindAsync(projectId);
         if (project == null)
         {
-            result.IsValid = false;
-            result.Issues.Add(new ValidationIssue
+            var errorResult = new ValidationResultDto { IsValid = false };
+            errorResult.Issues.Add(new ValidationIssue
             {
                 Severity = "error",
-                Message = "Project not found"
+                Message = "Project not found",
+                Category = ValidationCategory.Other
             });
-            return result;
+            return errorResult;
+        }
+
+        // Check cache first (unless force refresh)
+        if (!forceRefresh && project.ValidationCacheJson != null && project.ValidationCachedAt != null)
+        {
+            // Consider cache valid for 5 minutes
+            var cacheAge = DateTime.UtcNow - project.ValidationCachedAt.Value;
+            if (cacheAge.TotalMinutes < 5)
+            {
+                try
+                {
+                    var cachedResult = JsonSerializer.Deserialize<ValidationResultDto>(project.ValidationCacheJson);
+                    if (cachedResult != null)
+                    {
+                        cachedResult.IsCached = true;
+                        cachedResult.ValidatedAt = project.ValidationCachedAt;
+                        return cachedResult;
+                    }
+                }
+                catch
+                {
+                    // Cache corrupted, recompute
+                }
+            }
+        }
+
+        // Compute fresh validation
+        var result = await ComputeValidationAsync(project);
+
+        // Cache the result
+        try
+        {
+            project.ValidationCacheJson = JsonSerializer.Serialize(result);
+            project.ValidationCachedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to cache validation result for project {ProjectId}", projectId);
+        }
+
+        result.ValidatedAt = project.ValidationCachedAt ?? DateTime.UtcNow;
+        result.IsCached = false;
+        return result;
+    }
+
+    public async Task InvalidateValidationCacheAsync(int projectId)
+    {
+        var project = await _db.Projects.FindAsync(projectId);
+        if (project != null)
+        {
+            project.ValidationCacheJson = null;
+            project.ValidationCachedAt = null;
+            await _db.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Computes validation for a project (the actual validation logic).
+    /// </summary>
+    private async Task<ValidationResultDto> ComputeValidationAsync(Project project)
+    {
+        var result = new ValidationResultDto { IsValid = true };
+
+        // Load resource keys with translations
+        var keys = await _db.ResourceKeys
+            .Include(k => k.Translations)
+            .Where(k => k.ProjectId == project.Id)
+            .ToListAsync();
+
+        if (keys.Count == 0)
+        {
+            return result; // No keys, validation passes
         }
 
         // Get all languages in the project
-        var languages = project.ResourceKeys
+        var languages = keys
             .SelectMany(k => k.Translations)
-            .Select(t => t.LanguageCode)
+            .Select(t => string.IsNullOrEmpty(t.LanguageCode) ? project.DefaultLanguage : t.LanguageCode)
             .Distinct()
             .ToList();
 
-        // Check each resource key
-        foreach (var key in project.ResourceKeys)
+        // Identify default language translations
+        var defaultLangKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in keys)
         {
-            // Check for empty key names
+            var defaultTrans = key.Translations.FirstOrDefault(t =>
+                t.LanguageCode == project.DefaultLanguage ||
+                string.IsNullOrEmpty(t.LanguageCode));
+            if (defaultTrans != null && !string.IsNullOrWhiteSpace(defaultTrans.Value))
+            {
+                defaultLangKeys.Add(key.KeyName);
+            }
+        }
+
+        // ============================================================
+        // 1. Duplicate Keys (case-insensitive)
+        // ============================================================
+        var duplicateGroups = keys
+            .GroupBy(k => k.KeyName, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .ToList();
+
+        foreach (var group in duplicateGroups)
+        {
+            result.IsValid = false;
+            var keyNames = string.Join(", ", group.Select(k => k.KeyName).Distinct());
+            result.Issues.Add(new ValidationIssue
+            {
+                Severity = "error",
+                Message = $"Duplicate key (case-insensitive): {group.Count()} occurrences",
+                Category = ValidationCategory.Duplicate,
+                KeyName = group.First().KeyName,
+                Details = $"Keys: {keyNames}"
+            });
+        }
+
+        // ============================================================
+        // 2. Check each key for issues
+        // ============================================================
+        foreach (var key in keys)
+        {
+            // Empty key names
             if (string.IsNullOrWhiteSpace(key.KeyName))
             {
                 result.IsValid = false;
@@ -617,54 +729,112 @@ public class ResourceService : IResourceService
                 {
                     Severity = "error",
                     Message = "Resource key has empty name",
+                    Category = ValidationCategory.Other,
                     KeyName = key.KeyName
                 });
+                continue;
             }
 
-            // Check for missing translations
+            // Get default language value for placeholder comparison
+            var defaultTranslation = key.Translations.FirstOrDefault(t =>
+                t.LanguageCode == project.DefaultLanguage ||
+                string.IsNullOrEmpty(t.LanguageCode));
+            var defaultValue = defaultTranslation?.Value;
+
             foreach (var language in languages)
             {
-                var translation = key.Translations.FirstOrDefault(t => t.LanguageCode == language);
-                if (translation == null || string.IsNullOrWhiteSpace(translation.Value))
+                // Skip default language for missing/empty checks against itself
+                var isDefaultLang = language == project.DefaultLanguage;
+
+                var translation = key.Translations.FirstOrDefault(t =>
+                    t.LanguageCode == language ||
+                    (isDefaultLang && string.IsNullOrEmpty(t.LanguageCode)));
+
+                // Missing translation
+                if (translation == null)
+                {
+                    if (!isDefaultLang) // Don't flag missing default as "missing translation"
+                    {
+                        result.Issues.Add(new ValidationIssue
+                        {
+                            Severity = "warning",
+                            Message = $"Missing translation for language '{language}'",
+                            Category = ValidationCategory.Missing,
+                            KeyName = key.KeyName,
+                            LanguageCode = language
+                        });
+                    }
+                    continue;
+                }
+
+                // Empty value
+                if (string.IsNullOrWhiteSpace(translation.Value))
                 {
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = "warning",
-                        Message = $"Missing translation for language '{language}'",
+                        Message = $"Empty value for language '{language}'",
+                        Category = ValidationCategory.Empty,
+                        KeyName = key.KeyName,
+                        LanguageCode = language
+                    });
+                    continue;
+                }
+
+                // Placeholder validation (only for non-default languages)
+                if (!isDefaultLang && !string.IsNullOrEmpty(defaultValue))
+                {
+                    var placeholderResult = PlaceholderValidator.Validate(defaultValue, translation.Value);
+                    if (!placeholderResult.IsValid)
+                    {
+                        result.Issues.Add(new ValidationIssue
+                        {
+                            Severity = "warning",
+                            Message = $"Placeholder mismatch in '{language}'",
+                            Category = ValidationCategory.Placeholder,
+                            KeyName = key.KeyName,
+                            LanguageCode = language,
+                            Details = placeholderResult.GetSummary()
+                        });
+                    }
+                }
+
+                // Pending review status
+                if (translation.Status == TranslationStatus.Pending)
+                {
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = "info",
+                        Message = $"Pending review for language '{language}'",
+                        Category = ValidationCategory.Pending,
                         KeyName = key.KeyName,
                         LanguageCode = language
                     });
                 }
             }
-
-            // Check for pending translations
-            var pendingCount = key.Translations.Count(t => t.Status == TranslationStatus.Pending);
-            if (pendingCount > 0)
-            {
-                result.Issues.Add(new ValidationIssue
-                {
-                    Severity = "info",
-                    Message = $"{pendingCount} translation(s) pending review",
-                    KeyName = key.KeyName
-                });
-            }
         }
 
-        // Check for duplicate keys (should not happen, but validate anyway)
-        var duplicateKeys = project.ResourceKeys
-            .GroupBy(k => k.KeyName)
-            .Where(g => g.Count() > 1)
-            .Select(g => g.Key);
+        // ============================================================
+        // 3. Compute Summary
+        // ============================================================
+        result.Summary = new ValidationSummary
+        {
+            TotalIssues = result.Issues.Count,
+            Errors = result.Issues.Count(i => i.Severity == "error"),
+            Warnings = result.Issues.Count(i => i.Severity == "warning"),
+            Info = result.Issues.Count(i => i.Severity == "info"),
+            DuplicateKeys = result.Issues.Count(i => i.Category == ValidationCategory.Duplicate),
+            MissingTranslations = result.Issues.Count(i => i.Category == ValidationCategory.Missing),
+            EmptyValues = result.Issues.Count(i => i.Category == ValidationCategory.Empty),
+            PlaceholderMismatches = result.Issues.Count(i => i.Category == ValidationCategory.Placeholder),
+            ExtraKeys = result.Issues.Count(i => i.Category == ValidationCategory.Extra),
+            PendingReview = result.Issues.Count(i => i.Category == ValidationCategory.Pending)
+        };
 
-        foreach (var dupKey in duplicateKeys)
+        // Mark as invalid if there are any errors
+        if (result.Summary.Errors > 0)
         {
             result.IsValid = false;
-            result.Issues.Add(new ValidationIssue
-            {
-                Severity = "error",
-                Message = "Duplicate resource key found",
-                KeyName = dupKey
-            });
         }
 
         return result;
@@ -1171,6 +1341,12 @@ public class ResourceService : IResourceService
 
             await transaction.CommitAsync();
             response.Applied = changes.Count;
+
+            // Invalidate validation cache if there were changes
+            if (changes.Count > 0)
+            {
+                await InvalidateValidationCacheAsync(projectId);
+            }
 
             return response;
         }

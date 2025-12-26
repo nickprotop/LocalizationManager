@@ -12,9 +12,15 @@ namespace LocalizationManager.Core.Validation;
 public static class PlaceholderDetector
 {
     // .NET format strings: {0}, {1}, {name}, {0:N2}, {count:D3}
-    // Uses negative lookbehind to exclude template literals ${...}
+    // Uses negative lookbehind/lookahead to exclude template literals ${...} and i18next {{...}}
     private static readonly Regex DotNetFormatRegex = new(
-        @"(?<!\$)\{(?<index>\d+)(?::(?<format>[^}]+))?\}|(?<!\$)\{(?<name>[a-zA-Z_]\w*)(?::(?<format>[^}]+))?\}",
+        @"(?<!\$)(?<!\{)\{(?<index>\d+)(?::(?<format>[^}]+))?\}(?!\})|(?<!\$)(?<!\{)\{(?<name>[a-zA-Z_]\w*)(?::(?<format>[^}]+))?\}(?!\})",
+        RegexOptions.Compiled);
+
+    // i18next format: {{count}}, {{ count }}, {{user.name}}
+    // Allows optional whitespace inside braces
+    private static readonly Regex I18nextRegex = new(
+        @"\{\{\s*(?<name>[a-zA-Z_][\w.]*)\s*\}\}",
         RegexOptions.Compiled);
 
     // Printf-style: %s, %d, %f, %1$s, %2$d
@@ -132,6 +138,21 @@ public static class PlaceholderDetector
             }
         }
 
+        // Detect i18next placeholders
+        if (enabledTypes.HasFlag(PlaceholderType.I18next))
+        {
+            foreach (Match match in I18nextRegex.Matches(text))
+            {
+                placeholders.Add(new Placeholder
+                {
+                    Type = PlaceholderType.I18next,
+                    Original = match.Value,
+                    Name = match.Groups["name"].Value.Trim(), // Normalize whitespace
+                    Position = match.Index
+                });
+            }
+        }
+
         return placeholders.OrderBy(p => p.Position).ToList();
     }
 
@@ -148,6 +169,7 @@ public static class PlaceholderDetector
             PlaceholderType.PrintfStyle => placeholder.Index ?? placeholder.Format ?? "",
             PlaceholderType.IcuMessageFormat => placeholder.Name ?? "",
             PlaceholderType.TemplateLiteral => placeholder.Name ?? "",
+            PlaceholderType.I18next => placeholder.Name ?? "",
             _ => placeholder.Original
         };
     }
@@ -223,7 +245,12 @@ public enum PlaceholderType
     TemplateLiteral = 8,
 
     /// <summary>
+    /// i18next format: {{count}}, {{ count }}, {{user.name}}
+    /// </summary>
+    I18next = 16,
+
+    /// <summary>
     /// All placeholder types.
     /// </summary>
-    All = DotNetFormat | PrintfStyle | IcuMessageFormat | TemplateLiteral
+    All = DotNetFormat | PrintfStyle | IcuMessageFormat | TemplateLiteral | I18next
 }
