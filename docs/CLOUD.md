@@ -6,6 +6,68 @@ LRM Cloud is a web-based platform for team localization management with real-tim
 
 ![LRM Cloud Dashboard](../assets/cloud-dashboard.png)
 
+## Open Source & Deployment Options
+
+LRM is a fully **open source project** under the MIT license. You have two options for using LRM Cloud:
+
+### Option 1: Hosted Platform (Recommended)
+
+Use our managed cloud platform at **[lrm-cloud.com](https://lrm-cloud.com)** — no setup required.
+
+| Plan | Price | Best For |
+|------|-------|----------|
+| **Free** | $0/month | Personal projects, evaluation |
+| **Team** | $9/month | Small teams, startups |
+| **Enterprise** | $29/month | Large teams, high volume |
+
+All plans include the full feature set. [See pricing details](#plans--pricing) for limits.
+
+### Option 2: Self-Hosted
+
+Deploy LRM Cloud on your own infrastructure using Docker Compose.
+
+**Requirements:**
+- Docker & Docker Compose
+- Linux server (Ubuntu 20.04+ recommended)
+- Domain with SSL certificate (optional but recommended)
+
+**Quick Start:**
+
+```bash
+# Clone the repository
+git clone https://github.com/nickprotop/LocalizationManager.git
+cd LocalizationManager/cloud/deploy
+
+# Run interactive setup (first time only)
+./setup.sh
+
+# Build and deploy
+./deploy.sh
+```
+
+The `setup.sh` script interactively configures:
+- Database credentials and connection
+- Domain name and SSL settings
+- API keys for translation providers
+- nginx configuration from templates
+
+The `deploy.sh` script handles building and deploying.
+
+**Self-Hosted Components:**
+
+| Service | Purpose |
+|---------|---------|
+| nginx | Reverse proxy, SSL termination |
+| api | REST API server |
+| web | Blazor WASM frontend |
+| postgres | PostgreSQL 16 database |
+| redis | Session cache |
+| minio | S3-compatible storage (optional) |
+
+For detailed deployment instructions, see [`cloud/deploy/README.md`](../cloud/deploy/README.md).
+
+---
+
 ## Features
 
 - **Web-based Translation Editor** - Edit translations in a spreadsheet-like interface
