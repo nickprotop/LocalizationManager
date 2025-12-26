@@ -33,6 +33,14 @@
             </ChildContent>
         </RadzenFormField>
 
+        @if (ShowCaseSensitive)
+        {
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                <RadzenCheckBox @bind-Value="_caseSensitive" TValue="bool" />
+                <RadzenText>Case-sensitive matching</RadzenText>
+            </RadzenStack>
+        }
+
         <hr />
 
         <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
@@ -82,7 +90,10 @@
 
 @code {
     [Parameter]
-    public int OrganizationId { get; set; }
+    public int? OrganizationId { get; set; }
+
+    [Parameter]
+    public int? ProjectId { get; set; }
 
     [Parameter]
     public List<string> AvailableLanguages { get; set; } = new();
@@ -90,10 +101,15 @@
     [Parameter]
     public GlossaryTermDto? EditingTerm { get; set; }
 
+    [Parameter]
+    public bool ShowCaseSensitive { get; set; } = false;
+
     private bool _isEditing => EditingTerm != null;
+    private bool _isProjectGlossary => ProjectId.HasValue;
     private string _sourceTerm = "";
     private string _sourceLanguage = "en";
     private string? _description;
+    private bool _caseSensitive;
     private List<TranslationEntry> _translations = new();
     private bool _saving;
     private string? _errorMessage;
@@ -111,6 +127,7 @@
             _sourceTerm = EditingTerm.SourceTerm;
             _sourceLanguage = EditingTerm.SourceLanguage;
             _description = EditingTerm.Description;
+            _caseSensitive = EditingTerm.CaseSensitive;
             _translations = EditingTerm.Translations
                 .Select(kv => new TranslationEntry { Language = kv.Key, Value = kv.Value })
                 .ToList();
@@ -162,10 +179,15 @@
                     SourceTerm = _sourceTerm,
                     SourceLanguage = _sourceLanguage,
                     Description = _description,
+                    CaseSensitive = _caseSensitive,
                     Translations = translations
                 };
 
-                await GlossaryService.UpdateOrganizationTermAsync(OrganizationId, EditingTerm!.Id, request);
+                if (_isProjectGlossary)
+                    await GlossaryService.UpdateProjectTermAsync(ProjectId!.Value, EditingTerm!.Id, request);
+                else
+                    await GlossaryService.UpdateOrganizationTermAsync(OrganizationId!.Value, EditingTerm!.Id, request);
+
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Glossary term updated");
             }
             else
@@ -175,10 +197,15 @@
                     SourceTerm = _sourceTerm,
                     SourceLanguage = _sourceLanguage,
                     Description = _description,
+                    CaseSensitive = _caseSensitive,
                     Translations = translations
                 };
 
-                await GlossaryService.CreateOrganizationTermAsync(OrganizationId, request);
+                if (_isProjectGlossary)
+                    await GlossaryService.CreateProjectTermAsync(ProjectId!.Value, request);
+                else
+                    await GlossaryService.CreateOrganizationTermAsync(OrganizationId!.Value, request);
+
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Glossary term added");
             }
 

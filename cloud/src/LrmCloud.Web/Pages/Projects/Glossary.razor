@@ -216,12 +216,6 @@ else
     private bool _isSavingInheritance;
 
     // Dialog state
-    private GlossaryTermDto? _editingTerm;
-    private string _formSourceTerm = "";
-    private string _formSourceLanguage = "en";
-    private string _formDescription = "";
-    private bool _formCaseSensitive;
-    private Dictionary<string, string> _formTranslations = new();
     private List<string> _availableLanguages = new() { "en", "fr", "de", "es", "it", "el", "pt", "nl", "pl", "ru", "ja", "zh", "ko" };
 
     private string _projectName = "";
@@ -329,135 +323,38 @@ else
 
     private async Task OpenAddDialog()
     {
-        _editingTerm = null;
-        _formSourceTerm = "";
-        _formSourceLanguage = "en";
-        _formDescription = "";
-        _formCaseSensitive = false;
-        _formTranslations = new Dictionary<string, string>();
-        foreach (var lang in _availableLanguages.Where(l => l != "en"))
-        {
-            _formTranslations[lang] = "";
-        }
-
-        await ShowTermDialog("Add Glossary Term");
-    }
-
-    private async Task OpenEditDialog(GlossaryTermDto term)
-    {
-        _editingTerm = term;
-        _formSourceTerm = term.SourceTerm;
-        _formSourceLanguage = term.SourceLanguage;
-        _formDescription = term.Description ?? "";
-        _formCaseSensitive = term.CaseSensitive;
-        _formTranslations = new Dictionary<string, string>(term.Translations);
-
-        foreach (var lang in _availableLanguages.Where(l => l != term.SourceLanguage))
-        {
-            if (!_formTranslations.ContainsKey(lang))
-                _formTranslations[lang] = "";
-        }
-
-        await ShowTermDialog("Edit Glossary Term");
-    }
-
-    private async Task ShowTermDialog(string title)
-    {
-        var result = await DialogService.OpenAsync(title, ds =>
-            @<RadzenStack Gap="1rem">
-                <RadzenFormField Text="Source Term" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
-                    <RadzenTextBox @bind-Value="_formSourceTerm" Placeholder="e.g., Dashboard" Style="width: 100%;" />
-                </RadzenFormField>
-
-                <RadzenFormField Text="Source Language" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
-                    <RadzenDropDown @bind-Value="_formSourceLanguage" Data="@_availableLanguages" Style="width: 100%;">
-                        <Template Context="lang">@lang.ToUpperInvariant()</Template>
-                    </RadzenDropDown>
-                </RadzenFormField>
-
-                <RadzenFormField Text="Description (optional)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
-                    <RadzenTextArea @bind-Value="_formDescription" Rows="2" Placeholder="Context or usage notes" Style="width: 100%;" />
-                </RadzenFormField>
-
-                <RadzenCheckBox @bind-Value="_formCaseSensitive" TValue="bool">
-                    <Template>Case-sensitive matching</Template>
-                </RadzenCheckBox>
-
-                <hr />
-
-                <RadzenText TextStyle="TextStyle.Subtitle1">Translations</RadzenText>
-                @foreach (var lang in _availableLanguages.Where(l => l != _formSourceLanguage))
-                {
-                    <RadzenFormField Text="@($"Translation ({lang.ToUpperInvariant()})")" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
-                        <RadzenTextBox Value="@GetTranslation(lang)" ValueChanged="@(v => SetTranslation(lang, v))" Placeholder="@($"Enter translation in {lang.ToUpperInvariant()}")" Style="width: 100%;" />
-                    </RadzenFormField>
-                }
-
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
-                    <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@(() => ds.Close(false))" />
-                    <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary"
-                                  Text="@(_editingTerm == null ? "Add" : "Save")"
-                                  Click="@(() => ds.Close(true))"
-                                  Disabled="@(string.IsNullOrWhiteSpace(_formSourceTerm) || string.IsNullOrWhiteSpace(_formSourceLanguage))" />
-                </RadzenStack>
-            </RadzenStack>,
+        var result = await DialogService.OpenAsync<GlossaryTermDialog>(
+            "Add Glossary Term",
+            new Dictionary<string, object>
+            {
+                { "ProjectId", ProjectId },
+                { "AvailableLanguages", _availableLanguages },
+                { "ShowCaseSensitive", true }
+            },
             new Radzen.DialogOptions { Width = "500px" });
 
         if (result == true)
         {
-            await SaveTerm();
+            await LoadGlossaryAsync();
         }
     }
 
-    private string GetTranslation(string lang) => _formTranslations.TryGetValue(lang, out var val) ? val : "";
-
-    private void SetTranslation(string lang, string value) => _formTranslations[lang] = value;
-
-    private async Task SaveTerm()
+    private async Task OpenEditDialog(GlossaryTermDto term)
     {
-        if (string.IsNullOrWhiteSpace(_formSourceTerm) || string.IsNullOrWhiteSpace(_formSourceLanguage))
-            return;
+        var result = await DialogService.OpenAsync<GlossaryTermDialog>(
+            "Edit Glossary Term",
+            new Dictionary<string, object>
+            {
+                { "ProjectId", ProjectId },
+                { "AvailableLanguages", _availableLanguages },
+                { "EditingTerm", term },
+                { "ShowCaseSensitive", true }
+            },
+            new Radzen.DialogOptions { Width = "500px" });
 
-        try
+        if (result == true)
         {
-            var translations = _formTranslations
-                .Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
-                .ToDictionary(kv => kv.Key, kv => kv.Value);
-
-            if (_editingTerm == null)
-            {
-                var request = new CreateGlossaryTermRequest
-                {
-                    SourceTerm = _formSourceTerm,
-                    SourceLanguage = _formSourceLanguage,
-                    Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
-                    CaseSensitive = _formCaseSensitive,
-                    Translations = translations
-                };
-
-                await GlossaryService.CreateProjectTermAsync(ProjectId, request);
-                NotificationService.Notify(NotificationSeverity.Success, "Success", "Term added successfully");
-            }
-            else
-            {
-                var request = new UpdateGlossaryTermRequest
-                {
-                    SourceTerm = _formSourceTerm,
-                    SourceLanguage = _formSourceLanguage,
-                    Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
-                    CaseSensitive = _formCaseSensitive,
-                    Translations = translations
-                };
-
-                await GlossaryService.UpdateProjectTermAsync(ProjectId, _editingTerm.Id, request);
-                NotificationService.Notify(NotificationSeverity.Success, "Success", "Term updated successfully");
-            }
-
             await LoadGlossaryAsync();
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
     }
 
