@@ -167,6 +167,19 @@ public class Project
     [Column("max_snapshots")]
     public int? MaxSnapshots { get; set; }
 
+    // Validation cache
+    /// <summary>
+    /// Cached validation result as JSON.
+    /// </summary>
+    [Column("validation_cache_json", TypeName = "jsonb")]
+    public string? ValidationCacheJson { get; set; }
+
+    /// <summary>
+    /// When the validation cache was last computed.
+    /// </summary>
+    [Column("validation_cached_at")]
+    public DateTime? ValidationCachedAt { get; set; }
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
