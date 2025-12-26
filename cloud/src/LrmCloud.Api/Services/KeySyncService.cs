@@ -1,9 +1,9 @@
 // Copyright (c) 2025 Nikolaos Protopapas
 // Licensed under the MIT License
 
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using LocalizationManager.Core.Cloud;
 using LrmCloud.Api.Data;
 using LrmCloud.Shared.DTOs.Sync;
 using Microsoft.EntityFrameworkCore;
@@ -19,17 +19,20 @@ public class KeySyncService : IKeySyncService
     private readonly AppDbContext _db;
     private readonly IProjectService _projectService;
     private readonly ISyncHistoryService _historyService;
+    private readonly IResourceService _resourceService;
     private readonly ILogger<KeySyncService> _logger;
 
     public KeySyncService(
         AppDbContext db,
         IProjectService projectService,
         ISyncHistoryService historyService,
+        IResourceService resourceService,
         ILogger<KeySyncService> logger)
     {
         _db = db;
         _projectService = projectService;
         _historyService = historyService;
+        _resourceService = resourceService;
         _logger = logger;
     }
 
@@ -145,6 +148,12 @@ public class KeySyncService : IKeySyncService
 
             await transaction.CommitAsync(ct);
 
+            // Invalidate validation cache after successful push
+            if (response.Applied > 0 || response.Deleted > 0)
+            {
+                await _resourceService.InvalidateValidationCacheAsync(projectId);
+            }
+
             _logger.LogInformation(
                 "User {UserId} pushed {Applied} entries, deleted {Deleted} to project {ProjectId}",
                 userId, response.Applied, response.Deleted, projectId);
@@ -251,8 +260,8 @@ public class KeySyncService : IKeySyncService
 
                     // Compute hash from all plural forms
                     var hash = pluralForms.Count > 0
-                        ? ComputePluralHash(pluralForms, translations.FirstOrDefault()?.Comment)
-                        : ComputeHash(mainValue, translations.FirstOrDefault()?.Comment);
+                        ? EntryHasher.ComputePluralHash(pluralForms, translations.FirstOrDefault()?.Comment)
+                        : EntryHasher.ComputeHash(mainValue, translations.FirstOrDefault()?.Comment);
 
                     entryData.Translations[langCode] = new TranslationDataDto
                     {
@@ -271,7 +280,7 @@ public class KeySyncService : IKeySyncService
                 foreach (var translation in key.Translations)
                 {
                     // Compute hash if not stored
-                    var hash = translation.Hash ?? ComputeHash(translation.Value ?? "", translation.Comment);
+                    var hash = translation.Hash ?? EntryHasher.ComputeHash(translation.Value ?? "", translation.Comment);
 
                     // Use raw language code from database - do NOT resolve empty string here
                     // Sync operations need to match exactly what was pushed (empty = default lang)
@@ -399,7 +408,7 @@ public class KeySyncService : IKeySyncService
         var translation = resourceKey.Translations
             .FirstOrDefault(t => t.LanguageCode == entry.Lang && (t.PluralForm == "" || t.PluralForm == null));
 
-        var newHash = ComputeHash(entry.Value, entry.Comment);
+        var newHash = EntryHasher.ComputeHash(entry.Value, entry.Comment);
 
         if (translation == null)
         {
@@ -483,7 +492,7 @@ public class KeySyncService : IKeySyncService
             .ToList();
 
         // Compute hash from all plural forms
-        var newHash = ComputePluralHash(entry.PluralForms!, entry.Comment);
+        var newHash = EntryHasher.ComputePluralHash(entry.PluralForms!, entry.Comment);
 
         // Check for conflict using the main entry's BaseHash
         if (entry.BaseHash != null)
@@ -495,7 +504,7 @@ public class KeySyncService : IKeySyncService
 
             if (existingPluralForms.Count > 0)
             {
-                var existingHash = ComputePluralHash(existingPluralForms, existingTranslations.FirstOrDefault()?.Comment);
+                var existingHash = EntryHasher.ComputePluralHash(existingPluralForms, existingTranslations.FirstOrDefault()?.Comment);
                 if (entry.BaseHash != existingHash)
                 {
                     // CONFLICT: Remote changed since last sync
@@ -578,39 +587,6 @@ public class KeySyncService : IKeySyncService
             WasNew = wasNew,
             NewHash = newHash
         };
-    }
-
-    /// <summary>
-    /// Computes hash for plural forms.
-    /// Must match LocalizationManager.Core.Cloud.EntryHasher.ComputePluralHash exactly.
-    /// </summary>
-    private static string ComputePluralHash(Dictionary<string, string> pluralForms, string? comment)
-    {
-        if (pluralForms == null || pluralForms.Count == 0)
-        {
-            return ComputeHash("", comment);
-        }
-
-        var sb = new StringBuilder();
-
-        // Sort plural categories alphabetically for consistent hashing (using Ordinal comparison)
-        foreach (var kvp in pluralForms.OrderBy(p => p.Key, StringComparer.Ordinal))
-        {
-            var category = kvp.Key;
-            var form = kvp.Value.Normalize(NormalizationForm.FormC);
-
-            sb.Append(category);
-            sb.Append('=');
-            sb.Append(form);
-            sb.Append('|');
-        }
-
-        sb.Append('\0');
-        sb.Append(comment?.Normalize(NormalizationForm.FormC) ?? "");
-
-        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     private class EntryChangeResult
@@ -798,7 +774,7 @@ public class KeySyncService : IKeySyncService
             }
 
             SetNestedProperty(existingConfig, change.Path, value);
-            newHashes[change.Path] = ComputeConfigPropertyHash(change.Value);
+            newHashes[change.Path] = EntryHasher.ComputeConfigHash(change.Value);
         }
 
         // Apply deletions (skip immutable settings)
@@ -911,7 +887,7 @@ public class KeySyncService : IKeySyncService
                 if (resolution.EditedValue != null && translation != null)
                 {
                     translation.Value = resolution.EditedValue;
-                    translation.Hash = ComputeHash(resolution.EditedValue, translation.Comment);
+                    translation.Hash = EntryHasher.ComputeHash(resolution.EditedValue, translation.Comment);
                     translation.Version++;
                     translation.UpdatedAt = DateTime.UtcNow;
                     response.Applied++;
@@ -940,7 +916,7 @@ public class KeySyncService : IKeySyncService
                             ResourceKeyId = resourceKey.Id,
                             LanguageCode = resolution.Lang!,
                             Value = resolution.EditedValue,
-                            Hash = ComputeHash(resolution.EditedValue, null),
+                            Hash = EntryHasher.ComputeHash(resolution.EditedValue, null),
                             Status = "translated",
                             PluralForm = "",
                             Version = 1,
@@ -952,7 +928,7 @@ public class KeySyncService : IKeySyncService
                     else
                     {
                         translation.Value = resolution.EditedValue;
-                        translation.Hash = ComputeHash(resolution.EditedValue, translation.Comment);
+                        translation.Hash = EntryHasher.ComputeHash(resolution.EditedValue, translation.Comment);
                         translation.Version++;
                         translation.UpdatedAt = DateTime.UtcNow;
                     }
@@ -971,22 +947,6 @@ public class KeySyncService : IKeySyncService
         }
         hashes[key][lang] = hash;
     }
-
-    private static string ComputeHash(string value, string? comment)
-    {
-        var normalizedValue = value.Normalize(NormalizationForm.FormC);
-        var normalizedComment = comment?.Normalize(NormalizationForm.FormC);
-
-        var sb = new StringBuilder();
-        sb.Append(normalizedValue);
-        sb.Append('\0');
-        sb.Append(normalizedComment ?? "");
-
-        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToHexString(hash).ToLowerInvariant();
-    }
-
 
     private static ConfigDataDto? ExtractConfigData(string configJson)
     {
@@ -1023,7 +983,7 @@ public class KeySyncService : IKeySyncService
             {
                 // Extract leaf value
                 var value = prop.Value.GetRawText();
-                var hash = ComputeConfigPropertyHash(value);
+                var hash = EntryHasher.ComputeConfigHash(value);
 
                 properties[propPath] = new ConfigPropertyDataDto
                 {
@@ -1032,13 +992,6 @@ public class KeySyncService : IKeySyncService
                 };
             }
         }
-    }
-
-    private static string ComputeConfigPropertyHash(string value)
-    {
-        var bytes = Encoding.UTF8.GetBytes(value);
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     #endregion
