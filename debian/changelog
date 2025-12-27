@@ -1,7 +1,7 @@
-lrm (0.7.2-1) noble; urgency=medium
+lrm (0.7.3-1) noble; urgency=medium
 
-  * Fixed: Fix glossary dialog: use component instead of broken inline dialog\n- Fix service worker update notification by disabling cache for SW and index.html\n- Fix markup error in cloud init project selection\n- Fix project creation JSON serialization and improve error messages\n- Fix snapshot list JSON deserialization error\n- Fix TranslationGrid row deselection after Select All\n- Fix theme persistence when using RadzenAppearanceToggle\n
-  * Added: Add inline validation indicators to Editor TranslationGrid\n- Add validation page and API endpoint for project validation\n- Add i18next placeholder support and use shared PlaceholderValidator in API\n- Add validation cache to Project entity\n- Add organization selector to organization glossary page\n- Add open source and self-hosting section to CLOUD.md documentation\n- Add cloud platform screenshots and documentation\n
-  * Changed: Show validation status icons on project cards\n- Use shared EntryHasher in KeySyncService\n- Make KeyEditorDialog larger and fix grid refresh on data changes\n- Redesign KeyEditorDialog with RadzenDataGrid for better UX\n- Replace numeric CSS variables with theme-adaptive semantic equivalents\n
+  * Fixed: Fix cloud test assertions for ApiResponse wrapper and expected values\n
+  * Added: Add per-translation comment support with UI editing and sync\n- Add ca-certificates to API container for Let's Encrypt TLS validation\n
+  * Changed: Run update-ca-certificates to generate SSL bundle in API container\n
 
- -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Fri, 26 Dec 2025 19:20:40 +0200
+ -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Sat, 27 Dec 2025 04:17:05 +0200
