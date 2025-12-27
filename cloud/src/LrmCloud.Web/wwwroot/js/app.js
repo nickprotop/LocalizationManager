@@ -266,12 +266,21 @@ window.lrmServiceWorker = {
         }
     },
 
-    applyUpdate: function() {
+    applyUpdate: async function() {
+        // Clear all caches to ensure fresh load (prevents stale DLL issues)
+        try {
+            const cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map(name => caches.delete(name)));
+            console.log('[SW] Caches cleared for update');
+        } catch (err) {
+            console.error('[SW] Failed to clear caches:', err);
+        }
+
         if (this.registration?.waiting) {
             this.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-            // Fallback reload in case controllerchange doesn't fire
-            setTimeout(() => window.location.reload(), 1000);
         }
+        // Reload after cache clear (controllerchange may also trigger reload)
+        window.location.reload();
     }
 };
 

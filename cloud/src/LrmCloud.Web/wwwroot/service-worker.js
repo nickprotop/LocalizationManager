@@ -102,12 +102,29 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // For Blazor framework files - NETWORK FIRST (critical for version consistency)
+    // Blazor uses integrity hashes; serving stale DLLs causes hash mismatch errors
+    if (url.pathname.includes('/_framework/')) {
+        event.respondWith(
+            fetch(request)
+                .then((response) => {
+                    if (response.ok) {
+                        const responseClone = response.clone();
+                        caches.open(CACHE_NAME)
+                            .then((cache) => cache.put(request, responseClone));
+                    }
+                    return response;
+                })
+                .catch(() => caches.match(request))  // Fallback to cache only if offline
+        );
+        return;
+    }
+
     // For static assets, try cache first, then network
     if (
         url.pathname.includes('/css/') ||
         url.pathname.includes('/js/') ||
         url.pathname.includes('/_content/') ||
-        url.pathname.includes('/_framework/') ||
         url.pathname.endsWith('.png') ||
         url.pathname.endsWith('.ico') ||
         url.pathname.endsWith('.json') ||
