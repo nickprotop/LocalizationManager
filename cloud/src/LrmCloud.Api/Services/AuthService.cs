@@ -150,28 +150,28 @@ public class AuthService : IAuthService
 
         if (user == null)
         {
-            return (false, "Invalid verification link");
+            return (false, "This verification link is invalid. Please check the link or request a new one.");
         }
 
         if (user.EmailVerified)
         {
-            return (false, "Email already verified");
+            return (false, "Your email address has already been verified. You can log in now.");
         }
 
         if (user.EmailVerificationExpiresAt == null || user.EmailVerificationExpiresAt < DateTime.UtcNow)
         {
-            return (false, "Verification link expired");
+            return (false, "This verification link has expired. Please register again to receive a new link.");
         }
 
         if (string.IsNullOrEmpty(user.EmailVerificationTokenHash))
         {
-            return (false, "Invalid verification token");
+            return (false, "This verification link is invalid or has already been used.");
         }
 
         // Verify token by hashing and comparing
         if (!BCrypt.Net.BCrypt.Verify(token, user.EmailVerificationTokenHash))
         {
-            return (false, "Invalid verification token");
+            return (false, "This verification link is invalid or has already been used.");
         }
 
         // Mark as verified
@@ -263,25 +263,25 @@ public class AuthService : IAuthService
             .FirstOrDefaultAsync(u => u.Email == request.Email.ToLowerInvariant());
 
         if (user == null)
-            return (false, "Invalid password reset link");
+            return (false, "This password reset link is invalid. Please request a new one.");
 
         if (user.AuthType != "email")
-            return (false, "Password reset is only available for email accounts");
+            return (false, "Password reset is only available for email/password accounts. You signed up with a social login.");
 
         if (string.IsNullOrEmpty(user.PasswordResetTokenHash))
         {
-            return (false, "No password reset requested");
+            return (false, "No password reset was requested for this account. Please request a new reset link.");
         }
 
         if (user.PasswordResetExpires == null || user.PasswordResetExpires < DateTime.UtcNow)
         {
-            return (false, "Password reset link expired");
+            return (false, "This password reset link has expired. Please request a new one.");
         }
 
         // Verify token by hashing and comparing
         if (!BCrypt.Net.BCrypt.Verify(request.Token, user.PasswordResetTokenHash))
         {
-            return (false, "Invalid password reset token");
+            return (false, "This password reset link is invalid or has already been used.");
         }
 
         // Hash new password
@@ -348,7 +348,7 @@ public class AuthService : IAuthService
         // Validate user exists and uses email auth
         if (user == null || user.AuthType != "email")
         {
-            return (false, null, "Invalid email or password");
+            return (false, null, "The email or password you entered is incorrect.");
         }
 
         // Verify password
@@ -374,13 +374,13 @@ public class AuthService : IAuthService
             _logger.LogWarning("Failed login attempt for user: {Email} (attempt {Count}/{Max})",
                 user.Email, user.FailedLoginAttempts, _config.Auth.MaxFailedLoginAttempts);
 
-            return (false, null, "Invalid email or password");
+            return (false, null, "The email or password you entered is incorrect.");
         }
 
         // Check if email is verified
         if (!user.EmailVerified)
         {
-            return (false, null, "Please verify your email address before logging in");
+            return (false, null, "Please verify your email address before logging in. Check your inbox for the verification link.");
         }
 
         // Success - reset failed attempts and update last login
