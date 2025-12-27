@@ -106,6 +106,30 @@ else
         </RadzenColumn>
     </RadzenRow>
 
+    @* Actions *@
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                <RadzenButton Variant="Radzen.Variant.Text" Icon="code" Text="GitHub Sync"
+                              Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/github"))" />
+                <RadzenButton Variant="Radzen.Variant.Text" Icon="history" Text="Snapshots"
+                              Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/snapshots"))" />
+                <RadzenButton Variant="Radzen.Variant.Text" Icon="restore" Text="History"
+                              Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/history"))" />
+                <RadzenButton Variant="Radzen.Variant.Text" Icon="book" Text="Glossary"
+                              Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/glossary"))" />
+                <RadzenButton Variant="Radzen.Variant.Text" Icon="verified" Text="Validation"
+                              Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/validation"))" />
+            </RadzenStack>
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+                <RadzenButton Variant="Radzen.Variant.Text" Icon="translate" Text="Translate Missing"
+                              Click="@OpenTranslateDialog" />
+                <RadzenButton Variant="Radzen.Variant.Text" Icon="file_download" Text="Export"
+                              Click="@ExportProject" />
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
+
     @if (_stats != null && _stats.Languages.Any())
     {
         <RadzenText TextStyle="TextStyle.H6" class="rz-mt-6 rz-mb-3">Language Progress</RadzenText>
@@ -291,27 +315,6 @@ else
         </RadzenRow>
     </RadzenCard>
 
-    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-6 rz-mb-3">Quick Actions</RadzenText>
-    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
-        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="edit" Text="Open Editor"
-                      Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/editor"))" />
-        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="code" Text="GitHub Sync"
-                      Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/github"))" />
-        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="history" Text="View Snapshots"
-                      Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/snapshots"))" />
-        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="restore" Text="Sync History"
-                      Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/history"))" />
-        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="book" Text="Glossary"
-                      Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/glossary"))" />
-        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="verified" Text="Validation"
-                      Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/validation"))" />
-        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="translate" Text="Translate All Missing"
-                      Click="@OpenTranslateDialog" />
-        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="file_download" Text="Export"
-                      Click="@ExportProject" />
-        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="content_copy" Text="CLI Sync Command"
-                      Click="@CopySyncCommand" />
-    </RadzenStack>
 }
 
 @code {

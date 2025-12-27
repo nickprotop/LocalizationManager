@@ -1,0 +1,73 @@
+@* StatCard - Modern stat display with icon box and value *@
+
+<div class="stat-card @_variantClass @Class" style="@Style" @onclick="HandleClick">
+    <div class="stat-card-icon" style="background: @_iconBgColor; color: @_iconColor;">
+        <RadzenIcon Icon="@Icon" />
+    </div>
+    <div class="stat-card-content">
+        <div class="stat-card-value">@Value</div>
+        <div class="stat-card-label">@Label</div>
+        @if (ChildContent != null)
+        {
+            <div class="stat-card-extra">@ChildContent</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Icon { get; set; } = "info";
+    [Parameter] public string Value { get; set; } = "0";
+    [Parameter] public string Label { get; set; } = "Label";
+    [Parameter] public StatCardVariant Variant { get; set; } = StatCardVariant.Primary;
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Style { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
+
+    private async Task HandleClick(MouseEventArgs args)
+    {
+        if (OnClick.HasDelegate)
+        {
+            await OnClick.InvokeAsync(args);
+        }
+    }
+
+    private string _variantClass => Variant switch
+    {
+        StatCardVariant.Primary => "stat-card--primary",
+        StatCardVariant.Info => "stat-card--info",
+        StatCardVariant.Success => "stat-card--success",
+        StatCardVariant.Warning => "stat-card--warning",
+        StatCardVariant.Danger => "stat-card--danger",
+        _ => "stat-card--primary"
+    };
+
+    private string _iconBgColor => Variant switch
+    {
+        StatCardVariant.Primary => "var(--lrm-primary-100)",
+        StatCardVariant.Info => "rgba(6, 182, 212, 0.15)",
+        StatCardVariant.Success => "rgba(34, 197, 94, 0.15)",
+        StatCardVariant.Warning => "rgba(245, 158, 11, 0.15)",
+        StatCardVariant.Danger => "rgba(239, 68, 68, 0.15)",
+        _ => "var(--lrm-primary-100)"
+    };
+
+    private string _iconColor => Variant switch
+    {
+        StatCardVariant.Primary => "var(--lrm-primary-600)",
+        StatCardVariant.Info => "var(--lrm-info)",
+        StatCardVariant.Success => "var(--lrm-success)",
+        StatCardVariant.Warning => "var(--lrm-warning)",
+        StatCardVariant.Danger => "var(--lrm-danger)",
+        _ => "var(--lrm-primary-600)"
+    };
+
+    public enum StatCardVariant
+    {
+        Primary,
+        Info,
+        Success,
+        Warning,
+        Danger
+    }
+}

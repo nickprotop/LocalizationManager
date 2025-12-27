@@ -2,6 +2,7 @@
 @using LrmCloud.Shared.DTOs.Admin
 @using LrmCloud.Web.Services
 @using LrmCloud.Web.Helpers
+@using LrmCloud.Web.Components
 @inject AdminService AdminService
 @inject NavigationManager Navigation
 @attribute [Authorize]
@@ -18,103 +19,80 @@
 
 @if (_isLoading)
 {
-    <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+    <RadzenRow Gap="1rem" class="rz-mb-4 lrm-stagger">
+        @for (int i = 0; i < 8; i++)
+        {
+            <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                <div class="stat-card">
+                    <div class="lrm-skeleton" style="width: 48px; height: 48px;"></div>
+                    <div class="stat-card-content">
+                        <div class="lrm-skeleton" style="width: 60px; height: 28px; margin-bottom: 4px;"></div>
+                        <div class="lrm-skeleton" style="width: 100px; height: 16px;"></div>
+                    </div>
+                </div>
+            </RadzenColumn>
+        }
+    </RadzenRow>
 }
 else
 {
     @* Stats Cards - Row 1 *@
-    <RadzenRow Gap="1rem" class="rz-mb-4">
+    <RadzenRow Gap="1rem" class="rz-mb-4 lrm-stagger">
         <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-            <RadzenCard>
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
-                    <RadzenIcon Icon="people" Style="font-size: 2rem; color: var(--rz-primary);" />
-                    <RadzenStack Gap="0">
-                        <RadzenText TextStyle="TextStyle.H4">@(_stats?.TotalUsers.ToString("N0") ?? "-")</RadzenText>
-                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Total Users</RadzenText>
-                    </RadzenStack>
-                </RadzenStack>
-            </RadzenCard>
+            <StatCard Icon="people"
+                      Value="@(_stats?.TotalUsers.ToString("N0") ?? "-")"
+                      Label="Total Users"
+                      Variant="StatCard.StatCardVariant.Primary" />
         </RadzenColumn>
         <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-            <RadzenCard>
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
-                    <RadzenIcon Icon="credit_card" Style="font-size: 2rem; color: var(--rz-success);" />
-                    <RadzenStack Gap="0">
-                        <RadzenText TextStyle="TextStyle.H4">@(_stats?.PaidUsers.ToString("N0") ?? "-")</RadzenText>
-                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Active Subscribers</RadzenText>
-                    </RadzenStack>
-                </RadzenStack>
-            </RadzenCard>
+            <StatCard Icon="credit_card"
+                      Value="@(_stats?.PaidUsers.ToString("N0") ?? "-")"
+                      Label="Active Subscribers"
+                      Variant="StatCard.StatCardVariant.Success" />
         </RadzenColumn>
         <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-            <RadzenCard>
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
-                    <RadzenIcon Icon="folder" Style="font-size: 2rem; color: var(--rz-info);" />
-                    <RadzenStack Gap="0">
-                        <RadzenText TextStyle="TextStyle.H4">@(_stats?.TotalProjects.ToString("N0") ?? "-")</RadzenText>
-                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Projects</RadzenText>
-                    </RadzenStack>
-                </RadzenStack>
-            </RadzenCard>
+            <StatCard Icon="folder"
+                      Value="@(_stats?.TotalProjects.ToString("N0") ?? "-")"
+                      Label="Projects"
+                      Variant="StatCard.StatCardVariant.Info" />
         </RadzenColumn>
         <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-            <RadzenCard>
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
-                    <RadzenIcon Icon="business" Style="font-size: 2rem; color: var(--rz-warning);" />
-                    <RadzenStack Gap="0">
-                        <RadzenText TextStyle="TextStyle.H4">@(_stats?.TotalOrganizations.ToString("N0") ?? "-")</RadzenText>
-                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Organizations</RadzenText>
-                    </RadzenStack>
-                </RadzenStack>
-            </RadzenCard>
+            <StatCard Icon="business"
+                      Value="@(_stats?.TotalOrganizations.ToString("N0") ?? "-")"
+                      Label="Organizations"
+                      Variant="StatCard.StatCardVariant.Warning" />
         </RadzenColumn>
     </RadzenRow>
 
     @* Stats Cards - Row 2 (MRR) *@
-    <RadzenRow Gap="1rem" class="rz-mb-4">
+    <RadzenRow Gap="1rem" class="rz-mb-4 lrm-stagger">
         <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-            <RadzenCard Style="cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("admin/analytics"))">
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
-                    <RadzenIcon Icon="attach_money" Style="font-size: 2rem; color: var(--rz-success);" />
-                    <RadzenStack Gap="0">
-                        <RadzenText TextStyle="TextStyle.H4">$@(_revenue?.CurrentMrr.ToString("N0") ?? "-")</RadzenText>
-                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Monthly Revenue</RadzenText>
-                    </RadzenStack>
-                </RadzenStack>
-            </RadzenCard>
+            <StatCard Icon="attach_money"
+                      Value="@($"${_revenue?.CurrentMrr.ToString("N0") ?? "-"}")"
+                      Label="Monthly Revenue"
+                      Variant="StatCard.StatCardVariant.Success"
+                      Style="cursor: pointer;"
+                      OnClick="@(() => Navigation.NavigateTo("admin/analytics"))" />
         </RadzenColumn>
         <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-            <RadzenCard Style="cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("admin/analytics"))">
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
-                    <RadzenIcon Icon="trending_up" Style="@($"font-size: 2rem; color: {(_userAnalytics?.GrowthRate >= 0 ? "var(--rz-success)" : "var(--rz-danger)")};")" />
-                    <RadzenStack Gap="0">
-                        <RadzenText TextStyle="TextStyle.H4">@((_userAnalytics?.NewUsersThisMonth ?? 0) > 0 ? "+" : "")@(_userAnalytics?.NewUsersThisMonth.ToString("N0") ?? "-")</RadzenText>
-                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">New Users (Month)</RadzenText>
-                    </RadzenStack>
-                </RadzenStack>
-            </RadzenCard>
+            <StatCard Icon="trending_up"
+                      Value="@(((_userAnalytics?.NewUsersThisMonth ?? 0) > 0 ? "+" : "") + (_userAnalytics?.NewUsersThisMonth.ToString("N0") ?? "-"))"
+                      Label="New Users (Month)"
+                      Variant="@(_userAnalytics?.GrowthRate >= 0 ? StatCard.StatCardVariant.Success : StatCard.StatCardVariant.Danger)"
+                      Style="cursor: pointer;"
+                      OnClick="@(() => Navigation.NavigateTo("admin/analytics"))" />
         </RadzenColumn>
         <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-            <RadzenCard>
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
-                    <RadzenIcon Icon="translate" Style="font-size: 2rem; color: var(--rz-primary);" />
-                    <RadzenStack Gap="0">
-                        <RadzenText TextStyle="TextStyle.H4">@UiHelpers.FormatNumber(_stats?.TotalTranslationCharsUsed ?? 0)</RadzenText>
-                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">LRM Chars Used</RadzenText>
-                    </RadzenStack>
-                </RadzenStack>
-            </RadzenCard>
+            <StatCard Icon="translate"
+                      Value="@UiHelpers.FormatNumber(_stats?.TotalTranslationCharsUsed ?? 0)"
+                      Label="LRM Chars Used"
+                      Variant="StatCard.StatCardVariant.Primary" />
         </RadzenColumn>
         <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-            <RadzenCard>
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.75rem">
-                    <RadzenIcon Icon="key" Style="font-size: 2rem; color: var(--rz-info);" />
-                    <RadzenStack Gap="0">
-                        <RadzenText TextStyle="TextStyle.H4">@UiHelpers.FormatNumber(_stats?.TotalOtherCharsUsed ?? 0)</RadzenText>
-                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">BYOK Chars Used</RadzenText>
-                    </RadzenStack>
-                </RadzenStack>
-            </RadzenCard>
+            <StatCard Icon="key"
+                      Value="@UiHelpers.FormatNumber(_stats?.TotalOtherCharsUsed ?? 0)"
+                      Label="BYOK Chars Used"
+                      Variant="StatCard.StatCardVariant.Info" />
         </RadzenColumn>
     </RadzenRow>
 

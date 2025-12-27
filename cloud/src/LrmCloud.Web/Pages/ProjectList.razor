@@ -1,6 +1,7 @@
 @page "/projects"
 @attribute [Authorize]
 @using LrmCloud.Web.Helpers
+@using LrmCloud.Web.Components
 @inject ProjectService ProjectService
 @inject LimitsService LimitsService
 @inject NavigationManager Navigation
@@ -21,93 +22,55 @@
 
 @if (_isLoading)
 {
-    <RadzenRow Gap="1rem">
+    <RadzenRow Gap="1rem" class="lrm-stagger">
         @for (int i = 0; i < 6; i++)
         {
             <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
-                <RadzenCard Style="height: 180px;">
-                    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
-                </RadzenCard>
+                <div class="project-card" style="cursor: default;">
+                    <div class="project-card-header">
+                        <div style="flex: 1;">
+                            <div class="lrm-skeleton" style="width: 120px; height: 22px; margin-bottom: 4px;"></div>
+                            <div class="lrm-skeleton" style="width: 80px; height: 16px;"></div>
+                        </div>
+                        <div class="lrm-skeleton" style="width: 50px; height: 20px;"></div>
+                    </div>
+                    <div class="lrm-skeleton" style="width: 100%; height: 16px; margin: 12px 0;"></div>
+                    <div class="lrm-skeleton" style="width: 100%; height: 4px; margin-bottom: 16px;"></div>
+                    <div style="display: flex; gap: 8px;">
+                        <div class="lrm-skeleton" style="width: 50px; height: 32px;"></div>
+                        <div class="lrm-skeleton" style="width: 70px; height: 32px;"></div>
+                    </div>
+                </div>
             </RadzenColumn>
         }
     </RadzenRow>
 }
 else if (!FilteredProjects.Any())
 {
-    <RadzenCard>
-        <RadzenStack AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.Center" class="rz-py-8">
-            @if (_projects.Count == 0)
-            {
-                <RadzenIcon Icon="folder_open" Style="font-size: 3rem; color: var(--rz-text-secondary-color);" />
-                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-color-secondary">No projects yet</RadzenText>
-                <RadzenButton Variant="Radzen.Variant.Filled" Icon="add" Text="Create Your First Project" Click="@OpenCreateDialog" class="rz-mt-2" Disabled="@(!_canCreateProject)" title="@_limitMessage" />
-            }
-            else
-            {
-                <RadzenIcon Icon="search_off" Style="font-size: 3rem; color: var(--rz-text-secondary-color);" />
-                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-color-secondary">No projects match your search</RadzenText>
-                <RadzenButton Variant="Radzen.Variant.Text" Text="Clear Filters" Click="ClearFilters" class="rz-mt-2" />
-            }
-        </RadzenStack>
-    </RadzenCard>
+    <div class="empty-state lrm-animate-fade-in-up">
+        @if (_projects.Count == 0)
+        {
+            <RadzenIcon Icon="folder_open" Style="font-size: 4rem; color: var(--lrm-text-muted);" />
+            <h3 style="margin: 1rem 0 0.5rem; color: var(--lrm-text-primary);">No projects yet</h3>
+            <p style="color: var(--lrm-text-secondary); margin-bottom: 1.5rem;">Create your first project to start managing translations</p>
+            <RadzenButton Variant="Radzen.Variant.Filled" Icon="add" Text="Create Your First Project" Click="@OpenCreateDialog" Disabled="@(!_canCreateProject)" title="@_limitMessage" />
+        }
+        else
+        {
+            <RadzenIcon Icon="search_off" Style="font-size: 4rem; color: var(--lrm-text-muted);" />
+            <h3 style="margin: 1rem 0 0.5rem; color: var(--lrm-text-primary);">No projects match your search</h3>
+            <p style="color: var(--lrm-text-secondary); margin-bottom: 1.5rem;">Try adjusting your filters</p>
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Clear Filters" Click="ClearFilters" />
+        }
+    </div>
 }
 else
 {
-    <RadzenRow Gap="1rem">
+    <RadzenRow Gap="1rem" class="lrm-stagger">
         @foreach (var project in FilteredProjects)
         {
             <RadzenColumn Size="12" SizeSM="6" SizeMD="4">
-                <RadzenCard Style="cursor: pointer;" @onclick="@(() => NavigateToProject(project.Id))">
-                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
-                        <div>
-                            <RadzenText TextStyle="TextStyle.H6">@project.Name</RadzenText>
-                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
-                                @(project.OrganizationName ?? "Personal")
-                            </RadzenText>
-                        </div>
-                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem" AlignItems="Radzen.AlignItems.Center">
-                            <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(project.Format)" Text="@project.Format" />
-                            @if (!string.IsNullOrEmpty(project.GitHubRepo))
-                            {
-                                <span @onclick="() => NavigateToGitHub(project.Id)" @onclick:stopPropagation="true">
-                                    <RadzenBadge BadgeStyle="BadgeStyle.Dark"
-                                                 Style="cursor: pointer;"
-                                                 Title="@project.GitHubRepo">
-                                        <RadzenIcon Icon="@UiHelpers.GetGitHubStatusIcon(project.SyncStatus)" Style="font-size: 0.875rem;" />
-                                    </RadzenBadge>
-                                </span>
-                            }
-                            @if (project.ValidationErrors > 0 || project.ValidationWarnings > 0)
-                            {
-                                <span title="@UiHelpers.GetValidationTooltip(project)" style="display: flex; gap: 0.125rem;">
-                                    @if (project.ValidationErrors > 0)
-                                    {
-                                        <RadzenIcon Icon="error" Style="color: var(--rz-danger); font-size: 1rem;" />
-                                    }
-                                    @if (project.ValidationWarnings > 0)
-                                    {
-                                        <RadzenIcon Icon="warning" Style="color: var(--rz-warning); font-size: 1rem;" />
-                                    }
-                                </span>
-                            }
-                        </RadzenStack>
-                    </RadzenStack>
-                    @if (!string.IsNullOrEmpty(project.Description))
-                    {
-                        <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-2" Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            @project.Description
-                        </RadzenText>
-                    }
-                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mt-2">
-                        <RadzenText TextStyle="TextStyle.Caption">@project.KeyCount keys</RadzenText>
-                        <RadzenText TextStyle="TextStyle.Caption">@project.CompletionPercentage.ToString("F0")% complete</RadzenText>
-                    </RadzenStack>
-                    <RadzenProgressBar Value="@project.CompletionPercentage" ShowValue="false" ProgressBarStyle="@UiHelpers.GetCompletionProgressStyle(project.CompletionPercentage)" class="rz-mt-2" Style="height: 4px;" />
-                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" class="rz-mt-3">
-                        <RadzenButton Variant="Radzen.Variant.Text" Text="Edit" Click="@(() => NavigateToEditor(project.Id))" @onclick:stopPropagation="true" />
-                        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Secondary" Text="Settings" Click="@(() => NavigateToSettings(project.Id))" @onclick:stopPropagation="true" />
-                    </RadzenStack>
-                </RadzenCard>
+                <ProjectCard Project="project" />
             </RadzenColumn>
         }
     </RadzenRow>
@@ -184,11 +147,6 @@ else
         }
     }
 
-    private void NavigateToSettings(int projectId)
-    {
-        Navigation.NavigateTo($"projects/{projectId}/settings");
-    }
-
     private async Task OnProjectCreated(ProjectDto project)
     {
         _projects.Insert(0, project);
@@ -197,18 +155,4 @@ else
         StateHasChanged();
     }
 
-    private void NavigateToProject(int projectId)
-    {
-        Navigation.NavigateTo($"projects/{projectId}");
-    }
-
-    private void NavigateToEditor(int projectId)
-    {
-        Navigation.NavigateTo($"projects/{projectId}/editor");
-    }
-
-    private void NavigateToGitHub(int projectId)
-    {
-        Navigation.NavigateTo($"projects/{projectId}/github");
-    }
 }

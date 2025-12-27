@@ -1,6 +1,33 @@
 // LRM Cloud Application JavaScript
 
 // =============================================================================
+// Command Palette (Ctrl+K / Cmd+K)
+// =============================================================================
+window.lrmCommandPalette = {
+    dotNetRef: null,
+
+    init: function(dotNetReference) {
+        this.dotNetRef = dotNetReference;
+        document.addEventListener('keydown', this.handleKeyDown.bind(this));
+    },
+
+    dispose: function() {
+        document.removeEventListener('keydown', this.handleKeyDown.bind(this));
+        this.dotNetRef = null;
+    },
+
+    handleKeyDown: function(e) {
+        // Ctrl+K or Cmd+K - Open command palette
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            if (this.dotNetRef) {
+                this.dotNetRef.invokeMethodAsync('Toggle');
+            }
+        }
+    }
+};
+
+// =============================================================================
 // Keyboard Shortcuts
 // =============================================================================
 window.lrmKeyboard = {

@@ -24,10 +24,13 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json" />
 
-    <!-- Radzen CSS is loaded dynamically by RadzenTheme component -->
+    <!-- Radzen Default Theme CSS (static loading - light/dark only) -->
+    <link rel="stylesheet" href="_content/Radzen.Blazor/css/default.css" />
 
-    <!-- Google Fonts for Radzen -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
+    <!-- Google Fonts - Inter (modern) + JetBrains Mono (code) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
     <!-- App CSS (versioned for cache busting) -->
     <link rel="stylesheet" href="css/app.css?v=__BUILD_VERSION__" />

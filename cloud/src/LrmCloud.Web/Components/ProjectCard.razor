@@ -1,0 +1,95 @@
+@* ProjectCard - Modern project display card *@
+@using LrmCloud.Web.Helpers
+@inject NavigationManager Navigation
+
+<div class="project-card" @onclick="@(() => Navigation.NavigateTo($"projects/{Project.Id}"))">
+    <div class="project-card-header">
+        <div>
+            <h3 class="project-card-title">@Project.Name</h3>
+            <div class="project-card-org">@(Project.OrganizationName ?? "Personal")</div>
+        </div>
+        <div class="project-card-badges">
+            <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(Project.Format)" Text="@Project.Format" />
+            @if (!string.IsNullOrEmpty(Project.GitHubRepo))
+            {
+                <span @onclick="NavigateToGitHub" @onclick:stopPropagation="true">
+                    <RadzenBadge BadgeStyle="BadgeStyle.Dark"
+                                 Style="cursor: pointer;"
+                                 Title="@Project.GitHubRepo">
+                        <RadzenIcon Icon="@UiHelpers.GetGitHubStatusIcon(Project.SyncStatus)" Style="font-size: 0.875rem;" />
+                    </RadzenBadge>
+                </span>
+            }
+            @if (Project.ValidationErrors > 0 || Project.ValidationWarnings > 0)
+            {
+                <span title="@UiHelpers.GetValidationTooltip(Project)" style="display: flex; gap: 0.125rem;">
+                    @if (Project.ValidationErrors > 0)
+                    {
+                        <RadzenIcon Icon="error" Style="color: var(--lrm-danger); font-size: 1rem;" />
+                    }
+                    @if (Project.ValidationWarnings > 0)
+                    {
+                        <RadzenIcon Icon="warning" Style="color: var(--lrm-warning); font-size: 1rem;" />
+                    }
+                </span>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Project.Description))
+    {
+        <div class="project-card-description">@Project.Description</div>
+    }
+
+    <div class="project-card-stats">
+        <span>@Project.KeyCount keys</span>
+        <span>@Project.CompletionPercentage.ToString("F0")% complete</span>
+    </div>
+
+    <div class="project-card-progress">
+        <div class="project-card-progress-bar @GetProgressClass()"
+             style="width: @(Project.CompletionPercentage)%"></div>
+    </div>
+
+    <div class="project-card-actions">
+        <RadzenButton Variant="Radzen.Variant.Text"
+                      Text="Edit"
+                      Click="@NavigateToEditor"
+                      @onclick:stopPropagation="true" />
+        <RadzenButton Variant="Radzen.Variant.Text"
+                      ButtonStyle="ButtonStyle.Secondary"
+                      Text="Settings"
+                      Click="@NavigateToSettings"
+                      @onclick:stopPropagation="true" />
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public ProjectDto Project { get; set; } = default!;
+
+    private string GetProgressClass()
+    {
+        return Project.CompletionPercentage switch
+        {
+            >= 80 => "project-card-progress-bar--success",
+            >= 50 => "project-card-progress-bar--warning",
+            _ => "project-card-progress-bar--danger"
+        };
+    }
+
+    private void NavigateToEditor()
+    {
+        Navigation.NavigateTo($"projects/{Project.Id}/editor");
+    }
+
+    private void NavigateToSettings()
+    {
+        Navigation.NavigateTo($"projects/{Project.Id}/settings");
+    }
+
+    private void NavigateToGitHub()
+    {
+        Navigation.NavigateTo($"projects/{Project.Id}/github");
+    }
+}

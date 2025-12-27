@@ -1,28 +1,10 @@
 @inherits LayoutComponentBase
-@inject IJSRuntime JS
-@inject LrmThemeService ThemeService
-@inject Radzen.ThemeService RadzenThemeService
-
-<HeadContent>
-    <RadzenTheme Theme="@RadzenThemeService.Theme" />
-</HeadContent>
 
 <RadzenLayout Style="min-height: 100vh;">
     <RadzenComponents />
-    <RadzenBody Style="display: flex; justify-content: center; align-items: center; min-height: 100vh;">
+    <RadzenBody Style="display: flex; justify-content: center; align-items: center; min-height: 100vh; background: var(--lrm-surface-elevated);">
         <RadzenCard Style="max-width: 400px; width: 100%; margin: 1rem;">
             @Body
         </RadzenCard>
     </RadzenBody>
 </RadzenLayout>
-
-@code {
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await ThemeService.InitializeAsync();
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-}

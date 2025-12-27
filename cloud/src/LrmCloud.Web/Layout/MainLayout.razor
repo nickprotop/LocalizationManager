@@ -2,13 +2,9 @@
 @inject AuthService AuthService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
-@inject LrmThemeService ThemeService
-@inject Radzen.ThemeService RadzenThemeService
 @using LrmCloud.Web.Components
 
-<HeadContent>
-    <RadzenTheme Theme="@RadzenThemeService.Theme" />
-</HeadContent>
+<CommandPalette @ref="_commandPalette" />
 
 <RadzenLayout>
     <RadzenHeader>
@@ -21,7 +17,11 @@
             <div style="flex: 1;"></div>
             <AuthorizeView>
                 <Authorized Context="authContext">
-                    <RadzenAppearanceToggle />
+                    <button type="button" class="search-trigger" @onclick="OpenCommandPalette" title="Search (Ctrl+K)">
+                        <RadzenIcon Icon="search" />
+                        <span class="search-trigger-text">Search...</span>
+                        <span class="lrm-kbd lrm-kbd--sm">Ctrl+K</span>
+                    </button>
                     <RadzenProfileMenu Click="@OnProfileMenuClick">
                         <Template>
                             <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
@@ -35,17 +35,6 @@
                             <RadzenProfileMenuItem Text="API Keys" Path="settings/api-keys" Icon="key" />
                             <RadzenProfileMenuItem Text="Usage" Path="settings/usage" Icon="analytics" />
                             <RadzenProfileMenuItem Text="Billing" Path="settings/billing" Icon="credit_card" />
-                            <RadzenStack Gap="0.25rem" Style="padding: 0.5rem 1rem; min-width: 180px;">
-                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Theme</RadzenText>
-                                <RadzenDropDown TValue="string"
-                                                Value="@RadzenThemeService.Theme"
-                                                Data="@LrmThemeService.AvailableThemes"
-                                                Change="@OnThemeDropdownChanged">
-                                    <Template Context="themeName">
-                                        @GetThemeDisplayName(themeName)
-                                    </Template>
-                                </RadzenDropDown>
-                            </RadzenStack>
                             <RadzenProfileMenuItem Text="Logout" Icon="logout" Value="logout" />
                         </ChildContent>
                     </RadzenProfileMenu>
@@ -58,10 +47,11 @@
     </RadzenHeader>
 
     <RadzenSidebar @bind-Expanded="@_sidebarExpanded"
-                   Style="width: 250px;"
-                   Responsive="true">
+                   Style="@_sidebarStyle"
+                   Responsive="true"
+                   class="@(_sidebarCollapsed ? "sidebar-collapsed" : "")">
         <RadzenPanelMenu>
-            <RadzenPanelMenuItem Text="Dashboard" Path="" Icon="dashboard" />
+            <RadzenPanelMenuItem Text="Dashboard" Path="" Icon="dashboard" Match="NavLinkMatch.All" />
             <RadzenPanelMenuItem Text="Projects" Path="projects" Icon="folder" />
             <RadzenPanelMenuItem Text="Organizations" Path="organizations" Icon="business" />
             <RadzenPanelMenuItem Text="Settings" Icon="settings">
@@ -91,9 +81,14 @@
             </AuthorizeView>
         </RadzenPanelMenu>
         <div style="flex: 1;"></div>
-        <RadzenPanelMenu Style="margin-bottom: 1rem;">
-            <RadzenPanelMenuItem Text="Help & Support" Path="support" Icon="help_outline" />
-        </RadzenPanelMenu>
+        <div class="sidebar-footer">
+            <RadzenPanelMenu>
+                <RadzenPanelMenuItem Text="Help & Support" Path="support" Icon="help_outline" />
+            </RadzenPanelMenu>
+            <button type="button" class="sidebar-collapse-btn" @onclick="ToggleSidebarCollapse" title="@(_sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")">
+                <RadzenIcon Icon="@(_sidebarCollapsed ? "chevron_right" : "chevron_left")" />
+            </button>
+        </div>
     </RadzenSidebar>
 
     <RadzenBody>
@@ -112,45 +107,44 @@
 
 @code {
     private bool _sidebarExpanded = true;
+    private bool _sidebarCollapsed = false;
+    private CommandPalette? _commandPalette;
 
-    protected override void OnInitialized()
+    private string _sidebarStyle => _sidebarCollapsed
+        ? "width: 64px; transition: width 200ms ease;"
+        : "width: 250px; transition: width 200ms ease;";
+
+    private async Task OpenCommandPalette()
     {
-        RadzenThemeService.ThemeChanged += OnRadzenThemeChanged;
+        if (_commandPalette != null)
+        {
+            await _commandPalette.Open();
+        }
+    }
+
+    private async Task ToggleSidebarCollapse()
+    {
+        _sidebarCollapsed = !_sidebarCollapsed;
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", "lrm-sidebar-collapsed", _sidebarCollapsed.ToString().ToLower());
+        }
+        catch { }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await ThemeService.InitializeAsync();
-            await InvokeAsync(StateHasChanged);
+            // Load sidebar collapsed state
+            try
+            {
+                var collapsed = await JS.InvokeAsync<string?>("localStorage.getItem", "lrm-sidebar-collapsed");
+                _sidebarCollapsed = collapsed == "true";
+                await InvokeAsync(StateHasChanged);
+            }
+            catch { }
         }
-    }
-
-    private async void OnRadzenThemeChanged()
-    {
-        // Sync the theme change to our persistence layer
-        var currentRadzenTheme = RadzenThemeService.Theme;
-        if (!string.IsNullOrEmpty(currentRadzenTheme) && currentRadzenTheme != ThemeService.CurrentTheme)
-        {
-            await ThemeService.SetThemeAsync(currentRadzenTheme);
-        }
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private async Task OnThemeDropdownChanged(object value)
-    {
-        if (value is string theme)
-        {
-            await ThemeService.SetThemeAsync(theme);
-        }
-    }
-
-    private static string GetThemeDisplayName(string themeName)
-    {
-        return LrmThemeService.ThemeDisplayNames.TryGetValue(themeName, out var displayName)
-            ? displayName
-            : themeName;
     }
 
     private async Task OnProfileMenuClick(RadzenProfileMenuItem item)
@@ -160,10 +154,5 @@
             await AuthService.LogoutAsync();
             Navigation.NavigateTo("login", forceLoad: true);
         }
-    }
-
-    public void Dispose()
-    {
-        RadzenThemeService.ThemeChanged -= OnRadzenThemeChanged;
     }
 }

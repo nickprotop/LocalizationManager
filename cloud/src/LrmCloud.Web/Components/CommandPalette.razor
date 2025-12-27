@@ -1,0 +1,284 @@
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject ProjectService ProjectService
+@inject OrganizationService OrganizationService
+@implements IAsyncDisposable
+
+@if (_isOpen)
+{
+    <div class="command-palette-backdrop" @onclick="Close" @onclick:stopPropagation="false">
+        <div class="command-palette" @onclick:stopPropagation="true">
+            <div class="command-palette-header">
+                <RadzenIcon Icon="search" class="command-palette-search-icon" />
+                <input type="text"
+                       @ref="_searchInput"
+                       class="command-palette-input"
+                       placeholder="Search pages, projects, actions..."
+                       @bind="_searchQuery"
+                       @bind:event="oninput"
+                       @onkeydown="HandleKeyDown" />
+                <span class="lrm-kbd">ESC</span>
+            </div>
+
+            <div class="command-palette-content">
+                @if (_filteredItems.Count == 0)
+                {
+                    <div class="command-palette-empty">
+                        <RadzenIcon Icon="search_off" />
+                        <span>No results found</span>
+                    </div>
+                }
+                else
+                {
+                    var groupedItems = _filteredItems.GroupBy(i => i.Category);
+                    @foreach (var group in groupedItems)
+                    {
+                        <div class="command-palette-group">
+                            <div class="command-palette-group-title">@group.Key</div>
+                            @foreach (var item in group)
+                            {
+                                var isSelected = item == _selectedItem;
+                                <div class="command-palette-item @(isSelected ? "selected" : "")"
+                                     @onclick="() => ExecuteItem(item)"
+                                     @onmouseenter="() => _selectedItem = item">
+                                    <RadzenIcon Icon="@item.Icon" class="command-palette-item-icon" />
+                                    <div class="command-palette-item-content">
+                                        <span class="command-palette-item-title">@item.Title</span>
+                                        @if (!string.IsNullOrEmpty(item.Subtitle))
+                                        {
+                                            <span class="command-palette-item-subtitle">@item.Subtitle</span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(item.Shortcut))
+                                    {
+                                        <span class="lrm-kbd lrm-kbd--sm">@item.Shortcut</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+
+            <div class="command-palette-footer">
+                <span><span class="lrm-kbd lrm-kbd--sm">↑↓</span> Navigate</span>
+                <span><span class="lrm-kbd lrm-kbd--sm">↵</span> Select</span>
+                <span><span class="lrm-kbd lrm-kbd--sm">ESC</span> Close</span>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isOpen;
+    private string _searchQuery = "";
+    private ElementReference _searchInput;
+    private List<CommandItem> _allItems = new();
+    private List<CommandItem> _filteredItems = new();
+    private CommandItem? _selectedItem;
+    private DotNetObjectReference<CommandPalette>? _dotNetRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await BuildCommandItems();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("lrmCommandPalette.init", _dotNetRef);
+        }
+
+        if (_isOpen)
+        {
+            try
+            {
+                await _searchInput.FocusAsync();
+            }
+            catch { }
+        }
+    }
+
+    private async Task BuildCommandItems()
+    {
+        _allItems = new List<CommandItem>
+        {
+            // Navigation
+            new("Dashboard", "dashboard", "", "Navigation", ""),
+            new("Projects", "folder", "projects", "Navigation", ""),
+            new("Organizations", "business", "organizations", "Navigation", ""),
+
+            // Settings
+            new("Profile Settings", "person", "settings/profile", "Settings", ""),
+            new("CLI API Keys", "key", "settings/api-keys", "Settings", ""),
+            new("Translation Providers", "translate", "settings/translation", "Settings", ""),
+            new("Translation Memory", "memory", "settings/translation-memory", "Settings", ""),
+            new("Glossary", "book", "settings/glossary", "Settings", ""),
+            new("Usage", "analytics", "settings/usage", "Settings", ""),
+            new("Billing", "credit_card", "settings/billing", "Settings", ""),
+
+            // Actions
+            new("Create Project", "add", "action:create-project", "Actions", ""),
+            new("Import Project", "upload", "action:import-project", "Actions", ""),
+
+            // Help
+            new("Help & Support", "help_outline", "support", "Help", ""),
+        };
+
+        // Load recent projects
+        try
+        {
+            var projects = await ProjectService.GetProjectsAsync();
+            foreach (var project in projects.Take(5))
+            {
+                _allItems.Add(new CommandItem(
+                    project.Name,
+                    "folder_open",
+                    $"projects/{project.Id}",
+                    "Recent Projects",
+                    project.OrganizationName ?? "Personal"
+                ));
+            }
+        }
+        catch { }
+
+        FilterItems();
+    }
+
+    private void FilterItems()
+    {
+        if (string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            _filteredItems = _allItems.ToList();
+        }
+        else
+        {
+            var query = _searchQuery.ToLowerInvariant();
+            _filteredItems = _allItems
+                .Where(i => i.Title.ToLowerInvariant().Contains(query) ||
+                           i.Category.ToLowerInvariant().Contains(query) ||
+                           (!string.IsNullOrEmpty(i.Subtitle) && i.Subtitle.ToLowerInvariant().Contains(query)))
+                .ToList();
+        }
+
+        _selectedItem = _filteredItems.FirstOrDefault();
+    }
+
+    [JSInvokable]
+    public async Task Toggle()
+    {
+        if (_isOpen)
+        {
+            Close();
+        }
+        else
+        {
+            await Open();
+        }
+    }
+
+    [JSInvokable]
+    public async Task Open()
+    {
+        _isOpen = true;
+        _searchQuery = "";
+        await BuildCommandItems();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void Close()
+    {
+        _isOpen = false;
+        _searchQuery = "";
+        StateHasChanged();
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Escape":
+                Close();
+                break;
+
+            case "ArrowDown":
+                SelectNext();
+                break;
+
+            case "ArrowUp":
+                SelectPrevious();
+                break;
+
+            case "Enter":
+                if (_selectedItem != null)
+                {
+                    ExecuteItem(_selectedItem);
+                }
+                break;
+
+            default:
+                // Filter will be updated via binding
+                FilterItems();
+                break;
+        }
+    }
+
+    private void SelectNext()
+    {
+        if (_filteredItems.Count == 0) return;
+
+        var currentIndex = _selectedItem != null ? _filteredItems.IndexOf(_selectedItem) : -1;
+        var nextIndex = (currentIndex + 1) % _filteredItems.Count;
+        _selectedItem = _filteredItems[nextIndex];
+    }
+
+    private void SelectPrevious()
+    {
+        if (_filteredItems.Count == 0) return;
+
+        var currentIndex = _selectedItem != null ? _filteredItems.IndexOf(_selectedItem) : 0;
+        var prevIndex = currentIndex <= 0 ? _filteredItems.Count - 1 : currentIndex - 1;
+        _selectedItem = _filteredItems[prevIndex];
+    }
+
+    private void ExecuteItem(CommandItem item)
+    {
+        Close();
+
+        if (item.Path.StartsWith("action:"))
+        {
+            // Handle special actions
+            var action = item.Path.Replace("action:", "");
+            switch (action)
+            {
+                case "create-project":
+                    Navigation.NavigateTo("");  // Dashboard will handle the dialog
+                    break;
+                case "import-project":
+                    Navigation.NavigateTo("");
+                    break;
+            }
+        }
+        else
+        {
+            Navigation.NavigateTo(item.Path);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_dotNetRef != null)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("lrmCommandPalette.dispose");
+            }
+            catch { }
+            _dotNetRef.Dispose();
+        }
+    }
+
+    private record CommandItem(string Title, string Icon, string Path, string Category, string Subtitle, string Shortcut = "");
+}
