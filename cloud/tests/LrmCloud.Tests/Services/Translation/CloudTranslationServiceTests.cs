@@ -468,8 +468,9 @@ public class CloudTranslationServiceTests : IDisposable
         // Act
         var result = await _translationService.TranslateKeysAsync(project.Id, user.Id, request);
 
-        // Assert
-        Assert.Equal(1, result.SkippedCount);
+        // Assert - Keys without source values are silently skipped (not counted)
+        // SkippedCount is only for keys with existing translations when OnlyMissing=true
+        Assert.Equal(0, result.SkippedCount);
         Assert.Equal(0, result.TranslatedCount);
     }
 

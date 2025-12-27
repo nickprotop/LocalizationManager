@@ -668,7 +668,7 @@ public class ResourceServiceTests : IDisposable
         var result = await _resourceService.ValidateProjectAsync(project.Id, user.Id);
 
         // Assert
-        Assert.Contains(result.Issues, i => i.Severity == "info" && i.Message.Contains("pending review"));
+        Assert.Contains(result.Issues, i => i.Severity == "info" && i.Message.Contains("Pending review"));
     }
 
     [Fact]

@@ -713,7 +713,8 @@ public class ProjectServiceTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(2, result.KeyCount);
         Assert.Equal(3, result.TranslationCount);
-        Assert.Equal(100.0, result.CompletionPercentage); // All 3 translations have non-empty values
+        // Completion = actual / expected = 3 / (2 keys × 2 languages) = 75%
+        Assert.Equal(75.0, result.CompletionPercentage);
     }
 
     [Fact]

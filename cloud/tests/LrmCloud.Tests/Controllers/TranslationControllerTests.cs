@@ -4,6 +4,7 @@ using LrmCloud.Api.Controllers;
 using LrmCloud.Api.Data;
 using LrmCloud.Api.Services;
 using LrmCloud.Api.Services.Translation;
+using LrmCloud.Shared.Api;
 using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.DTOs.Translation;
 using LrmCloud.Shared.Entities;
@@ -162,8 +163,8 @@ public class TranslationControllerTests : IDisposable
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var providers = Assert.IsAssignableFrom<List<TranslationProviderDto>>(okResult.Value);
-        Assert.NotEmpty(providers);
+        var response = Assert.IsType<ApiResponse<List<TranslationProviderDto>>>(okResult.Value);
+        Assert.NotEmpty(response.Data);
     }
 
     [Fact]
@@ -178,9 +179,9 @@ public class TranslationControllerTests : IDisposable
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var providers = Assert.IsAssignableFrom<List<TranslationProviderDto>>(okResult.Value);
+        var response = Assert.IsType<ApiResponse<List<TranslationProviderDto>>>(okResult.Value);
 
-        var google = providers.FirstOrDefault(p => p.Name == "google");
+        var google = response.Data.FirstOrDefault(p => p.Name == "google");
         Assert.NotNull(google);
         Assert.True(google.IsConfigured);
         Assert.Equal("project", google.ApiKeySource);
@@ -198,8 +199,8 @@ public class TranslationControllerTests : IDisposable
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var usage = Assert.IsType<TranslationUsageDto>(okResult.Value);
-        Assert.NotNull(usage.Plan);
+        var response = Assert.IsType<ApiResponse<TranslationUsageDto>>(okResult.Value);
+        Assert.NotNull(response.Data.Plan);
     }
 
     // ============================================================
@@ -214,8 +215,8 @@ public class TranslationControllerTests : IDisposable
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var usage = Assert.IsAssignableFrom<List<ProviderUsageDto>>(okResult.Value);
-        Assert.NotNull(usage);
+        var response = Assert.IsType<ApiResponse<List<ProviderUsageDto>>>(okResult.Value);
+        Assert.NotNull(response.Data);
     }
 
     // ============================================================
@@ -223,7 +224,7 @@ public class TranslationControllerTests : IDisposable
     // ============================================================
 
     [Fact]
-    public async Task TranslateKeys_ShouldReturnBadRequest_WhenProjectNotFound()
+    public async Task TranslateKeys_ShouldReturnErrorInResponse_WhenProjectNotFound()
     {
         // Arrange
         var request = new TranslateRequestDto
@@ -234,10 +235,10 @@ public class TranslationControllerTests : IDisposable
         // Act
         var result = await _controller.TranslateKeys(9999, request);
 
-        // Assert
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
-        var response = Assert.IsType<TranslateResponseDto>(badRequestResult.Value);
-        Assert.Contains("Project not found", response.Errors);
+        // Assert - Controller returns Success wrapper with errors inside
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var apiResponse = Assert.IsType<ApiResponse<TranslateResponseDto>>(okResult.Value);
+        Assert.Contains("Project not found", apiResponse.Data.Errors);
     }
 
     [Fact]
@@ -301,7 +302,7 @@ public class TranslationControllerTests : IDisposable
         var result = await _controller.SetUserApiKey(request);
 
         // Assert
-        Assert.IsType<OkObjectResult>(result);
+        Assert.IsType<OkObjectResult>(result.Result);
 
         // Verify key was saved
         var savedKey = await _db.UserApiKeys.FirstOrDefaultAsync(
@@ -321,7 +322,7 @@ public class TranslationControllerTests : IDisposable
         var result = await _controller.SetUserApiKey(request2);
 
         // Assert
-        Assert.IsType<OkObjectResult>(result);
+        Assert.IsType<OkObjectResult>(result.Result);
 
         var keys = await _db.UserApiKeys.Where(
             k => k.UserId == _testUser.Id && k.Provider == "google").ToListAsync();
@@ -342,7 +343,7 @@ public class TranslationControllerTests : IDisposable
         var result = await _controller.RemoveUserApiKey("deepl");
 
         // Assert
-        Assert.IsType<OkObjectResult>(result);
+        Assert.IsType<OkObjectResult>(result.Result);
 
         var key = await _db.UserApiKeys.FirstOrDefaultAsync(
             k => k.UserId == _testUser.Id && k.Provider == "deepl");
@@ -356,7 +357,9 @@ public class TranslationControllerTests : IDisposable
         var result = await _controller.RemoveUserApiKey("nonexistent");
 
         // Assert
-        Assert.IsType<NotFoundObjectResult>(result);
+        Assert.IsType<ObjectResult>(result.Result);
+        var objectResult = (ObjectResult)result.Result!;
+        Assert.Equal(404, objectResult.StatusCode);
     }
 
     // ============================================================
@@ -378,7 +381,7 @@ public class TranslationControllerTests : IDisposable
         var result = await _controller.SetProjectApiKey(project.Id, request);
 
         // Assert
-        Assert.IsType<OkObjectResult>(result);
+        Assert.IsType<OkObjectResult>(result.Result);
 
         var savedKey = await _db.ProjectApiKeys.FirstOrDefaultAsync(
             k => k.ProjectId == project.Id && k.Provider == "google");
@@ -400,7 +403,7 @@ public class TranslationControllerTests : IDisposable
         var result = await _controller.RemoveProjectApiKey(project.Id, "deepl");
 
         // Assert
-        Assert.IsType<OkObjectResult>(result);
+        Assert.IsType<OkObjectResult>(result.Result);
     }
 
     [Fact]
@@ -413,7 +416,9 @@ public class TranslationControllerTests : IDisposable
         var result = await _controller.RemoveProjectApiKey(project.Id, "nonexistent");
 
         // Assert
-        Assert.IsType<NotFoundObjectResult>(result);
+        Assert.IsType<ObjectResult>(result.Result);
+        var objectResult = (ObjectResult)result.Result!;
+        Assert.Equal(404, objectResult.StatusCode);
     }
 
     // ============================================================
@@ -435,7 +440,7 @@ public class TranslationControllerTests : IDisposable
         var result = await _controller.SetOrganizationApiKey(org.Id, request);
 
         // Assert
-        Assert.IsType<OkObjectResult>(result);
+        Assert.IsType<OkObjectResult>(result.Result);
 
         var savedKey = await _db.OrganizationApiKeys.FirstOrDefaultAsync(
             k => k.OrganizationId == org.Id && k.Provider == "openai");
@@ -457,7 +462,7 @@ public class TranslationControllerTests : IDisposable
         var result = await _controller.RemoveOrganizationApiKey(org.Id, "claude");
 
         // Assert
-        Assert.IsType<OkObjectResult>(result);
+        Assert.IsType<OkObjectResult>(result.Result);
     }
 
     [Fact]
@@ -470,7 +475,9 @@ public class TranslationControllerTests : IDisposable
         var result = await _controller.RemoveOrganizationApiKey(org.Id, "nonexistent");
 
         // Assert
-        Assert.IsType<NotFoundObjectResult>(result);
+        Assert.IsType<ObjectResult>(result.Result);
+        var objectResult = (ObjectResult)result.Result!;
+        Assert.Equal(404, objectResult.StatusCode);
     }
 
     // ============================================================
@@ -492,8 +499,8 @@ public class TranslationControllerTests : IDisposable
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var response = Assert.IsType<TestApiKeyResponse>(okResult.Value);
-        Assert.True(response.IsValid);
+        var apiResponse = Assert.IsType<ApiResponse<TestApiKeyResponse>>(okResult.Value);
+        Assert.True(apiResponse.Data.IsValid);
     }
 
     [Fact]
@@ -511,11 +518,11 @@ public class TranslationControllerTests : IDisposable
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var response = Assert.IsType<TestApiKeyResponse>(okResult.Value);
+        var apiResponse = Assert.IsType<ApiResponse<TestApiKeyResponse>>(okResult.Value);
 
         // Should return invalid (not throw) for bad API key
-        Assert.False(response.IsValid);
-        Assert.NotNull(response.Error);
+        Assert.False(apiResponse.Data.IsValid);
+        Assert.NotNull(apiResponse.Data.Error);
     }
 
     // ============================================================
@@ -547,9 +554,9 @@ public class TranslationControllerTests : IDisposable
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var providers = Assert.IsAssignableFrom<List<TranslationProviderDto>>(okResult.Value);
+        var apiResponse = Assert.IsType<ApiResponse<List<TranslationProviderDto>>>(okResult.Value);
 
-        var google = providers.First(p => p.Name == "google");
+        var google = apiResponse.Data.First(p => p.Name == "google");
         Assert.Equal("project", google.ApiKeySource); // Project should take precedence
     }
 
@@ -579,9 +586,9 @@ public class TranslationControllerTests : IDisposable
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var providers = Assert.IsAssignableFrom<List<TranslationProviderDto>>(okResult.Value);
+        var apiResponse = Assert.IsType<ApiResponse<List<TranslationProviderDto>>>(okResult.Value);
 
-        var deepl = providers.First(p => p.Name == "deepl");
+        var deepl = apiResponse.Data.First(p => p.Name == "deepl");
         Assert.Equal("user", deepl.ApiKeySource); // User should take precedence over org
     }
 }
