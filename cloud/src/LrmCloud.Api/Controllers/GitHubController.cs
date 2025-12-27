@@ -215,6 +215,7 @@ public class GitHubController : ApiControllerBase
         project.GitHubRepo = request.RepoFullName;
         project.GitHubDefaultBranch = request.DefaultBranch;
         project.GitHubBasePath = request.BasePath;
+        project.GitHubAccessTokenEncrypted = null; // Clear any old PAT - use user's OAuth token
         project.GitHubConnectedByUserId = userId;
         project.SyncStatus = null; // Reset sync status
         project.SyncError = null;
