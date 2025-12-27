@@ -326,6 +326,22 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // Check for GitHub link result query params
+        var uri = new Uri(NavigationManager.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+
+        if (query["github_linked"] == "true")
+        {
+            NotificationService.Notify(NotificationSeverity.Success, "Success", "GitHub account connected successfully!");
+            // Remove query params from URL
+            NavigationManager.NavigateTo("/settings/profile", replace: true);
+        }
+        else if (!string.IsNullOrEmpty(query["github_error"]))
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", query["github_error"]);
+            NavigationManager.NavigateTo("/settings/profile", replace: true);
+        }
+
         // Load profile and GitHub status in parallel
         var profileTask = LoadProfileAsync();
         var githubTask = LoadGitHubStatusAsync();
@@ -485,22 +501,42 @@ else
             return;
         }
 
-        var confirmed = await DialogService.Confirm(
-            "Are you sure you want to disconnect your GitHub account? Projects using your token will need to be reconfigured.",
-            "Disconnect GitHub",
-            new Radzen.ConfirmOptions { OkButtonText = "Disconnect", CancelButtonText = "Cancel" });
+        // Prompt for password if user has email auth
+        string? password = null;
+        if (_profile?.AuthType == "email")
+        {
+            password = await DialogService.OpenAsync<PasswordPromptDialog>(
+                "Confirm Password",
+                new Dictionary<string, object>
+                {
+                    { "Message", "Enter your password to disconnect GitHub:" }
+                },
+                new Radzen.DialogOptions { Width = "400px" });
 
-        if (confirmed != true)
-            return;
+            if (string.IsNullOrEmpty(password))
+                return; // User cancelled
+        }
+        else
+        {
+            // GitHub-only user - just confirm
+            var confirmed = await DialogService.Confirm(
+                "Are you sure you want to disconnect your GitHub account?",
+                "Disconnect GitHub",
+                new Radzen.ConfirmOptions { OkButtonText = "Disconnect", CancelButtonText = "Cancel" });
+
+            if (confirmed != true)
+                return;
+        }
 
         _isDisconnectingGitHub = true;
         try
         {
-            var result = await AuthService.UnlinkGitHubAsync();
+            var result = await AuthService.UnlinkGitHubAsync(password);
             if (result.IsSuccess)
             {
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "GitHub account disconnected");
                 _gitHubStatus = null;
+                await LoadGitHubStatusAsync(); // Refresh status
             }
             else
             {

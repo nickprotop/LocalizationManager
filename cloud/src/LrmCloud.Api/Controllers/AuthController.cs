@@ -374,9 +374,10 @@ public class AuthController : ApiControllerBase
     /// </summary>
     [HttpGet("github/callback")]
     [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status302Found)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<ApiResponse<LoginResponse>>> GitHubCallback(
+    public async Task<IActionResult> GitHubCallback(
         [FromQuery] string code,
         [FromQuery] string state)
     {
@@ -392,6 +393,9 @@ public class AuthController : ApiControllerBase
         // Delete state cookie
         Response.Cookies.Delete("github_oauth_state");
 
+        // Check if this is a link operation (state format: "link:{userId}:{random}")
+        var isLinkOperation = expectedState.StartsWith("link:");
+
         try
         {
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
@@ -400,14 +404,32 @@ public class AuthController : ApiControllerBase
 
             if (!success)
             {
+                if (isLinkOperation)
+                {
+                    // Redirect to profile with error
+                    return Redirect($"{_config.Server.BaseUrl}/settings/profile?github_error={Uri.EscapeDataString(errorMessage ?? "Failed to link GitHub account")}");
+                }
                 return BadRequest(ErrorCodes.AUTH_INVALID_CREDENTIALS, errorMessage!);
             }
 
-            return Success(response!);
+            if (isLinkOperation)
+            {
+                // Redirect to profile page with success indicator
+                return Redirect($"{_config.Server.BaseUrl}/settings/profile?github_linked=true");
+            }
+
+            // Login operation - return JSON for frontend to handle
+            return Ok(new ApiResponse<LoginResponse> { Data = response! });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during GitHub OAuth callback");
+
+            if (isLinkOperation)
+            {
+                return Redirect($"{_config.Server.BaseUrl}/settings/profile?github_error={Uri.EscapeDataString("An error occurred during GitHub authentication")}");
+            }
+
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
                 Problem(

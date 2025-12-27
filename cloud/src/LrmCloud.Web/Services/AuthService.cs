@@ -308,11 +308,12 @@ public class AuthService
         }
     }
 
-    public async Task<AuthResult> UnlinkGitHubAsync()
+    public async Task<AuthResult> UnlinkGitHubAsync(string? password = null)
     {
         try
         {
-            var response = await _httpClient.PostAsync("auth/github/unlink", null);
+            var request = new UnlinkGitHubRequest { Password = password };
+            var response = await _httpClient.PostAsJsonAsync("auth/github/unlink", request);
             if (response.IsSuccessStatusCode)
             {
                 return AuthResult.Success(null, "GitHub account disconnected");

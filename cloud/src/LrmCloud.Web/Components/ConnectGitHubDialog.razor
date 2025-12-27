@@ -1,6 +1,7 @@
 @using LrmCloud.Shared.DTOs.GitHub
 @inject GitHubIntegrationService GitHubService
 @inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 
 <RadzenStack Gap="1.5rem">
     @if (_isLoading)
@@ -285,9 +286,6 @@
     [Parameter]
     public int ProjectId { get; set; }
 
-    [CascadingParameter]
-    public Radzen.DialogService? DialogService { get; set; }
-
     // Token sources
     private AvailableTokenSources? _availableTokens;
     private string? _selectedTokenSource;
@@ -441,7 +439,7 @@
 
             if (success)
             {
-                DialogService?.Close(true);
+                DialogService.Close(true);
             }
             else
             {
@@ -473,7 +471,7 @@
 
             if (success)
             {
-                DialogService?.Close(true);
+                DialogService.Close(true);
             }
             else
             {
@@ -492,6 +490,6 @@
 
     private void Cancel()
     {
-        DialogService?.Close(false);
+        DialogService.Close(false);
     }
 }

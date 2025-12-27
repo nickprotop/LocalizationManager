@@ -1,6 +1,7 @@
 @using LrmCloud.Shared.DTOs.GitHub
 @inject GitHubIntegrationService GitHubService
 @inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
 
 <RadzenStack Gap="1rem">
     @if (!Conflicts.Any())
@@ -177,9 +178,6 @@
     [Parameter]
     public List<GitHubPullConflict> Conflicts { get; set; } = new();
 
-    [CascadingParameter]
-    public Radzen.DialogService? DialogService { get; set; }
-
     private Dictionary<string, string> _resolutions = new();
     private Dictionary<string, string> _editedValues = new();
     private bool _isResolving;
@@ -285,7 +283,7 @@
                 NotificationService.Notify(NotificationSeverity.Success,
                     "Conflicts Resolved",
                     $"Successfully resolved {resolutions.Count} conflict(s)");
-                DialogService?.Close(true);
+                DialogService.Close(true);
             }
             else
             {
@@ -304,6 +302,6 @@
 
     private void Cancel()
     {
-        DialogService?.Close(false);
+        DialogService.Close(false);
     }
 }
