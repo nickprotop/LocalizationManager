@@ -110,12 +110,13 @@ public class KeyLevelMerger
             .ToDictionary(g => g.Key, g => g.First());
 
         // Build lookup for remote entries
+        // Note: We use translation.Comment (per-language) rather than entry.Comment (key-level)
         var remoteByKey = new Dictionary<(string Key, string Lang), (string Value, string Hash, string? Comment, bool IsPlural, Dictionary<string, string>? PluralForms)>();
         foreach (var entry in remoteEntries)
         {
             foreach (var (lang, translation) in entry.Translations)
             {
-                remoteByKey[(entry.Key, lang)] = (translation.Value, translation.Hash, entry.Comment, entry.IsPlural, translation.PluralForms);
+                remoteByKey[(entry.Key, lang)] = (translation.Value, translation.Hash, translation.Comment, entry.IsPlural, translation.PluralForms);
             }
         }
 
@@ -173,7 +174,9 @@ public class KeyLevelMerger
                         Lang = lang,
                         Type = ConflictType.DeletedLocallyModifiedRemotely,
                         LocalValue = null,
+                        LocalComment = null,
                         RemoteValue = remoteEntry.Value,
+                        RemoteComment = remoteEntry.Comment,
                         RemoteHash = remoteEntry.Hash
                     });
                 }
@@ -201,7 +204,9 @@ public class KeyLevelMerger
                         Lang = lang,
                         Type = ConflictType.DeletedRemotelyModifiedLocally,
                         LocalValue = localEntry!.Value,
+                        LocalComment = localEntry.Comment,
                         RemoteValue = null,
+                        RemoteComment = null,
                         RemoteHash = null
                     });
                 }
@@ -236,7 +241,9 @@ public class KeyLevelMerger
                         Lang = lang,
                         Type = ConflictType.BothModified,
                         LocalValue = localEntry!.Value,
+                        LocalComment = localEntry.Comment,
                         RemoteValue = remoteEntry.Value,
+                        RemoteComment = remoteEntry.Comment,
                         RemoteHash = remoteEntry.Hash
                     });
                 }
@@ -249,7 +256,9 @@ public class KeyLevelMerger
                         Lang = lang,
                         Type = ConflictType.BothModified,
                         LocalValue = localEntry!.Value,
+                        LocalComment = localEntry.Comment,
                         RemoteValue = remoteEntry.Value,
+                        RemoteComment = remoteEntry.Comment,
                         RemoteHash = remoteEntry.Hash
                     });
                 }
@@ -272,12 +281,13 @@ public class KeyLevelMerger
         {
             foreach (var (lang, translation) in entry.Translations)
             {
+                // Use translation.Comment (per-language) rather than entry.Comment (key-level)
                 result.ToWrite.Add(new MergedEntry
                 {
                     Key = entry.Key,
                     Lang = lang,
                     Value = translation.Value,
-                    Comment = entry.Comment,
+                    Comment = translation.Comment,
                     IsPlural = entry.IsPlural,
                     PluralForms = translation.PluralForms,
                     Hash = translation.Hash,
@@ -345,7 +355,7 @@ public class KeyLevelMerger
                             Key = conflict.Key,
                             Lang = conflict.Lang,
                             Value = conflict.RemoteValue,
-                            Comment = null, // Remote comment not stored in conflict
+                            Comment = conflict.RemoteComment,
                             IsPlural = false,
                             PluralForms = null,
                             Hash = conflict.RemoteHash!,
@@ -358,13 +368,15 @@ public class KeyLevelMerger
                 case ResolutionChoice.Edit:
                     if (!string.IsNullOrEmpty(resolution.EditedValue))
                     {
-                        var hash = EntryHasher.ComputeHash(resolution.EditedValue, null);
+                        // Use edited comment if provided, otherwise preserve remote comment
+                        var comment = resolution.EditedComment ?? conflict.RemoteComment;
+                        var hash = EntryHasher.ComputeHash(resolution.EditedValue, comment);
                         mergeResult.ToWrite.Add(new MergedEntry
                         {
                             Key = conflict.Key,
                             Lang = conflict.Lang,
                             Value = resolution.EditedValue,
-                            Comment = null,
+                            Comment = comment,
                             IsPlural = false,
                             PluralForms = null,
                             Hash = hash,

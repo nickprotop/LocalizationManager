@@ -357,6 +357,7 @@ public class ResourceService : IResourceService
                     Value = request.Value,
                     PluralForm = request.PluralForm,
                     Status = request.Status,
+                    Comment = request.Comment,
                     Version = 1,
                     UpdatedAt = DateTime.UtcNow
                 };
@@ -374,6 +375,7 @@ public class ResourceService : IResourceService
                 // Update existing translation
                 translation.Value = request.Value;
                 translation.Status = request.Status;
+                translation.Comment = request.Comment;
                 translation.UpdatedAt = DateTime.UtcNow;
                 translation.Version++;
             }
@@ -904,7 +906,8 @@ public class ResourceService : IResourceService
             TranslatedBy = null, // TODO: Phase 3 - track user who translated
             ReviewedBy = null,   // TODO: Phase 3 - track reviewer
             Version = translation.Version,
-            UpdatedAt = translation.UpdatedAt
+            UpdatedAt = translation.UpdatedAt,
+            Comment = translation.Comment
         };
     }
 
@@ -1269,10 +1272,11 @@ public class ResourceService : IResourceService
                         PluralForm = pluralForm,
                         Value = newValue,
                         Status = translationChange.Status ?? TranslationStatus.Translated,
+                        Comment = translationChange.Comment,
                         Version = 1,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow,
-                        Hash = ComputeHash(newValue, null)
+                        Hash = ComputeHash(newValue, translationChange.Comment)
                     };
                     _db.Translations.Add(translation);
                 }
@@ -1281,8 +1285,9 @@ public class ResourceService : IResourceService
                     // Existing translation - check if anything changed
                     var valueChanged = translationChange.Value != null && translation.Value != translationChange.Value;
                     var statusChanged = translationChange.Status != null && translation.Status != translationChange.Status;
+                    var commentChanged = translationChange.Comment != null && translation.Comment != translationChange.Comment;
 
-                    if (!valueChanged && !statusChanged)
+                    if (!valueChanged && !statusChanged && !commentChanged)
                     {
                         continue; // No actual change
                     }
@@ -1292,13 +1297,17 @@ public class ResourceService : IResourceService
                     if (translationChange.Value != null)
                     {
                         translation.Value = translationChange.Value;
-                        // Update hash when value changes
-                        translation.Hash = ComputeHash(translationChange.Value, translation.Comment);
                     }
                     if (translationChange.Status != null)
                     {
                         translation.Status = translationChange.Status;
                     }
+                    if (translationChange.Comment != null)
+                    {
+                        translation.Comment = translationChange.Comment;
+                    }
+                    // Update hash when value or comment changes
+                    translation.Hash = ComputeHash(translation.Value ?? "", translation.Comment);
                     translation.UpdatedAt = DateTime.UtcNow;
                     translation.Version++;
                 }

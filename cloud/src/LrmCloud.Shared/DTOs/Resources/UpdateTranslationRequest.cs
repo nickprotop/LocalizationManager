@@ -20,4 +20,10 @@ public class UpdateTranslationRequest
     /// If provided and doesn't match, update will fail.
     /// </summary>
     public int? Version { get; set; }
+
+    /// <summary>
+    /// Translation-specific comment (per-language note).
+    /// </summary>
+    [MaxLength(1000, ErrorMessage = "Comment must not exceed 1000 characters")]
+    public string? Comment { get; set; }
 }

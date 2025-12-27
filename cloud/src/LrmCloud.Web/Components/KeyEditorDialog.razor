@@ -142,9 +142,24 @@
                                 </RadzenStack>
                             </RadzenCard>
                         }
-                        <RadzenTextArea @bind-Value="row.Value" Rows="2"
-                                        Placeholder="@GetPlaceholder(row)" Style="width: 100%;"
-                                        Change="@(() => OnRowValueChanged(row))" />
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem" AlignItems="Radzen.AlignItems.Start">
+                            <RadzenTextArea @bind-Value="row.Value" Rows="2"
+                                            Placeholder="@GetPlaceholder(row)" Style="flex: 1;"
+                                            Change="@(() => OnRowValueChanged(row))" />
+                            <RadzenButton Icon="@(row.ShowComment ? "sticky_note_2" : "add_comment")"
+                                          Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                          ButtonStyle="@(string.IsNullOrEmpty(row.Comment) ? ButtonStyle.Light : ButtonStyle.Info)"
+                                          Click="@(() => ToggleRowComment(row))"
+                                          title="@(row.ShowComment ? "Hide translator note" : (string.IsNullOrEmpty(row.Comment) ? "Add translator note" : "Show translator note"))" />
+                        </RadzenStack>
+                        @if (row.ShowComment)
+                        {
+                            <RadzenTextArea @bind-Value="row.Comment" Rows="1"
+                                            Placeholder="Translator note for this language..."
+                                            Style="width: 100%; font-size: 0.85rem; background-color: var(--rz-info-lighter);"
+                                            MaxLength="500"
+                                            Change="@(() => OnRowValueChanged(row))" />
+                        }
                     </RadzenStack>
                 </Template>
             </RadzenDataGridColumn>
@@ -248,8 +263,11 @@
         public string? PluralForm { get; set; }
         public string? Value { get; set; }
         public string? OriginalValue { get; set; }
+        public string? Comment { get; set; }
+        public string? OriginalComment { get; set; }
         public bool IsDefault { get; set; }
-        public bool IsDirty => Value != OriginalValue;
+        public bool IsDirty => Value != OriginalValue || Comment != OriginalComment;
+        public bool ShowComment { get; set; }
         public TmMatchDto? TmSuggestion { get; set; }
         public TranslationCell? SourceCell { get; set; }
     }
@@ -275,6 +293,9 @@
                         PluralForm = pluralForm,
                         Value = cell?.Value,
                         OriginalValue = cell?.OriginalValue,
+                        Comment = cell?.Comment,
+                        OriginalComment = cell?.OriginalComment,
+                        ShowComment = !string.IsNullOrEmpty(cell?.Comment),
                         IsDefault = isDefault,
                         SourceCell = cell
                     });
@@ -290,6 +311,9 @@
                     PluralForm = null,
                     Value = cell?.Value,
                     OriginalValue = cell?.OriginalValue,
+                    Comment = cell?.Comment,
+                    OriginalComment = cell?.OriginalComment,
+                    ShowComment = !string.IsNullOrEmpty(cell?.Comment),
                     IsDefault = isDefault,
                     SourceCell = cell
                 });
@@ -304,7 +328,9 @@
             if (editRow.SourceCell != null)
             {
                 editRow.SourceCell.Value = editRow.Value;
-                editRow.SourceCell.IsDirty = editRow.IsDirty;
+                editRow.SourceCell.Comment = editRow.Comment;
+                editRow.SourceCell.IsDirty = editRow.Value != editRow.OriginalValue;
+                // Note: IsCommentDirty is computed from Comment != OriginalComment in TranslationCell
             }
         }
     }
@@ -314,8 +340,15 @@
         if (row.SourceCell != null)
         {
             row.SourceCell.Value = row.Value;
-            row.SourceCell.IsDirty = row.IsDirty;
+            row.SourceCell.Comment = row.Comment;
+            row.SourceCell.IsDirty = row.Value != row.OriginalValue;
         }
+        StateHasChanged();
+    }
+
+    private void ToggleRowComment(EditableTranslationRow row)
+    {
+        row.ShowComment = !row.ShowComment;
         StateHasChanged();
     }
 

@@ -71,6 +71,12 @@ public class TranslationChangeDto
     /// Empty string or null for non-plural translations.
     /// </summary>
     public string? PluralForm { get; set; }
+
+    /// <summary>
+    /// Translation-specific comment (per-language note).
+    /// Null to keep existing, empty string to clear.
+    /// </summary>
+    public string? Comment { get; set; }
 }
 
 /// <summary>

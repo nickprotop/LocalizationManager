@@ -170,6 +170,8 @@ public class TranslationGridRow
                 PluralForm = kvp.Value.PluralForm,
                 Status = kvp.Value.Status,
                 Version = kvp.Value.Version,
+                Comment = kvp.Value.Comment,
+                OriginalComment = kvp.Value.OriginalComment,
                 IsDirty = kvp.Value.IsDirty
             };
         }
@@ -193,6 +195,7 @@ public class TranslationGridRow
             if (Translations.TryGetValue(kvp.Key, out var existingCell))
             {
                 existingCell.Value = kvp.Value.Value;
+                existingCell.Comment = kvp.Value.Comment;
                 existingCell.IsDirty = kvp.Value.IsDirty;
             }
             else
@@ -206,6 +209,8 @@ public class TranslationGridRow
                     PluralForm = kvp.Value.PluralForm,
                     Status = kvp.Value.Status,
                     Version = kvp.Value.Version,
+                    Comment = kvp.Value.Comment,
+                    OriginalComment = kvp.Value.OriginalComment,
                     IsDirty = kvp.Value.IsDirty
                 };
             }
@@ -234,9 +239,24 @@ public class TranslationCell
     public int Version { get; set; }
 
     /// <summary>
+    /// Translation-specific comment (per-language note).
+    /// </summary>
+    public string? Comment { get; set; }
+
+    /// <summary>
+    /// Original comment for dirty detection.
+    /// </summary>
+    public string? OriginalComment { get; set; }
+
+    /// <summary>
     /// Whether this cell has unsaved changes
     /// </summary>
     public bool IsDirty { get; set; }
+
+    /// <summary>
+    /// Whether the comment has changed from the original.
+    /// </summary>
+    public bool IsCommentDirty => Comment != OriginalComment;
 }
 
 /// <summary>

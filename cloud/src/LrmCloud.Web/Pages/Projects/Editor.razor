@@ -282,7 +282,9 @@ else
                         OriginalValue = translation.Value,
                         PluralForm = translation.PluralForm,
                         Status = translation.Status,
-                        Version = translation.Version
+                        Version = translation.Version,
+                        Comment = translation.Comment,
+                        OriginalComment = translation.Comment
                     };
                 }
 
@@ -444,7 +446,7 @@ else
                     });
                 }
 
-                foreach (var (langKey, cell) in row.Translations.Where(t => t.Value.IsDirty))
+                foreach (var (langKey, cell) in row.Translations.Where(t => t.Value.IsDirty || t.Value.IsCommentDirty))
                 {
                     request.TranslationChanges.Add(new TranslationChangeDto
                     {
@@ -452,7 +454,8 @@ else
                         LanguageCode = cell.LanguageCode,
                         Value = cell.Value ?? "",
                         PluralForm = cell.PluralForm,
-                        Status = "translated"
+                        Status = "translated",
+                        Comment = cell.Comment
                     });
                 }
             }
@@ -470,15 +473,16 @@ else
                         row.OriginalComment = row.Comment;
                     }
 
-                    foreach (var cell in row.Translations.Values.Where(t => t.IsDirty))
+                    foreach (var cell in row.Translations.Values.Where(t => t.IsDirty || t.IsCommentDirty))
                     {
                         cell.IsDirty = false;
                         cell.OriginalValue = cell.Value;
+                        cell.OriginalComment = cell.Comment;
                     }
                 }
 
                 var keysToRemove = _editedRows
-                    .Where(kv => !kv.Value.Translations.Values.Any(t => t.IsDirty) && !kv.Value.IsKeyMetadataDirty)
+                    .Where(kv => !kv.Value.Translations.Values.Any(t => t.IsDirty || t.IsCommentDirty) && !kv.Value.IsKeyMetadataDirty)
                     .Select(kv => kv.Key)
                     .ToList();
                 foreach (var key in keysToRemove)
@@ -487,7 +491,7 @@ else
                 }
 
                 _hasUnsavedChanges = _editedRows.Any(kv =>
-                    kv.Value.Translations.Values.Any(t => t.IsDirty) || kv.Value.IsKeyMetadataDirty);
+                    kv.Value.Translations.Values.Any(t => t.IsDirty || t.IsCommentDirty) || kv.Value.IsKeyMetadataDirty);
 
                 var message = $"Saved {response.TranslationsModified} translations";
                 if (response.KeysModified > 0)

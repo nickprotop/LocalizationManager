@@ -14,4 +14,9 @@ public class TranslationDto
     public int? ReviewedBy { get; set; }
     public int Version { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Translation-specific comment (per-language note).
+    /// </summary>
+    public string? Comment { get; set; }
 }

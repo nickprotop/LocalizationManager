@@ -85,6 +85,7 @@
                 AllowSorting="true"
                 AllowPaging="true"
                 PageSize="50"
+                PageSizeOptions="@(new int[] { 25, 50, 100, 200 })"
                 PagerHorizontalAlign="HorizontalAlign.Right"
                 ShowPagingSummary="true"
                 PagingSummaryFormat="Showing {0} to {1} of {2} items"
@@ -203,25 +204,33 @@
                             : row.Translations.GetValueOrDefault(langCode);
                         var value = cell?.Value ?? "";
                         var isDirty = row.IsPlural
-                            ? row.GetTranslationsForLanguage(langCode).Any(c => c.IsDirty)
-                            : (cell?.IsDirty ?? false);
+                            ? row.GetTranslationsForLanguage(langCode).Any(c => c.IsDirty || c.IsCommentDirty)
+                            : (cell?.IsDirty ?? false) || (cell?.IsCommentDirty ?? false);
+                        var hasComment = !string.IsNullOrEmpty(cell?.Comment);
                         var pluralSummary = row.IsPlural ? GetPluralSummary(row, langCode) : null;
                     }
-                    <div style="@(isDirty ? "background-color: rgba(255, 193, 7, 0.1); padding: 2px 4px; border-radius: 2px;" : "")"
-                         title="@pluralSummary">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem"
+                                 Style="@(isDirty ? "background-color: rgba(255, 193, 7, 0.1); padding: 2px 4px; border-radius: 2px;" : "")"
+                                 title="@pluralSummary">
                         @if (string.IsNullOrEmpty(value))
                         {
-                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="font-style: italic;">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="font-style: italic; flex: 1;">
                                 (empty)
                             </RadzenText>
                         }
                         else
                         {
-                            <RadzenText TextStyle="TextStyle.Body2" Style="@GetCellStyle(value)">
+                            <RadzenText TextStyle="TextStyle.Body2" Style="@(GetCellStyle(value) + " flex: 1;")">
                                 @value
                             </RadzenText>
                         }
-                    </div>
+                        @if (hasComment)
+                        {
+                            <span title="@cell!.Comment">
+                                <RadzenIcon Icon="sticky_note_2" Style="font-size: 0.75rem; color: var(--rz-info);" />
+                            </span>
+                        }
+                    </RadzenStack>
                 </Template>
                 <EditTemplate Context="row">
                     @{

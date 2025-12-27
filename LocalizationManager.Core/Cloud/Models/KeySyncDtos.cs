@@ -366,9 +366,19 @@ public class EntryConflict
     public string? LocalValue { get; set; }
 
     /// <summary>
+    /// Local comment (what the user is trying to push).
+    /// </summary>
+    public string? LocalComment { get; set; }
+
+    /// <summary>
     /// Remote value (current server state).
     /// </summary>
     public string? RemoteValue { get; set; }
+
+    /// <summary>
+    /// Remote comment (current server state).
+    /// </summary>
+    public string? RemoteComment { get; set; }
 
     /// <summary>
     /// Hash of remote value.
@@ -483,6 +493,12 @@ public class ConflictResolution
     /// Custom value if Resolution is Edit.
     /// </summary>
     public string? EditedValue { get; set; }
+
+    /// <summary>
+    /// Custom comment if Resolution is Edit.
+    /// If null, preserves the local comment for Local resolution, or remote comment for Remote/Edit.
+    /// </summary>
+    public string? EditedComment { get; set; }
 }
 
 /// <summary>
