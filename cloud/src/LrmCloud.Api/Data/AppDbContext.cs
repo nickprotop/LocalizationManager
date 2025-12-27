@@ -33,6 +33,8 @@ public class AppDbContext : DbContext
     // Sync & Audit
     public DbSet<SyncHistory> SyncHistory => Set<SyncHistory>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<GitHubSyncState> GitHubSyncStates => Set<GitHubSyncState>();
+    public DbSet<PendingConflict> PendingConflicts => Set<PendingConflict>();
 
     // Snapshots
     public DbSet<Snapshot> Snapshots => Set<Snapshot>();
@@ -104,6 +106,12 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.OwnerId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure GitHubConnectedByUser relationship (who connected GitHub)
+            entity.HasOne(e => e.GitHubConnectedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.GitHubConnectedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // Soft delete filter
             entity.HasQueryFilter(e => e.DeletedAt == null);
@@ -185,6 +193,12 @@ public class AppDbContext : DbContext
                 .HasForeignKey(e => e.ConfigUpdatedBy)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // Configure GitHubConnectedByUser relationship (who connected GitHub)
+            entity.HasOne(e => e.GitHubConnectedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.GitHubConnectedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             // Check constraint: must have either user_id or organization_id
             entity.ToTable(t => t.HasCheckConstraint(
                 "CK_projects_owner",
@@ -211,6 +225,9 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.LanguageCode);
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.UpdatedAt);
+
+            // Configure optimistic locking for concurrent updates
+            entity.Property(e => e.Version).IsConcurrencyToken();
         });
 
         // =====================================================================
@@ -285,6 +302,41 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.ProjectId);
             entity.HasIndex(e => e.CreatedAt);
             entity.HasIndex(e => e.Action);
+        });
+
+        // =====================================================================
+        // GitHub Sync State (for three-way merge between Cloud and GitHub)
+        // =====================================================================
+        modelBuilder.Entity<GitHubSyncState>(entity =>
+        {
+            // Unique per project + key + language + plural form
+            entity.HasIndex(e => new { e.ProjectId, e.KeyName, e.LanguageCode, e.PluralForm }).IsUnique();
+            entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => e.SyncedAt);
+
+            entity.HasOne(e => e.Project)
+                .WithMany(p => p.GitHubSyncStates)
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure optimistic locking for concurrent sync operations
+            entity.Property(e => e.Version).IsConcurrencyToken();
+        });
+
+        // =====================================================================
+        // Pending Conflicts (for GitHub pull conflict resolution)
+        // =====================================================================
+        modelBuilder.Entity<PendingConflict>(entity =>
+        {
+            // Unique per project + key + language + plural form
+            entity.HasIndex(e => new { e.ProjectId, e.KeyName, e.LanguageCode, e.PluralForm }).IsUnique();
+            entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => e.CreatedAt);
+
+            entity.HasOne(e => e.Project)
+                .WithMany()
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // =====================================================================

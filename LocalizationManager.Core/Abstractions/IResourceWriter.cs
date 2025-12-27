@@ -64,4 +64,12 @@ public interface IResourceWriter
     /// <param name="language">Language information for the file to delete.</param>
     /// <param name="ct">Cancellation token.</param>
     Task DeleteLanguageFileAsync(LanguageInfo language, CancellationToken ct = default);
+
+    /// <summary>
+    /// Serialize a ResourceFile to a string without writing to disk.
+    /// Useful for API responses and GitHub sync operations.
+    /// </summary>
+    /// <param name="file">Resource file to serialize.</param>
+    /// <returns>Serialized content as a string.</returns>
+    string SerializeToString(ResourceFile file);
 }

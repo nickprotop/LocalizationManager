@@ -43,6 +43,26 @@ public partial class AndroidResourceWriter : IResourceWriter
         if (string.IsNullOrEmpty(file.Language.FilePath))
             throw new ArgumentException("Language file path is required");
 
+        var doc = BuildXmlDocument(file);
+
+        // Save with proper formatting
+        var settings = new XmlWriterSettings
+        {
+            Indent = true,
+            IndentChars = "    ",
+            Encoding = new UTF8Encoding(false),
+            OmitXmlDeclaration = false
+        };
+
+        using var writer = XmlWriter.Create(file.Language.FilePath, settings);
+        doc.Save(writer);
+    }
+
+    /// <summary>
+    /// Builds the XDocument from the resource file.
+    /// </summary>
+    private XDocument BuildXmlDocument(ResourceFile file)
+    {
         var doc = new XDocument(
             new XDeclaration("1.0", "utf-8", null),
             new XElement("resources")
@@ -92,17 +112,7 @@ public partial class AndroidResourceWriter : IResourceWriter
             }
         }
 
-        // Save with proper formatting
-        var settings = new XmlWriterSettings
-        {
-            Indent = true,
-            IndentChars = "    ",
-            Encoding = new UTF8Encoding(false),
-            OmitXmlDeclaration = false
-        };
-
-        using var writer = XmlWriter.Create(file.Language.FilePath, settings);
-        doc.Save(writer);
+        return doc;
     }
 
     /// <inheritdoc />
@@ -179,6 +189,25 @@ public partial class AndroidResourceWriter : IResourceWriter
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public string SerializeToString(ResourceFile file)
+    {
+        var doc = BuildXmlDocument(file);
+        var settings = new XmlWriterSettings
+        {
+            Indent = true,
+            IndentChars = "    ",
+            Encoding = new UTF8Encoding(false),
+            OmitXmlDeclaration = false
+        };
+
+        using var stringWriter = new StringWriter();
+        using var writer = XmlWriter.Create(stringWriter, settings);
+        doc.Save(writer);
+        writer.Flush();
+        return stringWriter.ToString();
     }
 
     /// <summary>

@@ -204,34 +204,83 @@ else
             </RadzenTabsItem>
 
             <RadzenTabsItem Text="GitHub" Icon="code">
-                <RadzenRow Gap="1rem">
-                    <RadzenColumn Size="12" SizeMD="6">
-                        <RadzenStack Gap="1rem">
-                            <RadzenFormField Text="GitHub Repository" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
-                                <ChildContent>
-                                    <RadzenTextBox @bind-Value="_model.GitHubRepo" Disabled="_isSubmitting" Style="width: 100%;" />
-                                </ChildContent>
-                                <Helper>
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">e.g., owner/repo</RadzenText>
-                                </Helper>
-                            </RadzenFormField>
-
-                            <RadzenFormField Text="Default Branch" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
-                                <ChildContent>
-                                    <RadzenTextBox @bind-Value="_model.GitHubDefaultBranch" Disabled="_isSubmitting" Style="width: 100%;" />
-                                </ChildContent>
-                                <Helper>
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">e.g., main</RadzenText>
-                                </Helper>
-                            </RadzenFormField>
-                        </RadzenStack>
-                    </RadzenColumn>
-                    <RadzenColumn Size="12" SizeMD="6">
-                        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">
-                            Link a GitHub repository to enable automatic sync with your source code.
+                <RadzenStack Gap="1.5rem">
+                    @if (!string.IsNullOrEmpty(_project.GitHubRepo))
+                    {
+                        @* Connected State *@
+                        <RadzenAlert AlertStyle="AlertStyle.Success" AllowClose="false" Shade="Shade.Lighter">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Style="width: 100%;">
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                    <RadzenIcon Icon="check_circle" />
+                                    <RadzenText TextStyle="TextStyle.Body1" class="rz-mb-0">
+                                        Connected to <strong>@_project.GitHubRepo</strong> (@(_project.GitHubDefaultBranch ?? "main"))
+                                    </RadzenText>
+                                </RadzenStack>
+                                <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary"
+                                              Icon="sync" Text="Open GitHub Sync"
+                                              Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/github"))" />
+                            </RadzenStack>
                         </RadzenAlert>
-                    </RadzenColumn>
-                </RadzenRow>
+
+                        @if (_project.LastSyncedAt.HasValue)
+                        {
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Last synced: @_project.LastSyncedAt.Value.ToString("MMMM dd, yyyy HH:mm")
+                            </RadzenText>
+                        }
+                    }
+                    else
+                    {
+                        @* Not Connected State *@
+                        <RadzenAlert AlertStyle="AlertStyle.Info" AllowClose="false" Shade="Shade.Lighter">
+                            <RadzenStack Gap="0.5rem">
+                                <RadzenText TextStyle="TextStyle.Body1" class="rz-mb-0">
+                                    <strong>GitHub not connected</strong>
+                                </RadzenText>
+                                <RadzenText TextStyle="TextStyle.Body2">
+                                    Connect a GitHub repository to enable two-way sync with your source code. Push translations to GitHub and pull updates from your repository.
+                                </RadzenText>
+                            </RadzenStack>
+                        </RadzenAlert>
+
+                        <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary"
+                                      Icon="link" Text="Connect GitHub Repository"
+                                      Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/github"))" />
+                    }
+
+                    @* Manual Configuration (for advanced users) *@
+                    <RadzenCard Style="border: 1px solid var(--rz-base);">
+                        <RadzenStack Gap="1rem">
+                            <RadzenText TextStyle="TextStyle.Subtitle2">Manual Configuration</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                For advanced users: configure repository details manually. For most use cases, use the GitHub Sync page instead.
+                            </RadzenText>
+
+                            <RadzenRow Gap="1rem">
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenFormField Text="GitHub Repository" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                        <ChildContent>
+                                            <RadzenTextBox @bind-Value="_model.GitHubRepo" Disabled="_isSubmitting" Style="width: 100%;" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">e.g., owner/repo</RadzenText>
+                                        </Helper>
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenFormField Text="Default Branch" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                        <ChildContent>
+                                            <RadzenTextBox @bind-Value="_model.GitHubDefaultBranch" Disabled="_isSubmitting" Style="width: 100%;" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">e.g., main</RadzenText>
+                                        </Helper>
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                            </RadzenRow>
+                        </RadzenStack>
+                    </RadzenCard>
+                </RadzenStack>
             </RadzenTabsItem>
 
             <RadzenTabsItem Text="Translation" Icon="translate">

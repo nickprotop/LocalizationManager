@@ -276,6 +276,8 @@ else
     <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
         <RadzenButton Variant="Radzen.Variant.Outlined" Icon="edit" Text="Open Editor"
                       Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/editor"))" />
+        <RadzenButton Variant="Radzen.Variant.Outlined" Icon="code" Text="GitHub Sync"
+                      Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/github"))" />
         <RadzenButton Variant="Radzen.Variant.Outlined" Icon="history" Text="View Snapshots"
                       Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/snapshots"))" />
         <RadzenButton Variant="Radzen.Variant.Outlined" Icon="restore" Text="Sync History"

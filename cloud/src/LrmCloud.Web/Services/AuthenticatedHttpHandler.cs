@@ -19,11 +19,16 @@ public class AuthenticatedHttpHandler : DelegatingHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        // Skip auth header for auth endpoints (except /auth/me and /auth/logout)
+        // Skip auth header for auth endpoints (except ones that require authentication)
         var path = request.RequestUri?.PathAndQuery ?? "";
         var isAuthEndpoint = path.Contains("/auth/") &&
                             !path.Contains("/auth/me") &&
-                            !path.Contains("/auth/logout");
+                            !path.Contains("/auth/logout") &&
+                            !path.Contains("/auth/github/link/initiate") &&
+                            !path.Contains("/auth/github/unlink") &&
+                            !path.Contains("/auth/change-password") &&
+                            !path.Contains("/auth/profile") &&
+                            !path.Contains("/auth/change-email");
 
         if (!isAuthEndpoint)
         {

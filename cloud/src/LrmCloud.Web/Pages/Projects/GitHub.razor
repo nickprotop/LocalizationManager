@@ -1,0 +1,486 @@
+@page "/projects/{ProjectId:int}/github"
+@attribute [Authorize]
+@using LrmCloud.Shared.DTOs.GitHub
+@using LrmCloud.Web.Helpers
+@inject ProjectService ProjectService
+@inject GitHubIntegrationService GitHubService
+@inject NavigationManager Navigation
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<PageTitle>GitHub - @(_project?.Name ?? "Project") - LRM Cloud</PageTitle>
+
+@if (_isLoading)
+{
+    <RadzenStack Gap="1rem">
+        <RadzenSkeleton Style="height: 60px; width: 100%;" />
+        <RadzenSkeleton Style="height: 200px; width: 100%;" />
+    </RadzenStack>
+}
+else if (_project == null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">
+        Project not found or you don't have access to it.
+        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Primary" Text="Go to Dashboard" Click="@(() => Navigation.NavigateTo(""))" />
+    </RadzenAlert>
+}
+else
+{
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" Size="ButtonSize.Small" />
+            <RadzenText TextStyle="TextStyle.H4">GitHub Sync</RadzenText>
+            <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(_project.Format)" Text="@_project.Format" />
+        </RadzenStack>
+    </RadzenStack>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="true" Close="@(() => _errorMessage = null)" class="rz-mb-4">
+            @_errorMessage
+        </RadzenAlert>
+    }
+
+    @if (!string.IsNullOrEmpty(_successMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Success" AllowClose="true" Close="@(() => _successMessage = null)" class="rz-mb-4">
+            @_successMessage
+        </RadzenAlert>
+    }
+
+    @* Connection Status Card *@
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="1rem">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                <RadzenIcon Icon="@(_syncStatus?.Connected == true ? "link" : "link_off")"
+                            Style="@($"font-size: 2.5rem; color: {(_syncStatus?.Connected == true ? "var(--rz-success)" : "var(--rz-secondary)")}")" />
+                <RadzenStack Gap="0">
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">
+                        @if (_syncStatus?.Connected == true)
+                        {
+                            <span>Connected to <strong>@_syncStatus.RepoFullName</strong></span>
+                        }
+                        else
+                        {
+                            <span>Not Connected</span>
+                        }
+                    </RadzenText>
+                    @if (_syncStatus?.Connected == true)
+                    {
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            Branch: @(_project.GitHubDefaultBranch ?? "main")
+                            @if (!string.IsNullOrEmpty(_syncStatus.BasePath))
+                            {
+                                <span> | Path: @_syncStatus.BasePath</span>
+                            }
+                            @if (_syncStatus.LastSyncedAt.HasValue)
+                            {
+                                <span> | Last sync: @_syncStatus.LastSyncedAt.Value.ToString("g")</span>
+                            }
+                        </RadzenText>
+                        @if (!string.IsNullOrEmpty(_syncStatus.TokenSource))
+                        {
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                <RadzenIcon Icon="@GetTokenSourceIcon(_syncStatus.TokenSource)" Style="font-size: 0.875rem; color: var(--rz-text-secondary-color);" />
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                    Token: @GetTokenSourceLabel(_syncStatus.TokenSource)
+                                    @if (!string.IsNullOrEmpty(_syncStatus.TokenSourceName))
+                                    {
+                                        <text> (@_syncStatus.TokenSourceName)</text>
+                                    }
+                                </RadzenText>
+                            </RadzenStack>
+                        }
+                    }
+                    else
+                    {
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            Connect a GitHub repository to sync your translations
+                        </RadzenText>
+                    }
+                </RadzenStack>
+            </RadzenStack>
+
+            @if (_syncStatus?.Connected == true)
+            {
+                <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Danger" Icon="link_off"
+                              Text="Disconnect" Click="@DisconnectRepository" Disabled="_isProcessing" />
+            }
+            else
+            {
+                <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Icon="add_link"
+                              Text="Connect Repository" Click="@ShowConnectDialog" Disabled="_isProcessing" />
+            }
+        </RadzenStack>
+    </RadzenCard>
+
+    @if (_syncStatus?.Connected == true)
+    {
+        @* Sync Actions *@
+        <RadzenRow Gap="1rem" class="rz-mb-4">
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenCard Style="height: 100%;">
+                    <RadzenStack Gap="1rem">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="cloud_upload" Style="font-size: 1.5rem; color: var(--rz-primary);" />
+                            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Push to GitHub</RadzenText>
+                        </RadzenStack>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                            Create a pull request with your Cloud changes. This exports all translations to the repository.
+                        </RadzenText>
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Icon="publish"
+                                          Text="Create PR" Click="@PushToGitHub" Disabled="_isProcessing" IsBusy="_isPushing" />
+                        </RadzenStack>
+                        @if (!string.IsNullOrEmpty(_syncStatus.LastPrUrl))
+                        {
+                            <RadzenLink Path="@_syncStatus.LastPrUrl" Target="_blank" Text="View Last PR" />
+                        }
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenCard Style="height: 100%;">
+                    <RadzenStack Gap="1rem">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="cloud_download" Style="font-size: 1.5rem; color: var(--rz-info);" />
+                            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Pull from GitHub</RadzenText>
+                        </RadzenStack>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                            Import changes from GitHub into Cloud. Conflicts will be detected and can be resolved.
+                        </RadzenText>
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Info" Icon="preview"
+                                          Text="Preview" Click="@PreviewPull" Disabled="_isProcessing" IsBusy="_isPreviewing" />
+                            <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Info" Icon="cloud_download"
+                                          Text="Pull" Click="@PullFromGitHub" Disabled="_isProcessing" IsBusy="_isPulling" />
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+
+        @* Pending Conflicts *@
+        @if (_pendingConflicts != null && _pendingConflicts.TotalConflicts > 0)
+        {
+            <RadzenCard class="rz-mb-4">
+                <RadzenStack Gap="1rem">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="warning" Style="font-size: 1.5rem; color: var(--rz-warning);" />
+                            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Pending Conflicts (@_pendingConflicts.TotalConflicts)</RadzenText>
+                        </RadzenStack>
+                        <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Warning" Icon="merge_type"
+                                      Text="Resolve Conflicts" Click="@ShowConflictResolution" Disabled="_isProcessing" />
+                    </RadzenStack>
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                        @_pendingConflicts.BothModifiedCount modified on both sides,
+                        @_pendingConflicts.DeletedInGitHubCount deleted in GitHub,
+                        @_pendingConflicts.DeletedInCloudCount deleted in Cloud
+                    </RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        }
+
+        @* Pull Preview Results *@
+        @if (_pullPreview != null)
+        {
+            <RadzenCard class="rz-mb-4">
+                <RadzenStack Gap="1rem">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Pull Preview</RadzenText>
+                        <RadzenButton Variant="Radzen.Variant.Text" Icon="close" Click="@(() => _pullPreview = null)" Size="ButtonSize.Small" />
+                    </RadzenStack>
+
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="6" SizeMD="3">
+                            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0">
+                                <RadzenText TextStyle="TextStyle.H4" class="rz-color-success">@_pullPreview.EntriesAdded</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption">Added</RadzenText>
+                            </RadzenStack>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6" SizeMD="3">
+                            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0">
+                                <RadzenText TextStyle="TextStyle.H4" class="rz-color-info">@_pullPreview.EntriesApplied</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption">Modified</RadzenText>
+                            </RadzenStack>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6" SizeMD="3">
+                            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0">
+                                <RadzenText TextStyle="TextStyle.H4" class="rz-color-danger">@_pullPreview.EntriesDeleted</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption">Deleted</RadzenText>
+                            </RadzenStack>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6" SizeMD="3">
+                            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0">
+                                <RadzenText TextStyle="TextStyle.H4" class="rz-color-warning">@_pullPreview.Conflicts.Count</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption">Conflicts</RadzenText>
+                            </RadzenStack>
+                        </RadzenColumn>
+                    </RadzenRow>
+
+                    @if (_pullPreview.ProcessedFiles.Any())
+                    {
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            Files: @string.Join(", ", _pullPreview.ProcessedFiles.Take(5))
+                            @if (_pullPreview.ProcessedFiles.Count > 5)
+                            {
+                                <span> and @(_pullPreview.ProcessedFiles.Count - 5) more...</span>
+                            }
+                        </RadzenText>
+                    }
+                </RadzenStack>
+            </RadzenCard>
+        }
+
+        @* Sync Status *@
+        @if (!string.IsNullOrEmpty(_syncStatus.SyncStatus) && _syncStatus.SyncStatus != "idle")
+        {
+            <RadzenCard class="rz-mb-4">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+                    <RadzenText TextStyle="TextStyle.Body1">Sync in progress: @_syncStatus.SyncStatus</RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        }
+    }
+}
+
+@* Connect Repository Dialog *@
+<RadzenDialog />
+
+@code {
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    private LrmCloud.Shared.DTOs.Projects.ProjectDto? _project;
+    private GitHubSyncStatus? _syncStatus;
+    private GitHubPullConflictSummary? _pendingConflicts;
+    private GitHubPullResult? _pullPreview;
+
+    private bool _isLoading = true;
+    private bool _isProcessing;
+    private bool _isPushing;
+    private bool _isPulling;
+    private bool _isPreviewing;
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            _project = await ProjectService.GetProjectAsync(ProjectId);
+            if (_project != null)
+            {
+                _syncStatus = await GitHubService.GetSyncStatusAsync(ProjectId);
+                if (_syncStatus?.Connected == true)
+                {
+                    _pendingConflicts = await GitHubService.GetPendingConflictsAsync(ProjectId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load project: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ShowConnectDialog()
+    {
+        var result = await DialogService.OpenAsync<ConnectGitHubDialog>("Connect GitHub Repository",
+            new Dictionary<string, object> { { "ProjectId", ProjectId } },
+            new DialogOptions { Width = "600px", Height = "auto", CloseDialogOnOverlayClick = false });
+
+        if (result == true)
+        {
+            _successMessage = "Repository connected successfully!";
+            await LoadDataAsync();
+        }
+    }
+
+    private async Task DisconnectRepository()
+    {
+        var confirm = await DialogService.Confirm(
+            "Are you sure you want to disconnect this repository? This will not delete any data.",
+            "Disconnect Repository",
+            new ConfirmOptions { OkButtonText = "Disconnect", CancelButtonText = "Cancel" });
+
+        if (confirm != true)
+            return;
+
+        _isProcessing = true;
+        _errorMessage = null;
+
+        try
+        {
+            var (success, error) = await GitHubService.DisconnectRepositoryAsync(ProjectId);
+            if (success)
+            {
+                _successMessage = "Repository disconnected successfully.";
+                await LoadDataAsync();
+            }
+            else
+            {
+                _errorMessage = error ?? "Failed to disconnect repository.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task PushToGitHub()
+    {
+        _isProcessing = true;
+        _isPushing = true;
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            var result = await GitHubService.SyncToGitHubAsync(ProjectId, new TriggerSyncRequest(null, true));
+            if (result?.Success == true)
+            {
+                _successMessage = $"Pull request created successfully! {result.FilesUpdated} files updated.";
+                if (!string.IsNullOrEmpty(result.PullRequestUrl))
+                {
+                    _successMessage += $" <a href=\"{result.PullRequestUrl}\" target=\"_blank\">View PR</a>";
+                }
+                await LoadDataAsync();
+            }
+            else
+            {
+                _errorMessage = result?.ErrorMessage ?? "Failed to push to GitHub.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+            _isPushing = false;
+        }
+    }
+
+    private async Task PreviewPull()
+    {
+        _isProcessing = true;
+        _isPreviewing = true;
+        _errorMessage = null;
+
+        try
+        {
+            _pullPreview = await GitHubService.PreviewPullAsync(ProjectId);
+            if (_pullPreview?.Success != true)
+            {
+                _errorMessage = _pullPreview?.ErrorMessage ?? "Failed to preview pull.";
+                _pullPreview = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+            _isPreviewing = false;
+        }
+    }
+
+    private async Task PullFromGitHub()
+    {
+        _isProcessing = true;
+        _isPulling = true;
+        _errorMessage = null;
+        _successMessage = null;
+        _pullPreview = null;
+
+        try
+        {
+            var result = await GitHubService.PullFromGitHubAsync(ProjectId, new GitHubPullRequest(false, "prompt"));
+            if (result?.Success == true)
+            {
+                if (result.Conflicts.Any())
+                {
+                    _successMessage = $"Pull completed with conflicts. {result.EntriesApplied + result.EntriesAdded} entries applied, {result.Conflicts.Count} conflicts need resolution.";
+                    _pendingConflicts = await GitHubService.GetPendingConflictsAsync(ProjectId);
+                }
+                else
+                {
+                    _successMessage = $"Pull completed successfully! {result.EntriesApplied} modified, {result.EntriesAdded} added, {result.EntriesDeleted} deleted.";
+                }
+                await LoadDataAsync();
+            }
+            else
+            {
+                _errorMessage = result?.ErrorMessage ?? "Failed to pull from GitHub.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+            _isPulling = false;
+        }
+    }
+
+    private async Task ShowConflictResolution()
+    {
+        if (_pendingConflicts == null || !_pendingConflicts.Conflicts.Any())
+            return;
+
+        var result = await DialogService.OpenAsync<ResolveConflictsDialog>("Resolve Conflicts",
+            new Dictionary<string, object>
+            {
+                { "ProjectId", ProjectId },
+                { "Conflicts", _pendingConflicts.Conflicts }
+            },
+            new DialogOptions { Width = "900px", Height = "80vh", CloseDialogOnOverlayClick = false });
+
+        if (result == true)
+        {
+            _successMessage = "Conflicts resolved successfully!";
+            await LoadDataAsync();
+        }
+    }
+
+    private static string GetTokenSourceIcon(string tokenSource) => tokenSource switch
+    {
+        "user" => "person",
+        "organization" => "corporate_fare",
+        "project_pat" => "key",
+        _ => "vpn_key"
+    };
+
+    private static string GetTokenSourceLabel(string tokenSource) => tokenSource switch
+    {
+        "user" => "Personal GitHub",
+        "organization" => "Organization",
+        "project_pat" => "Project PAT",
+        _ => tokenSource
+    };
+}

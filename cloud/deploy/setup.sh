@@ -475,6 +475,35 @@ else
 fi
 API_KEY_SECRET=${INPUT_API_KEY_SECRET:-$DEFAULT_API_KEY_SECRET}
 
+# ============================================================================
+# GitHub OAuth Configuration (optional)
+# ============================================================================
+echo ""
+echo -e "${BLUE}GitHub OAuth (optional - for GitHub login & sync):${NC}"
+print_info "Create OAuth App at https://github.com/settings/developers"
+print_info "Callback URL: \${baseUrl}/api/auth/github/callback"
+echo ""
+
+CURRENT_GITHUB_CLIENT_ID=$(config_get '.auth.githubClientId' '')
+CURRENT_GITHUB_CLIENT_SECRET=$(config_get '.auth.githubClientSecret' '')
+
+read -p "GitHub OAuth Client ID [$CURRENT_GITHUB_CLIENT_ID]: " GITHUB_CLIENT_ID
+GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-$CURRENT_GITHUB_CLIENT_ID}
+
+if [ -n "$GITHUB_CLIENT_ID" ]; then
+    if [ -n "$CURRENT_GITHUB_CLIENT_SECRET" ]; then
+        print_info "GitHub Client Secret exists (hidden)"
+        read -s -p "GitHub Client Secret [keep existing]: " INPUT_GITHUB_SECRET
+        echo ""
+        GITHUB_CLIENT_SECRET=${INPUT_GITHUB_SECRET:-$CURRENT_GITHUB_CLIENT_SECRET}
+    else
+        read -s -p "GitHub Client Secret: " GITHUB_CLIENT_SECRET
+        echo ""
+    fi
+else
+    GITHUB_CLIENT_SECRET=""
+fi
+
 # Preserve other existing config values
 CURRENT_JWT_EXPIRY=$(config_get '.auth.jwtExpiryHours' '24')
 CURRENT_REG=$(config_get '.features.registration' 'true')
@@ -556,7 +585,9 @@ NEW_CONFIG=$(cat <<EOF
   "apiKeyMasterSecret": "${API_KEY_SECRET}",
   "auth": {
     "jwtSecret": "${JWT_SECRET}",
-    "jwtExpiryHours": ${CURRENT_JWT_EXPIRY}
+    "jwtExpiryHours": ${CURRENT_JWT_EXPIRY},
+    "githubClientId": "${GITHUB_CLIENT_ID}",
+    "githubClientSecret": "${GITHUB_CLIENT_SECRET}"
   },
   "mail": {
     "backend": "${MAIL_BACKEND}",

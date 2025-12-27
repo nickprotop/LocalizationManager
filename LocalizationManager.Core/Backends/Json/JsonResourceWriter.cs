@@ -46,6 +46,15 @@ public class JsonResourceWriter : IResourceWriter
     /// <inheritdoc />
     public void Write(ResourceFile file)
     {
+        var json = BuildJsonString(file);
+        File.WriteAllText(file.Language.FilePath, json);
+    }
+
+    /// <summary>
+    /// Builds the JSON string from the resource file without writing to disk.
+    /// </summary>
+    private string BuildJsonString(ResourceFile file)
+    {
         var root = new Dictionary<string, object>();
 
         // Add meta if configured
@@ -96,13 +105,11 @@ public class JsonResourceWriter : IResourceWriter
             }
         }
 
-        var json = JsonSerializer.Serialize(root, new JsonSerializerOptions
+        return JsonSerializer.Serialize(root, new JsonSerializerOptions
         {
             WriteIndented = true,
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         });
-
-        File.WriteAllText(file.Language.FilePath, json);
     }
 
     /// <inheritdoc />
@@ -172,6 +179,12 @@ public class JsonResourceWriter : IResourceWriter
         if (File.Exists(language.FilePath))
             File.Delete(language.FilePath);
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public string SerializeToString(ResourceFile file)
+    {
+        return BuildJsonString(file);
     }
 
     /// <summary>

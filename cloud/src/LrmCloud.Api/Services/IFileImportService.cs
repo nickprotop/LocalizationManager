@@ -1,0 +1,72 @@
+namespace LrmCloud.Api.Services;
+
+/// <summary>
+/// Represents a parsed entry from a GitHub file.
+/// </summary>
+public class GitHubEntry
+{
+    public required string Key { get; init; }
+    public required string LanguageCode { get; init; }
+    public string PluralForm { get; init; } = "";
+    public string? Value { get; init; }
+    public string? Comment { get; init; }
+    public bool IsPlural { get; init; }
+    public Dictionary<string, string>? PluralForms { get; init; }
+    public required string Hash { get; init; }
+}
+
+/// <summary>
+/// Result of parsing a single file.
+/// </summary>
+public class ParsedResourceFile
+{
+    public required string FilePath { get; init; }
+    public required string LanguageCode { get; init; }
+    public bool IsDefault { get; init; }
+    public required List<GitHubEntry> Entries { get; init; }
+}
+
+/// <summary>
+/// Service for importing/parsing translation files from GitHub.
+/// Inverse of FileExportService - parses file content into entries.
+/// </summary>
+public interface IFileImportService
+{
+    /// <summary>
+    /// Parse a single file's content into entries.
+    /// </summary>
+    /// <param name="format">File format (resx, json, i18next, android, ios)</param>
+    /// <param name="filePath">Path of the file (used for language detection)</param>
+    /// <param name="content">File content as string</param>
+    /// <param name="defaultLanguage">Project default language</param>
+    /// <returns>Parsed entries with computed hashes</returns>
+    ParsedResourceFile ParseFile(
+        string format,
+        string filePath,
+        string content,
+        string defaultLanguage);
+
+    /// <summary>
+    /// Parse multiple files into a unified entry dictionary.
+    /// </summary>
+    /// <param name="format">File format</param>
+    /// <param name="files">Dictionary of filePath -> content</param>
+    /// <param name="defaultLanguage">Project default language</param>
+    /// <returns>Dictionary keyed by (keyName, languageCode, pluralForm) containing all entries</returns>
+    Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry> ParseFiles(
+        string format,
+        Dictionary<string, string> files,
+        string defaultLanguage);
+
+    /// <summary>
+    /// Detect language code from a file path based on format conventions.
+    /// </summary>
+    /// <param name="format">File format</param>
+    /// <param name="filePath">File path</param>
+    /// <param name="defaultLanguage">Project default language</param>
+    /// <returns>Tuple of (languageCode, isDefault)</returns>
+    (string languageCode, bool isDefault) DetectLanguageFromPath(
+        string format,
+        string filePath,
+        string defaultLanguage);
+}

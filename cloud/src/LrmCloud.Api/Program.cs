@@ -140,6 +140,11 @@ public class Program
             }
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IGitHubAuthService, GitHubAuthService>();
+            builder.Services.AddScoped<IGitHubApiService, GitHubApiService>();
+            builder.Services.AddScoped<IFileExportService, FileExportService>();
+            builder.Services.AddScoped<IFileImportService, FileImportService>();
+            builder.Services.AddScoped<IGitHubSyncService, GitHubSyncService>();
+            builder.Services.AddScoped<IGitHubPullService, GitHubPullService>(); // Pull from GitHub with three-way merge
             builder.Services.AddScoped<IOrganizationService, OrganizationService>();
             builder.Services.AddScoped<IProjectService, ProjectService>();
             builder.Services.AddScoped<IResourceService, ResourceService>();

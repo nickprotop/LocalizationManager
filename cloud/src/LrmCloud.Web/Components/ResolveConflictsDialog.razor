@@ -1,0 +1,309 @@
+@using LrmCloud.Shared.DTOs.GitHub
+@inject GitHubIntegrationService GitHubService
+@inject NotificationService NotificationService
+
+<RadzenStack Gap="1rem">
+    @if (!Conflicts.Any())
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info" AllowClose="false">
+            No conflicts to resolve.
+        </RadzenAlert>
+    }
+    else
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false" Shade="Shade.Lighter">
+            <RadzenStack Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.Body1" class="rz-mb-0">
+                    <strong>@Conflicts.Count conflict(s)</strong> need resolution
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption">
+                    Choose how to resolve each conflict. You can keep the GitHub version, keep the Cloud version, or manually edit.
+                </RadzenText>
+            </RadzenStack>
+        </RadzenAlert>
+
+        <RadzenStack Gap="1.5rem" class="rz-mt-2">
+            @foreach (var conflict in Conflicts)
+            {
+                var conflictId = GetConflictId(conflict);
+                <RadzenCard class="rz-p-4">
+                    <RadzenStack Gap="0.75rem">
+                        @* Header *@
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" AlignItems="Radzen.AlignItems.Center">
+                                <RadzenIcon Icon="key" Style="color: var(--rz-primary);" />
+                                <RadzenText TextStyle="TextStyle.Body1" class="rz-mb-0">
+                                    <strong>@conflict.Key</strong>
+                                </RadzenText>
+                                <RadzenBadge Text="@conflict.LanguageCode" BadgeStyle="BadgeStyle.Info" />
+                                @if (!string.IsNullOrEmpty(conflict.PluralForm))
+                                {
+                                    <RadzenBadge Text="@conflict.PluralForm" BadgeStyle="BadgeStyle.Light" />
+                                }
+                            </RadzenStack>
+                            <RadzenBadge Text="@GetConflictTypeLabel(conflict.ConflictType)" BadgeStyle="@GetConflictTypeBadgeStyle(conflict.ConflictType)" />
+                        </RadzenStack>
+
+                        @* Values Comparison *@
+                        <RadzenRow Gap="1rem" class="rz-mt-2">
+                            @* GitHub Value *@
+                            <RadzenColumn Size="12" SizeMD="4">
+                                <RadzenFieldset Text="GitHub" Style="height: 100%;">
+                                    @if (conflict.GitHubValue == null)
+                                    {
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-font-italic">
+                                            (deleted)
+                                        </RadzenText>
+                                    }
+                                    else
+                                    {
+                                        <RadzenText TextStyle="TextStyle.Body2" Style="word-break: break-word; white-space: pre-wrap;">
+                                            @conflict.GitHubValue
+                                        </RadzenText>
+                                    }
+                                </RadzenFieldset>
+                            </RadzenColumn>
+
+                            @* Cloud Value *@
+                            <RadzenColumn Size="12" SizeMD="4">
+                                <RadzenFieldset Text="Cloud" Style="height: 100%;">
+                                    @if (conflict.CloudValue == null)
+                                    {
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-font-italic">
+                                            (deleted)
+                                        </RadzenText>
+                                    }
+                                    else
+                                    {
+                                        <RadzenStack Gap="0.25rem">
+                                            <RadzenText TextStyle="TextStyle.Body2" Style="word-break: break-word; white-space: pre-wrap;">
+                                                @conflict.CloudValue
+                                            </RadzenText>
+                                            @if (conflict.CloudModifiedAt.HasValue)
+                                            {
+                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                    Modified @conflict.CloudModifiedAt.Value.ToString("g")
+                                                    @if (!string.IsNullOrEmpty(conflict.CloudModifiedBy))
+                                                    {
+                                                        <text> by @conflict.CloudModifiedBy</text>
+                                                    }
+                                                </RadzenText>
+                                            }
+                                        </RadzenStack>
+                                    }
+                                </RadzenFieldset>
+                            </RadzenColumn>
+
+                            @* Base Value *@
+                            <RadzenColumn Size="12" SizeMD="4">
+                                <RadzenFieldset Text="Common Ancestor" Style="height: 100%;">
+                                    @if (conflict.BaseValue == null)
+                                    {
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-font-italic">
+                                            (new key)
+                                        </RadzenText>
+                                    }
+                                    else
+                                    {
+                                        <RadzenText TextStyle="TextStyle.Body2" Style="word-break: break-word; white-space: pre-wrap;">
+                                            @conflict.BaseValue
+                                        </RadzenText>
+                                    }
+                                </RadzenFieldset>
+                            </RadzenColumn>
+                        </RadzenRow>
+
+                        @* Resolution Selection *@
+                        <RadzenStack Gap="0.5rem" class="rz-mt-2">
+                            <RadzenText TextStyle="TextStyle.Subtitle2">Resolution:</RadzenText>
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                                <RadzenButton Variant="@(GetResolution(conflictId) == "github" ? Radzen.Variant.Filled : Radzen.Variant.Outlined)"
+                                              ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small"
+                                              Text="Use GitHub" Icon="cloud_download"
+                                              Click="@(() => SetResolution(conflictId, "github"))"
+                                              Disabled="@(conflict.GitHubValue == null && conflict.ConflictType != "deleted_in_github")" />
+
+                                <RadzenButton Variant="@(GetResolution(conflictId) == "cloud" ? Radzen.Variant.Filled : Radzen.Variant.Outlined)"
+                                              ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
+                                              Text="Keep Cloud" Icon="cloud"
+                                              Click="@(() => SetResolution(conflictId, "cloud"))"
+                                              Disabled="@(conflict.CloudValue == null && conflict.ConflictType != "deleted_in_cloud")" />
+
+                                <RadzenButton Variant="@(GetResolution(conflictId) == "edit" ? Radzen.Variant.Filled : Radzen.Variant.Outlined)"
+                                              ButtonStyle="ButtonStyle.Warning" Size="ButtonSize.Small"
+                                              Text="Edit Manually" Icon="edit"
+                                              Click="@(() => SetResolution(conflictId, "edit"))" />
+
+                                <RadzenButton Variant="@(GetResolution(conflictId) == "skip" ? Radzen.Variant.Filled : Radzen.Variant.Outlined)"
+                                              ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                                              Text="Skip" Icon="skip_next"
+                                              Click="@(() => SetResolution(conflictId, "skip"))" />
+                            </RadzenStack>
+
+                            @* Edit Box (if edit selected) *@
+                            @if (GetResolution(conflictId) == "edit")
+                            {
+                                <RadzenFormField Text="Custom Value" Variant="Radzen.Variant.Outlined" Style="width: 100%;" class="rz-mt-2">
+                                    <RadzenTextArea @bind-Value="_editedValues[conflictId]" Rows="3" Style="width: 100%;" />
+                                </RadzenFormField>
+                            }
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+            }
+        </RadzenStack>
+    }
+
+    @* Actions *@
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+        <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" Disabled="_isResolving" />
+        <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary"
+                      Text="Apply Resolutions" Icon="check"
+                      Click="@ApplyResolutions" Disabled="@(!CanApply())" IsBusy="_isResolving" />
+    </RadzenStack>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="true" Close="@(() => _errorMessage = null)" class="rz-mt-2">
+            @_errorMessage
+        </RadzenAlert>
+    }
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    [Parameter]
+    public List<GitHubPullConflict> Conflicts { get; set; } = new();
+
+    [CascadingParameter]
+    public Radzen.DialogService? DialogService { get; set; }
+
+    private Dictionary<string, string> _resolutions = new();
+    private Dictionary<string, string> _editedValues = new();
+    private bool _isResolving;
+    private string? _errorMessage;
+
+    protected override void OnInitialized()
+    {
+        // Initialize default resolutions (skip all by default)
+        foreach (var conflict in Conflicts)
+        {
+            var id = GetConflictId(conflict);
+            _resolutions[id] = "skip";
+            _editedValues[id] = conflict.CloudValue ?? conflict.GitHubValue ?? "";
+        }
+    }
+
+    private string GetConflictId(GitHubPullConflict conflict)
+    {
+        return $"{conflict.Key}|{conflict.LanguageCode}|{conflict.PluralForm ?? ""}";
+    }
+
+    private string GetResolution(string conflictId)
+    {
+        return _resolutions.TryGetValue(conflictId, out var resolution) ? resolution : "skip";
+    }
+
+    private void SetResolution(string conflictId, string resolution)
+    {
+        _resolutions[conflictId] = resolution;
+    }
+
+    private string GetConflictTypeLabel(string conflictType)
+    {
+        return conflictType switch
+        {
+            "both_modified" => "Both Modified",
+            "deleted_in_github" => "Deleted in GitHub",
+            "deleted_in_cloud" => "Deleted in Cloud",
+            _ => conflictType
+        };
+    }
+
+    private BadgeStyle GetConflictTypeBadgeStyle(string conflictType)
+    {
+        return conflictType switch
+        {
+            "both_modified" => BadgeStyle.Warning,
+            "deleted_in_github" => BadgeStyle.Danger,
+            "deleted_in_cloud" => BadgeStyle.Info,
+            _ => BadgeStyle.Light
+        };
+    }
+
+    private bool CanApply()
+    {
+        // At least one non-skip resolution
+        return _resolutions.Values.Any(r => r != "skip");
+    }
+
+    private async Task ApplyResolutions()
+    {
+        _isResolving = true;
+        _errorMessage = null;
+
+        try
+        {
+            var resolutions = new List<GitHubPullConflictResolution>();
+
+            foreach (var conflict in Conflicts)
+            {
+                var id = GetConflictId(conflict);
+                var resolution = GetResolution(id);
+
+                if (resolution == "skip")
+                    continue;
+
+                string? editedValue = null;
+                if (resolution == "edit")
+                {
+                    editedValue = _editedValues.TryGetValue(id, out var val) ? val : null;
+                }
+
+                resolutions.Add(new GitHubPullConflictResolution(
+                    conflict.Key,
+                    conflict.LanguageCode,
+                    conflict.PluralForm ?? "",
+                    resolution,
+                    editedValue
+                ));
+            }
+
+            if (!resolutions.Any())
+            {
+                _errorMessage = "No resolutions selected";
+                return;
+            }
+
+            var request = new GitHubPullConflictResolutionRequest(resolutions);
+            var result = await GitHubService.ResolveConflictsAsync(ProjectId, request);
+
+            if (result?.Success == true)
+            {
+                NotificationService.Notify(NotificationSeverity.Success,
+                    "Conflicts Resolved",
+                    $"Successfully resolved {resolutions.Count} conflict(s)");
+                DialogService?.Close(true);
+            }
+            else
+            {
+                _errorMessage = result?.ErrorMessage ?? "Failed to resolve conflicts";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isResolving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService?.Close(false);
+    }
+}

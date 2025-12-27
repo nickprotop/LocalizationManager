@@ -3,6 +3,7 @@ using System;
 using LrmCloud.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LrmCloud.Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251227113020_AddGitHubPullSupport")]
+    partial class AddGitHubPullSupport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -206,11 +209,6 @@ namespace LrmCloud.Api.Data.Migrations
                     b.Property<DateTime>("SyncedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("synced_at");
-
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("integer")
-                        .HasColumnName("version");
 
                     b.HasKey("Id");
 
@@ -712,85 +710,6 @@ namespace LrmCloud.Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("organization_reviewers");
-                });
-
-            modelBuilder.Entity("LrmCloud.Shared.Entities.PendingConflict", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("BaseValue")
-                        .HasColumnType("text")
-                        .HasColumnName("base_value");
-
-                    b.Property<DateTime?>("CloudModifiedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("cloud_modified_at");
-
-                    b.Property<string>("CloudModifiedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("cloud_modified_by");
-
-                    b.Property<string>("CloudValue")
-                        .HasColumnType("text")
-                        .HasColumnName("cloud_value");
-
-                    b.Property<string>("CommitSha")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("commit_sha");
-
-                    b.Property<string>("ConflictType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("conflict_type");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("GitHubValue")
-                        .HasColumnType("text")
-                        .HasColumnName("github_value");
-
-                    b.Property<string>("KeyName")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("key_name");
-
-                    b.Property<string>("LanguageCode")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasColumnName("language_code");
-
-                    b.Property<string>("PluralForm")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("plural_form");
-
-                    b.Property<int>("ProjectId")
-                        .HasColumnType("integer")
-                        .HasColumnName("project_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("ProjectId");
-
-                    b.HasIndex("ProjectId", "KeyName", "LanguageCode", "PluralForm")
-                        .IsUnique();
-
-                    b.ToTable("pending_conflicts");
                 });
 
             modelBuilder.Entity("LrmCloud.Shared.Entities.Project", b =>
@@ -1450,7 +1369,6 @@ namespace LrmCloud.Api.Data.Migrations
                         .HasColumnName("value");
 
                     b.Property<int>("Version")
-                        .IsConcurrencyToken()
                         .HasColumnType("integer")
                         .HasColumnName("version");
 
@@ -2159,17 +2077,6 @@ namespace LrmCloud.Api.Data.Migrations
                     b.Navigation("Organization");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("LrmCloud.Shared.Entities.PendingConflict", b =>
-                {
-                    b.HasOne("LrmCloud.Shared.Entities.Project", "Project")
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Project");
                 });
 
             modelBuilder.Entity("LrmCloud.Shared.Entities.Project", b =>

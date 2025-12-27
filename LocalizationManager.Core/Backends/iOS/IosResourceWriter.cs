@@ -168,6 +168,46 @@ public class IosResourceWriter : IResourceWriter
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
+    public string SerializeToString(ResourceFile file)
+    {
+        // For iOS, we serialize to .strings format (simple strings only)
+        // Plurals would need to be in a separate .stringsdict file
+        var simpleStrings = file.Entries.Where(e => !e.IsPlural).ToList();
+
+        if (!simpleStrings.Any())
+        {
+            return "";
+        }
+
+        var stringsEntries = simpleStrings.Select(e =>
+            new StringsFileParser.StringsEntry(e.Key, e.Value ?? "", e.Comment));
+
+        return _stringsParser.Serialize(stringsEntries);
+    }
+
+    /// <summary>
+    /// Serialize entries to .stringsdict format (for plurals).
+    /// </summary>
+    public string SerializeToStringdict(ResourceFile file)
+    {
+        var pluralStrings = file.Entries.Where(e => e.IsPlural && e.PluralForms?.Count > 0).ToList();
+
+        if (!pluralStrings.Any())
+        {
+            return "";
+        }
+
+        var stringsdictEntries = pluralStrings.Select(e =>
+            new StringsdictParser.StringsdictEntry(
+                e.Key,
+                StringsdictParser.CreateFormatKey(),
+                DetectValueType(e.PluralForms!),
+                e.PluralForms!));
+
+        return _stringsdictParser.Serialize(stringsdictEntries);
+    }
+
     /// <summary>
     /// Detects the value type from plural forms (d for integers, f for floats, @ for objects).
     /// </summary>

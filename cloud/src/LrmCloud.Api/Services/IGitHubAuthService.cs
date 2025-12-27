@@ -7,8 +7,9 @@ public interface IGitHubAuthService
     /// <summary>
     /// Generates the GitHub OAuth authorization URL with state parameter.
     /// </summary>
+    /// <param name="statePrefix">Optional prefix to include in state (e.g., "link:{userId}" for account linking)</param>
     /// <returns>Authorization URL and state token for CSRF protection</returns>
-    (string AuthorizationUrl, string State) GetAuthorizationUrl();
+    (string AuthorizationUrl, string State) GetAuthorizationUrl(string? statePrefix = null);
 
     /// <summary>
     /// Exchanges OAuth authorization code for access token and user profile.

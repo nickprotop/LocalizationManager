@@ -73,5 +73,6 @@ builder.Services.AddScoped<OrganizationService>();
 builder.Services.AddScoped<OrganizationContextService>();
 builder.Services.AddScoped<BillingService>();
 builder.Services.AddScoped<AdminService>();
+builder.Services.AddScoped<GitHubIntegrationService>();
 
 await builder.Build().RunAsync();

@@ -32,19 +32,25 @@ public class GitHubAuthService : IGitHubAuthService
         _logger = logger;
     }
 
-    public (string AuthorizationUrl, string State) GetAuthorizationUrl()
+    public (string AuthorizationUrl, string State) GetAuthorizationUrl(string? statePrefix = null)
     {
         if (string.IsNullOrEmpty(_config.Auth.GitHubClientId))
             throw new InvalidOperationException("GitHub OAuth is not configured (GitHubClientId missing)");
 
         // Generate secure random state for CSRF protection
-        var state = TokenGenerator.GenerateSecureToken(32);
+        var randomPart = TokenGenerator.GenerateSecureToken(32);
+
+        // Include prefix if provided (e.g., "link:{userId}:{random}" for account linking)
+        var state = string.IsNullOrEmpty(statePrefix)
+            ? randomPart
+            : $"{statePrefix}:{randomPart}";
 
         var callbackUrl = $"{_config.Server.BaseUrl}/api/auth/github/callback";
+        // Request both user:email (for profile) and repo (for repository access) scopes
         var url = $"{GitHubAuthorizeUrl}?" +
                   $"client_id={Uri.EscapeDataString(_config.Auth.GitHubClientId)}&" +
                   $"redirect_uri={Uri.EscapeDataString(callbackUrl)}&" +
-                  $"scope=user:email&" +
+                  $"scope=user:email%20repo&" +
                   $"state={Uri.EscapeDataString(state)}";
 
         return (url, state);
@@ -63,6 +69,22 @@ public class GitHubAuthService : IGitHubAuthService
             return (false, null, "Invalid OAuth state parameter");
         }
 
+        // Check if this is a link operation (state format: "link:{userId}:{random}")
+        int? linkUserId = null;
+        if (expectedState.StartsWith("link:"))
+        {
+            var parts = expectedState.Split(':');
+            if (parts.Length >= 2 && int.TryParse(parts[1], out var userId))
+            {
+                linkUserId = userId;
+            }
+            else
+            {
+                _logger.LogWarning("Invalid link state format: {State}", expectedState);
+                return (false, null, "Invalid link state format");
+            }
+        }
+
         try
         {
             // Exchange code for access token
@@ -75,8 +97,26 @@ public class GitHubAuthService : IGitHubAuthService
             if (githubProfile == null)
                 return (false, null, "Failed to fetch user profile from GitHub");
 
-            // Create or link user account
-            var (user, isNewUser) = await CreateOrLinkUserAsync(githubProfile, accessToken);
+            User user;
+            bool isNewUser;
+
+            if (linkUserId.HasValue)
+            {
+                // This is a link operation - link GitHub to existing user
+                var (success, linkedUser, error) = await LinkGitHubToExistingUserAsync(
+                    linkUserId.Value, githubProfile, accessToken);
+
+                if (!success)
+                    return (false, null, error);
+
+                user = linkedUser!;
+                isNewUser = false;
+            }
+            else
+            {
+                // Normal login/register flow
+                (user, isNewUser) = await CreateOrLinkUserAsync(githubProfile, accessToken);
+            }
 
             // Generate JWT and refresh tokens
             var (token, expiresAt) = JwtTokenGenerator.GenerateToken(
@@ -167,6 +207,56 @@ public class GitHubAuthService : IGitHubAuthService
 
         _logger.LogInformation("GitHub account unlinked for user {UserId}", userId);
         return (true, null);
+    }
+
+    /// <summary>
+    /// Links a GitHub account to an existing user (for email users adding GitHub).
+    /// </summary>
+    private async Task<(bool Success, User? User, string? ErrorMessage)> LinkGitHubToExistingUserAsync(
+        int userId,
+        GitHubUserProfile githubProfile,
+        string accessToken)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null)
+            return (false, null, "User not found");
+
+        // Check if this GitHub account is already linked to another user
+        var existingGitHubUser = await _db.Users.FirstOrDefaultAsync(u => u.GitHubId == githubProfile.Id);
+        if (existingGitHubUser != null)
+        {
+            if (existingGitHubUser.Id == userId)
+            {
+                // Already linked to this user - just update token
+                user.GitHubAccessTokenEncrypted = EncryptToken(accessToken);
+                user.GitHubTokenExpiresAt = null;
+                user.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+
+                _logger.LogInformation("Updated GitHub token for user {UserId}", userId);
+                return (true, user, null);
+            }
+
+            return (false, null, "This GitHub account is already linked to another user");
+        }
+
+        // Check if user already has a different GitHub account linked
+        if (user.GitHubId != null && user.GitHubId != githubProfile.Id)
+        {
+            return (false, null, "A different GitHub account is already linked. Unlink it first.");
+        }
+
+        // Link GitHub account
+        user.GitHubId = githubProfile.Id;
+        user.GitHubAccessTokenEncrypted = EncryptToken(accessToken);
+        user.GitHubTokenExpiresAt = null;
+        user.AvatarUrl = githubProfile.AvatarUrl ?? user.AvatarUrl;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Linked GitHub ID {GitHubId} to existing user {UserId}", githubProfile.Id, userId);
+        return (true, user, null);
     }
 
     // ============================================================================

@@ -19,6 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Xml.Linq;
 using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Models;
 
@@ -62,5 +63,55 @@ public class ResxResourceWriter : IResourceWriter
     {
         _fileManager.DeleteLanguageFile(language);
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public string SerializeToString(ResourceFile file)
+    {
+        var xdoc = CreateNewResxDocument();
+        var root = xdoc.Root!;
+
+        foreach (var entry in file.Entries)
+        {
+            root.Add(CreateDataElement(entry));
+        }
+
+        return xdoc.Declaration + Environment.NewLine + xdoc.ToString();
+    }
+
+    private static XDocument CreateNewResxDocument()
+    {
+        return new XDocument(
+            new XDeclaration("1.0", "utf-8", null),
+            new XElement("root",
+                new XElement("resheader",
+                    new XAttribute("name", "resmimetype"),
+                    new XElement("value", "text/microsoft-resx")),
+                new XElement("resheader",
+                    new XAttribute("name", "version"),
+                    new XElement("value", "2.0")),
+                new XElement("resheader",
+                    new XAttribute("name", "reader"),
+                    new XElement("value", "System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089")),
+                new XElement("resheader",
+                    new XAttribute("name", "writer"),
+                    new XElement("value", "System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089"))
+            )
+        );
+    }
+
+    private static XElement CreateDataElement(ResourceEntry entry)
+    {
+        var dataElement = new XElement("data",
+            new XAttribute("name", entry.Key),
+            new XAttribute(XNamespace.Xml + "space", "preserve"),
+            new XElement("value", entry.Value ?? string.Empty));
+
+        if (!string.IsNullOrEmpty(entry.Comment))
+        {
+            dataElement.Add(new XElement("comment", entry.Comment));
+        }
+
+        return dataElement;
     }
 }

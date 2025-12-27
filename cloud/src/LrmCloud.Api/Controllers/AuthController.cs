@@ -1,6 +1,7 @@
 using LrmCloud.Api.Helpers;
 using LrmCloud.Api.Services;
 using LrmCloud.Shared.Api;
+using LrmCloud.Shared.Configuration;
 using LrmCloud.Shared.DTOs.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,16 +17,34 @@ public class AuthController : ApiControllerBase
 {
     private readonly IAuthService _authService;
     private readonly IGitHubAuthService _githubAuthService;
+    private readonly CloudConfiguration _config;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IAuthService authService,
         IGitHubAuthService githubAuthService,
+        CloudConfiguration config,
         ILogger<AuthController> logger)
     {
         _authService = authService;
         _githubAuthService = githubAuthService;
+        _config = config;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Get available authentication providers on this server.
+    /// This endpoint is public (no auth required) to show/hide GitHub button on login page.
+    /// </summary>
+    [HttpGet("providers")]
+    [DisableRateLimiting]
+    [ProducesResponseType(typeof(ApiResponse<AuthProvidersDto>), StatusCodes.Status200OK)]
+    public ActionResult<ApiResponse<AuthProvidersDto>> GetProviders()
+    {
+        return Success(new AuthProvidersDto
+        {
+            GitHub = !string.IsNullOrEmpty(_config.Auth?.GitHubClientId)
+        });
     }
 
     /// <summary>
@@ -433,6 +452,129 @@ public class AuthController : ApiControllerBase
         }
 
         return Success("GitHub account unlinked successfully");
+    }
+
+    // In-memory store for GitHub link codes (short-lived, 5 minutes)
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (int UserId, DateTime ExpiresAt)> _linkCodes = new();
+
+    /// <summary>
+    /// Initiate GitHub account linking - generates a short-lived code for the redirect.
+    /// Call this first, then redirect to /api/auth/github/link?code={code}
+    /// </summary>
+    [HttpPost("github/link/initiate")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse<GitHubLinkInitiateResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public ActionResult<ApiResponse<GitHubLinkInitiateResponse>> InitiateGitHubLink()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(Problem(
+                title: "Unauthorized",
+                detail: "Invalid authentication token",
+                statusCode: StatusCodes.Status401Unauthorized,
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+            ));
+        }
+
+        // Clean up expired codes
+        var expiredCodes = _linkCodes.Where(kvp => kvp.Value.ExpiresAt < DateTime.UtcNow).Select(kvp => kvp.Key).ToList();
+        foreach (var code in expiredCodes)
+        {
+            _linkCodes.TryRemove(code, out _);
+        }
+
+        // Generate a short-lived code
+        var linkCode = Guid.NewGuid().ToString("N");
+        _linkCodes[linkCode] = (userId, DateTime.UtcNow.AddMinutes(5));
+
+        return Success(new GitHubLinkInitiateResponse(linkCode));
+    }
+
+    /// <summary>
+    /// Link GitHub account to current user - initiates OAuth flow.
+    /// For email users who want to add GitHub login capability.
+    /// Requires a link code from /api/auth/github/link/initiate
+    /// </summary>
+    [HttpGet("github/link")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public IActionResult LinkGitHub([FromQuery] string? code)
+    {
+        int userId;
+
+        // Try to get user ID from link code (primary method for browser redirects)
+        if (!string.IsNullOrEmpty(code) && _linkCodes.TryRemove(code, out var linkData))
+        {
+            if (linkData.ExpiresAt < DateTime.UtcNow)
+            {
+                return BadRequest(Problem(
+                    title: "Link Expired",
+                    detail: "The GitHub link code has expired. Please try again.",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_EXPIRED.ToLowerInvariant().Replace('_', '-')}"
+                ));
+            }
+            userId = linkData.UserId;
+        }
+        // Fallback: Try JWT auth (for direct API calls)
+        else if (User.Identity?.IsAuthenticated == true)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out userId))
+            {
+                return Unauthorized(Problem(
+                    title: "Unauthorized",
+                    detail: "Invalid authentication token",
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    type: $"https://lrm-cloud.com/errors/{ErrorCodes.AUTH_TOKEN_INVALID.ToLowerInvariant().Replace('_', '-')}"
+                ));
+            }
+        }
+        else
+        {
+            return BadRequest(Problem(
+                title: "Missing Link Code",
+                detail: "A valid link code is required. Please initiate the linking process from your profile.",
+                statusCode: StatusCodes.Status400BadRequest,
+                type: $"https://lrm-cloud.com/errors/{ErrorCodes.VAL_REQUIRED_FIELD.ToLowerInvariant().Replace('_', '-')}"
+            ));
+        }
+
+        try
+        {
+            // Generate authorization URL with link prefix in state
+            var (authorizationUrl, state) = _githubAuthService.GetAuthorizationUrl($"link:{userId}");
+
+            // Store state in cookie for CSRF validation
+            Response.Cookies.Append("github_oauth_state", state, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Lax,
+                MaxAge = TimeSpan.FromMinutes(10)
+            });
+
+            return Redirect(authorizationUrl);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex, "GitHub OAuth not configured");
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                Problem(
+                    title: "Service Unavailable",
+                    detail: "GitHub OAuth is not configured on this server",
+                    statusCode: StatusCodes.Status500InternalServerError,
+                    type: $"https://lrm-cloud.com/errors/{ErrorCodes.SRV_INTERNAL_ERROR.ToLowerInvariant().Replace('_', '-')}"
+                )
+            );
+        }
     }
 
     // ============================================================================

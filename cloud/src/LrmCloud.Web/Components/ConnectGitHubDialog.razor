@@ -1,0 +1,497 @@
+@using LrmCloud.Shared.DTOs.GitHub
+@inject GitHubIntegrationService GitHubService
+@inject NotificationService NotificationService
+
+<RadzenStack Gap="1.5rem">
+    @if (_isLoading)
+    {
+        <RadzenStack AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.Center" Style="min-height: 200px;">
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+            <RadzenText>Checking GitHub connection...</RadzenText>
+        </RadzenStack>
+    }
+    else if (_step == 0)
+    {
+        @* Step 0: Token Source Selection *@
+        <RadzenText TextStyle="TextStyle.Subtitle1">Choose how to connect</RadzenText>
+
+        <RadzenStack Gap="0.75rem">
+            @if (_availableTokens?.UserTokenAvailable == true)
+            {
+                <RadzenCard Style="@($"cursor: pointer; border: 2px solid {(_selectedTokenSource == "user" ? "var(--rz-primary)" : "transparent")};")"
+                            @onclick="@(() => _selectedTokenSource = "user")">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                        <RadzenIcon Icon="@(_selectedTokenSource == "user" ? "radio_button_checked" : "radio_button_unchecked")"
+                                    Style="@($"color: {(_selectedTokenSource == "user" ? "var(--rz-primary)" : "var(--rz-text-secondary-color)")}")" />
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Body1" class="rz-mb-0">
+                                <strong>Your GitHub Account</strong>
+                                @if (!string.IsNullOrEmpty(_availableTokens.UserGitHubLogin))
+                                {
+                                    <text> (@@@_availableTokens.UserGitHubLogin)</text>
+                                }
+                            </RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Use your personal OAuth connection
+                            </RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+            }
+
+            @if (_availableTokens?.OrganizationTokenAvailable == true)
+            {
+                <RadzenCard Style="@($"cursor: pointer; border: 2px solid {(_selectedTokenSource == "organization" ? "var(--rz-primary)" : "transparent")};")"
+                            @onclick="@(() => _selectedTokenSource = "organization")">
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                        <RadzenIcon Icon="@(_selectedTokenSource == "organization" ? "radio_button_checked" : "radio_button_unchecked")"
+                                    Style="@($"color: {(_selectedTokenSource == "organization" ? "var(--rz-primary)" : "var(--rz-text-secondary-color)")}")" />
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Body1" class="rz-mb-0">
+                                <strong>Organization Token</strong>
+                                @if (!string.IsNullOrEmpty(_availableTokens.OrganizationName))
+                                {
+                                    <text> (@_availableTokens.OrganizationName)</text>
+                                }
+                            </RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Shared access for all organization members
+                                @if (!string.IsNullOrEmpty(_availableTokens.OrganizationConnectedBy))
+                                {
+                                    <text> (connected by @@@_availableTokens.OrganizationConnectedBy)</text>
+                                }
+                            </RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+            }
+
+            <RadzenCard Style="@($"cursor: pointer; border: 2px solid {(_selectedTokenSource == "pat" ? "var(--rz-primary)" : "transparent")};")"
+                        @onclick="@(() => _selectedTokenSource = "pat")">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="1rem">
+                    <RadzenIcon Icon="@(_selectedTokenSource == "pat" ? "radio_button_checked" : "radio_button_unchecked")"
+                                Style="@($"color: {(_selectedTokenSource == "pat" ? "var(--rz-primary)" : "var(--rz-text-secondary-color)")}")" />
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenText TextStyle="TextStyle.Body1" class="rz-mb-0">
+                            <strong>Personal Access Token (PAT)</strong>
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            Project-specific token with custom permissions
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenStack>
+
+        @if (!_availableTokens?.UserTokenAvailable == true && !_availableTokens?.OrganizationTokenAvailable == true)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info" AllowClose="false" Shade="Shade.Lighter">
+                <RadzenStack Gap="0.25rem">
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-0">
+                        No OAuth tokens available. You can connect your GitHub account in your
+                        <RadzenLink Path="settings/profile" Text="Profile Settings" />, or use a Personal Access Token below.
+                    </RadzenText>
+                </RadzenStack>
+            </RadzenAlert>
+        }
+
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" />
+            <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Text="Next"
+                          Click="@ProceedFromTokenSelection" Disabled="@(string.IsNullOrEmpty(_selectedTokenSource))" />
+        </RadzenStack>
+    }
+    else if (_selectedTokenSource == "pat")
+    {
+        @* PAT Mode: Manual entry *@
+        <RadzenText TextStyle="TextStyle.Subtitle1">Connect with Personal Access Token</RadzenText>
+
+        <RadzenAlert AlertStyle="AlertStyle.Info" AllowClose="false" Shade="Shade.Lighter">
+            Create a PAT with <code>repo</code> scope at
+            <RadzenLink Path="https://github.com/settings/tokens/new" Target="_blank">GitHub Settings</RadzenLink>
+        </RadzenAlert>
+
+        <RadzenFormField Text="Personal Access Token" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+            <RadzenPassword @bind-Value="_pat" Disabled="_isConnecting" Style="width: 100%;" Placeholder="ghp_..." />
+        </RadzenFormField>
+
+        <RadzenFormField Text="Repository" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="_repoFullName" Disabled="_isConnecting" Style="width: 100%;" Placeholder="owner/repo" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">e.g., myorg/myproject</RadzenText>
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Branch" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="_branch" Disabled="_isConnecting" Style="width: 100%;" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Default branch to sync with</RadzenText>
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Base Path (Optional)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="_basePath" Disabled="_isConnecting" Style="width: 100%;" Placeholder="src/locales" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Path to localization files in the repository</RadzenText>
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" Disabled="_isConnecting" />
+            <RadzenButton Variant="Radzen.Variant.Text" Text="Back" Click="@(() => _step = 0)" Disabled="_isConnecting" />
+            <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Text="Connect"
+                          Click="@ConnectWithPat" Disabled="@(string.IsNullOrEmpty(_pat) || string.IsNullOrEmpty(_repoFullName) || _isConnecting)"
+                          IsBusy="_isConnecting" />
+        </RadzenStack>
+    }
+    else if (_selectedTokenSource == "user" || _selectedTokenSource == "organization")
+    {
+        @* OAuth Mode: Select from available repos *@
+        <RadzenAlert AlertStyle="AlertStyle.Success" AllowClose="false" Shade="Shade.Lighter">
+            @if (_selectedTokenSource == "user" && !string.IsNullOrEmpty(_availableTokens?.UserGitHubLogin))
+            {
+                <text>Using your GitHub account: <strong>@@@_availableTokens.UserGitHubLogin</strong></text>
+            }
+            else if (_selectedTokenSource == "organization" && !string.IsNullOrEmpty(_availableTokens?.OrganizationName))
+            {
+                <text>Using organization token: <strong>@_availableTokens.OrganizationName</strong></text>
+            }
+        </RadzenAlert>
+
+        @if (_step == 1)
+        {
+            @* Step 1: Select Repository *@
+            <RadzenText TextStyle="TextStyle.Subtitle1">Select Repository</RadzenText>
+
+            @if (_repositories == null)
+            {
+                <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+            }
+            else if (!_repositories.Any())
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false">
+                    No repositories found. Make sure your GitHub account has access to repositories.
+                </RadzenAlert>
+            }
+            else
+            {
+                <RadzenFormField Text="Repository" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <RadzenDropDown @bind-Value="_selectedRepo" Data="@_repositories" TextProperty="FullName"
+                                    ValueProperty="FullName" Placeholder="Select a repository" Style="width: 100%;"
+                                    Change="@OnRepoSelected" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                    AllowFiltering="true" />
+                </RadzenFormField>
+            }
+
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" />
+                <RadzenButton Variant="Radzen.Variant.Text" Text="Back" Click="@(() => _step = 0)" />
+                <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Text="Next"
+                              Click="@(() => _step = 2)" Disabled="@(string.IsNullOrEmpty(_selectedRepo))" />
+            </RadzenStack>
+        }
+        else if (_step == 2)
+        {
+            @* Step 2: Select Branch *@
+            <RadzenText TextStyle="TextStyle.Subtitle1">Select Branch</RadzenText>
+
+            @if (_branches == null)
+            {
+                <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+            }
+            else
+            {
+                <RadzenFormField Text="Branch" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <RadzenDropDown @bind-Value="_branch" Data="@_branches" TextProperty="Name"
+                                    ValueProperty="Name" Placeholder="Select a branch" Style="width: 100%;"
+                                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" AllowFiltering="true" />
+                </RadzenFormField>
+            }
+
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" />
+                <RadzenButton Variant="Radzen.Variant.Text" Text="Back" Click="@(() => _step = 1)" />
+                <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Text="Next"
+                              Click="@DetectLocalization" Disabled="@(string.IsNullOrEmpty(_branch))" IsBusy="_isDetecting" />
+            </RadzenStack>
+        }
+        else if (_step == 3)
+        {
+            @* Step 3: Configure Path *@
+            <RadzenText TextStyle="TextStyle.Subtitle1">Configure Path</RadzenText>
+
+            @if (_detectionResult != null && _detectionResult.DetectedPaths.Any())
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Success" AllowClose="false" Shade="Shade.Lighter">
+                    Found @_detectionResult.DetectedPaths.Count localization path(s)
+                </RadzenAlert>
+
+                <RadzenFormField Text="Localization Path" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <RadzenDropDown @bind-Value="_basePath" Data="@_detectionResult.DetectedPaths"
+                                    TextProperty="Path" ValueProperty="Path" Style="width: 100%;"
+                                    Placeholder="Select detected path or enter custom">
+                        <Template Context="item">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+                                <span>@item.Path</span>
+                                <RadzenBadge Text="@item.Format" />
+                                <RadzenText TextStyle="TextStyle.Caption">(@item.FileCount files)</RadzenText>
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDropDown>
+                </RadzenFormField>
+            }
+            else
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Info" AllowClose="false" Shade="Shade.Lighter">
+                    No localization files detected. Enter the path manually.
+                </RadzenAlert>
+            }
+
+            <RadzenFormField Text="Custom Path" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="_basePath" Style="width: 100%;" Placeholder="e.g., src/locales" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        Leave empty for repository root
+                    </RadzenText>
+                </Helper>
+            </RadzenFormField>
+
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Cancel" Disabled="_isConnecting" />
+                <RadzenButton Variant="Radzen.Variant.Text" Text="Back" Click="@(() => _step = 2)" Disabled="_isConnecting" />
+                <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Text="Connect"
+                              Click="@ConnectWithOAuth" IsBusy="_isConnecting" Disabled="_isConnecting" />
+            </RadzenStack>
+        }
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="true" Close="@(() => _errorMessage = null)">
+            @_errorMessage
+        </RadzenAlert>
+    }
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    [CascadingParameter]
+    public Radzen.DialogService? DialogService { get; set; }
+
+    // Token sources
+    private AvailableTokenSources? _availableTokens;
+    private string? _selectedTokenSource;
+
+    private GitHubTokenStatus? _tokenStatus;
+    private List<GitHubRepoDto>? _repositories;
+    private List<GitHubBranchDto>? _branches;
+    private DetectLocalizationResult? _detectionResult;
+
+    private int _step = 0; // Start with token source selection
+    private string? _selectedRepo;
+    private string _branch = "main";
+    private string? _basePath;
+    private string? _pat;
+    private string? _repoFullName;
+
+    private bool _isLoading = true;
+    private bool _isConnecting;
+    private bool _isDetecting;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAvailableTokensAsync();
+    }
+
+    private async Task LoadAvailableTokensAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _availableTokens = await GitHubService.GetAvailableTokenSourcesAsync(ProjectId);
+
+            // Pre-select the best available option
+            if (_availableTokens?.UserTokenAvailable == true)
+            {
+                _selectedTokenSource = "user";
+            }
+            else if (_availableTokens?.OrganizationTokenAvailable == true)
+            {
+                _selectedTokenSource = "organization";
+            }
+            else
+            {
+                _selectedTokenSource = "pat";
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ProceedFromTokenSelection()
+    {
+        if (_selectedTokenSource == "pat")
+        {
+            // Go directly to PAT entry - set step to -1 to exit step 0 condition
+            _step = -1;
+            return;
+        }
+
+        // For user/org OAuth, load repositories
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            _tokenStatus = await GitHubService.GetTokenStatusAsync();
+            if (_tokenStatus?.Valid == true)
+            {
+                _repositories = await GitHubService.ListRepositoriesAsync();
+                _step = 1; // Go to repo selection
+            }
+            else
+            {
+                _errorMessage = "GitHub token is not valid. Please check your connection.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load repositories: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OnRepoSelected()
+    {
+        if (string.IsNullOrEmpty(_selectedRepo))
+            return;
+
+        var parts = _selectedRepo.Split('/');
+        if (parts.Length != 2)
+            return;
+
+        _branches = await GitHubService.ListBranchesAsync(parts[0], parts[1]);
+
+        // Set default branch
+        var repo = _repositories?.FirstOrDefault(r => r.FullName == _selectedRepo);
+        if (repo != null)
+        {
+            _branch = repo.DefaultBranch;
+        }
+    }
+
+    private async Task DetectLocalization()
+    {
+        if (string.IsNullOrEmpty(_selectedRepo) || string.IsNullOrEmpty(_branch))
+            return;
+
+        _isDetecting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var parts = _selectedRepo.Split('/');
+            _detectionResult = await GitHubService.DetectLocalizationFilesAsync(parts[0], parts[1], _branch);
+
+            if (_detectionResult?.RecommendedPath != null)
+            {
+                _basePath = _detectionResult.RecommendedPath;
+            }
+
+            _step = 3;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Detection failed: {ex.Message}";
+        }
+        finally
+        {
+            _isDetecting = false;
+        }
+    }
+
+    private async Task ConnectWithOAuth()
+    {
+        if (string.IsNullOrEmpty(_selectedRepo) || string.IsNullOrEmpty(_branch))
+            return;
+
+        _isConnecting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var request = new ConnectGitHubRequest(_selectedRepo, _branch, _basePath);
+            var (success, error) = await GitHubService.ConnectRepositoryAsync(ProjectId, request);
+
+            if (success)
+            {
+                DialogService?.Close(true);
+            }
+            else
+            {
+                _errorMessage = error ?? "Failed to connect repository";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isConnecting = false;
+        }
+    }
+
+    private async Task ConnectWithPat()
+    {
+        if (string.IsNullOrEmpty(_pat) || string.IsNullOrEmpty(_repoFullName))
+            return;
+
+        _isConnecting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var request = new ConnectGitHubPatRequest(_repoFullName, _branch, _basePath, _pat);
+            var (success, error) = await GitHubService.ConnectRepositoryWithPatAsync(ProjectId, request);
+
+            if (success)
+            {
+                DialogService?.Close(true);
+            }
+            else
+            {
+                _errorMessage = error ?? "Failed to connect repository";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isConnecting = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService?.Close(false);
+    }
+}

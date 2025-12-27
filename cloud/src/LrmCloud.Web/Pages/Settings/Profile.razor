@@ -1,8 +1,10 @@
 @page "/settings/profile"
 @attribute [Authorize]
 @using LrmCloud.Shared.DTOs.Auth
+@using LrmCloud.Shared.DTOs.GitHub
 @using LrmCloud.Web.Services
 @inject AuthService AuthService
+@inject GitHubIntegrationService GitHubService
 @inject NotificationService NotificationService
 @inject NavigationManager NavigationManager
 @inject Radzen.DialogService DialogService
@@ -141,6 +143,93 @@ else
         </RadzenDataGrid>
     </RadzenCard>
 
+    <!-- GitHub Account Card -->
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+            <RadzenIcon Icon="code" />
+            <RadzenText TextStyle="TextStyle.H6">GitHub Account</RadzenText>
+        </RadzenStack>
+
+        @if (_isLoadingGitHub)
+        {
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+        }
+        else if (_gitHubStatus?.Connected == true)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Success" AllowClose="false" Shade="Shade.Lighter" class="rz-mb-4">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="check_circle" />
+                    <RadzenText TextStyle="TextStyle.Body1" class="rz-mb-0">
+                        Connected
+                        @if (!string.IsNullOrEmpty(_gitHubStatus.GitHubLogin))
+                        {
+                            <text> as <strong>@@@_gitHubStatus.GitHubLogin</strong></text>
+                        }
+                    </RadzenText>
+                </RadzenStack>
+            </RadzenAlert>
+
+            <RadzenRow Gap="1rem" class="rz-mb-4">
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Repository Access</RadzenText>
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                            @if (_gitHubStatus.HasRepoScope)
+                            {
+                                <RadzenIcon Icon="check" Style="color: var(--rz-success); font-size: 1rem;" />
+                                <RadzenText>Full repository access</RadzenText>
+                            }
+                            else
+                            {
+                                <RadzenIcon Icon="warning" Style="color: var(--rz-warning); font-size: 1rem;" />
+                                <RadzenText>Limited access</RadzenText>
+                            }
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Projects Using Token</RadzenText>
+                        <RadzenText>@_gitHubStatus.ProjectsUsingToken project(s)</RadzenText>
+                    </RadzenStack>
+                </RadzenColumn>
+            </RadzenRow>
+
+            @if (_gitHubStatus.ProjectsUsingToken > 0)
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false" Shade="Shade.Lighter" class="rz-mb-4">
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-0">
+                        @_gitHubStatus.ProjectsUsingToken project(s) are using your GitHub token.
+                        You must reconfigure those projects before disconnecting.
+                    </RadzenText>
+                </RadzenAlert>
+            }
+
+            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Danger"
+                          Text="Disconnect GitHub" Icon="link_off"
+                          Click="@DisconnectGitHubAsync"
+                          Disabled="@(_isDisconnectingGitHub || _gitHubStatus.ProjectsUsingToken > 0)"
+                          IsBusy="@_isDisconnectingGitHub" />
+        }
+        else
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info" AllowClose="false" Shade="Shade.Lighter" class="rz-mb-4">
+                <RadzenStack Gap="0.5rem">
+                    <RadzenText TextStyle="TextStyle.Body1" class="rz-mb-0">
+                        <strong>GitHub not connected</strong>
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2">
+                        Connect your GitHub account to enable repository sync for your projects without entering Personal Access Tokens.
+                    </RadzenText>
+                </RadzenStack>
+            </RadzenAlert>
+
+            <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary"
+                          Text="Connect GitHub Account" Icon="link"
+                          Click="@ConnectGitHubAsync" />
+        }
+    </RadzenCard>
+
     <!-- Change Password Card (only for email auth) -->
     @if (_profile.AuthType == "email")
     {
@@ -223,6 +312,11 @@ else
     private string _newPassword = string.Empty;
     private string _confirmPassword = string.Empty;
 
+    // GitHub
+    private UserGitHubStatus? _gitHubStatus;
+    private bool _isLoadingGitHub;
+    private bool _isDisconnectingGitHub;
+
     // Helper class for account info display
     private class AccountInfo
     {
@@ -232,7 +326,10 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadProfileAsync();
+        // Load profile and GitHub status in parallel
+        var profileTask = LoadProfileAsync();
+        var githubTask = LoadGitHubStatusAsync();
+        await Task.WhenAll(profileTask, githubTask);
     }
 
     private IEnumerable<AccountInfo> GetAccountInfo()
@@ -346,4 +443,74 @@ else
         "team" => BadgeStyle.Secondary,
         _ => BadgeStyle.Light
     };
+
+    // GitHub methods
+    private async Task LoadGitHubStatusAsync()
+    {
+        _isLoadingGitHub = true;
+        try
+        {
+            _gitHubStatus = await GitHubService.GetUserGitHubStatusAsync();
+        }
+        catch
+        {
+            // Ignore errors - just show not connected
+            _gitHubStatus = null;
+        }
+        _isLoadingGitHub = false;
+    }
+
+    private async Task ConnectGitHubAsync()
+    {
+        // First, initiate the link to get a short-lived code
+        var (success, code, error) = await AuthService.InitiateGitHubLinkAsync();
+
+        if (!success || string.IsNullOrEmpty(code))
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", error ?? "Failed to initiate GitHub linking");
+            return;
+        }
+
+        // Then redirect to the link endpoint with the code
+        NavigationManager.NavigateTo($"/api/auth/github/link?code={code}", forceLoad: true);
+    }
+
+    private async Task DisconnectGitHubAsync()
+    {
+        // Double-check projects aren't using the token
+        if (_gitHubStatus?.ProjectsUsingToken > 0)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Cannot Disconnect",
+                $"{_gitHubStatus.ProjectsUsingToken} project(s) are using your GitHub token. Reconfigure them first.");
+            return;
+        }
+
+        var confirmed = await DialogService.Confirm(
+            "Are you sure you want to disconnect your GitHub account? Projects using your token will need to be reconfigured.",
+            "Disconnect GitHub",
+            new Radzen.ConfirmOptions { OkButtonText = "Disconnect", CancelButtonText = "Cancel" });
+
+        if (confirmed != true)
+            return;
+
+        _isDisconnectingGitHub = true;
+        try
+        {
+            var result = await AuthService.UnlinkGitHubAsync();
+            if (result.IsSuccess)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "GitHub account disconnected");
+                _gitHubStatus = null;
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to disconnect GitHub");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+        _isDisconnectingGitHub = false;
+    }
 }

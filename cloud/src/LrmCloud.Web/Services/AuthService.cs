@@ -308,6 +308,47 @@ public class AuthService
         }
     }
 
+    public async Task<AuthResult> UnlinkGitHubAsync()
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync("auth/github/unlink", null);
+            if (response.IsSuccessStatusCode)
+            {
+                return AuthResult.Success(null, "GitHub account disconnected");
+            }
+            var error = await ReadErrorMessageAsync(response);
+            return AuthResult.Failure(error);
+        }
+        catch (Exception ex)
+        {
+            return AuthResult.Failure($"Failed to unlink GitHub: {ex.Message}");
+        }
+    }
+
+    public async Task<(bool Success, string? Code, string? Error)> InitiateGitHubLinkAsync()
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync("auth/github/link/initiate", null);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<GitHubLinkInitiateResponse>>();
+                if (result?.Data?.Code != null)
+                {
+                    return (true, result.Data.Code, null);
+                }
+                return (false, null, "Failed to get link code");
+            }
+            var error = await ReadErrorMessageAsync(response);
+            return (false, null, error);
+        }
+        catch (Exception ex)
+        {
+            return (false, null, $"Failed to initiate GitHub link: {ex.Message}");
+        }
+    }
+
     public async Task<AuthResult> DeleteAccountAsync(DeleteAccountRequest request)
     {
         try

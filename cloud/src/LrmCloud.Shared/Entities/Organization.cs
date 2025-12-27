@@ -50,6 +50,23 @@ public class Organization
     [Column("payment_provider")]
     public string? PaymentProvider { get; set; }
 
+    // GitHub integration (organization-level token)
+    /// <summary>
+    /// Encrypted GitHub access token for organization-wide repository access.
+    /// Used as fallback when project doesn't have its own token.
+    /// </summary>
+    [Column("github_access_token_encrypted")]
+    public string? GitHubAccessTokenEncrypted { get; set; }
+
+    /// <summary>
+    /// User ID who connected the organization's GitHub account.
+    /// </summary>
+    [Column("github_connected_by_user_id")]
+    public int? GitHubConnectedByUserId { get; set; }
+
+    [ForeignKey(nameof(GitHubConnectedByUserId))]
+    public User? GitHubConnectedByUser { get; set; }
+
     [Column("translation_chars_used")]
     public int TranslationCharsUsed { get; set; }
 

@@ -62,6 +62,30 @@ public class Project
     [Column("github_webhook_secret")]
     public string? GitHubWebhookSecret { get; set; }
 
+    /// <summary>
+    /// Path in the GitHub repo where resource files are located.
+    /// Same semantics as CLI --path (folder containing resource files).
+    /// </summary>
+    [MaxLength(500)]
+    [Column("github_base_path")]
+    public string? GitHubBasePath { get; set; }
+
+    /// <summary>
+    /// Encrypted GitHub access token for project-specific access (e.g., PAT).
+    /// Checked before organization token and user's OAuth token.
+    /// </summary>
+    [Column("github_access_token_encrypted")]
+    public string? GitHubAccessTokenEncrypted { get; set; }
+
+    /// <summary>
+    /// User ID who connected this project to GitHub.
+    /// </summary>
+    [Column("github_connected_by_user_id")]
+    public int? GitHubConnectedByUserId { get; set; }
+
+    [ForeignKey(nameof(GitHubConnectedByUserId))]
+    public User? GitHubConnectedByUser { get; set; }
+
     // Localization settings
     [MaxLength(500)]
     [Column("localization_path")]
@@ -94,6 +118,20 @@ public class Project
     [MaxLength(40)]
     [Column("last_synced_commit")]
     public string? LastSyncedCommit { get; set; }
+
+    // GitHub Pull tracking
+    /// <summary>
+    /// When translations were last pulled from GitHub.
+    /// </summary>
+    [Column("last_github_pull_at")]
+    public DateTime? LastGitHubPullAt { get; set; }
+
+    /// <summary>
+    /// Git commit SHA from the last pull from GitHub.
+    /// </summary>
+    [MaxLength(40)]
+    [Column("last_github_pull_commit")]
+    public string? LastGitHubPullCommit { get; set; }
 
     [MaxLength(50)]
     [Column("sync_status")]
@@ -192,4 +230,5 @@ public class Project
     public ICollection<SyncHistory> SyncHistory { get; set; } = new List<SyncHistory>();
     public ICollection<Snapshot> Snapshots { get; set; } = new List<Snapshot>();
     public ICollection<ProjectReviewer> Reviewers { get; set; } = new List<ProjectReviewer>();
+    public ICollection<GitHubSyncState> GitHubSyncStates { get; set; } = new List<GitHubSyncState>();
 }
