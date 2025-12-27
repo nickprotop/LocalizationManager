@@ -215,4 +215,44 @@ public static class UiHelpers
             parts.Add($"{project.ValidationWarnings} warning{(project.ValidationWarnings != 1 ? "s" : "")}");
         return string.Join(", ", parts);
     }
+
+    // ==========================================================================
+    // GitHub Sync Status Helpers
+    // ==========================================================================
+
+    /// <summary>
+    /// Gets Radzen BadgeStyle based on GitHub sync status.
+    /// </summary>
+    public static BadgeStyle GetGitHubStatusBadgeStyle(string? syncStatus) => syncStatus switch
+    {
+        "idle" => BadgeStyle.Success,
+        "syncing" => BadgeStyle.Info,
+        "pending" => BadgeStyle.Warning,
+        "error" => BadgeStyle.Danger,
+        _ => BadgeStyle.Light
+    };
+
+    /// <summary>
+    /// Gets Material icon name for GitHub sync status.
+    /// </summary>
+    public static string GetGitHubStatusIcon(string? syncStatus) => syncStatus switch
+    {
+        "idle" => "check_circle",
+        "syncing" => "autorenew",
+        "pending" => "schedule",
+        "error" => "error",
+        _ => "link"
+    };
+
+    /// <summary>
+    /// Gets CSS color style for GitHub sync status.
+    /// </summary>
+    public static string GetGitHubStatusColor(string? syncStatus) => syncStatus switch
+    {
+        "idle" => "color: var(--rz-success);",
+        "syncing" => "color: var(--rz-info);",
+        "pending" => "color: var(--rz-warning);",
+        "error" => "color: var(--rz-danger);",
+        _ => "color: var(--rz-secondary);"
+    };
 }

@@ -1,10 +1,12 @@
 @page "/"
 @attribute [Authorize]
 @using LrmCloud.Shared.DTOs.Usage
+@using LrmCloud.Shared.DTOs.GitHub
 @using LrmCloud.Web.Helpers
 @using LrmCloud.Web.Components
 @inject ProjectService ProjectService
 @inject UsageService UsageService
+@inject GitHubIntegrationService GitHubService
 @inject OrganizationContextService OrgContext
 @inject NavigationManager Navigation
 @inject NotificationService NotificationService
@@ -87,6 +89,25 @@ else
                 </RadzenStack>
             </RadzenCard>
         </RadzenColumn>
+        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+            <RadzenCard Style="cursor: pointer;" @onclick="NavigateToGitHubSettings">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
+                    <div>
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">GitHub</RadzenText>
+                        @if (_gitHubStatus?.Connected == true)
+                        {
+                            <RadzenText TextStyle="TextStyle.H6">@@@_gitHubStatus.GitHubLogin</RadzenText>
+                        }
+                        else
+                        {
+                            <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary">Not Connected</RadzenText>
+                        }
+                    </div>
+                    <RadzenIcon Icon="@(_gitHubStatus?.Connected == true ? "check_circle" : "link_off")"
+                               Style="@($"font-size: 2rem; color: var(--rz-{(_gitHubStatus?.Connected == true ? "success" : "secondary")});")" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
     </RadzenRow>
 }
 
@@ -137,6 +158,16 @@ else
                         </div>
                         <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem" AlignItems="Radzen.AlignItems.Center">
                             <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(project.Format)" Text="@project.Format" />
+                            @if (!string.IsNullOrEmpty(project.GitHubRepo))
+                            {
+                                <span @onclick="() => NavigateToGitHub(project.Id)" @onclick:stopPropagation="true">
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Dark"
+                                                 Style="cursor: pointer;"
+                                                 Title="@project.GitHubRepo">
+                                        <RadzenIcon Icon="@UiHelpers.GetGitHubStatusIcon(project.SyncStatus)" Style="font-size: 0.875rem;" />
+                                    </RadzenBadge>
+                                </span>
+                            }
                             @if (project.ValidationErrors > 0 || project.ValidationWarnings > 0)
                             {
                                 <span title="@UiHelpers.GetValidationTooltip(project)" style="display: flex; gap: 0.125rem;">
@@ -186,6 +217,7 @@ else
     private List<ProjectDto> _filteredProjects = new();
     private DashboardStats _stats = new();
     private UsageStatsDto? _usageStats;
+    private UserGitHubStatus? _gitHubStatus;
     private bool _isLoading = true;
 
     protected override async Task OnInitializedAsync()
@@ -210,6 +242,7 @@ else
             FilterProjects();
             _stats = await ProjectService.GetDashboardStatsAsync();
             _usageStats = await UsageService.GetStatsAsync();
+            _gitHubStatus = await GitHubService.GetUserGitHubStatusAsync();
         }
         catch (Exception ex)
         {
@@ -290,6 +323,16 @@ else
     private void NavigateToEditor(int projectId)
     {
         Navigation.NavigateTo($"projects/{projectId}/editor");
+    }
+
+    private void NavigateToGitHub(int projectId)
+    {
+        Navigation.NavigateTo($"projects/{projectId}/github");
+    }
+
+    private void NavigateToGitHubSettings()
+    {
+        Navigation.NavigateTo("settings/profile");
     }
 
     private string FormatLrmUsage()

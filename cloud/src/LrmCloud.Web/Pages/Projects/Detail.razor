@@ -35,6 +35,15 @@ else
             <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Click="@(() => Navigation.NavigateTo(""))" Size="ButtonSize.Small" />
             <RadzenText TextStyle="TextStyle.H4">@_project.Name</RadzenText>
             <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(_project.Format)" Text="@_project.Format" />
+            @if (!string.IsNullOrEmpty(_project.GitHubRepo))
+            {
+                <RadzenBadge BadgeStyle="BadgeStyle.Dark"
+                             Style="cursor: pointer;"
+                             Title="@_project.GitHubRepo"
+                             Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/github"))">
+                    <RadzenIcon Icon="@UiHelpers.GetGitHubStatusIcon(_project.SyncStatus)" Style="font-size: 0.875rem;" /> GitHub
+                </RadzenBadge>
+            }
         </RadzenStack>
 
         <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
@@ -253,8 +262,18 @@ else
             @if (!string.IsNullOrEmpty(_project.GitHubRepo))
             {
                 <RadzenColumn Size="12" SizeSM="6">
-                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">GitHub Repository</RadzenText>
-                    <RadzenLink Path="@($"https://github.com/{_project.GitHubRepo}")" Target="_blank" Text="@_project.GitHubRepo" />
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">GitHub</RadzenText>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" AlignItems="Radzen.AlignItems.Center">
+                        <RadzenIcon Icon="@UiHelpers.GetGitHubStatusIcon(_project.SyncStatus)"
+                                   Style="@UiHelpers.GetGitHubStatusColor(_project.SyncStatus)" />
+                        <RadzenLink Path="@($"projects/{ProjectId}/github")" Text="@_project.GitHubRepo" />
+                    </RadzenStack>
+                    @if (_project.LastSyncedAt.HasValue)
+                    {
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            Last synced @UiHelpers.GetRelativeTime(_project.LastSyncedAt.Value)
+                        </RadzenText>
+                    }
                 </RadzenColumn>
                 <RadzenColumn Size="12" SizeSM="6">
                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Default Branch</RadzenText>

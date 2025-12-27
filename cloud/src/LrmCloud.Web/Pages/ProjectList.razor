@@ -67,6 +67,16 @@ else
                         </div>
                         <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem" AlignItems="Radzen.AlignItems.Center">
                             <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(project.Format)" Text="@project.Format" />
+                            @if (!string.IsNullOrEmpty(project.GitHubRepo))
+                            {
+                                <span @onclick="() => NavigateToGitHub(project.Id)" @onclick:stopPropagation="true">
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Dark"
+                                                 Style="cursor: pointer;"
+                                                 Title="@project.GitHubRepo">
+                                        <RadzenIcon Icon="@UiHelpers.GetGitHubStatusIcon(project.SyncStatus)" Style="font-size: 0.875rem;" />
+                                    </RadzenBadge>
+                                </span>
+                            }
                             @if (project.ValidationErrors > 0 || project.ValidationWarnings > 0)
                             {
                                 <span title="@UiHelpers.GetValidationTooltip(project)" style="display: flex; gap: 0.125rem;">
@@ -195,5 +205,10 @@ else
     private void NavigateToEditor(int projectId)
     {
         Navigation.NavigateTo($"projects/{projectId}/editor");
+    }
+
+    private void NavigateToGitHub(int projectId)
+    {
+        Navigation.NavigateTo($"projects/{projectId}/github");
     }
 }
