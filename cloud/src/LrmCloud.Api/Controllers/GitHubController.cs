@@ -211,11 +211,13 @@ public class GitHubController : ApiControllerBase
         if (repository == null)
             return NotFound("repo_not_found", "Repository not found or you don't have access to it");
 
-        // Update project
+        // Update project - reset sync state for fresh connection
         project.GitHubRepo = request.RepoFullName;
         project.GitHubDefaultBranch = request.DefaultBranch;
         project.GitHubBasePath = request.BasePath;
         project.GitHubConnectedByUserId = userId;
+        project.SyncStatus = null; // Reset sync status
+        project.SyncError = null;
         project.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
@@ -231,7 +233,7 @@ public class GitHubController : ApiControllerBase
             BasePath: project.GitHubBasePath,
             LastSyncedAt: project.LastSyncedAt,
             LastPrUrl: null,
-            SyncStatus: project.SyncStatus,
+            SyncStatus: null,
             ConnectionMethod: "oauth",
             ConnectedByUsername: user?.Username
         ));
@@ -264,11 +266,14 @@ public class GitHubController : ApiControllerBase
         // Encrypt and store the PAT
         var encryptedToken = TokenEncryption.Encrypt(request.PersonalAccessToken, _config.Encryption.TokenKey);
 
+        // Reset sync state for fresh connection
         project.GitHubRepo = request.RepoFullName;
         project.GitHubDefaultBranch = request.DefaultBranch;
         project.GitHubBasePath = request.BasePath;
         project.GitHubAccessTokenEncrypted = encryptedToken;
         project.GitHubConnectedByUserId = userId;
+        project.SyncStatus = null; // Reset sync status
+        project.SyncError = null;
         project.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
@@ -284,7 +289,7 @@ public class GitHubController : ApiControllerBase
             BasePath: project.GitHubBasePath,
             LastSyncedAt: project.LastSyncedAt,
             LastPrUrl: null,
-            SyncStatus: project.SyncStatus,
+            SyncStatus: null,
             ConnectionMethod: "pat",
             ConnectedByUsername: user?.Username
         ));
@@ -313,7 +318,7 @@ public class GitHubController : ApiControllerBase
         project.GitHubConnectedByUserId = null;
         project.LastSyncedAt = null;
         project.LastSyncedCommit = null;
-        project.SyncStatus = "pending";
+        project.SyncStatus = null; // Clear sync status on disconnect
         project.SyncError = null;
         project.UpdatedAt = DateTime.UtcNow;
 
