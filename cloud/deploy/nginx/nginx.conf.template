@@ -160,7 +160,7 @@ http {
 
         # Auth pages - no cache (ensure fresh content after deployments)
         location ~ ^/app/(verify-email|reset-password|forgot-password|login|register|accept-invitation|verify-new-email) {
-            proxy_pass http://web/;
+            proxy_pass http://web;
             proxy_http_version 1.1;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
@@ -302,7 +302,7 @@ http {
 
         # Auth pages - no cache (ensure fresh content after deployments)
         location ~ ^/app/(verify-email|reset-password|forgot-password|login|register|accept-invitation|verify-new-email) {
-            proxy_pass http://web/;
+            proxy_pass http://web;
             proxy_http_version 1.1;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
