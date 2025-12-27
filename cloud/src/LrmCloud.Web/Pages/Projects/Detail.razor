@@ -46,12 +46,8 @@ else
             }
         </RadzenStack>
 
-        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
-            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Secondary" Icon="settings"
-                          Text="Settings" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/settings"))" />
-            <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Icon="edit"
-                          Text="Open Editor" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/editor"))" />
-        </RadzenStack>
+        <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Secondary" Icon="settings"
+                      Text="Settings" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/settings"))" />
     </RadzenStack>
 
     @if (!string.IsNullOrEmpty(_project.Description))
@@ -109,7 +105,10 @@ else
     @* Actions *@
     <RadzenCard class="rz-mb-4">
         <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem">
-            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap" AlignItems="Radzen.AlignItems.Center">
+                <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Icon="edit"
+                              Text="Open Editor" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/editor"))" />
+                <span class="toolbar-divider"></span>
                 <RadzenButton Variant="Radzen.Variant.Text" Icon="code" Text="GitHub Sync"
                               Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/github"))" />
                 <RadzenButton Variant="Radzen.Variant.Text" Icon="history" Text="Snapshots"
