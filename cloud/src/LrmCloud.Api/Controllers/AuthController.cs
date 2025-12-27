@@ -407,7 +407,7 @@ public class AuthController : ApiControllerBase
                 if (isLinkOperation)
                 {
                     // Redirect to profile with error
-                    return Redirect($"{_config.Server.BaseUrl}/settings/profile?github_error={Uri.EscapeDataString(errorMessage ?? "Failed to link GitHub account")}");
+                    return Redirect($"{_config.Server.AppBaseUrl}/settings/profile?github_error={Uri.EscapeDataString(errorMessage ?? "Failed to link GitHub account")}");
                 }
                 return BadRequest(ErrorCodes.AUTH_INVALID_CREDENTIALS, errorMessage!);
             }
@@ -415,7 +415,7 @@ public class AuthController : ApiControllerBase
             if (isLinkOperation)
             {
                 // Redirect to profile page with success indicator
-                return Redirect($"{_config.Server.BaseUrl}/settings/profile?github_linked=true");
+                return Redirect($"{_config.Server.AppBaseUrl}/settings/profile?github_linked=true");
             }
 
             // Login operation - return JSON for frontend to handle
@@ -427,7 +427,7 @@ public class AuthController : ApiControllerBase
 
             if (isLinkOperation)
             {
-                return Redirect($"{_config.Server.BaseUrl}/settings/profile?github_error={Uri.EscapeDataString("An error occurred during GitHub authentication")}");
+                return Redirect($"{_config.Server.AppBaseUrl}/settings/profile?github_error={Uri.EscapeDataString("An error occurred during GitHub authentication")}");
             }
 
             return StatusCode(
