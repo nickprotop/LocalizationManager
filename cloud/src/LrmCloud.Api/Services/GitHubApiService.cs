@@ -77,10 +77,31 @@ public class GitHubApiService : IGitHubApiService
             if (file == null || file.Type != ContentType.File)
                 return null;
 
-            // Content is base64 encoded
+            // Octokit returns content that may already be decoded (for small files)
+            // or base64-encoded (from raw API). Check if it looks like base64.
             if (!string.IsNullOrEmpty(file.Content))
             {
-                return Encoding.UTF8.GetString(Convert.FromBase64String(file.Content));
+                // If content starts with typical text file markers, it's already decoded
+                if (file.Content.TrimStart().StartsWith("<?") ||
+                    file.Content.TrimStart().StartsWith("{") ||
+                    file.Content.TrimStart().StartsWith("<"))
+                {
+                    _logger.LogDebug("File content already decoded for {Path}", path);
+                    return file.Content;
+                }
+
+                // Try to decode as base64
+                try
+                {
+                    var cleanBase64 = System.Text.RegularExpressions.Regex.Replace(file.Content, @"\s", "");
+                    return Encoding.UTF8.GetString(Convert.FromBase64String(cleanBase64));
+                }
+                catch (FormatException)
+                {
+                    // Not valid base64, assume it's already decoded text
+                    _logger.LogDebug("Content not base64, returning as-is for {Path}", path);
+                    return file.Content;
+                }
             }
 
             // If content is too large, we need to fetch it via blob API
@@ -88,7 +109,16 @@ public class GitHubApiService : IGitHubApiService
             {
                 var blob = await GitHubRetryPolicy.ExecuteAsync(
                     () => client.Git.Blob.Get(owner, repo, file.Sha), _logger);
-                return Encoding.UTF8.GetString(Convert.FromBase64String(blob.Content));
+
+                // Blob API always returns base64
+                if (blob.Encoding.Value == EncodingType.Base64)
+                {
+                    var cleanBase64 = System.Text.RegularExpressions.Regex.Replace(blob.Content, @"\s", "");
+                    return Encoding.UTF8.GetString(Convert.FromBase64String(cleanBase64));
+                }
+
+                // UTF-8 encoded content
+                return blob.Content;
             }
 
             return null;
