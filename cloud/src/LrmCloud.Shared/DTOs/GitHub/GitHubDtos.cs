@@ -136,6 +136,7 @@ public record GitHubPullResult(
     int EntriesAdded,
     int EntriesDeleted,
     int EntriesUnchanged,
+    int EntriesNeedsReview,
     List<GitHubPullConflict> Conflicts,
     string? CommitSha,
     List<string> ProcessedFiles
@@ -147,7 +148,7 @@ public record GitHubPullResult(
 /// <param name="Key">Resource key name</param>
 /// <param name="LanguageCode">Language code</param>
 /// <param name="PluralForm">Plural form (empty for non-plural)</param>
-/// <param name="ConflictType">Type of conflict: "BothModified", "DeletedInGitHub", "DeletedInCloud"</param>
+/// <param name="ConflictType">Type of conflict: "BothModified", "DeletedInGitHub", "DeletedInCloud", "NeedsReview"</param>
 /// <param name="GitHubValue">Value from GitHub</param>
 /// <param name="CloudValue">Current value in Cloud</param>
 /// <param name="BaseValue">Last synced value (base for three-way merge)</param>
@@ -196,6 +197,7 @@ public record GitHubPullConflictSummary(
     int BothModifiedCount,
     int DeletedInGitHubCount,
     int DeletedInCloudCount,
+    int NeedsReviewCount,
     List<GitHubPullConflict> Conflicts
 );
 

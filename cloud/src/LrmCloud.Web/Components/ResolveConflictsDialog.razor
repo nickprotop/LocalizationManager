@@ -213,9 +213,10 @@
     {
         return conflictType switch
         {
-            "both_modified" => "Both Modified",
-            "deleted_in_github" => "Deleted in GitHub",
-            "deleted_in_cloud" => "Deleted in Cloud",
+            "BothModified" => "Both Modified",
+            "DeletedInGitHub" => "Deleted in GitHub",
+            "DeletedInCloud" => "Deleted in Cloud",
+            "NeedsReview" => "Needs Review",
             _ => conflictType
         };
     }
@@ -224,9 +225,10 @@
     {
         return conflictType switch
         {
-            "both_modified" => BadgeStyle.Warning,
-            "deleted_in_github" => BadgeStyle.Danger,
-            "deleted_in_cloud" => BadgeStyle.Info,
+            "BothModified" => BadgeStyle.Warning,
+            "DeletedInGitHub" => BadgeStyle.Danger,
+            "DeletedInCloud" => BadgeStyle.Info,
+            "NeedsReview" => BadgeStyle.Secondary,
             _ => BadgeStyle.Light
         };
     }

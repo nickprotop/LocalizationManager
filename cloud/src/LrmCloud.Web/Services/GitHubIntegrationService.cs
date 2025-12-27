@@ -258,7 +258,7 @@ public class GitHubIntegrationService
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                return new GitHubPullResult(false, $"Failed to preview: {errorContent}", 0, 0, 0, 0, new List<GitHubPullConflict>(), null, new List<string>());
+                return new GitHubPullResult(false, $"Failed to preview: {errorContent}", 0, 0, 0, 0, 0, new List<GitHubPullConflict>(), null, new List<string>());
             }
 
             var result = await response.Content.ReadFromJsonAsync<ApiResponse<GitHubPullResult>>(_jsonOptions);
@@ -266,7 +266,7 @@ public class GitHubIntegrationService
         }
         catch (Exception ex)
         {
-            return new GitHubPullResult(false, ex.Message, 0, 0, 0, 0, new List<GitHubPullConflict>(), null, new List<string>());
+            return new GitHubPullResult(false, ex.Message, 0, 0, 0, 0, 0, new List<GitHubPullConflict>(), null, new List<string>());
         }
     }
 
@@ -285,7 +285,7 @@ public class GitHubIntegrationService
         }
         catch (Exception ex)
         {
-            return new GitHubPullResult(false, ex.Message, 0, 0, 0, 0, new List<GitHubPullConflict>(), null, new List<string>());
+            return new GitHubPullResult(false, ex.Message, 0, 0, 0, 0, 0, new List<GitHubPullConflict>(), null, new List<string>());
         }
     }
 
@@ -323,7 +323,7 @@ public class GitHubIntegrationService
         }
         catch (Exception ex)
         {
-            return new GitHubPullResult(false, ex.Message, 0, 0, 0, 0, new List<GitHubPullConflict>(), null, new List<string>());
+            return new GitHubPullResult(false, ex.Message, 0, 0, 0, 0, 0, new List<GitHubPullConflict>(), null, new List<string>());
         }
     }
 

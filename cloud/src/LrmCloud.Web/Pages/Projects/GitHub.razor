@@ -193,19 +193,19 @@ else
                     </RadzenStack>
 
                     <RadzenRow Gap="1rem">
-                        <RadzenColumn Size="6" SizeMD="3">
+                        <RadzenColumn Size="6" SizeMD="2">
                             <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0">
                                 <RadzenText TextStyle="TextStyle.H4" class="rz-color-success">@_pullPreview.EntriesAdded</RadzenText>
                                 <RadzenText TextStyle="TextStyle.Caption">Added</RadzenText>
                             </RadzenStack>
                         </RadzenColumn>
-                        <RadzenColumn Size="6" SizeMD="3">
+                        <RadzenColumn Size="6" SizeMD="2">
                             <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0">
                                 <RadzenText TextStyle="TextStyle.H4" class="rz-color-info">@_pullPreview.EntriesApplied</RadzenText>
                                 <RadzenText TextStyle="TextStyle.Caption">Modified</RadzenText>
                             </RadzenStack>
                         </RadzenColumn>
-                        <RadzenColumn Size="6" SizeMD="3">
+                        <RadzenColumn Size="6" SizeMD="2">
                             <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0">
                                 <RadzenText TextStyle="TextStyle.H4" class="rz-color-danger">@_pullPreview.EntriesDeleted</RadzenText>
                                 <RadzenText TextStyle="TextStyle.Caption">Deleted</RadzenText>
@@ -213,7 +213,13 @@ else
                         </RadzenColumn>
                         <RadzenColumn Size="6" SizeMD="3">
                             <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0">
-                                <RadzenText TextStyle="TextStyle.H4" class="rz-color-warning">@_pullPreview.Conflicts.Count</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4" class="rz-color-secondary">@_pullPreview.EntriesNeedsReview</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption">Needs Review</RadzenText>
+                            </RadzenStack>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6" SizeMD="3">
+                            <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0">
+                                <RadzenText TextStyle="TextStyle.H4" class="rz-color-warning">@(_pullPreview.Conflicts.Count - _pullPreview.EntriesNeedsReview)</RadzenText>
                                 <RadzenText TextStyle="TextStyle.Caption">Conflicts</RadzenText>
                             </RadzenStack>
                         </RadzenColumn>

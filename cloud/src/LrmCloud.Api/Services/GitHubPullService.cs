@@ -157,10 +157,11 @@ public class GitHubPullService : IGitHubPullService
                 }
             }
 
-            // 9. Store conflicts for later resolution
-            if (!previewOnly && mergeResult.Conflicts.Any())
+            // 9. Store conflicts and needs review items for later resolution
+            var allPendingItems = mergeResult.Conflicts.Values.Concat(mergeResult.NeedsReview).ToList();
+            if (!previewOnly && allPendingItems.Any())
             {
-                await StorePendingConflictsAsync(projectId, mergeResult.Conflicts.Values, commitSha);
+                await StorePendingConflictsAsync(projectId, allPendingItems, commitSha);
             }
 
             return new GitHubPullResult(
@@ -170,7 +171,8 @@ public class GitHubPullService : IGitHubPullService
                 EntriesAdded: mergeResult.ToAdd.Count,
                 EntriesDeleted: mergeResult.ToDelete.Count,
                 EntriesUnchanged: mergeResult.Unchanged,
-                Conflicts: mergeResult.Conflicts.Select(c => c.Value).ToList(),
+                EntriesNeedsReview: mergeResult.NeedsReview.Count,
+                Conflicts: mergeResult.Conflicts.Select(c => c.Value).Concat(mergeResult.NeedsReview).ToList(),
                 CommitSha: commitSha,
                 ProcessedFiles: githubFiles.Keys.ToList()
             );
@@ -298,6 +300,7 @@ public class GitHubPullService : IGitHubPullService
                 EntriesAdded: 0,
                 EntriesDeleted: 0,
                 EntriesUnchanged: skipped,
+                EntriesNeedsReview: 0,
                 Conflicts: new List<GitHubPullConflict>(),
                 CommitSha: null,
                 ProcessedFiles: new List<string>()
@@ -327,6 +330,7 @@ public class GitHubPullService : IGitHubPullService
                 BothModifiedCount: 0,
                 DeletedInGitHubCount: 0,
                 DeletedInCloudCount: 0,
+                NeedsReviewCount: 0,
                 Conflicts: new List<GitHubPullConflict>()
             );
         }
@@ -348,6 +352,7 @@ public class GitHubPullService : IGitHubPullService
             BothModifiedCount: conflicts.Count(c => c.ConflictType == "BothModified"),
             DeletedInGitHubCount: conflicts.Count(c => c.ConflictType == "DeletedInGitHub"),
             DeletedInCloudCount: conflicts.Count(c => c.ConflictType == "DeletedInCloud"),
+            NeedsReviewCount: conflicts.Count(c => c.ConflictType == "NeedsReview"),
             Conflicts: conflicts
         );
     }
@@ -357,7 +362,7 @@ public class GitHubPullService : IGitHubPullService
     // ============================================================================
 
     private static GitHubPullResult CreateErrorResult(string message) =>
-        new(false, message, 0, 0, 0, 0, new List<GitHubPullConflict>(), null, new List<string>());
+        new(false, message, 0, 0, 0, 0, 0, new List<GitHubPullConflict>(), null, new List<string>());
 
     /// <summary>
     /// Stores pending conflicts in the database for later resolution.
@@ -597,8 +602,8 @@ public class GitHubPullService : IGitHubPullService
                 }
                 else if (!hasBase)
                 {
-                    // No base - this is a new sync, conflict
-                    result.Conflicts[key] = CreateConflict(key, "BothModified", ghEntry, dbEntry, null);
+                    // No base - first sync, needs manual review (not a true conflict)
+                    result.NeedsReview.Add(CreateConflict(key, "NeedsReview", ghEntry, dbEntry, null));
                 }
                 else if (baseHash == dbEntry.Hash)
                 {
@@ -653,8 +658,8 @@ public class GitHubPullService : IGitHubPullService
         }
 
         _logger.LogInformation(
-            "Merge result: {Apply} to apply, {Add} to add, {Delete} to delete, {Unchanged} unchanged, {Conflicts} conflicts",
-            result.ToApply.Count, result.ToAdd.Count, result.ToDelete.Count, result.Unchanged, result.Conflicts.Count);
+            "Merge result: {Apply} to apply, {Add} to add, {Delete} to delete, {Unchanged} unchanged, {Conflicts} conflicts, {NeedsReview} needs review",
+            result.ToApply.Count, result.ToAdd.Count, result.ToDelete.Count, result.Unchanged, result.Conflicts.Count, result.NeedsReview.Count);
 
         return result;
     }
@@ -859,6 +864,7 @@ public class GitHubPullService : IGitHubPullService
         public List<GitHubEntry> ToAdd { get; } = new();
         public List<(string Key, string LanguageCode, string PluralForm)> ToDelete { get; } = new();
         public Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubPullConflict> Conflicts { get; } = new();
+        public List<GitHubPullConflict> NeedsReview { get; } = new();
         public int Unchanged { get; set; }
     }
 }
