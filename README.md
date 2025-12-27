@@ -45,17 +45,22 @@ ext install nickprotop.localization-manager
 
 **👉 [Try LRM Cloud Free →](https://lrm-cloud.com)** | **[Documentation →](docs/CLOUD.md)**
 
-Cloud platform for team-based localization management with web dashboard and CLI sync.
+Cloud platform for team-based localization management with web dashboard and CLI sync. **100% open source** — self-host with no restrictions or use the managed platform.
 
 **Features:**
 - Web-based translation editor with real-time collaboration
 - Team management with role-based access (Owner, Admin, Member, Viewer)
+- GitHub integration with push/pull and automatic PR creation
 - 10 translation providers (free + paid + bring your own keys)
-- Git-style CLI sync: `lrm push` / `lrm pull`
-- Usage tracking and analytics
+- Git-style CLI sync with three-way merge: `lrm push` / `lrm pull`
+- Translation Memory and Glossary management
 - REST API for custom integrations
 
-**Plans:**
+**Deployment Options:**
+- **Hosted**: Use [lrm-cloud.com](https://lrm-cloud.com) — no setup required
+- **Self-hosted**: Deploy on your infrastructure with Docker — unlimited usage, full data ownership
+
+**Plans (Hosted):**
 | Plan | Price | Translation Credits | Projects | Team |
 |------|-------|---------------------|----------|------|
 | Free | $0/mo | 5K chars | 3 | Solo |

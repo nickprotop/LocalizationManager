@@ -6,11 +6,25 @@ LRM Cloud is a web-based platform for team localization management with real-tim
 
 ![LRM Cloud Dashboard](../assets/cloud-dashboard.png)
 
-## Open Source & Deployment Options
+## 100% Open Source
 
-LRM is a fully **open source project** under the MIT license. You have two options for using LRM Cloud:
+LRM is a **fully open source project** under the MIT license. Unlike other localization platforms that only open-source parts of their system, LRM provides the **complete stack**:
 
-### Option 1: Hosted Platform (Recommended)
+- **CLI Tool** - Open source (MIT)
+- **Cloud Backend API** - Open source (MIT)
+- **Web Frontend** - Open source (MIT)
+- **VS Code Extension** - Open source (MIT)
+- **Docker Deployment** - Open source (MIT)
+
+This means you can:
+- **Self-host** with no feature restrictions
+- **Modify** the source code for your needs
+- **Audit** the code for security compliance
+- **Contribute** improvements back to the community
+
+## Deployment Options
+
+### Option 1: Hosted Platform
 
 Use our managed cloud platform at **[lrm-cloud.com](https://lrm-cloud.com)** — no setup required.
 
@@ -22,9 +36,17 @@ Use our managed cloud platform at **[lrm-cloud.com](https://lrm-cloud.com)** —
 
 All plans include the full feature set. [See pricing details](#plans--pricing) for limits.
 
-### Option 2: Self-Hosted
+### Option 2: Self-Hosted (No Restrictions)
 
-Deploy LRM Cloud on your own infrastructure using Docker Compose.
+Deploy LRM Cloud on your own infrastructure using Docker Compose. **All features are available** — no artificial limitations, no phone-home, no license checks.
+
+**Self-hosted benefits:**
+- **Unlimited** translation characters (use your own API keys)
+- **Unlimited** projects and team members
+- **Complete data ownership** — your data stays on your servers
+- **GDPR/compliance friendly** — control your data jurisdiction
+- **Air-gapped deployments** — works offline with Ollama for translation
+- **Customizable** — modify the source code as needed
 
 **Requirements:**
 - Docker & Docker Compose
@@ -58,7 +80,7 @@ The `deploy.sh` script handles building and deploying.
 | Service | Purpose |
 |---------|---------|
 | nginx | Reverse proxy, SSL termination |
-| api | REST API server |
+| api | REST API server (.NET 9) |
 | web | Blazor WASM frontend |
 | postgres | PostgreSQL 16 database |
 | redis | Session cache |
@@ -74,7 +96,8 @@ For detailed deployment instructions, see [`cloud/deploy/README.md`](../cloud/de
 - **Multiple Translation Providers** - Google, DeepL, OpenAI, Claude, Azure, and more
 - **Translation Memory** - Automatic caching for cost savings and consistency
 - **Glossary Management** - Enforce consistent terminology across translations
-- **CLI Sync** - Bidirectional sync between local files and cloud
+- **CLI Sync** - Bidirectional sync between local files and cloud with three-way merge
+- **GitHub Integration** - Connect repositories, push/pull translations, auto-create PRs
 - **Team Collaboration** - Organizations with role-based access control
 - **Multi-format Support** - RESX, JSON, i18next, Android XML, iOS strings
 
@@ -294,6 +317,60 @@ lrm cloud push
 | `lrm cloud snapshot create` | Create a named snapshot |
 
 See [Cloud Sync Guide](CLOUD_SYNC.md) for complete documentation.
+
+## GitHub Integration
+
+Connect your GitHub repository to LRM Cloud for seamless version control integration.
+
+### Connecting a Repository
+
+1. Go to **Project Settings** > **GitHub**
+2. Click **"Connect to GitHub"**
+3. Authorize LRM Cloud to access your repository
+4. Select the repository and branch
+
+### Push to GitHub
+
+Push translations from LRM Cloud to your GitHub repository:
+
+1. Make changes in the web editor or via CLI sync
+2. Click **"Push to GitHub"** in project settings
+3. LRM creates a branch and opens a pull request
+4. Review and merge the PR in GitHub
+
+### Pull from GitHub
+
+Pull translations from GitHub into LRM Cloud:
+
+1. Click **"Pull from GitHub"** in project settings
+2. LRM performs a **three-way merge**:
+   - Compares GitHub, Cloud, and last synced state
+   - Auto-merges non-conflicting changes
+   - Presents conflicts for manual resolution
+3. Review and apply changes
+
+### Three-Way Merge
+
+LRM uses proper three-way merge (like Git) at every sync boundary:
+
+- **CLI ↔ Cloud**: Merges local file changes with cloud changes
+- **Cloud ↔ GitHub**: Merges cloud edits with repository changes
+
+This means:
+- Changes in different places merge automatically
+- Same change in both places = no conflict
+- Only truly divergent changes require resolution
+- No accidental overwrites
+
+### Conflict Resolution
+
+When conflicts occur:
+
+| Strategy | Description |
+|----------|-------------|
+| **GitHub** | Accept all GitHub values |
+| **Cloud** | Keep all Cloud values |
+| **Prompt** | Choose per-conflict in UI |
 
 ## Teams & Organizations
 
