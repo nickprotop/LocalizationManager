@@ -40,22 +40,26 @@
     [SupplyParameterFromQuery(Name = "token")]
     public string? Token { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "email")]
+    public string? Email { get; set; }
+
     private bool _isLoading = true;
     private bool _isSuccess;
     private string? _errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
-        if (string.IsNullOrEmpty(Token))
+        if (string.IsNullOrEmpty(Token) || string.IsNullOrEmpty(Email))
         {
             _isLoading = false;
-            _errorMessage = "Invalid or missing verification token.";
+            _errorMessage = "Invalid or missing verification link.";
             return;
         }
 
         try
         {
-            var result = await AuthService.VerifyEmailAsync(Token);
+            var result = await AuthService.VerifyEmailAsync(Email, Token);
             _isSuccess = result.IsSuccess;
             _errorMessage = result.ErrorMessage ?? "Unable to verify email. The link may have expired.";
         }

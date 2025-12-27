@@ -3,7 +3,8 @@
   "server": {
     "urls": "http://0.0.0.0:8080",
     "environment": "Production",
-    "baseUrl": "https://your-domain.com"
+    "baseUrl": "https://your-domain.com",
+    "appPath": "/app"
   },
   "database": {
     "connectionString": "Host=localhost;Port=5432;Database=lrmcloud;Username=lrm;Password=YOUR_DB_PASSWORD",

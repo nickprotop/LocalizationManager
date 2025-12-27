@@ -1048,7 +1048,7 @@ public class OrganizationService : IOrganizationService
         try
         {
             var inviter = await _db.Users.FindAsync(invitedByUserId);
-            var invitationLink = $"{_config.Server.BaseUrl}/accept-invitation?token={plainToken}";
+            var invitationLink = $"{_config.Server.AppBaseUrl}/accept-invitation?token={plainToken}";
 
             var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "OrganizationInvitation.html");
 
@@ -1099,7 +1099,7 @@ public class OrganizationService : IOrganizationService
     {
         try
         {
-            var dashboardLink = $"{_config.Server.BaseUrl}/dashboard";
+            var dashboardLink = $"{_config.Server.AppBaseUrl}/dashboard";
 
             var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "OrganizationWelcome.html");
 

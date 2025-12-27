@@ -118,11 +118,11 @@ public class AuthService
         }
     }
 
-    public async Task<AuthResult> VerifyEmailAsync(string token)
+    public async Task<AuthResult> VerifyEmailAsync(string email, string token)
     {
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("auth/verify-email", new { Token = token });
+            var response = await _httpClient.PostAsync($"auth/verify-email?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(token)}", null);
 
             if (response.IsSuccessStatusCode)
             {

@@ -85,7 +85,7 @@ public class AuthService : IAuthService
     {
         try
         {
-            var verificationLink = $"{_config.Server.BaseUrl}/verify-email?token={plainToken}&email={Uri.EscapeDataString(user.Email!)}";
+            var verificationLink = $"{_config.Server.AppBaseUrl}/verify-email?token={plainToken}&email={Uri.EscapeDataString(user.Email!)}";
 
             var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "EmailVerification.html");
             var templateText = await File.ReadAllTextAsync(templatePath);
@@ -116,8 +116,8 @@ public class AuthService : IAuthService
     {
         try
         {
-            var loginLink = $"{_config.Server.BaseUrl}/login";
-            var resetLink = $"{_config.Server.BaseUrl}/forgot-password";
+            var loginLink = $"{_config.Server.AppBaseUrl}/login";
+            var resetLink = $"{_config.Server.AppBaseUrl}/forgot-password";
 
             var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "AccountExists.html");
             var templateText = await File.ReadAllTextAsync(templatePath);
@@ -231,7 +231,7 @@ public class AuthService : IAuthService
     {
         try
         {
-            var resetLink = $"{_config.Server.BaseUrl}/reset-password?token={plainToken}&email={Uri.EscapeDataString(user.Email!)}";
+            var resetLink = $"{_config.Server.AppBaseUrl}/reset-password?token={plainToken}&email={Uri.EscapeDataString(user.Email!)}";
 
             var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "PasswordReset.html");
             var templateText = await File.ReadAllTextAsync(templatePath);
@@ -307,7 +307,7 @@ public class AuthService : IAuthService
     {
         try
         {
-            var loginLink = $"{_config.Server.BaseUrl}/login";
+            var loginLink = $"{_config.Server.AppBaseUrl}/login";
 
             var templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "Email", "PasswordResetSuccess.html");
             var templateText = await File.ReadAllTextAsync(templatePath);
@@ -878,7 +878,7 @@ public class AuthService : IAuthService
     {
         try
         {
-            var verificationLink = $"{_config.Server.BaseUrl}/verify-new-email?token={Uri.EscapeDataString(token)}";
+            var verificationLink = $"{_config.Server.AppBaseUrl}/verify-new-email?token={Uri.EscapeDataString(token)}";
 
             var subject = "Verify Your New Email Address";
             var htmlBody = $@"

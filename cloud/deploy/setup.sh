@@ -101,6 +101,8 @@ CURRENT_MINIO_USER=$(env_get 'MINIO_USER' 'lrmcloud')
 CURRENT_MINIO_PASSWORD=$(env_get 'MINIO_PASSWORD' '')
 
 CURRENT_ENV=$(config_get '.server.environment' 'Production')
+CURRENT_BASE_URL=$(config_get '.server.baseUrl' 'http://localhost:3000')
+CURRENT_APP_PATH=$(config_get '.server.appPath' '/app')
 
 CURRENT_DB_CONN=$(config_get '.database.connectionString' '')
 CURRENT_DB_PASSWORD=$(extract_password "$CURRENT_DB_CONN")
@@ -210,6 +212,17 @@ MINIO_CONSOLE=${MINIO_CONSOLE:-$CURRENT_MINIO_CONSOLE}
 
 read -p "Environment [$CURRENT_ENV]: " ENVIRONMENT
 ENVIRONMENT=${ENVIRONMENT:-$CURRENT_ENV}
+
+echo ""
+echo -e "${BLUE}Public URL Configuration:${NC}"
+print_info "Used for email links (verification, password reset, etc.)"
+echo ""
+
+read -p "Public Base URL [$CURRENT_BASE_URL]: " BASE_URL
+BASE_URL=${BASE_URL:-$CURRENT_BASE_URL}
+
+read -p "Blazor App Path [$CURRENT_APP_PATH]: " APP_PATH
+APP_PATH=${APP_PATH:-$CURRENT_APP_PATH}
 
 echo ""
 echo -e "${BLUE}Mail Configuration:${NC}"
@@ -504,12 +517,16 @@ print_step "Writing config.json..."
 if [ "$CORS_CONFIG" = "null" ]; then
     SERVER_JSON='{
       "urls": "http://0.0.0.0:8080",
-      "environment": "'"${ENVIRONMENT}"'"
+      "environment": "'"${ENVIRONMENT}"'",
+      "baseUrl": "'"${BASE_URL}"'",
+      "appPath": "'"${APP_PATH}"'"
     }'
 else
     SERVER_JSON='{
       "urls": "http://0.0.0.0:8080",
       "environment": "'"${ENVIRONMENT}"'",
+      "baseUrl": "'"${BASE_URL}"'",
+      "appPath": "'"${APP_PATH}"'",
       "cors": '"${CORS_CONFIG}"'
     }'
 fi

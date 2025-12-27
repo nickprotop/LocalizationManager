@@ -88,10 +88,25 @@ public sealed class ServerConfiguration
     public required string Environment { get; init; }
 
     /// <summary>
-    /// Base URL for generating links in emails and redirects.
+    /// Public base URL for generating links in emails and redirects.
+    /// This should be the externally-accessible URL (behind reverse proxy).
     /// Example: "https://lrm-cloud.com" or "http://localhost:3000"
     /// </summary>
     public string BaseUrl { get; init; } = "http://localhost:3000";
+
+    /// <summary>
+    /// Path prefix where the Blazor web app is hosted.
+    /// Used for generating frontend links in emails.
+    /// Example: "/app" (default), "" for root
+    /// </summary>
+    public string AppPath { get; init; } = "/app";
+
+    /// <summary>
+    /// Gets the full base URL for the Blazor web application.
+    /// Combines BaseUrl and AppPath for generating frontend links.
+    /// </summary>
+    [JsonIgnore]
+    public string AppBaseUrl => $"{BaseUrl.TrimEnd('/')}{AppPath}";
 
     /// <summary>
     /// CORS configuration for API access.
