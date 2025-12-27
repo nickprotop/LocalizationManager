@@ -39,7 +39,7 @@ public class ProjectDto
     /// </summary>
     public bool InheritOrganizationGlossary { get; set; } = true;
 
-    public string SyncStatus { get; set; } = "pending";
+    public string SyncStatus { get; set; } = "idle";
     public string? SyncError { get; set; }
     public DateTime? LastSyncedAt { get; set; }
 

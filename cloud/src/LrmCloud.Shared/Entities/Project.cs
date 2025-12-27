@@ -135,7 +135,7 @@ public class Project
 
     [MaxLength(50)]
     [Column("sync_status")]
-    public string SyncStatus { get; set; } = "pending";
+    public string SyncStatus { get; set; } = "idle";
 
     [Column("sync_error")]
     public string? SyncError { get; set; }

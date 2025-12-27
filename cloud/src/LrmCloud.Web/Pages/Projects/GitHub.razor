@@ -233,13 +233,13 @@ else
             </RadzenCard>
         }
 
-        @* Sync Status *@
-        @if (!string.IsNullOrEmpty(_syncStatus.SyncStatus) && _syncStatus.SyncStatus != "idle")
+        @* Sync Status - only show when actively syncing *@
+        @if (_syncStatus.SyncStatus == "syncing")
         {
             <RadzenCard class="rz-mb-4">
                 <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="1rem">
                     <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
-                    <RadzenText TextStyle="TextStyle.Body1">Sync in progress: @_syncStatus.SyncStatus</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body1">Sync in progress...</RadzenText>
                 </RadzenStack>
             </RadzenCard>
         }
