@@ -164,6 +164,14 @@ public class PayPalPaymentProvider : IPaymentProvider
         var response = await _httpClient.SendAsync(request);
         if (!response.IsSuccessStatusCode)
         {
+            // If subscription doesn't exist in PayPal (e.g., incomplete/abandoned payment),
+            // treat it as successfully cancelled - there's nothing to cancel
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _logger.LogWarning("PayPal subscription {SubscriptionId} not found - treating as cancelled", subscriptionId);
+                return;
+            }
+
             var errorBody = await response.Content.ReadAsStringAsync();
             _logger.LogError("PayPal cancel subscription failed: {StatusCode} - {Body}",
                 response.StatusCode, errorBody);
