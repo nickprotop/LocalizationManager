@@ -149,6 +149,7 @@ public class Program
             builder.Services.AddScoped<IOrganizationService, OrganizationService>();
             builder.Services.AddScoped<IProjectService, ProjectService>();
             builder.Services.AddScoped<IResourceService, ResourceService>();
+            builder.Services.AddScoped<IOtaService, OtaService>(); // OTA localization bundle delivery
             builder.Services.AddScoped<IKeySyncService, KeySyncService>(); // Key-level sync with three-way merge
             builder.Services.AddScoped<ISyncHistoryService, SyncHistoryService>(); // Sync history and revert
             builder.Services.AddScoped<SnapshotService>(); // Point-in-time snapshot management
