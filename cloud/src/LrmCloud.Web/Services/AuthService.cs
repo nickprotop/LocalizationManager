@@ -327,6 +327,31 @@ public class AuthService
         }
     }
 
+    /// <summary>
+    /// Process tokens received from GitHub OAuth callback (via URL fragment)
+    /// </summary>
+    public async Task<AuthResult> ProcessGitHubCallbackAsync(string token, DateTime expiresAt, string refreshToken, DateTime refreshTokenExpiresAt)
+    {
+        try
+        {
+            await _tokenStorage.StoreTokensAsync(token, refreshToken, expiresAt, refreshTokenExpiresAt);
+
+            // Fetch user info to update auth state
+            var user = await GetCurrentUserAsync();
+            if (user != null)
+            {
+                _authStateProvider.NotifyUserAuthentication(user);
+                return AuthResult.Success(user);
+            }
+
+            return AuthResult.Failure("Failed to get user info after GitHub login");
+        }
+        catch (Exception ex)
+        {
+            return AuthResult.Failure($"Failed to process GitHub login: {ex.Message}");
+        }
+    }
+
     public async Task<(bool Success, string? Code, string? Error)> InitiateGitHubLinkAsync()
     {
         try

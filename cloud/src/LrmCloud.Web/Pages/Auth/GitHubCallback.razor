@@ -1,0 +1,119 @@
+@page "/auth/github/callback"
+@layout AuthLayout
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>GitHub Login - LRM Cloud</PageTitle>
+
+<RadzenStack Gap="1rem" Style="text-align: center;">
+    <RadzenIcon Icon="language" Style="font-size: 3rem; color: var(--rz-primary);" />
+    <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">LRM Cloud</RadzenText>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
+            @_errorMessage
+        </RadzenAlert>
+        <RadzenButton Text="Back to Login" Click="@(() => Navigation.NavigateTo("/login"))" />
+    }
+    else
+    {
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Completing GitHub login...</RadzenText>
+    }
+</RadzenStack>
+
+@code {
+    private string? _errorMessage;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ProcessCallback();
+        }
+    }
+
+    private async Task ProcessCallback()
+    {
+        try
+        {
+            // Read tokens from URL fragment using JavaScript
+            var fragment = await JS.InvokeAsync<string>("getUrlFragment");
+
+            if (string.IsNullOrEmpty(fragment))
+            {
+                _errorMessage = "No authentication data received. Please try again.";
+                StateHasChanged();
+                return;
+            }
+
+            // Parse fragment parameters
+            var parameters = ParseFragment(fragment);
+
+            if (!parameters.TryGetValue("token", out var token) ||
+                !parameters.TryGetValue("refreshToken", out var refreshToken) ||
+                !parameters.TryGetValue("expiresAt", out var expiresAtStr) ||
+                !parameters.TryGetValue("refreshTokenExpiresAt", out var refreshTokenExpiresAtStr))
+            {
+                _errorMessage = "Invalid authentication data. Please try again.";
+                StateHasChanged();
+                return;
+            }
+
+            // Parse dates
+            if (!DateTime.TryParse(Uri.UnescapeDataString(expiresAtStr), out var expiresAt) ||
+                !DateTime.TryParse(Uri.UnescapeDataString(refreshTokenExpiresAtStr), out var refreshTokenExpiresAt))
+            {
+                _errorMessage = "Invalid token expiration data. Please try again.";
+                StateHasChanged();
+                return;
+            }
+
+            // Process the tokens
+            var result = await AuthService.ProcessGitHubCallbackAsync(
+                Uri.UnescapeDataString(token),
+                expiresAt,
+                Uri.UnescapeDataString(refreshToken),
+                refreshTokenExpiresAt);
+
+            if (result.IsSuccess)
+            {
+                // Clear the fragment from URL before redirecting (security)
+                await JS.InvokeVoidAsync("clearUrlFragment");
+                Navigation.NavigateTo("/", forceLoad: true);
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage ?? "GitHub login failed. Please try again.";
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private static Dictionary<string, string> ParseFragment(string fragment)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        // Remove leading # if present
+        if (fragment.StartsWith("#"))
+            fragment = fragment[1..];
+
+        foreach (var part in fragment.Split('&'))
+        {
+            var keyValue = part.Split('=', 2);
+            if (keyValue.Length == 2)
+            {
+                result[keyValue[0]] = keyValue[1];
+            }
+        }
+
+        return result;
+    }
+}

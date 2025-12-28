@@ -418,8 +418,15 @@ public class AuthController : ApiControllerBase
                 return Redirect($"{_config.Server.AppBaseUrl}/settings/profile?github_linked=true");
             }
 
-            // Login operation - return JSON for frontend to handle
-            return Ok(new ApiResponse<LoginResponse> { Data = response! });
+            // Login operation - redirect to frontend with tokens
+            // Using URL fragment (#) so tokens aren't logged in server access logs
+            var redirectUrl = $"{_config.Server.AppBaseUrl}/auth/github/callback" +
+                $"#token={Uri.EscapeDataString(response!.Token)}" +
+                $"&expiresAt={Uri.EscapeDataString(response.ExpiresAt.ToString("O"))}" +
+                $"&refreshToken={Uri.EscapeDataString(response.RefreshToken)}" +
+                $"&refreshTokenExpiresAt={Uri.EscapeDataString(response.RefreshTokenExpiresAt.ToString("O"))}";
+
+            return Redirect(redirectUrl);
         }
         catch (Exception ex)
         {

@@ -337,3 +337,15 @@ window.lrmLinks = {
         window.open(url, '_blank', 'noopener,noreferrer');
     }
 };
+
+// =============================================================================
+// URL Fragment Helpers (for OAuth callbacks)
+// =============================================================================
+window.getUrlFragment = function() {
+    return window.location.hash;
+};
+
+window.clearUrlFragment = function() {
+    // Clear fragment without triggering navigation
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+};
