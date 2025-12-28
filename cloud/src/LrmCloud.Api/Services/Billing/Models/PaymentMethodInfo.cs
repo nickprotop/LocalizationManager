@@ -61,7 +61,7 @@ public sealed class PaymentMethodInfo
     public string DisplayString => Type switch
     {
         PaymentMethodType.Card => $"{CardBrand?.ToUpperInvariant() ?? "Card"} •••• {CardLast4}",
-        PaymentMethodType.PayPal => $"PayPal ({PayPalEmail})",
+        PaymentMethodType.PayPal => "PayPal",
         PaymentMethodType.BankAccount => $"{BankName ?? "Bank"} •••• {BankLast4}",
         _ => "Unknown payment method"
     };

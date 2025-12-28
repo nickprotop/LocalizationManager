@@ -99,8 +99,9 @@ else
                     {
                         <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Success" Icon="refresh" Text="Reactivate Subscription" Click="@ReactivateSubscription" class="rz-mt-2" />
                     }
-                    else if (!_subscription.CancelAtPeriodEnd && !string.IsNullOrEmpty(_subscription.PaymentSubscriptionId))
+                    else if (!_subscription.CancelAtPeriodEnd && !string.IsNullOrEmpty(_subscription.PaymentSubscriptionId) && _subscription.Status?.ToLower() != "incomplete")
                     {
+                        @* Hide Cancel Subscription when incomplete - PaymentSubscriptionId points to pending upgrade, not current subscription *@
                         <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Danger" Icon="cancel" Text="Cancel Subscription" Click="@ShowCancelDialog" class="rz-mt-2" />
                     }
                 }
