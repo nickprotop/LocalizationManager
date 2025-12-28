@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using System.Reflection;
+using LocalizationManager.JsonLocalization.Core;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Options;
 
@@ -13,7 +14,10 @@ namespace LocalizationManager.JsonLocalization;
 /// </summary>
 public class JsonStringLocalizerFactory : IStringLocalizerFactory
 {
-    private readonly JsonLocalizationOptions _options;
+    private readonly JsonLocalizationOptions? _options;
+    private readonly IResourceLoader? _customLoader;
+    private readonly string? _customBaseName;
+    private readonly JsonFormatConfiguration? _customConfig;
     private readonly ConcurrentDictionary<string, JsonLocalizer> _localizerCache = new();
 
     /// <summary>
@@ -22,6 +26,19 @@ public class JsonStringLocalizerFactory : IStringLocalizerFactory
     public JsonStringLocalizerFactory(IOptions<JsonLocalizationOptions> options)
     {
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+    }
+
+    /// <summary>
+    /// Creates a new JsonStringLocalizerFactory with a custom resource loader (for OTA support).
+    /// </summary>
+    /// <param name="loader">The resource loader to use.</param>
+    /// <param name="baseName">Base name for resources.</param>
+    /// <param name="config">JSON format configuration.</param>
+    public JsonStringLocalizerFactory(IResourceLoader loader, string baseName, JsonFormatConfiguration config)
+    {
+        _customLoader = loader ?? throw new ArgumentNullException(nameof(loader));
+        _customBaseName = baseName ?? "strings";
+        _customConfig = config ?? new JsonFormatConfiguration();
     }
 
     /// <inheritdoc />
@@ -56,7 +73,7 @@ public class JsonStringLocalizerFactory : IStringLocalizerFactory
             }
         }
 
-        assembly ??= _options.ResourceAssembly ?? Assembly.GetEntryAssembly();
+        assembly ??= _options?.ResourceAssembly ?? Assembly.GetEntryAssembly();
 
         return CreateLocalizer(baseName, assembly);
     }
@@ -70,9 +87,16 @@ public class JsonStringLocalizerFactory : IStringLocalizerFactory
 
         var localizer = _localizerCache.GetOrAdd(cacheKey, _ =>
         {
+            // Use custom loader if provided (OTA mode)
+            if (_customLoader != null)
+            {
+                return new JsonLocalizer(_customLoader, _customBaseName ?? baseName, _customConfig!);
+            }
+
+            // Use options-based loader (standard mode)
             IResourceLoader loader;
 
-            if (_options.UseEmbeddedResources)
+            if (_options!.UseEmbeddedResources)
             {
                 var resourceAssembly = assembly ?? _options.ResourceAssembly ?? Assembly.GetEntryAssembly()!;
                 loader = new EmbeddedResourceLoader(resourceAssembly, _options.ResourcesPath);
@@ -97,20 +121,26 @@ public class JsonStringLocalizerFactory : IStringLocalizerFactory
     /// </summary>
     private string GetBaseName(Type resourceSource)
     {
+        // Use custom base name if in OTA mode
+        if (_customBaseName != null)
+        {
+            return _customBaseName;
+        }
+
         // Use the configured base name if the type doesn't have a custom one
         var typeName = resourceSource.Name;
 
         // For generic IStringLocalizer (without type parameter), use the configured base name
         if (resourceSource == typeof(object))
         {
-            return _options.BaseName;
+            return _options!.BaseName;
         }
 
         // Check for common patterns like "HomeController" -> use configured base name
         // This allows sharing a single JSON file across multiple controllers
         if (typeName.EndsWith("Controller") || typeName.EndsWith("Model") || typeName.EndsWith("ViewModel"))
         {
-            return _options.BaseName;
+            return _options!.BaseName;
         }
 
         // Otherwise, use the type name as the base name

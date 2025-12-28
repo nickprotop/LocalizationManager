@@ -4,6 +4,7 @@
 using System.Globalization;
 using System.Reflection;
 using LocalizationManager.JsonLocalization.Core;
+using LocalizationManager.JsonLocalization.Ota;
 
 namespace LocalizationManager.JsonLocalization;
 
@@ -59,6 +60,54 @@ public class JsonLocalizationOptions
     /// Default: true
     /// </summary>
     public bool UseNestedKeys { get; set; } = true;
+
+    /// <summary>
+    /// OTA (Over-The-Air) localization options.
+    /// When configured, translations are fetched from LRM Cloud at runtime.
+    /// </summary>
+    public OtaOptions? Ota { get; set; }
+
+    /// <summary>
+    /// Configures OTA (Over-The-Air) localization with LRM Cloud.
+    /// Translations are fetched from the cloud at runtime and updated periodically.
+    /// </summary>
+    /// <param name="endpoint">The LRM Cloud endpoint URL (default: https://lrm-cloud.com)</param>
+    /// <param name="apiKey">The API key for authentication (must start with lrm_)</param>
+    /// <param name="project">Project path: @username/project for user projects, or org/project for organizations</param>
+    /// <returns>This options instance for chaining.</returns>
+    /// <example>
+    /// <code>
+    /// services.AddJsonLocalization(options => {
+    ///     options.UseOta(
+    ///         endpoint: "https://lrm-cloud.com",
+    ///         apiKey: "lrm_your_api_key",
+    ///         project: "@username/my-project"
+    ///     );
+    /// });
+    /// </code>
+    /// </example>
+    public JsonLocalizationOptions UseOta(string endpoint, string apiKey, string project)
+    {
+        Ota = new OtaOptions
+        {
+            Endpoint = endpoint,
+            ApiKey = apiKey,
+            Project = project
+        };
+        return this;
+    }
+
+    /// <summary>
+    /// Configures OTA (Over-The-Air) localization with detailed options.
+    /// </summary>
+    /// <param name="configure">Action to configure OTA options.</param>
+    /// <returns>This options instance for chaining.</returns>
+    public JsonLocalizationOptions UseOta(Action<OtaOptions> configure)
+    {
+        Ota = new OtaOptions();
+        configure(Ota);
+        return this;
+    }
 
     /// <summary>
     /// Gets the JSON format configuration based on these options.
