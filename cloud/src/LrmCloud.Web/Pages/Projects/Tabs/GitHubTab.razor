@@ -1,5 +1,3 @@
-@page "/projects/{ProjectId:int}/github"
-@attribute [Authorize]
 @using LrmCloud.Shared.DTOs.GitHub
 @using LrmCloud.Web.Helpers
 @inject ProjectService ProjectService
@@ -8,32 +6,24 @@
 @inject NotificationService NotificationService
 @inject Radzen.DialogService DialogService
 
-<PageTitle>GitHub - @(_project?.Name ?? "Project") - LRM Cloud</PageTitle>
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+    <RadzenStack Gap="0">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="code" Style="vertical-align: middle;" />
+            <RadzenText TextStyle="TextStyle.H5">GitHub Sync</RadzenText>
+        </RadzenStack>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+            Sync your translations with a GitHub repository.
+        </RadzenText>
+    </RadzenStack>
+</RadzenStack>
 
 @if (_isLoading)
 {
-    <RadzenStack Gap="1rem">
-        <RadzenSkeleton Style="height: 60px; width: 100%;" />
-        <RadzenSkeleton Style="height: 200px; width: 100%;" />
-    </RadzenStack>
-}
-else if (_project == null)
-{
-    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">
-        Project not found or you don't have access to it.
-        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Primary" Text="Go to Dashboard" Click="@(() => Navigation.NavigateTo(""))" />
-    </RadzenAlert>
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
 }
 else
 {
-    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
-        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
-            <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" Size="ButtonSize.Small" />
-            <RadzenText TextStyle="TextStyle.H4">GitHub Sync</RadzenText>
-            <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(_project.Format)" Text="@_project.Format" />
-        </RadzenStack>
-    </RadzenStack>
-
     @if (!string.IsNullOrEmpty(_errorMessage))
     {
         <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="true" Close="@(() => _errorMessage = null)" class="rz-mb-4">
@@ -68,7 +58,7 @@ else
                     @if (_syncStatus?.Connected == true)
                     {
                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                            Branch: @(_project.GitHubDefaultBranch ?? "main")
+                            Branch: @(_project?.GitHubDefaultBranch ?? "main")
                             @if (!string.IsNullOrEmpty(_syncStatus.BasePath))
                             {
                                 <span> | Path: @_syncStatus.BasePath</span>
@@ -252,12 +242,8 @@ else
     }
 }
 
-@* Connect Repository Dialog *@
-<RadzenDialog />
-
 @code {
-    [Parameter]
-    public int ProjectId { get; set; }
+    [Parameter] public int ProjectId { get; set; }
 
     private LrmCloud.Shared.DTOs.Projects.ProjectDto? _project;
     private GitHubSyncStatus? _syncStatus;
@@ -272,7 +258,7 @@ else
     private string? _errorMessage;
     private string? _successMessage;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
         await LoadDataAsync();
     }

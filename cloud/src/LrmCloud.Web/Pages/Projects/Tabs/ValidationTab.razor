@@ -1,27 +1,12 @@
-@page "/projects/{ProjectId:int}/validation"
 @using LrmCloud.Shared.DTOs.Resources
 @inject ResourceService ResourceService
-@inject ProjectService ProjectService
-@inject NavigationManager Navigation
 @inject NotificationService NotificationService
-@attribute [Authorize]
-
-<PageTitle>Validation - LRM Cloud</PageTitle>
-
-<RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
-    <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" Size="ButtonSize.Small" />
-    <RadzenBreadCrumb>
-        <RadzenBreadCrumbItem Path="" Text="Projects" />
-        <RadzenBreadCrumbItem Path="@($"projects/{ProjectId}")" Text="@_projectName" />
-        <RadzenBreadCrumbItem Text="Validation" />
-    </RadzenBreadCrumb>
-</RadzenStack>
 
 <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
     <RadzenStack Gap="0">
         <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
             <RadzenIcon Icon="verified" Style="vertical-align: middle;" />
-            <RadzenText TextStyle="TextStyle.H4">Validation Report</RadzenText>
+            <RadzenText TextStyle="TextStyle.H5">Validation Report</RadzenText>
         </RadzenStack>
         <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
             Identify duplicates, missing translations, empty values, and placeholder mismatches.
@@ -163,7 +148,6 @@ else
 @code {
     [Parameter] public int ProjectId { get; set; }
 
-    private string _projectName = "";
     private ValidationResultDto? _validation;
     private bool _isLoading = true;
     private bool _isValidating = false;
@@ -178,7 +162,7 @@ else
         new("info", "Info only")
     };
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
         await LoadDataAsync();
     }
@@ -188,11 +172,6 @@ else
         _isLoading = true;
         try
         {
-            var project = await ProjectService.GetProjectAsync(ProjectId);
-            if (project != null)
-            {
-                _projectName = project.Name;
-            }
             _validation = await ResourceService.ValidateProjectAsync(ProjectId);
         }
         catch (Exception ex)

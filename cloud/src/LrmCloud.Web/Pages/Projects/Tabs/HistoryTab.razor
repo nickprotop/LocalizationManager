@@ -1,163 +1,140 @@
-@page "/projects/{ProjectId:int}/history"
-@attribute [Authorize]
 @using LrmCloud.Shared.DTOs.Sync
 @using LrmCloud.Shared.DTOs.Projects
 @inject SyncHistoryService HistoryService
 @inject ProjectService ProjectService
-@inject NavigationManager Navigation
 @inject NotificationService NotificationService
 @inject Radzen.DialogService DialogService
 
-<PageTitle>Sync History - @(_project?.Name ?? "Project") - LRM Cloud</PageTitle>
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+    <RadzenStack Gap="0">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="restore" Style="vertical-align: middle;" />
+            <RadzenText TextStyle="TextStyle.H5">Sync History</RadzenText>
+        </RadzenStack>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+            View push and revert operations. Click on an entry to see detailed changes, or revert to undo a push.
+        </RadzenText>
+    </RadzenStack>
+    <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Secondary" Icon="refresh"
+                  Text="Refresh" Click="@LoadDataAsync" Disabled="@_isLoading" />
+</RadzenStack>
 
 @if (_isLoading)
 {
-    <RadzenStack Gap="1rem">
-        <RadzenSkeleton Style="height: 60px; width: 100%;" />
-        <RadzenSkeleton Style="height: 400px; width: 100%;" />
-    </RadzenStack>
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
 }
-else if (_project == null)
+else if (_historyResponse == null || _historyResponse.Items.Count == 0)
 {
-    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">
-        Project not found or you don't have access to it.
-        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Primary" Text="Go to Dashboard" Click="@(() => Navigation.NavigateTo(""))" />
-    </RadzenAlert>
+    <RadzenCard Style="padding: 3rem;">
+        <RadzenStack AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.Center" Gap="1rem">
+            <RadzenIcon Icon="history" Style="font-size: 3rem;" class="rz-color-secondary" />
+            <RadzenText TextStyle="TextStyle.H6" class="rz-color-secondary">No sync history yet</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="text-align: center;">
+                Push changes from the CLI to start building history.<br/>
+                Use <code>lrm cloud push</code> to sync your local changes.
+            </RadzenText>
+        </RadzenStack>
+    </RadzenCard>
 }
 else
 {
-    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
-        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
-            <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" Size="ButtonSize.Small" />
-            <RadzenText TextStyle="TextStyle.H4">Sync History</RadzenText>
-            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@_project.Name" />
-        </RadzenStack>
-
-        <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Secondary" Icon="refresh"
-                      Text="Refresh" Click="@LoadDataAsync" Disabled="@_isLoading" />
-    </RadzenStack>
-
-    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-4">
-        View push and revert operations. Click on an entry to see detailed changes, or revert to undo a push.
-    </RadzenText>
-
-    @if (_historyResponse == null || _historyResponse.Items.Count == 0)
-    {
-        <RadzenCard Style="padding: 3rem;">
-            <RadzenStack AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.Center" Gap="1rem">
-                <RadzenIcon Icon="history" Style="font-size: 3rem;" class="rz-color-secondary" />
-                <RadzenText TextStyle="TextStyle.H6" class="rz-color-secondary">No sync history yet</RadzenText>
-                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="text-align: center;">
-                    Push changes from the CLI to start building history.<br/>
-                    Use <code>lrm cloud push</code> to sync your local changes.
-                </RadzenText>
-            </RadzenStack>
-        </RadzenCard>
-    }
-    else
-    {
-        <RadzenStack Gap="1rem">
-            @foreach (var entry in _historyResponse.Items)
-            {
-                <RadzenCard Style="@($"border-left: 4px solid {GetOperationTypeColorValue(entry.OperationType, entry.Status)};")">
-                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
-                        <RadzenStack Gap="0.5rem">
-                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" Wrap="FlexWrap.Wrap">
-                                <RadzenIcon Icon="@GetOperationIcon(entry.OperationType)" Style="@($"color: {GetOperationTypeColorValue(entry.OperationType, entry.Status)};")" />
-                                <RadzenText TextStyle="TextStyle.Subtitle1" Style="font-family: monospace;">@entry.HistoryId</RadzenText>
-                                <RadzenBadge BadgeStyle="@GetOperationTypeBadgeStyle(entry.OperationType, entry.Status)"
-                                             Variant="Radzen.Variant.Outlined" Text="@GetOperationDisplayName(entry.OperationType)" />
-                                @if (entry.Status == "reverted")
-                                {
-                                    <RadzenBadge BadgeStyle="BadgeStyle.Warning" Variant="Radzen.Variant.Text" Text="reverted" />
-                                }
-                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                    @entry.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")
-                                </RadzenText>
-                            </RadzenStack>
-
-                            @if (!string.IsNullOrEmpty(entry.Message))
+    <RadzenStack Gap="1rem">
+        @foreach (var entry in _historyResponse.Items)
+        {
+            <RadzenCard Style="@($"border-left: 4px solid {GetOperationTypeColorValue(entry.OperationType, entry.Status)};")">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                            <RadzenIcon Icon="@GetOperationIcon(entry.OperationType)" Style="@($"color: {GetOperationTypeColorValue(entry.OperationType, entry.Status)};")" />
+                            <RadzenText TextStyle="TextStyle.Subtitle1" Style="font-family: monospace;">@entry.HistoryId</RadzenText>
+                            <RadzenBadge BadgeStyle="@GetOperationTypeBadgeStyle(entry.OperationType, entry.Status)"
+                                         Variant="Radzen.Variant.Outlined" Text="@GetOperationDisplayName(entry.OperationType)" />
+                            @if (entry.Status == "reverted")
                             {
-                                <RadzenText TextStyle="TextStyle.Body2">@entry.Message</RadzenText>
+                                <RadzenBadge BadgeStyle="BadgeStyle.Warning" Variant="Radzen.Variant.Text" Text="reverted" />
                             }
-
-                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
-                                @if (entry.EntriesAdded > 0)
-                                {
-                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
-                                        <RadzenIcon Icon="add" Style="font-size: 1rem; color: var(--rz-success);" />
-                                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-success);">@entry.EntriesAdded added</RadzenText>
-                                    </RadzenStack>
-                                }
-                                @if (entry.EntriesModified > 0)
-                                {
-                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
-                                        <RadzenIcon Icon="edit" Style="font-size: 1rem; color: var(--rz-warning);" />
-                                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-warning);">@entry.EntriesModified modified</RadzenText>
-                                    </RadzenStack>
-                                }
-                                @if (entry.EntriesDeleted > 0)
-                                {
-                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
-                                        <RadzenIcon Icon="remove" Style="font-size: 1rem; color: var(--rz-danger);" />
-                                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-danger);">@entry.EntriesDeleted deleted</RadzenText>
-                                    </RadzenStack>
-                                }
-                                @if (!string.IsNullOrEmpty(entry.UserName) || !string.IsNullOrEmpty(entry.UserEmail))
-                                {
-                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
-                                        <RadzenIcon Icon="person" Style="font-size: 1rem;" class="rz-color-secondary" />
-                                        <RadzenText TextStyle="TextStyle.Caption">@(entry.UserName ?? entry.UserEmail)</RadzenText>
-                                    </RadzenStack>
-                                }
-                            </RadzenStack>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                @entry.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")
+                            </RadzenText>
                         </RadzenStack>
-                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem">
-                            <RadzenButton Icon="visibility" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
-                                          Click="@(() => ViewDetailAsync(entry))" title="View details" />
-                            @if (CanRevert(entry.OperationType, entry.Status))
+
+                        @if (!string.IsNullOrEmpty(entry.Message))
+                        {
+                            <RadzenText TextStyle="TextStyle.Body2">@entry.Message</RadzenText>
+                        }
+
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
+                            @if (entry.EntriesAdded > 0)
                             {
-                                <RadzenButton Icon="undo" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
-                                              ButtonStyle="ButtonStyle.Warning" Click="@(() => OpenRevertDialog(entry))" title="Revert this change" />
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                    <RadzenIcon Icon="add" Style="font-size: 1rem; color: var(--rz-success);" />
+                                    <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-success);">@entry.EntriesAdded added</RadzenText>
+                                </RadzenStack>
+                            }
+                            @if (entry.EntriesModified > 0)
+                            {
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                    <RadzenIcon Icon="edit" Style="font-size: 1rem; color: var(--rz-warning);" />
+                                    <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-warning);">@entry.EntriesModified modified</RadzenText>
+                                </RadzenStack>
+                            }
+                            @if (entry.EntriesDeleted > 0)
+                            {
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                    <RadzenIcon Icon="remove" Style="font-size: 1rem; color: var(--rz-danger);" />
+                                    <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-danger);">@entry.EntriesDeleted deleted</RadzenText>
+                                </RadzenStack>
+                            }
+                            @if (!string.IsNullOrEmpty(entry.UserName) || !string.IsNullOrEmpty(entry.UserEmail))
+                            {
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                    <RadzenIcon Icon="person" Style="font-size: 1rem;" class="rz-color-secondary" />
+                                    <RadzenText TextStyle="TextStyle.Caption">@(entry.UserName ?? entry.UserEmail)</RadzenText>
+                                </RadzenStack>
                             }
                         </RadzenStack>
                     </RadzenStack>
-                </RadzenCard>
-            }
-        </RadzenStack>
-
-        @if (_historyResponse.HasMore)
-        {
-            <RadzenStack AlignItems="Radzen.AlignItems.Center" class="rz-mt-4">
-                <RadzenButton Variant="Radzen.Variant.Outlined" Text="Load More"
-                              Click="@LoadMoreAsync" Disabled="@_isLoadingMore" IsBusy="@_isLoadingMore" />
-            </RadzenStack>
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem">
+                        <RadzenButton Icon="visibility" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                      Click="@(() => ViewDetailAsync(entry))" title="View details" />
+                        @if (CanRevert(entry.OperationType, entry.Status))
+                        {
+                            <RadzenButton Icon="undo" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                          ButtonStyle="ButtonStyle.Warning" Click="@(() => OpenRevertDialog(entry))" title="Revert this change" />
+                        }
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
         }
+    </RadzenStack>
+
+    @if (_historyResponse.HasMore)
+    {
+        <RadzenStack AlignItems="Radzen.AlignItems.Center" class="rz-mt-4">
+            <RadzenButton Variant="Radzen.Variant.Outlined" Text="Load More"
+                          Click="@LoadMoreAsync" Disabled="@_isLoadingMore" IsBusy="@_isLoadingMore" />
+        </RadzenStack>
     }
 }
 
 @code {
-    [Parameter]
-    public int ProjectId { get; set; }
+    [Parameter] public int ProjectId { get; set; }
 
-    private ProjectDto? _project;
     private SyncHistoryListResponse? _historyResponse;
     private bool _isLoading = true;
     private bool _isLoadingMore;
     private int _currentPage = 1;
     private const int PageSize = 20;
 
-    // View details dialog
     private SyncHistoryDto? _viewEntry;
     private SyncHistoryDetailDto? _viewDetail;
     private bool _isLoadingDetail;
 
-    // Revert dialog
     private SyncHistoryDto? _revertEntry;
     private string _revertMessage = "";
     private bool _isReverting;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
         await LoadDataAsync();
     }
@@ -168,11 +145,7 @@ else
         _currentPage = 1;
         try
         {
-            _project = await ProjectService.GetProjectAsync(ProjectId);
-            if (_project != null)
-            {
-                _historyResponse = await HistoryService.GetHistoryAsync(ProjectId, _currentPage, PageSize);
-            }
+            _historyResponse = await HistoryService.GetHistoryAsync(ProjectId, _currentPage, PageSize);
         }
         catch (Exception ex)
         {
@@ -211,7 +184,6 @@ else
         }
     }
 
-    // View Details Dialog
     private async Task ViewDetailAsync(SyncHistoryDto entry)
     {
         _viewEntry = entry;
@@ -377,7 +349,6 @@ else
         }
     }
 
-    // Revert Dialog
     private async Task OpenRevertDialog(SyncHistoryDto entry)
     {
         _revertEntry = entry;
@@ -447,14 +418,12 @@ else
                 NotificationService.Notify(NotificationSeverity.Success, "Success",
                     $"Successfully reverted push {_revertEntry.HistoryId}. {result.Data.EntriesRestored} entries restored.");
 
-                // Mark the reverted entry as reverted in the local list
                 var entry = _historyResponse?.Items.FirstOrDefault(e => e.HistoryId == _revertEntry.HistoryId);
                 if (entry != null)
                 {
                     entry.Status = "reverted";
                 }
 
-                // Add the new revert entry to the top of the list
                 if (result.Data.History != null && _historyResponse != null)
                 {
                     _historyResponse.Items.Insert(0, result.Data.History);
@@ -477,7 +446,6 @@ else
         }
     }
 
-    // Helper methods
     private static string GetOperationTypeColorValue(string operationType, string status)
     {
         if (status == "reverted")
@@ -526,8 +494,6 @@ else
     {
         if (status == "reverted")
             return false;
-
-        // Both CLI push and web-edit can be reverted
         return operationType.ToLower() is "push" or "web-edit";
     }
 
@@ -543,7 +509,6 @@ else
     {
         if (string.IsNullOrEmpty(value))
             return value;
-
         return value.Length <= maxLength ? value : value.Substring(0, maxLength) + "...";
     }
 }

@@ -1,138 +1,114 @@
-@page "/projects/{ProjectId:int}/snapshots"
-@attribute [Authorize]
 @using LrmCloud.Shared.DTOs.Snapshots
 @using LrmCloud.Shared.DTOs.Projects
 @inject SnapshotService SnapshotService
 @inject ProjectService ProjectService
-@inject NavigationManager Navigation
 @inject NotificationService NotificationService
 @inject Radzen.DialogService DialogService
 
-<PageTitle>Snapshots - @(_project?.Name ?? "Project") - LRM Cloud</PageTitle>
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+    <RadzenStack Gap="0">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="history" Style="vertical-align: middle;" />
+            <RadzenText TextStyle="TextStyle.H5">Snapshots</RadzenText>
+        </RadzenStack>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+            Snapshots are point-in-time backups of your project's translations. Use them to track changes and restore to previous states.
+        </RadzenText>
+    </RadzenStack>
+    <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Icon="add_circle"
+                  Text="Create Snapshot" Click="@OpenCreateDialog" Disabled="@_isCreating" IsBusy="@_isCreating" />
+</RadzenStack>
 
 @if (_isLoading)
 {
-    <RadzenStack Gap="1rem">
-        <RadzenSkeleton Style="height: 60px; width: 100%;" />
-        <RadzenSkeleton Style="height: 400px; width: 100%;" />
-    </RadzenStack>
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
 }
-else if (_project == null)
+else if (_snapshots.Count == 0)
 {
-    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">
-        Project not found or you don't have access to it.
-        <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Primary" Text="Go to Dashboard" Click="@(() => Navigation.NavigateTo(""))" />
-    </RadzenAlert>
+    <RadzenCard Style="padding: 3rem;">
+        <RadzenStack AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.Center" Gap="1rem">
+            <RadzenIcon Icon="history" Style="font-size: 3rem;" class="rz-color-secondary" />
+            <RadzenText TextStyle="TextStyle.H6" class="rz-color-secondary">No snapshots yet</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="text-align: center;">
+                Snapshots are created automatically when you push changes from the CLI.<br/>
+                You can also create manual snapshots using the button above.
+            </RadzenText>
+        </RadzenStack>
+    </RadzenCard>
 }
 else
 {
-    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
-        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
-            <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" Size="ButtonSize.Small" />
-            <RadzenText TextStyle="TextStyle.H4">Snapshots</RadzenText>
-            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@_project.Name" />
-        </RadzenStack>
-
-        <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Icon="add_circle"
-                      Text="Create Snapshot" Click="@OpenCreateDialog" Disabled="@_isCreating" IsBusy="@_isCreating" />
-    </RadzenStack>
-
-    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-4">
-        Snapshots are point-in-time backups of your project's translations. Use them to track changes and restore to previous states.
-    </RadzenText>
-
-    @if (_snapshots.Count == 0)
-    {
-        <RadzenCard Style="padding: 3rem;">
-            <RadzenStack AlignItems="Radzen.AlignItems.Center" JustifyContent="JustifyContent.Center" Gap="1rem">
-                <RadzenIcon Icon="history" Style="font-size: 3rem;" class="rz-color-secondary" />
-                <RadzenText TextStyle="TextStyle.H6" class="rz-color-secondary">No snapshots yet</RadzenText>
-                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="text-align: center;">
-                    Snapshots are created automatically when you push changes from the CLI.<br/>
-                    You can also create manual snapshots using the button above.
-                </RadzenText>
-            </RadzenStack>
-        </RadzenCard>
-    }
-    else
-    {
-        <RadzenStack Gap="1rem">
-            @foreach (var snapshot in _snapshots)
-            {
-                <RadzenCard Style="@($"border-left: 4px solid {GetSnapshotTypeColorValue(snapshot.SnapshotType)};")">
-                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
-                        <RadzenStack Gap="0.5rem">
-                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" Wrap="FlexWrap.Wrap">
-                                <RadzenText TextStyle="TextStyle.Subtitle1" Style="font-family: monospace;">@snapshot.SnapshotId</RadzenText>
-                                <RadzenBadge BadgeStyle="@GetSnapshotTypeBadgeStyle(snapshot.SnapshotType)" Variant="Radzen.Variant.Outlined" Text="@snapshot.SnapshotType" />
-                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                    @snapshot.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")
-                                </RadzenText>
-                            </RadzenStack>
-
-                            @if (!string.IsNullOrEmpty(snapshot.Description))
-                            {
-                                <RadzenText TextStyle="TextStyle.Body2">@snapshot.Description</RadzenText>
-                            }
-
-                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
-                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
-                                    <RadzenIcon Icon="description" Style="font-size: 1rem;" class="rz-color-secondary" />
-                                    <RadzenText TextStyle="TextStyle.Caption">@snapshot.FileCount files</RadzenText>
-                                </RadzenStack>
-                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
-                                    <RadzenIcon Icon="key" Style="font-size: 1rem;" class="rz-color-secondary" />
-                                    <RadzenText TextStyle="TextStyle.Caption">@snapshot.KeyCount keys</RadzenText>
-                                </RadzenStack>
-                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
-                                    <RadzenIcon Icon="translate" Style="font-size: 1rem;" class="rz-color-secondary" />
-                                    <RadzenText TextStyle="TextStyle.Caption">@snapshot.TranslationCount translations</RadzenText>
-                                </RadzenStack>
-                                @if (!string.IsNullOrEmpty(snapshot.CreatedByUsername))
-                                {
-                                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
-                                        <RadzenIcon Icon="person" Style="font-size: 1rem;" class="rz-color-secondary" />
-                                        <RadzenText TextStyle="TextStyle.Caption">@snapshot.CreatedByUsername</RadzenText>
-                                    </RadzenStack>
-                                }
-                            </RadzenStack>
+    <RadzenStack Gap="1rem">
+        @foreach (var snapshot in _snapshots)
+        {
+            <RadzenCard Style="@($"border-left: 4px solid {GetSnapshotTypeColorValue(snapshot.SnapshotType)};")">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                            <RadzenText TextStyle="TextStyle.Subtitle1" Style="font-family: monospace;">@snapshot.SnapshotId</RadzenText>
+                            <RadzenBadge BadgeStyle="@GetSnapshotTypeBadgeStyle(snapshot.SnapshotType)" Variant="Radzen.Variant.Outlined" Text="@snapshot.SnapshotType" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                @snapshot.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")
+                            </RadzenText>
                         </RadzenStack>
 
-                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem">
-                            <RadzenButton Icon="visibility" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
-                                          Click="@(() => ViewSnapshotAsync(snapshot))" title="View details" />
-                            <RadzenButton Icon="compare" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
-                                          ButtonStyle="ButtonStyle.Info" Click="@(() => OpenCompareDialog(snapshot))"
-                                          Disabled="@(_snapshots.Count < 2)" title="Compare with another snapshot" />
-                            <RadzenButton Icon="restore" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
-                                          ButtonStyle="ButtonStyle.Warning" Click="@(() => OpenRestoreDialog(snapshot))" title="Restore to this snapshot" />
-                            <RadzenButton Icon="delete" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
-                                          ButtonStyle="ButtonStyle.Danger" Click="@(() => OpenDeleteDialog(snapshot))" title="Delete snapshot" />
+                        @if (!string.IsNullOrEmpty(snapshot.Description))
+                        {
+                            <RadzenText TextStyle="TextStyle.Body2">@snapshot.Description</RadzenText>
+                        }
+
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                <RadzenIcon Icon="description" Style="font-size: 1rem;" class="rz-color-secondary" />
+                                <RadzenText TextStyle="TextStyle.Caption">@snapshot.FileCount files</RadzenText>
+                            </RadzenStack>
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                <RadzenIcon Icon="key" Style="font-size: 1rem;" class="rz-color-secondary" />
+                                <RadzenText TextStyle="TextStyle.Caption">@snapshot.KeyCount keys</RadzenText>
+                            </RadzenStack>
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                <RadzenIcon Icon="translate" Style="font-size: 1rem;" class="rz-color-secondary" />
+                                <RadzenText TextStyle="TextStyle.Caption">@snapshot.TranslationCount translations</RadzenText>
+                            </RadzenStack>
+                            @if (!string.IsNullOrEmpty(snapshot.CreatedByUsername))
+                            {
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
+                                    <RadzenIcon Icon="person" Style="font-size: 1rem;" class="rz-color-secondary" />
+                                    <RadzenText TextStyle="TextStyle.Caption">@snapshot.CreatedByUsername</RadzenText>
+                                </RadzenStack>
+                            }
                         </RadzenStack>
                     </RadzenStack>
-                </RadzenCard>
-            }
-        </RadzenStack>
-    }
+
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem">
+                        <RadzenButton Icon="visibility" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                      Click="@(() => ViewSnapshotAsync(snapshot))" title="View details" />
+                        <RadzenButton Icon="compare" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                      ButtonStyle="ButtonStyle.Info" Click="@(() => OpenCompareDialog(snapshot))"
+                                      Disabled="@(_snapshots.Count < 2)" title="Compare with another snapshot" />
+                        <RadzenButton Icon="restore" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                      ButtonStyle="ButtonStyle.Warning" Click="@(() => OpenRestoreDialog(snapshot))" title="Restore to this snapshot" />
+                        <RadzenButton Icon="delete" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                      ButtonStyle="ButtonStyle.Danger" Click="@(() => OpenDeleteDialog(snapshot))" title="Delete snapshot" />
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        }
+    </RadzenStack>
 }
 
 @code {
-    [Parameter]
-    public int ProjectId { get; set; }
+    [Parameter] public int ProjectId { get; set; }
 
-    private ProjectDto? _project;
     private List<SnapshotDto> _snapshots = new();
     private bool _isLoading = true;
 
-    // Create dialog
     private string _createDescription = "";
     private bool _isCreating;
 
-    // View dialog
     private SnapshotDto? _viewSnapshot;
     private SnapshotDetailDto? _viewSnapshotDetail;
 
-    // Restore dialog
     private SnapshotDto? _restoreSnapshot;
     private bool _restoreCreateBackup = true;
     private string _restoreMessage = "";
@@ -140,17 +116,15 @@ else
     private bool _hasUnsnapshotedChanges;
     private DateTime? _lastChangeAt;
 
-    // Delete dialog
     private SnapshotDto? _deleteSnapshot;
     private bool _isDeleting;
 
-    // Compare dialog
     private SnapshotDto? _compareFromSnapshot;
     private SnapshotDto? _compareToSnapshot;
     private SnapshotDiffDto? _compareDiff;
     private bool _isComparing;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
         await LoadDataAsync();
     }
@@ -160,11 +134,7 @@ else
         _isLoading = true;
         try
         {
-            _project = await ProjectService.GetProjectAsync(ProjectId);
-            if (_project != null)
-            {
-                _snapshots = await SnapshotService.GetSnapshotsAsync(ProjectId);
-            }
+            _snapshots = await SnapshotService.GetSnapshotsAsync(ProjectId);
         }
         catch (Exception ex)
         {
@@ -176,7 +146,6 @@ else
         }
     }
 
-    // Create dialog
     private async Task OpenCreateDialog()
     {
         _createDescription = "";
@@ -224,7 +193,6 @@ else
         }
     }
 
-    // View dialog
     private async Task ViewSnapshotAsync(SnapshotDto snapshot)
     {
         _viewSnapshot = snapshot;
@@ -316,7 +284,6 @@ else
         }
     }
 
-    // Restore dialog
     private async Task OpenRestoreDialog(SnapshotDto snapshot)
     {
         _restoreSnapshot = snapshot;
@@ -325,7 +292,6 @@ else
         _hasUnsnapshotedChanges = false;
         _lastChangeAt = null;
 
-        // Check for unsnapshot-ed changes
         var unsnapshotedChanges = await SnapshotService.CheckUnsnapshotedChangesAsync(ProjectId);
         if (unsnapshotedChanges != null)
         {
@@ -402,7 +368,6 @@ else
         }
     }
 
-    // Delete dialog
     private async Task OpenDeleteDialog(SnapshotDto snapshot)
     {
         _deleteSnapshot = snapshot;
@@ -443,7 +408,6 @@ else
         }
     }
 
-    // Compare dialog
     private async Task OpenCompareDialog(SnapshotDto snapshot)
     {
         _compareFromSnapshot = snapshot;

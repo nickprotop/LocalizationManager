@@ -1116,6 +1116,12 @@ ul.rz-profile-menu > li > ul.rz-navigation-menu {
     align-self: center;
 }
 
+/* Selected tab button - subtle border around filled button */
+.tab-button-selected.rz-button {
+    border: 1px solid var(--lrm-border-color-strong) !important;
+}
+
+
 /* =============================================================================
    Empty State
    ============================================================================= */
@@ -1351,3 +1357,4 @@ ul.rz-profile-menu > li > ul.rz-navigation-menu {
         max-height: none;
     }
 }
+

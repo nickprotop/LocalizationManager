@@ -1,7 +1,9 @@
 @page "/projects/{ProjectId:int}"
+@page "/projects/{ProjectId:int}/{Tab}"
 @attribute [Authorize]
 @using LrmCloud.Web.Components
 @using LrmCloud.Web.Helpers
+@using LrmCloud.Web.Pages.Projects.Tabs
 @using LrmCloud.Shared.DTOs.Translation
 @using LrmCloud.Shared.DTOs.Resources
 @inject ProjectService ProjectService
@@ -10,6 +12,7 @@
 @inject NavigationManager Navigation
 @inject NotificationService NotificationService
 @inject Radzen.DialogService DialogService
+@inject Radzen.ContextMenuService _contextMenuService
 @inject IJSRuntime JS
 
 <PageTitle>@(_project?.Name ?? "Project") - LRM Cloud</PageTitle>
@@ -40,7 +43,7 @@ else
                 <RadzenBadge BadgeStyle="BadgeStyle.Dark"
                              Style="cursor: pointer;"
                              Title="@_project.GitHubRepo"
-                             Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/github"))">
+                             Click="@(() => SelectTab("github"))">
                     <RadzenIcon Icon="@UiHelpers.GetGitHubStatusIcon(_project.SyncStatus)" Style="font-size: 0.875rem;" /> GitHub
                 </RadzenBadge>
             }
@@ -109,229 +112,128 @@ else
                 <RadzenButton Variant="Radzen.Variant.Filled" ButtonStyle="ButtonStyle.Primary" Icon="edit"
                               Text="Open Editor" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/editor"))" />
                 <span class="toolbar-divider"></span>
-                <RadzenButton Variant="Radzen.Variant.Text" Icon="code" Text="GitHub Sync"
-                              Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/github"))" />
-                <RadzenButton Variant="Radzen.Variant.Text" Icon="history" Text="Snapshots"
-                              Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/snapshots"))" />
-                <RadzenButton Variant="Radzen.Variant.Text" Icon="restore" Text="History"
-                              Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/history"))" />
-                <RadzenButton Variant="Radzen.Variant.Text" Icon="book" Text="Glossary"
-                              Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/glossary"))" />
-                <RadzenButton Variant="Radzen.Variant.Text" Icon="verified" Text="Validation"
-                              Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/validation"))" />
+                <RadzenButton Icon="dashboard" Text="Overview"
+                              Variant="@GetButtonVariant("overview")"
+                              ButtonStyle="@GetButtonStyle("overview")"
+                              class="@GetButtonClass("overview")"
+                              Click="@(() => SelectTab("overview"))" />
+                <RadzenButton Icon="code" Text="GitHub Sync"
+                              Variant="@GetButtonVariant("github")"
+                              ButtonStyle="@GetButtonStyle("github")"
+                              class="@GetButtonClass("github")"
+                              Click="@(() => SelectTab("github"))" />
+                <RadzenButton Icon="history" Text="Snapshots"
+                              Variant="@GetButtonVariant("snapshots")"
+                              ButtonStyle="@GetButtonStyle("snapshots")"
+                              class="@GetButtonClass("snapshots")"
+                              Click="@(() => SelectTab("snapshots"))" />
+                <RadzenButton Icon="restore" Text="History"
+                              Variant="@GetButtonVariant("history")"
+                              ButtonStyle="@GetButtonStyle("history")"
+                              class="@GetButtonClass("history")"
+                              Click="@(() => SelectTab("history"))" />
+                <RadzenButton Icon="book" Text="Glossary"
+                              Variant="@GetButtonVariant("glossary")"
+                              ButtonStyle="@GetButtonStyle("glossary")"
+                              class="@GetButtonClass("glossary")"
+                              Click="@(() => SelectTab("glossary"))" />
+                <RadzenButton Icon="verified" Text="Validation"
+                              Variant="@GetButtonVariant("validation")"
+                              ButtonStyle="@GetButtonStyle("validation")"
+                              class="@GetButtonClass("validation")"
+                              Click="@(() => SelectTab("validation"))" />
             </RadzenStack>
-            <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
-                <RadzenButton Variant="Radzen.Variant.Text" Icon="translate" Text="Translate Missing"
-                              Click="@OpenTranslateDialog" />
-                <RadzenButton Variant="Radzen.Variant.Text" Icon="file_download" Text="Export"
-                              Click="@ExportProject" />
-            </RadzenStack>
+            <RadzenButton Text="Actions" Icon="expand_more" Variant="Radzen.Variant.Text"
+                          ButtonStyle="ButtonStyle.Secondary"
+                          Click="@(args => _contextMenuService.Open(args, _actionMenuItems, OnActionMenuClick))" />
         </RadzenStack>
     </RadzenCard>
 
-    @if (_stats != null && _stats.Languages.Any())
-    {
-        <RadzenText TextStyle="TextStyle.H6" class="rz-mt-6 rz-mb-3">Language Progress</RadzenText>
-        <RadzenCard>
-            <RadzenStack Gap="1rem">
-                @foreach (var lang in _stats.Languages.OrderByDescending(l => l.Value.CompletionPercentage))
-                {
-                    <RadzenStack Gap="0.25rem">
-                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
-                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
-                                <RadzenText>@lang.Key.ToUpperInvariant()</RadzenText>
-                                @if (lang.Key == _project.DefaultLanguage)
-                                {
-                                    <RadzenBadge BadgeStyle="BadgeStyle.Primary" Variant="Radzen.Variant.Outlined" Text="Default" />
-                                }
-                            </RadzenStack>
-                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
-                                @lang.Value.TranslatedCount / @_stats.TotalKeys translated
-                            </RadzenText>
-                        </RadzenStack>
-                        <RadzenProgressBar Value="@lang.Value.CompletionPercentage" Max="100"
-                                           ProgressBarStyle="@UiHelpers.GetCompletionProgressStyle(lang.Value.CompletionPercentage)"
-                                           ShowValue="false" Style="height: 8px;" />
-                    </RadzenStack>
-                }
-            </RadzenStack>
-        </RadzenCard>
-    }
-
-    @* Validation Summary Card *@
-    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mt-6 rz-mb-3">
-        <RadzenText TextStyle="TextStyle.H6">Validation Status</RadzenText>
-        @if (_validation != null)
+    @* Tab Content *@
+    <div>
+        @switch (_activeTab)
         {
-            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
-                @if (_validation.IsCached && _validation.ValidatedAt.HasValue)
-                {
-                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                        Updated @GetRelativeTime(_validation.ValidatedAt.Value)
-                    </RadzenText>
-                }
-                <RadzenButton Icon="refresh" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
-                              Click="@RefreshValidation" Disabled="@_isValidating"
-                              title="Refresh validation" />
-            </RadzenStack>
+            case "overview":
+                <OverviewTab ProjectId="ProjectId" Project="_project" Stats="_stats" Validation="_validation"
+                             OnViewValidation="@(() => SelectTab("validation"))" />
+                break;
+            case "github":
+                <GitHubTab ProjectId="ProjectId" />
+                break;
+            case "snapshots":
+                <SnapshotsTab ProjectId="ProjectId" />
+                break;
+            case "history":
+                <HistoryTab ProjectId="ProjectId" />
+                break;
+            case "glossary":
+                <GlossaryTab ProjectId="ProjectId" />
+                break;
+            case "validation":
+                <ValidationTab ProjectId="ProjectId" />
+                break;
+            default:
+                <OverviewTab ProjectId="ProjectId" Project="_project" Stats="_stats" Validation="_validation"
+                             OnViewValidation="@(() => SelectTab("validation"))" />
+                break;
         }
-    </RadzenStack>
-    <RadzenCard>
-        @if (_isValidating)
-        {
-            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="height: 4px;" />
-        }
-        else if (_validation == null)
-        {
-            <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false" Shade="Shade.Lighter">
-                Unable to load validation results.
-            </RadzenAlert>
-        }
-        else if (_validation.Summary.TotalIssues == 0)
-        {
-            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
-                <RadzenIcon Icon="check_circle" Style="font-size: 1.5rem; color: var(--rz-success);" />
-                <RadzenText TextStyle="TextStyle.Body1">All validations passed. No issues found.</RadzenText>
-            </RadzenStack>
-        }
-        else
-        {
-            <RadzenStack Gap="1rem">
-                @* Summary row *@
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
-                    @if (_validation.Summary.Errors > 0)
-                    {
-                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
-                            <RadzenIcon Icon="error" Style="color: var(--rz-danger);" />
-                            <RadzenText><strong>@_validation.Summary.Errors</strong> errors</RadzenText>
-                        </RadzenStack>
-                    }
-                    @if (_validation.Summary.Warnings > 0)
-                    {
-                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
-                            <RadzenIcon Icon="warning" Style="color: var(--rz-warning);" />
-                            <RadzenText><strong>@_validation.Summary.Warnings</strong> warnings</RadzenText>
-                        </RadzenStack>
-                    }
-                    @if (_validation.Summary.Info > 0)
-                    {
-                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.25rem">
-                            <RadzenIcon Icon="info" Style="color: var(--rz-info);" />
-                            <RadzenText><strong>@_validation.Summary.Info</strong> info</RadzenText>
-                        </RadzenStack>
-                    }
-                </RadzenStack>
-
-                @* Category breakdown *@
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
-                    @if (_validation.Summary.DuplicateKeys > 0)
-                    {
-                        <RadzenBadge BadgeStyle="BadgeStyle.Danger" Variant="Radzen.Variant.Outlined"
-                                     Text="@($"{_validation.Summary.DuplicateKeys} duplicate{(_validation.Summary.DuplicateKeys != 1 ? "s" : "")}")" />
-                    }
-                    @if (_validation.Summary.MissingTranslations > 0)
-                    {
-                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Variant="Radzen.Variant.Outlined"
-                                     Text="@($"{_validation.Summary.MissingTranslations} missing")" />
-                    }
-                    @if (_validation.Summary.EmptyValues > 0)
-                    {
-                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Variant="Radzen.Variant.Outlined"
-                                     Text="@($"{_validation.Summary.EmptyValues} empty")" />
-                    }
-                    @if (_validation.Summary.PlaceholderMismatches > 0)
-                    {
-                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Variant="Radzen.Variant.Outlined"
-                                     Text="@($"{_validation.Summary.PlaceholderMismatches} placeholder{(_validation.Summary.PlaceholderMismatches != 1 ? "s" : "")}")" />
-                    }
-                    @if (_validation.Summary.PendingReview > 0)
-                    {
-                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Variant="Radzen.Variant.Outlined"
-                                     Text="@($"{_validation.Summary.PendingReview} pending review")" />
-                    }
-                </RadzenStack>
-
-                @* View details link *@
-                <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
-                              Icon="open_in_new" Text="View Full Report"
-                              Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/validation"))" />
-            </RadzenStack>
-        }
-    </RadzenCard>
-
-    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-6 rz-mb-3">Project Details</RadzenText>
-    <RadzenCard>
-        <RadzenRow Gap="1rem">
-            <RadzenColumn Size="12" SizeSM="6">
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Project ID (Slug)</RadzenText>
-                <RadzenText TextStyle="TextStyle.Body1">@_project.Slug</RadzenText>
-            </RadzenColumn>
-            <RadzenColumn Size="12" SizeSM="6">
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Format</RadzenText>
-                <RadzenText TextStyle="TextStyle.Body1">@_project.Format</RadzenText>
-            </RadzenColumn>
-            <RadzenColumn Size="12" SizeSM="6">
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Default Language</RadzenText>
-                <RadzenText TextStyle="TextStyle.Body1">@_project.DefaultLanguage</RadzenText>
-            </RadzenColumn>
-            <RadzenColumn Size="12" SizeSM="6">
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Localization Path</RadzenText>
-                <RadzenText TextStyle="TextStyle.Body1">@_project.LocalizationPath</RadzenText>
-            </RadzenColumn>
-            <RadzenColumn Size="12" SizeSM="6">
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Organization</RadzenText>
-                <RadzenText TextStyle="TextStyle.Body1">@(_project.OrganizationName ?? "Personal")</RadzenText>
-            </RadzenColumn>
-            @if (!string.IsNullOrEmpty(_project.GitHubRepo))
-            {
-                <RadzenColumn Size="12" SizeSM="6">
-                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">GitHub</RadzenText>
-                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" AlignItems="Radzen.AlignItems.Center">
-                        <RadzenIcon Icon="@UiHelpers.GetGitHubStatusIcon(_project.SyncStatus)"
-                                   Style="@UiHelpers.GetGitHubStatusColor(_project.SyncStatus)" />
-                        <RadzenLink Path="@($"projects/{ProjectId}/github")" Text="@_project.GitHubRepo" />
-                    </RadzenStack>
-                    @if (_project.LastSyncedAt.HasValue)
-                    {
-                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                            Last synced @UiHelpers.GetRelativeTime(_project.LastSyncedAt.Value)
-                        </RadzenText>
-                    }
-                </RadzenColumn>
-                <RadzenColumn Size="12" SizeSM="6">
-                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Default Branch</RadzenText>
-                    <RadzenText TextStyle="TextStyle.Body1">@(_project.GitHubDefaultBranch ?? "main")</RadzenText>
-                </RadzenColumn>
-            }
-            <RadzenColumn Size="12" SizeSM="6">
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Created</RadzenText>
-                <RadzenText TextStyle="TextStyle.Body1">@_project.CreatedAt.ToString("MMMM dd, yyyy")</RadzenText>
-            </RadzenColumn>
-            <RadzenColumn Size="12" SizeSM="6">
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Last Synced</RadzenText>
-                <RadzenText TextStyle="TextStyle.Body1">@(_project.LastSyncedAt?.ToString("MMMM dd, yyyy HH:mm") ?? "Never")</RadzenText>
-            </RadzenColumn>
-        </RadzenRow>
-    </RadzenCard>
-
+    </div>
 }
 
 @code {
     [Parameter]
     public int ProjectId { get; set; }
 
+    [Parameter]
+    public string? Tab { get; set; }
+
     private ProjectDto? _project;
     private ProjectStatsDto? _stats;
     private ValidationResultDto? _validation;
     private bool _isLoading = true;
-    private bool _isValidating = false;
+    private string _activeTab = "overview";
 
     // Export dialog state
     private string _exportFormat = "json";
 
+    // Actions context menu
+    private readonly List<ContextMenuItem> _actionMenuItems = new()
+    {
+        new ContextMenuItem { Text = "Translate Missing", Value = "translate", Icon = "translate" },
+        new ContextMenuItem { Text = "Export", Value = "export", Icon = "file_download" }
+    };
+
+    private void OnActionMenuClick(MenuItemEventArgs args)
+    {
+        _contextMenuService.Close();
+        switch (args.Value?.ToString())
+        {
+            case "translate":
+                InvokeAsync(OpenTranslateDialog);
+                break;
+            case "export":
+                InvokeAsync(ExportProject);
+                break;
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadDataAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Map URL tab to active tab
+        _activeTab = Tab?.ToLower() switch
+        {
+            "github" => "github",
+            "snapshots" => "snapshots",
+            "history" => "history",
+            "glossary" => "glossary",
+            "validation" => "validation",
+            _ => "overview"
+        };
     }
 
     private async Task LoadDataAsync()
@@ -360,22 +262,22 @@ else
         }
     }
 
-    private async Task RefreshValidation()
+    private void SelectTab(string tab)
     {
-        _isValidating = true;
-        try
-        {
-            _validation = await ResourceService.ValidateProjectAsync(ProjectId, forceRefresh: true);
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Validation failed: {ex.Message}");
-        }
-        finally
-        {
-            _isValidating = false;
-        }
+        _activeTab = tab;
+        // Update URL without full navigation
+        var url = tab == "overview" ? $"projects/{ProjectId}" : $"projects/{ProjectId}/{tab}";
+        Navigation.NavigateTo(url, replace: true);
     }
+
+    private Radzen.Variant GetButtonVariant(string tab) =>
+        _activeTab == tab ? Radzen.Variant.Flat : Radzen.Variant.Text;
+
+    private ButtonStyle GetButtonStyle(string tab) =>
+        _activeTab == tab ? ButtonStyle.Light : ButtonStyle.Secondary;
+
+    private string GetButtonClass(string tab) =>
+        _activeTab == tab ? "tab-button-selected" : "";
 
     private static string GetCompletionColor(double percentage) => percentage switch
     {
@@ -458,37 +360,5 @@ else
         // In the future, this could download files directly
         NotificationService.Notify(NotificationSeverity.Info, "Export",
             $"Export to {_exportFormat.ToUpper()} format - Use CLI: lrm cloud sync --project {ProjectId} --export {_exportFormat}");
-    }
-
-    // =========================================================================
-    // CLI Command
-    // =========================================================================
-
-    private async Task CopySyncCommand()
-    {
-        var command = $"lrm cloud sync --project {ProjectId}";
-        try
-        {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", command);
-            NotificationService.Notify(NotificationSeverity.Success, "Copied", "CLI command copied to clipboard!");
-        }
-        catch
-        {
-            NotificationService.Notify(NotificationSeverity.Info, "CLI Command", command);
-        }
-    }
-
-    private static string GetRelativeTime(DateTime dateTime)
-    {
-        var diff = DateTime.UtcNow - dateTime;
-        if (diff.TotalSeconds < 60)
-            return "just now";
-        if (diff.TotalMinutes < 60)
-            return $"{(int)diff.TotalMinutes}m ago";
-        if (diff.TotalHours < 24)
-            return $"{(int)diff.TotalHours}h ago";
-        if (diff.TotalDays < 7)
-            return $"{(int)diff.TotalDays}d ago";
-        return dateTime.ToString("MMM dd");
     }
 }

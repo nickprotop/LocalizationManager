@@ -1,30 +1,16 @@
-@page "/projects/{ProjectId:int}/glossary"
 @using LrmCloud.Shared.DTOs.Glossary
 @using LrmCloud.Shared.DTOs.Projects
 @using LrmCloud.Web.Services
 @inject GlossaryService GlossaryService
 @inject ProjectService ProjectService
-@inject NavigationManager Navigation
 @inject NotificationService NotificationService
 @inject Radzen.DialogService DialogService
-@attribute [Authorize]
-
-<PageTitle>Glossary - LRM Cloud</PageTitle>
-
-<RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
-    <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" Size="ButtonSize.Small" />
-    <RadzenBreadCrumb>
-        <RadzenBreadCrumbItem Path="" Text="Projects" />
-        <RadzenBreadCrumbItem Path="@($"projects/{ProjectId}")" Text="@_projectName" />
-        <RadzenBreadCrumbItem Text="Glossary" />
-    </RadzenBreadCrumb>
-</RadzenStack>
 
 <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
     <RadzenStack Gap="0">
         <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
             <RadzenIcon Icon="book" Style="vertical-align: middle;" />
-            <RadzenText TextStyle="TextStyle.H4">Project Glossary</RadzenText>
+            <RadzenText TextStyle="TextStyle.H5">Project Glossary</RadzenText>
         </RadzenStack>
         <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
             Define terms that should be translated consistently. Project terms override organization terms.
@@ -211,14 +197,10 @@ else
     private string _scopeFilter = "all";
     private string _languageFilter = "";
 
-    // Inheritance toggle
     private bool _inheritOrgGlossary = true;
     private bool _isSavingInheritance;
 
-    // Dialog state
     private List<string> _availableLanguages = new() { "en", "fr", "de", "es", "it", "el", "pt", "nl", "pl", "ru", "ja", "zh", "ko" };
-
-    private string _projectName = "";
 
     private List<SelectOption> _scopeOptions = new()
     {
@@ -248,58 +230,22 @@ else
         return options;
     }
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        await LoadProjectInfoAsync();
-        await LoadGlossaryAsync();
+        await LoadDataAsync();
     }
 
-    private async Task LoadProjectInfoAsync()
-    {
-        _project = await ProjectService.GetProjectAsync(ProjectId);
-        if (_project != null)
-        {
-            _projectName = _project.Name;
-            _inheritOrgGlossary = _project.InheritOrganizationGlossary;
-        }
-    }
-
-    private async Task OnInheritanceChanged()
-    {
-        _isSavingInheritance = true;
-        try
-        {
-            var request = new UpdateProjectRequest
-            {
-                InheritOrganizationGlossary = _inheritOrgGlossary
-            };
-
-            var result = await ProjectService.UpdateProjectAsync(ProjectId, request);
-            if (result.IsSuccess)
-            {
-                NotificationService.Notify(NotificationSeverity.Success, "Success", _inheritOrgGlossary ? "Organization glossary enabled" : "Organization glossary disabled");
-                await LoadGlossaryAsync();
-            }
-            else
-            {
-                NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to update setting");
-            }
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
-        }
-        finally
-        {
-            _isSavingInheritance = false;
-        }
-    }
-
-    private async Task LoadGlossaryAsync()
+    private async Task LoadDataAsync()
     {
         _isLoading = true;
         try
         {
+            _project = await ProjectService.GetProjectAsync(ProjectId);
+            if (_project != null)
+            {
+                _inheritOrgGlossary = _project.InheritOrganizationGlossary;
+            }
+
             _glossary = await GlossaryService.GetProjectGlossaryAsync(ProjectId);
 
             if (_glossary?.Languages.Count > 0)
@@ -321,6 +267,37 @@ else
         }
     }
 
+    private async Task OnInheritanceChanged()
+    {
+        _isSavingInheritance = true;
+        try
+        {
+            var request = new UpdateProjectRequest
+            {
+                InheritOrganizationGlossary = _inheritOrgGlossary
+            };
+
+            var result = await ProjectService.UpdateProjectAsync(ProjectId, request);
+            if (result.IsSuccess)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", _inheritOrgGlossary ? "Organization glossary enabled" : "Organization glossary disabled");
+                await LoadDataAsync();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", result.ErrorMessage ?? "Failed to update setting");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+        finally
+        {
+            _isSavingInheritance = false;
+        }
+    }
+
     private async Task OpenAddDialog()
     {
         var result = await DialogService.OpenAsync<GlossaryTermDialog>(
@@ -335,7 +312,7 @@ else
 
         if (result == true)
         {
-            await LoadGlossaryAsync();
+            await LoadDataAsync();
         }
     }
 
@@ -354,7 +331,7 @@ else
 
         if (result == true)
         {
-            await LoadGlossaryAsync();
+            await LoadDataAsync();
         }
     }
 
@@ -371,7 +348,7 @@ else
             {
                 await GlossaryService.DeleteProjectTermAsync(ProjectId, term.Id);
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Term deleted");
-                await LoadGlossaryAsync();
+                await LoadDataAsync();
             }
             catch (Exception ex)
             {
