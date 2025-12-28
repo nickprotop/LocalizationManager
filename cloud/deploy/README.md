@@ -243,6 +243,32 @@ location /health {
 ./deploy.sh
 ```
 
+## First Run - Default Admin User
+
+On first startup with an empty database, LRM Cloud automatically creates a default superadmin user:
+
+| Field | Value |
+|-------|-------|
+| **Email** | First email from `superAdmin.emails` config, or `admin@localhost` if not configured |
+| **Password** | `Password123!` |
+| **Username** | `admin` |
+
+**Important:**
+- The credentials are logged to the console on first run with a warning to change the password
+- After logging in, a yellow alert banner will appear prompting you to change the password
+- Navigate to **Settings > Profile** to change your password
+- The alert will disappear after you change your password
+
+To pre-configure a superadmin email, add it to `config.json` before first run:
+
+```json
+{
+  "superAdmin": {
+    "emails": ["your-admin@example.com"]
+  }
+}
+```
+
 ## Scripts
 
 ### setup.sh - Initial Setup

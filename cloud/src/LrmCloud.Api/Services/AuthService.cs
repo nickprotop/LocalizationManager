@@ -725,6 +725,7 @@ public class AuthService : IAuthService
 
         // Update password
         user.PasswordHash = newPasswordHash;
+        user.MustChangePassword = false;  // Clear the flag after password change
         user.UpdatedAt = DateTime.UtcNow;
 
         // Revoke all refresh tokens for this user (force re-login everywhere)

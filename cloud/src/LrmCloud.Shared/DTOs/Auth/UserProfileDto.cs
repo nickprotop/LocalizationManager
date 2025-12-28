@@ -24,6 +24,7 @@ public class UserProfileDto
 
     // Admin
     public bool IsSuperAdmin { get; set; }
+    public bool MustChangePassword { get; set; }
 
     // LRM Translation Usage & Limits (counts against plan)
     public int TranslationCharsUsed { get; set; }

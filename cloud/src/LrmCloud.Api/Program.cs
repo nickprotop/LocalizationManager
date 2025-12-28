@@ -10,6 +10,7 @@ using LrmCloud.Api.Services.Billing;
 using LrmCloud.Api.Services.Billing.Providers;
 using LrmCloud.Api.Services.Translation;
 using LrmCloud.Shared.Configuration;
+using LrmCloud.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
 using HealthChecks.NpgSql;
 using Minio;
@@ -424,8 +425,47 @@ public class Program
 
                 // Seed superadmins from configuration
                 var superAdminEmails = config.SuperAdmin?.Emails ?? new List<string>();
-                if (superAdminEmails.Count > 0)
+
+                // Check if this is first run (no users exist)
+                var userCount = db.Users.Count();
+                if (userCount == 0)
                 {
+                    // First run - create default superadmin
+                    var defaultEmail = superAdminEmails.Count > 0
+                        ? superAdminEmails[0].ToLowerInvariant().Trim()
+                        : "admin@localhost";
+                    var defaultPassword = "Password123!";
+                    var passwordHash = BCrypt.Net.BCrypt.HashPassword(defaultPassword, 12);
+
+                    var superAdmin = new User
+                    {
+                        AuthType = "email",
+                        Email = defaultEmail,
+                        EmailVerified = true,
+                        PasswordHash = passwordHash,
+                        Username = "admin",
+                        Plan = "team",
+                        IsSuperAdmin = true,
+                        MustChangePassword = true,
+                        TranslationCharsLimit = int.MaxValue,
+                        OtherCharsLimit = long.MaxValue,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    db.Users.Add(superAdmin);
+                    db.SaveChanges();
+
+                    Log.Warning("=========================================");
+                    Log.Warning("DEFAULT SUPERADMIN CREATED");
+                    Log.Warning("Email: {Email}", defaultEmail);
+                    Log.Warning("Password: {Password}", defaultPassword);
+                    Log.Warning("CHANGE THIS PASSWORD IMMEDIATELY!");
+                    Log.Warning("=========================================");
+                }
+                else if (superAdminEmails.Count > 0)
+                {
+                    // Mark existing users as superadmin if configured
                     Log.Information("Checking superadmin configuration for {Count} email(s)", superAdminEmails.Count);
                     foreach (var email in superAdminEmails)
                     {

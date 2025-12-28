@@ -10,5 +10,6 @@ public class UserDto
     public bool EmailVerified { get; set; }
     public string Plan { get; set; } = "free";
     public bool IsSuperAdmin { get; set; }
+    public bool MustChangePassword { get; set; }
     public DateTime CreatedAt { get; set; }
 }

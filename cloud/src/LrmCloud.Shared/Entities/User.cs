@@ -169,6 +169,13 @@ public class User
     [Column("is_superadmin")]
     public bool IsSuperAdmin { get; set; }
 
+    /// <summary>
+    /// Whether this user must change their password on next login.
+    /// Set to true for system-created default admin accounts.
+    /// </summary>
+    [Column("must_change_password")]
+    public bool MustChangePassword { get; set; }
+
     // Soft delete
     [Column("deleted_at")]
     public DateTime? DeletedAt { get; set; }
