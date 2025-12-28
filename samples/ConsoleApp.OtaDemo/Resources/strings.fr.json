@@ -1,0 +1,18 @@
+{
+  "Welcome": "Bienvenue (Fallback)",
+  "Goodbye": "Au revoir (Fallback)",
+  "AppTitle": "Demo OTA - Mode Fallback",
+  "Greeting": "Bonjour, {0}! (Fallback)",
+  "Items": {
+    "_plural": true,
+    "one": "{0} article (fallback)",
+    "other": "{0} articles (fallback)"
+  },
+  "Messages": {
+    "_plural": true,
+    "zero": "Aucun message (fallback)",
+    "one": "{0} message (fallback)",
+    "other": "{0} messages (fallback)"
+  },
+  "FallbackOnly": "Cette cle existe uniquement dans les ressources de secours"
+}

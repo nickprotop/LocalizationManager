@@ -1,0 +1,18 @@
+{
+  "Welcome": "Willkommen (Fallback)",
+  "Goodbye": "Auf Wiedersehen (Fallback)",
+  "AppTitle": "OTA-Demo - Fallback-Modus",
+  "Greeting": "Hallo, {0}! (Fallback)",
+  "Items": {
+    "_plural": true,
+    "one": "{0} Artikel (fallback)",
+    "other": "{0} Artikel (fallback)"
+  },
+  "Messages": {
+    "_plural": true,
+    "zero": "Keine Nachrichten (fallback)",
+    "one": "{0} Nachricht (fallback)",
+    "other": "{0} Nachrichten (fallback)"
+  },
+  "FallbackOnly": "Dieser Schlussel existiert nur in Fallback-Ressourcen"
+}

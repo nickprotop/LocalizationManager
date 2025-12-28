@@ -1,0 +1,18 @@
+{
+  "Welcome": "Welcome (Fallback)",
+  "Goodbye": "Goodbye (Fallback)",
+  "AppTitle": "OTA Demo - Fallback Mode",
+  "Greeting": "Hello, {0}! (Fallback)",
+  "Items": {
+    "_plural": true,
+    "one": "{0} item (fallback)",
+    "other": "{0} items (fallback)"
+  },
+  "Messages": {
+    "_plural": true,
+    "zero": "No messages (fallback)",
+    "one": "{0} message (fallback)",
+    "other": "{0} messages (fallback)"
+  },
+  "FallbackOnly": "This key only exists in fallback resources"
+}
