@@ -59,6 +59,7 @@ else
                         {
                             <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false" class="rz-mt-2">
                                 Your payment is pending. Please complete the payment to activate your subscription.
+                                <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Text="Cancel Upgrade" Click="@CancelIncompleteSubscription" Disabled="@_isProcessing" class="rz-ms-2" />
                             </RadzenAlert>
                         }
                         else if (_subscription.CancelAtPeriodEnd)
@@ -83,9 +84,9 @@ else
                         {
                             @if (_subscription.PaymentProvider == "paypal")
                             {
-                                <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary" Icon="open_in_new" Text="Manage on PayPal">
-                                    <a href="https://www.paypal.com/myaccount/autopay" target="_blank" style="display: contents; color: inherit; text-decoration: none;"></a>
-                                </RadzenButton>
+                                <a href="https://www.paypal.com/myaccount/autopay" target="_blank" style="text-decoration: none;">
+                                    <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary" Icon="open_in_new" Text="Manage on PayPal" />
+                                </a>
                             }
                             else
                             {
@@ -401,6 +402,32 @@ else
             else
             {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to reactivate subscription");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task CancelIncompleteSubscription()
+    {
+        _isProcessing = true;
+        try
+        {
+            var success = await BillingService.CancelSubscriptionAsync();
+            if (success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Cancelled", "Upgrade cancelled successfully");
+                await LoadDataAsync();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to cancel upgrade");
             }
         }
         catch (Exception ex)
