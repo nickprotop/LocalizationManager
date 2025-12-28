@@ -2,6 +2,7 @@
 // Licensed under the MIT License
 
 using LocalizationManager.Core;
+using LocalizationManager.Core.Backends.Resx;
 using LocalizationManager.Core.Models;
 using Xunit;
 
@@ -11,14 +12,14 @@ public class LanguageFileManagerTests : IDisposable
 {
     private readonly string _testDirectory;
     private readonly LanguageFileManager _manager;
-    private readonly ResourceFileParser _parser;
+    private readonly ResxResourceReader _reader = new();
+    private readonly ResxResourceWriter _writer = new();
 
     public LanguageFileManagerTests()
     {
         _testDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(_testDirectory);
         _manager = new LanguageFileManager();
-        _parser = new ResourceFileParser();
 
         // Create a default test resource file
         CreateDefaultTestResource();
@@ -45,7 +46,7 @@ public class LanguageFileManagerTests : IDisposable
             }
         };
 
-        _parser.Write(resourceFile);
+        _writer.Write(resourceFile);
     }
 
     public void Dispose()
@@ -88,7 +89,7 @@ public class LanguageFileManagerTests : IDisposable
             IsDefault = true,
             FilePath = Path.Combine(_testDirectory, "TestResource.resx")
         };
-        var sourceFile = _parser.Parse(defaultLang);
+        var sourceFile = _reader.Read(defaultLang);
 
         // Act
         var result = _manager.CreateLanguageFile(baseName, cultureCode, _testDirectory, sourceFile, copyEntries: true);
@@ -114,7 +115,7 @@ public class LanguageFileManagerTests : IDisposable
             IsDefault = true,
             FilePath = Path.Combine(_testDirectory, "TestResource.resx")
         };
-        var sourceFile = _parser.Parse(defaultLang);
+        var sourceFile = _reader.Read(defaultLang);
 
         // Act
         var result = _manager.CreateLanguageFile(baseName, cultureCode, _testDirectory, sourceFile, copyEntries: false);

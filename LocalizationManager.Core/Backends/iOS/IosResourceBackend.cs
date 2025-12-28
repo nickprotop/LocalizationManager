@@ -12,6 +12,9 @@ namespace LocalizationManager.Core.Backends.iOS;
 /// </summary>
 public class IosResourceBackend : IResourceBackend
 {
+    private readonly string _stringsFileName;
+    private readonly string _stringsdictFileName;
+
     /// <inheritdoc />
     public string Name => "ios";
 
@@ -39,9 +42,23 @@ public class IosResourceBackend : IResourceBackend
         string stringsFileName = "Localizable.strings",
         string? developmentLanguage = null)
     {
+        _stringsFileName = stringsFileName;
+        _stringsdictFileName = stringsFileName.Replace(".strings", ".stringsdict");
         Discovery = new IosResourceDiscovery(stringsFileName, developmentLanguage);
         Reader = new IosResourceReader();
         Writer = new IosResourceWriter(stringsFileName);
         Validator = new IosResourceValidator(stringsFileName, developmentLanguage);
+    }
+
+    /// <inheritdoc />
+    public bool CanHandle(string path)
+    {
+        if (!Directory.Exists(path))
+            return false;
+
+        // Check for *.lproj folders with .strings or .stringsdict files
+        return Directory.GetDirectories(path, "*.lproj")
+            .Any(d => File.Exists(Path.Combine(d, _stringsFileName)) ||
+                      File.Exists(Path.Combine(d, _stringsdictFileName)));
     }
 }

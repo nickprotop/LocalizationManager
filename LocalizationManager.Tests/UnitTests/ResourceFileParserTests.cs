@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Nikolaos Protopapas
 // Licensed under the MIT License
 
-using LocalizationManager.Core;
+using LocalizationManager.Core.Backends.Resx;
 using LocalizationManager.Core.Models;
 using Xunit;
 
@@ -10,6 +10,8 @@ namespace LocalizationManager.Tests.UnitTests;
 public class ResourceFileParserTests
 {
     private readonly string _testDataPath;
+    private readonly ResxResourceReader _reader = new();
+    private readonly ResxResourceWriter _writer = new();
 
     public ResourceFileParserTests()
     {
@@ -20,7 +22,6 @@ public class ResourceFileParserTests
     public void Parse_ValidResxFile_ReturnsResourceFile()
     {
         // Arrange
-        var parser = new ResourceFileParser();
         var languageInfo = new LanguageInfo
         {
             BaseName = "TestResource",
@@ -31,7 +32,7 @@ public class ResourceFileParserTests
         };
 
         // Act
-        var result = parser.Parse(languageInfo);
+        var result = _reader.Read(languageInfo);
 
         // Assert
         Assert.NotNull(result);
@@ -44,7 +45,6 @@ public class ResourceFileParserTests
     public void Parse_ValidResxFile_ParsesEntriesCorrectly()
     {
         // Arrange
-        var parser = new ResourceFileParser();
         var languageInfo = new LanguageInfo
         {
             BaseName = "TestResource",
@@ -55,7 +55,7 @@ public class ResourceFileParserTests
         };
 
         // Act
-        var result = parser.Parse(languageInfo);
+        var result = _reader.Read(languageInfo);
 
         // Assert
         var saveEntry = result.Entries.FirstOrDefault(e => e.Key == "Save");
@@ -68,7 +68,6 @@ public class ResourceFileParserTests
     public void Parse_ValidResxFile_ParsesEmptyValues()
     {
         // Arrange
-        var parser = new ResourceFileParser();
         var languageInfo = new LanguageInfo
         {
             BaseName = "TestResource",
@@ -79,7 +78,7 @@ public class ResourceFileParserTests
         };
 
         // Act
-        var result = parser.Parse(languageInfo);
+        var result = _reader.Read(languageInfo);
 
         // Assert
         var emptyEntry = result.Entries.FirstOrDefault(e => e.Key == "EmptyValue");
@@ -91,7 +90,6 @@ public class ResourceFileParserTests
     public void Parse_NonExistentFile_ThrowsFileNotFoundException()
     {
         // Arrange
-        var parser = new ResourceFileParser();
         var languageInfo = new LanguageInfo
         {
             BaseName = "NonExistent",
@@ -102,14 +100,13 @@ public class ResourceFileParserTests
         };
 
         // Act & Assert
-        Assert.Throws<FileNotFoundException>(() => parser.Parse(languageInfo));
+        Assert.Throws<FileNotFoundException>(() => _reader.Read(languageInfo));
     }
 
     [Fact]
     public void Write_ValidResourceFile_CreatesFile()
     {
         // Arrange
-        var parser = new ResourceFileParser();
         var tempFile = Path.Combine(Path.GetTempPath(), "TempTest.resx");
         var resourceFile = new ResourceFile
         {
@@ -130,13 +127,13 @@ public class ResourceFileParserTests
         try
         {
             // Act
-            parser.Write(resourceFile);
+            _writer.Write(resourceFile);
 
             // Assert
             Assert.True(File.Exists(tempFile));
 
             // Verify we can read it back
-            var readBack = parser.Parse(resourceFile.Language);
+            var readBack = _reader.Read(resourceFile.Language);
             Assert.Single(readBack.Entries);
             Assert.Equal("TestKey", readBack.Entries[0].Key);
             Assert.Equal("Test Value", readBack.Entries[0].Value);
@@ -156,7 +153,6 @@ public class ResourceFileParserTests
     public void Write_ShouldPreserveOriginalOrder()
     {
         // Arrange
-        var parser = new ResourceFileParser();
         var tempFile = Path.Combine(Path.GetTempPath(), "OrderTest.resx");
 
         // Create initial file with specific order
@@ -182,15 +178,15 @@ public class ResourceFileParserTests
         try
         {
             // Act - Write initial file
-            parser.Write(initialFile);
+            _writer.Write(initialFile);
 
             // Update one value (not adding/removing, just updating)
-            var updatedFile = parser.Parse(initialFile.Language);
+            var updatedFile = _reader.Read(initialFile.Language);
             updatedFile.Entries.First(e => e.Key == "Mike").Value = "Modified M";
-            parser.Write(updatedFile);
+            _writer.Write(updatedFile);
 
             // Assert - Order should be preserved
-            var result = parser.Parse(initialFile.Language);
+            var result = _reader.Read(initialFile.Language);
             Assert.Equal(4, result.Entries.Count);
             Assert.Equal("Zebra", result.Entries[0].Key); // Still first
             Assert.Equal("Alpha", result.Entries[1].Key); // Still second
@@ -208,7 +204,6 @@ public class ResourceFileParserTests
     public void Write_ShouldPreserveXmlSchema()
     {
         // Arrange
-        var parser = new ResourceFileParser();
         var sourceFile = Path.Combine(_testDataPath, "TestResource.resx");
         var tempFile = Path.Combine(Path.GetTempPath(), "SchemaTest.resx");
 
@@ -230,11 +225,11 @@ public class ResourceFileParserTests
                 IsDefault = true,
                 FilePath = tempFile
             };
-            var resourceFile = parser.Parse(languageInfo);
+            var resourceFile = _reader.Read(languageInfo);
 
             // Modify one value
             resourceFile.Entries.First(e => e.Key == "Save").Value = "Modified Save";
-            parser.Write(resourceFile);
+            _writer.Write(resourceFile);
 
             // Assert - Schema should still be present
             var modifiedXml = File.ReadAllText(tempFile);
@@ -245,7 +240,7 @@ public class ResourceFileParserTests
             }
 
             // Verify the change was applied
-            var result = parser.Parse(languageInfo);
+            var result = _reader.Read(languageInfo);
             Assert.Equal("Modified Save", result.Entries.First(e => e.Key == "Save").Value);
         }
         finally
@@ -258,7 +253,6 @@ public class ResourceFileParserTests
     public void Write_ShouldOnlyModifyChangedEntries()
     {
         // Arrange
-        var parser = new ResourceFileParser();
         var tempFile = Path.Combine(Path.GetTempPath(), "ModifyTest.resx");
 
         // Create initial file
@@ -283,12 +277,12 @@ public class ResourceFileParserTests
         try
         {
             // Act - Write, then modify only one entry
-            parser.Write(initialFile);
+            _writer.Write(initialFile);
             var originalXml = File.ReadAllText(tempFile);
 
-            var updatedFile = parser.Parse(initialFile.Language);
+            var updatedFile = _reader.Read(initialFile.Language);
             updatedFile.Entries.First(e => e.Key == "Key2").Value = "Modified Value2";
-            parser.Write(updatedFile);
+            _writer.Write(updatedFile);
 
             var modifiedXml = File.ReadAllText(tempFile);
 
@@ -299,7 +293,7 @@ public class ResourceFileParserTests
             Assert.Contains("Value3", modifiedXml); // Key3 unchanged
 
             // Verify all entries are still present
-            var result = parser.Parse(initialFile.Language);
+            var result = _reader.Read(initialFile.Language);
             Assert.Equal(3, result.Entries.Count);
         }
         finally
@@ -312,7 +306,6 @@ public class ResourceFileParserTests
     public void Write_ShouldAddNewEntriesAtEnd()
     {
         // Arrange
-        var parser = new ResourceFileParser();
         var tempFile = Path.Combine(Path.GetTempPath(), "AddTest.resx");
 
         // Create initial file with 2 entries
@@ -336,14 +329,14 @@ public class ResourceFileParserTests
         try
         {
             // Act - Write initial, then add a new entry
-            parser.Write(initialFile);
+            _writer.Write(initialFile);
 
-            var updatedFile = parser.Parse(initialFile.Language);
+            var updatedFile = _reader.Read(initialFile.Language);
             updatedFile.Entries.Add(new ResourceEntry { Key = "Third", Value = "3" });
-            parser.Write(updatedFile);
+            _writer.Write(updatedFile);
 
             // Assert - New entry should be at the end
-            var result = parser.Parse(initialFile.Language);
+            var result = _reader.Read(initialFile.Language);
             Assert.Equal(3, result.Entries.Count);
             Assert.Equal("First", result.Entries[0].Key);
             Assert.Equal("Second", result.Entries[1].Key);
@@ -359,7 +352,6 @@ public class ResourceFileParserTests
     public void Write_ShouldRemoveDeletedEntries()
     {
         // Arrange
-        var parser = new ResourceFileParser();
         var tempFile = Path.Combine(Path.GetTempPath(), "DeleteTest.resx");
 
         // Create initial file with 3 entries
@@ -384,14 +376,14 @@ public class ResourceFileParserTests
         try
         {
             // Act - Write initial, then remove middle entry
-            parser.Write(initialFile);
+            _writer.Write(initialFile);
 
-            var updatedFile = parser.Parse(initialFile.Language);
+            var updatedFile = _reader.Read(initialFile.Language);
             updatedFile.Entries.RemoveAll(e => e.Key == "Remove");
-            parser.Write(updatedFile);
+            _writer.Write(updatedFile);
 
             // Assert - Removed entry should be gone, others preserved in order
-            var result = parser.Parse(initialFile.Language);
+            var result = _reader.Read(initialFile.Language);
             Assert.Equal(2, result.Entries.Count);
             Assert.Equal("Keep1", result.Entries[0].Key);
             Assert.Equal("Keep2", result.Entries[1].Key);

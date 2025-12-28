@@ -54,4 +54,13 @@ public class ResxResourceBackend : IResourceBackend
         Writer = new ResxResourceWriter();
         Validator = new ResxResourceValidator();
     }
+
+    /// <inheritdoc />
+    public bool CanHandle(string path)
+    {
+        if (!Directory.Exists(path))
+            return false;
+
+        return Directory.GetFiles(path, "*.resx", SearchOption.TopDirectoryOnly).Any();
+    }
 }

@@ -55,4 +55,12 @@ public interface IResourceBackend
     /// Validator for checking resource files
     /// </summary>
     IResourceValidator Validator { get; }
+
+    /// <summary>
+    /// Checks if this backend can handle resources at the given path.
+    /// The path should be the resource folder directly (not project root).
+    /// </summary>
+    /// <param name="path">The path to check for compatible resource files</param>
+    /// <returns>True if this backend can handle resources at the path</returns>
+    bool CanHandle(string path);
 }

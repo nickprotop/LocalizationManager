@@ -2,7 +2,7 @@
 // Licensed under the MIT License
 
 using LocalizationManager.Commands;
-using LocalizationManager.Core;
+using LocalizationManager.Core.Backends.Resx;
 using LocalizationManager.Core.Models;
 using Spectre.Console.Cli;
 using Xunit;
@@ -12,15 +12,16 @@ namespace LocalizationManager.Tests.IntegrationTests;
 public class LanguageCommandsIntegrationTests : IDisposable
 {
     private readonly string _testDirectory;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly ResxResourceReader _reader = new();
+    private readonly ResxResourceWriter _writer = new();
+    private readonly ResxResourceDiscovery _discovery = new();
 
     public LanguageCommandsIntegrationTests()
     {
         _testDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(_testDirectory);
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        // Using _reader and _writer initialized above
+        // Using _discovery initialized above
 
         // Create a default test resource file
         CreateDefaultTestResource();
@@ -49,7 +50,7 @@ public class LanguageCommandsIntegrationTests : IDisposable
             }
         };
 
-        _parser.Write(resourceFile);
+        _writer.Write(resourceFile);
     }
 
     private void CreateGreekTestResource()
@@ -74,7 +75,7 @@ public class LanguageCommandsIntegrationTests : IDisposable
             }
         };
 
-        _parser.Write(resourceFile);
+        _writer.Write(resourceFile);
     }
 
     public void Dispose()
@@ -128,7 +129,7 @@ public class LanguageCommandsIntegrationTests : IDisposable
             IsDefault = false,
             FilePath = Path.Combine(_testDirectory, "TestResource.fr.resx")
         };
-        var frFile = _parser.Parse(frLang);
+        var frFile = _reader.Read(frLang);
         Assert.Equal(3, frFile.Entries.Count);
     }
 
@@ -158,7 +159,7 @@ public class LanguageCommandsIntegrationTests : IDisposable
             IsDefault = false,
             FilePath = Path.Combine(_testDirectory, "TestResource.de.resx")
         };
-        var deFile = _parser.Parse(deLang);
+        var deFile = _reader.Read(deLang);
         Assert.Empty(deFile.Entries);
     }
 
@@ -186,7 +187,7 @@ public class LanguageCommandsIntegrationTests : IDisposable
             IsDefault = false,
             FilePath = Path.Combine(_testDirectory, "TestResource.fr.resx")
         };
-        var frFile = _parser.Parse(frLang);
+        var frFile = _reader.Read(frLang);
 
         // Should have copied Greek entries
         Assert.Equal(3, frFile.Entries.Count);

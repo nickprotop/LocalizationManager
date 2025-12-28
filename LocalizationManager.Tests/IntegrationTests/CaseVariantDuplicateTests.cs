@@ -2,6 +2,7 @@
 // Licensed under the MIT License
 
 using LocalizationManager.Core;
+using LocalizationManager.Core.Backends.Resx;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Commands;
 using Spectre.Console.Cli;
@@ -16,16 +17,17 @@ namespace LocalizationManager.Tests.IntegrationTests;
 public class CaseVariantDuplicateTests : IDisposable
 {
     private readonly string _testDirectory;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly ResxResourceReader _reader = new();
+    private readonly ResxResourceWriter _writer = new();
+    private readonly ResxResourceDiscovery _discovery = new();
 
     public CaseVariantDuplicateTests()
     {
         _testDirectory = Path.Combine(Path.GetTempPath(), $"LrmCaseTests_{Guid.NewGuid()}");
         Directory.CreateDirectory(_testDirectory);
 
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        // Using _reader and _writer initialized above
+        // Using _discovery initialized above
     }
 
     public void Dispose()
@@ -76,8 +78,8 @@ public class CaseVariantDuplicateTests : IDisposable
             }
         };
 
-        _parser.Write(defaultFile);
-        _parser.Write(frenchFile);
+        _writer.Write(defaultFile);
+        _writer.Write(frenchFile);
     }
 
     private void CreateResourceFileWithSingleKey(string keyName, string value)
@@ -98,7 +100,7 @@ public class CaseVariantDuplicateTests : IDisposable
             }
         };
 
-        _parser.Write(defaultFile);
+        _writer.Write(defaultFile);
     }
 
     [Fact]
@@ -107,7 +109,7 @@ public class CaseVariantDuplicateTests : IDisposable
         // Arrange
         CreateResourceFilesWithCaseVariants();
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         var validator = new ResourceValidator();
 
@@ -148,7 +150,7 @@ public class CaseVariantDuplicateTests : IDisposable
 
         // Verify the key was not added
         var reloadedLanguages = _discovery.DiscoverLanguages(_testDirectory);
-        var reloadedFiles = reloadedLanguages.Select(lang => _parser.Parse(lang)).ToList();
+        var reloadedFiles = reloadedLanguages.Select(lang => _reader.Read(lang)).ToList();
         var reloadedDefault = reloadedFiles.First(rf => rf.Language.IsDefault);
 
         // Should still have only 1 entry (the original "Total")
@@ -165,19 +167,19 @@ public class CaseVariantDuplicateTests : IDisposable
         // Arrange
         CreateResourceFilesWithCaseVariants();
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act: Auto-merge (keeps first occurrence)
         MergeKeyAutoFirst(resourceFiles, "Total");
 
         foreach (var rf in resourceFiles)
         {
-            _parser.Write(rf);
+            _writer.Write(rf);
         }
 
         // Assert
         var reloadedLanguages = _discovery.DiscoverLanguages(_testDirectory);
-        var reloadedFiles = reloadedLanguages.Select(lang => _parser.Parse(lang)).ToList();
+        var reloadedFiles = reloadedLanguages.Select(lang => _reader.Read(lang)).ToList();
         var reloadedDefault = reloadedFiles.First(rf => rf.Language.IsDefault);
 
         // Should have only 1 occurrence
@@ -197,19 +199,19 @@ public class CaseVariantDuplicateTests : IDisposable
         // Arrange
         CreateResourceFilesWithCaseVariants();
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act: Auto-merge
         MergeKeyAutoFirst(resourceFiles, "TOTAL"); // Use different casing to search
 
         foreach (var rf in resourceFiles)
         {
-            _parser.Write(rf);
+            _writer.Write(rf);
         }
 
         // Assert: Both files should have standardized key name
         var reloadedLanguages = _discovery.DiscoverLanguages(_testDirectory);
-        var reloadedFiles = reloadedLanguages.Select(lang => _parser.Parse(lang)).ToList();
+        var reloadedFiles = reloadedLanguages.Select(lang => _reader.Read(lang)).ToList();
 
         foreach (var rf in reloadedFiles)
         {
@@ -242,7 +244,7 @@ public class CaseVariantDuplicateTests : IDisposable
 
         // Assert
         var reloadedLanguages = _discovery.DiscoverLanguages(_testDirectory);
-        var reloadedFiles = reloadedLanguages.Select(lang => _parser.Parse(lang)).ToList();
+        var reloadedFiles = reloadedLanguages.Select(lang => _reader.Read(lang)).ToList();
 
         foreach (var rf in reloadedFiles)
         {
@@ -273,7 +275,7 @@ public class CaseVariantDuplicateTests : IDisposable
                 new() { Key = "Total", Value = "Original value" }
             }
         };
-        _parser.Write(defaultFile);
+        _writer.Write(defaultFile);
 
         // Act: Update using "TOTAL" (different casing)
         var app = new CommandApp();
@@ -288,7 +290,7 @@ public class CaseVariantDuplicateTests : IDisposable
         Assert.Equal(0, result);
 
         var reloadedLanguages = _discovery.DiscoverLanguages(_testDirectory);
-        var reloadedFiles = reloadedLanguages.Select(lang => _parser.Parse(lang)).ToList();
+        var reloadedFiles = reloadedLanguages.Select(lang => _reader.Read(lang)).ToList();
         var reloadedDefault = reloadedFiles.First(rf => rf.Language.IsDefault);
 
         var entry = reloadedDefault.Entries.FirstOrDefault(e =>
@@ -308,7 +310,7 @@ public class CaseVariantDuplicateTests : IDisposable
 
         // Act: Use ViewCommand's FindMatchingKeys logic
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Search with lowercase "total"
@@ -329,7 +331,7 @@ public class CaseVariantDuplicateTests : IDisposable
         // Arrange
         CreateResourceFilesWithCaseVariants();
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Act: Group by key case-insensitively (as ViewCommand does)

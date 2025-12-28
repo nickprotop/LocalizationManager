@@ -78,118 +78,28 @@ public class ResourceBackendFactory : IResourceBackendFactory
     /// <inheritdoc />
     public IResourceBackend ResolveFromPath(string path, ConfigurationModel? config)
     {
-        // Check for existing files
-        if (Directory.Exists(path))
+        if (!Directory.Exists(path))
+            return GetBackend("resx", config); // Default fallback
+
+        // Priority order: most specific first (Android/iOS before JSON/RESX)
+        // JSON backend needs special handling for auto-detection of i18next format
+        var priorities = new[] { "android", "ios", "json", "resx" };
+
+        foreach (var name in priorities)
         {
-            // Check for Android project structure (res/values/strings.xml)
-            if (IsAndroidProject(path))
-                return GetBackend("android", config);
+            var backend = GetBackend(name, config);
+            if (backend.CanHandle(path))
+            {
+                // For JSON, recreate with path for auto-detection of i18next format
+                if (name == "json")
+                    return new JsonResourceBackend(path);
 
-            // Check for iOS project structure (*.lproj/Localizable.strings)
-            if (IsIosProject(path))
-                return GetBackend("ios", config);
-
-            // Check for JSON resource files (exclude lrm*.json config files)
-            var jsonFiles = Directory.GetFiles(path, "*.json", SearchOption.TopDirectoryOnly)
-                .Where(f => !Path.GetFileName(f).StartsWith("lrm", StringComparison.OrdinalIgnoreCase));
-
-            if (jsonFiles.Any() && _backends.ContainsKey("json"))
-                return new JsonResourceBackend(path);  // Pass path for auto-detection
-
-            if (Directory.GetFiles(path, "*.resx", SearchOption.TopDirectoryOnly).Any())
-                return GetBackend("resx", config);
+                return backend;
+            }
         }
 
         // Default to RESX for backward compatibility
         return GetBackend("resx", config);
-    }
-
-    /// <summary>
-    /// Checks if the path contains an Android project structure.
-    /// </summary>
-    private static bool IsAndroidProject(string path)
-    {
-        // Check if path is already the res folder
-        if (Path.GetFileName(path).Equals("res", StringComparison.OrdinalIgnoreCase))
-        {
-            return HasAndroidValuesFolder(path);
-        }
-
-        // Check for res/values*/strings.xml
-        var resPath = Path.Combine(path, "res");
-        if (Directory.Exists(resPath) && HasAndroidValuesFolder(resPath))
-            return true;
-
-        // Check for app/src/main/res structure (standard Android)
-        var mainResPath = Path.Combine(path, "app", "src", "main", "res");
-        if (Directory.Exists(mainResPath) && HasAndroidValuesFolder(mainResPath))
-            return true;
-
-        // Check for src/main/res structure (module)
-        var srcMainResPath = Path.Combine(path, "src", "main", "res");
-        if (Directory.Exists(srcMainResPath) && HasAndroidValuesFolder(srcMainResPath))
-            return true;
-
-        return false;
-    }
-
-    /// <summary>
-    /// Checks if the res folder contains any values folder with strings.xml.
-    /// </summary>
-    private static bool HasAndroidValuesFolder(string resPath)
-    {
-        // Check for values/ folder (default language)
-        if (File.Exists(Path.Combine(resPath, "values", "strings.xml")))
-            return true;
-
-        // Check for any values-* folder (language-specific)
-        try
-        {
-            foreach (var dir in Directory.GetDirectories(resPath, "values*"))
-            {
-                if (File.Exists(Path.Combine(dir, "strings.xml")))
-                    return true;
-            }
-        }
-        catch
-        {
-            // Ignore directory access errors
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Checks if the path contains an iOS project structure.
-    /// </summary>
-    private static bool IsIosProject(string path)
-    {
-        // Check for *.lproj folders with Localizable.strings
-        var lprojFolders = Directory.GetDirectories(path, "*.lproj");
-        foreach (var folder in lprojFolders)
-        {
-            if (File.Exists(Path.Combine(folder, "Localizable.strings")) ||
-                File.Exists(Path.Combine(folder, "Localizable.stringsdict")))
-            {
-                return true;
-            }
-        }
-
-        // Check Resources subfolder
-        var resourcesPath = Path.Combine(path, "Resources");
-        if (Directory.Exists(resourcesPath))
-        {
-            foreach (var folder in Directory.GetDirectories(resourcesPath, "*.lproj"))
-            {
-                if (File.Exists(Path.Combine(folder, "Localizable.strings")) ||
-                    File.Exists(Path.Combine(folder, "Localizable.stringsdict")))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     /// <inheritdoc />

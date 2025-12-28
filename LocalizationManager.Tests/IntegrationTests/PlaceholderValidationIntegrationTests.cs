@@ -2,6 +2,7 @@
 // Licensed under the MIT License
 
 using LocalizationManager.Core;
+using LocalizationManager.Core.Backends.Resx;
 using LocalizationManager.Core.Models;
 using Xunit;
 
@@ -10,12 +11,13 @@ namespace LocalizationManager.Tests.IntegrationTests;
 public class PlaceholderValidationIntegrationTests
 {
     private readonly ResourceValidator _validator;
-    private readonly ResourceFileParser _parser;
+    private readonly ResxResourceReader _reader = new();
+    private readonly ResxResourceWriter _writer = new();
 
     public PlaceholderValidationIntegrationTests()
     {
         _validator = new ResourceValidator();
-        _parser = new ResourceFileParser();
+        // Using _reader and _writer initialized above
     }
 
     [Fact]

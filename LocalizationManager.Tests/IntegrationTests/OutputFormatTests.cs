@@ -3,6 +3,7 @@
 
 using System.Text.Json;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Backends.Resx;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Core.Output;
 using Xunit;
@@ -12,8 +13,9 @@ namespace LocalizationManager.Tests.IntegrationTests;
 public class OutputFormatTests : IDisposable
 {
     private readonly string _testDirectory;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly ResxResourceReader _reader = new();
+    private readonly ResxResourceWriter _writer = new();
+    private readonly ResxResourceDiscovery _discovery = new();
     private readonly ResourceValidator _validator;
 
     public OutputFormatTests()
@@ -22,8 +24,8 @@ public class OutputFormatTests : IDisposable
         _testDirectory = Path.Combine(Path.GetTempPath(), $"LrmTests_{Guid.NewGuid()}");
         Directory.CreateDirectory(_testDirectory);
 
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        // Using _reader and _writer initialized above
+        // Using _discovery initialized above
         _validator = new ResourceValidator();
 
         // Create initial test resource files
@@ -71,8 +73,8 @@ public class OutputFormatTests : IDisposable
             }
         };
 
-        _parser.Write(defaultFile);
-        _parser.Write(greekFile);
+        _writer.Write(defaultFile);
+        _writer.Write(greekFile);
     }
 
     [Fact]
@@ -178,7 +180,7 @@ public class OutputFormatTests : IDisposable
         var resourceFiles = new List<ResourceFile>();
         foreach (var lang in languages)
         {
-            resourceFiles.Add(_parser.Parse(lang));
+            resourceFiles.Add(_reader.Read(lang));
         }
 
         // Act
@@ -221,7 +223,7 @@ public class OutputFormatTests : IDisposable
         var resourceFiles = new List<ResourceFile>();
         foreach (var lang in languages)
         {
-            resourceFiles.Add(_parser.Parse(lang));
+            resourceFiles.Add(_reader.Read(lang));
         }
 
         // Act

@@ -19,6 +19,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Xml;
+using System.Xml.Linq;
 using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Models;
 
@@ -26,15 +28,49 @@ namespace LocalizationManager.Core.Backends.Resx;
 
 /// <summary>
 /// RESX implementation of resource reader.
-/// Wraps the existing ResourceFileParser class.
+/// Parses .resx XML files into ResourceFile objects.
 /// </summary>
 public class ResxResourceReader : IResourceReader
 {
-    private readonly ResourceFileParser _parser = new();
+    /// <summary>
+    /// Creates secure XML reader settings to prevent XXE and XML bomb attacks.
+    /// </summary>
+    internal static XmlReaderSettings CreateSecureXmlSettings()
+    {
+        return new XmlReaderSettings
+        {
+            DtdProcessing = DtdProcessing.Prohibit,  // Block DTD processing (prevents XXE attacks)
+            XmlResolver = null,                       // Prevent external resource resolution
+            MaxCharactersFromEntities = 0,            // Block entity expansion (prevents XML bombs)
+            MaxCharactersInDocument = 10_000_000      // 10MB limit for document size
+        };
+    }
 
     /// <inheritdoc />
     public ResourceFile Read(LanguageInfo language)
-        => _parser.Parse(language);
+    {
+        if (string.IsNullOrEmpty(language.FilePath))
+        {
+            throw new ArgumentException("FilePath is required for file-based parsing", nameof(language));
+        }
+
+        if (!File.Exists(language.FilePath))
+        {
+            throw new FileNotFoundException($"Resource file not found: {language.FilePath}");
+        }
+
+        try
+        {
+            using var xmlReader = XmlReader.Create(language.FilePath, CreateSecureXmlSettings());
+            var xdoc = XDocument.Load(xmlReader);
+            return ParseXDocument(xdoc, language);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Failed to parse .resx file '{language.FilePath}': {ex.Message}", ex);
+        }
+    }
 
     /// <inheritdoc />
     public Task<ResourceFile> ReadAsync(LanguageInfo language, CancellationToken ct = default)
@@ -42,9 +78,57 @@ public class ResxResourceReader : IResourceReader
 
     /// <inheritdoc />
     public ResourceFile Read(TextReader reader, LanguageInfo metadata)
-        => _parser.Parse(reader, metadata);
+    {
+        try
+        {
+            using var xmlReader = XmlReader.Create(reader, CreateSecureXmlSettings());
+            var xdoc = XDocument.Load(xmlReader);
+            return ParseXDocument(xdoc, metadata);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Failed to parse .resx content: {ex.Message}", ex);
+        }
+    }
 
     /// <inheritdoc />
     public Task<ResourceFile> ReadAsync(TextReader reader, LanguageInfo metadata, CancellationToken ct = default)
         => Task.FromResult(Read(reader, metadata));
+
+    /// <summary>
+    /// Internal method to parse an XDocument into a ResourceFile.
+    /// </summary>
+    private static ResourceFile ParseXDocument(XDocument xdoc, LanguageInfo language)
+    {
+        var entries = new List<ResourceEntry>();
+
+        // Parse data elements from .resx XML
+        var dataElements = xdoc.Root?.Elements("data") ?? Enumerable.Empty<XElement>();
+
+        foreach (var dataElement in dataElements)
+        {
+            var key = dataElement.Attribute("name")?.Value;
+            if (string.IsNullOrEmpty(key))
+            {
+                continue; // Skip entries without a name
+            }
+
+            var value = dataElement.Element("value")?.Value;
+            var comment = dataElement.Element("comment")?.Value;
+
+            entries.Add(new ResourceEntry
+            {
+                Key = key,
+                Value = value,
+                Comment = comment
+            });
+        }
+
+        return new ResourceFile
+        {
+            Language = language,
+            Entries = entries
+        };
+    }
 }

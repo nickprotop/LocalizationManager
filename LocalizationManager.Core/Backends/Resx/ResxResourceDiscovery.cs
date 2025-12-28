@@ -19,6 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Globalization;
 using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Models;
 
@@ -26,17 +27,109 @@ namespace LocalizationManager.Core.Backends.Resx;
 
 /// <summary>
 /// RESX implementation of resource discovery.
-/// Wraps the existing ResourceDiscovery class.
+/// Auto-discovers .resx files and their associated languages in a specified directory.
 /// </summary>
 public class ResxResourceDiscovery : IResourceDiscovery
 {
-    private readonly ResourceDiscovery _inner = new();
-
     /// <inheritdoc />
     public List<LanguageInfo> DiscoverLanguages(string searchPath)
-        => _inner.DiscoverLanguages(searchPath);
+    {
+        if (!Directory.Exists(searchPath))
+        {
+            throw new DirectoryNotFoundException($"Directory not found: {searchPath}");
+        }
+
+        var languages = new List<LanguageInfo>();
+
+        // Find all .resx files (exclude .Designer.cs files)
+        var resxFiles = Directory.GetFiles(searchPath, "*.resx", SearchOption.TopDirectoryOnly)
+            .Where(f => !f.EndsWith(".Designer.cs", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (!resxFiles.Any())
+        {
+            return languages;
+        }
+
+        // Group by base name (e.g., "SharedResource" from "SharedResource.resx" and "SharedResource.el.resx")
+        var groups = resxFiles
+            .GroupBy(f => GetBaseName(f))
+            .ToList();
+
+        foreach (var group in groups)
+        {
+            var baseName = group.Key;
+
+            foreach (var file in group)
+            {
+                var fileName = Path.GetFileNameWithoutExtension(file);
+                var parts = fileName.Split('.');
+
+                if (parts.Length == 1)
+                {
+                    // Default language (e.g., SharedResource.resx)
+                    languages.Add(new LanguageInfo
+                    {
+                        BaseName = baseName,
+                        Code = "",
+                        Name = "Default",
+                        IsDefault = true,
+                        FilePath = file
+                    });
+                }
+                else if (parts.Length >= 2)
+                {
+                    // Culture-specific (e.g., SharedResource.el.resx)
+                    var cultureCode = parts[^1]; // Last part
+
+                    languages.Add(new LanguageInfo
+                    {
+                        BaseName = baseName,
+                        Code = cultureCode,
+                        Name = GetCultureName(cultureCode),
+                        IsDefault = false,
+                        FilePath = file
+                    });
+                }
+            }
+        }
+
+        // Sort: default language first, then alphabetically
+        return languages
+            .OrderBy(l => l.BaseName)
+            .ThenBy(l => l.IsDefault ? 0 : 1)
+            .ThenBy(l => l.Code)
+            .ToList();
+    }
 
     /// <inheritdoc />
     public Task<List<LanguageInfo>> DiscoverLanguagesAsync(string searchPath, CancellationToken ct = default)
         => Task.FromResult(DiscoverLanguages(searchPath));
+
+    /// <summary>
+    /// Extracts the base name from a file path (without culture code or extension).
+    /// </summary>
+    private static string GetBaseName(string filePath)
+    {
+        var fileName = Path.GetFileNameWithoutExtension(filePath);
+        // Return the first part before any dots
+        return fileName.Split('.')[0];
+    }
+
+    /// <summary>
+    /// Gets the display name for a culture code using .NET CultureInfo.
+    /// </summary>
+    private static string GetCultureName(string code)
+    {
+        try
+        {
+            var culture = new CultureInfo(code);
+            return $"{culture.NativeName} ({code})";
+        }
+        catch
+        {
+            // Fallback for invalid culture codes
+            return code.ToUpper();
+        }
+    }
 }

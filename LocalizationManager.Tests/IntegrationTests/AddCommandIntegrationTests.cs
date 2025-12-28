@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Nikolaos Protopapas
 // Licensed under the MIT License
 
-using LocalizationManager.Core;
+using LocalizationManager.Core.Backends.Resx;
 using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Backends.Json;
 using LocalizationManager.Core.Configuration;
@@ -18,8 +18,9 @@ public class AddCommandIntegrationTests : IDisposable
     private readonly string _testDirectory;
     private readonly string _resxDirectory;
     private readonly string _jsonDirectory;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly ResxResourceReader _reader = new();
+    private readonly ResxResourceWriter _writer = new();
+    private readonly ResxResourceDiscovery _discovery = new();
     private readonly IResourceBackend _jsonBackend;
 
     public AddCommandIntegrationTests()
@@ -31,8 +32,8 @@ public class AddCommandIntegrationTests : IDisposable
         Directory.CreateDirectory(_resxDirectory);
         Directory.CreateDirectory(_jsonDirectory);
 
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        // Using _reader and _writer initialized above
+        // Using _discovery initialized above
         _jsonBackend = new JsonResourceBackend(new JsonFormatConfiguration
         {
             UseNestedKeys = false,
@@ -88,8 +89,8 @@ public class AddCommandIntegrationTests : IDisposable
             }
         };
 
-        _parser.Write(defaultFile);
-        _parser.Write(greekFile);
+        _writer.Write(defaultFile);
+        _writer.Write(greekFile);
     }
 
     private void CreateJsonFiles()
@@ -152,14 +153,14 @@ public class AddCommandIntegrationTests : IDisposable
         var resourceFiles = new List<ResourceFile>();
         foreach (var lang in languages)
         {
-            var file = _parser.Parse(lang);
+            var file = _reader.Read(lang);
             file.Entries.Add(new ResourceEntry
             {
                 Key = newKey,
                 Value = values[lang.Code],
                 Comment = "Delete button"
             });
-            _parser.Write(file);
+            _writer.Write(file);
             resourceFiles.Add(file);
         }
 
@@ -167,7 +168,7 @@ public class AddCommandIntegrationTests : IDisposable
         var verifyLanguages = _discovery.DiscoverLanguages(_resxDirectory);
         foreach (var lang in verifyLanguages)
         {
-            var file = _parser.Parse(lang);
+            var file = _reader.Read(lang);
             var entry = file.Entries.FirstOrDefault(e => e.Key == newKey);
 
             Assert.NotNull(entry);
@@ -186,20 +187,20 @@ public class AddCommandIntegrationTests : IDisposable
         // Act
         foreach (var lang in languages)
         {
-            var file = _parser.Parse(lang);
+            var file = _reader.Read(lang);
             file.Entries.Add(new ResourceEntry
             {
                 Key = newKey,
                 Value = string.Empty
             });
-            _parser.Write(file);
+            _writer.Write(file);
         }
 
         // Assert
         var verifyLanguages = _discovery.DiscoverLanguages(_resxDirectory);
         foreach (var lang in verifyLanguages)
         {
-            var file = _parser.Parse(lang);
+            var file = _reader.Read(lang);
             var entry = file.Entries.FirstOrDefault(e => e.Key == newKey);
 
             Assert.NotNull(entry);
@@ -222,20 +223,20 @@ public class AddCommandIntegrationTests : IDisposable
         // Act
         foreach (var lang in languages)
         {
-            var file = _parser.Parse(lang);
+            var file = _reader.Read(lang);
             var entry = file.Entries.FirstOrDefault(e => e.Key == keyToUpdate);
             if (entry != null)
             {
                 entry.Value = newValues[lang.Code];
             }
-            _parser.Write(file);
+            _writer.Write(file);
         }
 
         // Assert
         var verifyLanguages = _discovery.DiscoverLanguages(_resxDirectory);
         foreach (var lang in verifyLanguages)
         {
-            var file = _parser.Parse(lang);
+            var file = _reader.Read(lang);
             var entry = file.Entries.FirstOrDefault(e => e.Key == keyToUpdate);
 
             Assert.NotNull(entry);
@@ -253,20 +254,20 @@ public class AddCommandIntegrationTests : IDisposable
         // Act
         foreach (var lang in languages)
         {
-            var file = _parser.Parse(lang);
+            var file = _reader.Read(lang);
             var entry = file.Entries.FirstOrDefault(e => e.Key == keyToDelete);
             if (entry != null)
             {
                 file.Entries.Remove(entry);
             }
-            _parser.Write(file);
+            _writer.Write(file);
         }
 
         // Assert
         var verifyLanguages = _discovery.DiscoverLanguages(_resxDirectory);
         foreach (var lang in verifyLanguages)
         {
-            var file = _parser.Parse(lang);
+            var file = _reader.Read(lang);
             var entry = file.Entries.FirstOrDefault(e => e.Key == keyToDelete);
 
             Assert.Null(entry);
@@ -289,14 +290,14 @@ public class AddCommandIntegrationTests : IDisposable
         var resourceFiles = new List<ResourceFile>();
         foreach (var lang in languages)
         {
-            var file = _parser.Parse(lang);
+            var file = _reader.Read(lang);
             file.Entries.Add(new ResourceEntry
             {
                 Key = newKey,
                 Value = values[lang.Code],
                 Comment = "Test with default alias"
             });
-            _parser.Write(file);
+            _writer.Write(file);
             resourceFiles.Add(file);
         }
 
@@ -304,7 +305,7 @@ public class AddCommandIntegrationTests : IDisposable
         var verifyLanguages = _discovery.DiscoverLanguages(_resxDirectory);
         foreach (var lang in verifyLanguages)
         {
-            var file = _parser.Parse(lang);
+            var file = _reader.Read(lang);
             var entry = file.Entries.FirstOrDefault(e => e.Key == newKey);
 
             Assert.NotNull(entry);
@@ -327,20 +328,20 @@ public class AddCommandIntegrationTests : IDisposable
         // Act
         foreach (var lang in languages)
         {
-            var file = _parser.Parse(lang);
+            var file = _reader.Read(lang);
             var entry = file.Entries.FirstOrDefault(e => e.Key == keyToUpdate);
             if (entry != null)
             {
                 entry.Value = newValues[lang.Code];
             }
-            _parser.Write(file);
+            _writer.Write(file);
         }
 
         // Assert
         var verifyLanguages = _discovery.DiscoverLanguages(_resxDirectory);
         foreach (var lang in verifyLanguages)
         {
-            var file = _parser.Parse(lang);
+            var file = _reader.Read(lang);
             var entry = file.Entries.FirstOrDefault(e => e.Key == keyToUpdate);
 
             Assert.NotNull(entry);
@@ -516,7 +517,7 @@ public class AddCommandIntegrationTests : IDisposable
         var resxLanguages = _discovery.DiscoverLanguages(_resxDirectory);
         var jsonLanguages = _jsonBackend.Discovery.DiscoverLanguages(_jsonDirectory);
 
-        var resxDefault = _parser.Parse(resxLanguages.First(l => l.IsDefault));
+        var resxDefault = _reader.Read(resxLanguages.First(l => l.IsDefault));
         var jsonDefault = _jsonBackend.Reader.Read(jsonLanguages.First(l => l.IsDefault));
 
         Assert.Equal(resxDefault.Entries.Count, jsonDefault.Entries.Count);

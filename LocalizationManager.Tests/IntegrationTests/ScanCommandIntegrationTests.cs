@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Nikolaos Protopapas
 // Licensed under the MIT License
 
-using LocalizationManager.Core;
+using LocalizationManager.Core.Backends.Resx;
 using LocalizationManager.Core.Scanning;
 using LocalizationManager.Core.Scanning.Models;
 using Xunit;
@@ -15,8 +15,9 @@ public class ScanCommandIntegrationTests : IDisposable
 {
     private readonly string _testDirectory;
     private readonly string _sourceFilesPath;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly ResxResourceReader _reader = new();
+    private readonly ResxResourceWriter _writer = new();
+    private readonly ResxResourceDiscovery _discovery = new();
     private readonly CodeScanner _scanner;
 
     public ScanCommandIntegrationTests()
@@ -25,8 +26,8 @@ public class ScanCommandIntegrationTests : IDisposable
         _testDirectory = Path.Combine(Path.GetTempPath(), $"ScanTests_{Guid.NewGuid()}");
         Directory.CreateDirectory(_testDirectory);
 
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        // Using _reader and _writer initialized above
+        // Using _discovery initialized above
         _scanner = new CodeScanner();
 
         // Copy TestResource.resx to temp directory
@@ -79,7 +80,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act
         var result = _scanner.Scan(_sourceFilesPath, resourceFiles, strictMode: false);
@@ -108,7 +109,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act
         var result = _scanner.Scan(_sourceFilesPath, resourceFiles, strictMode: false);
@@ -128,7 +129,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act
         var result = _scanner.Scan(_sourceFilesPath, resourceFiles, strictMode: false);
@@ -152,7 +153,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act
         var result = _scanner.Scan(_sourceFilesPath, resourceFiles, strictMode: false);
@@ -176,7 +177,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act
         var result = _scanner.Scan(_sourceFilesPath, resourceFiles, strictMode: false);
@@ -200,7 +201,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act
         var result = _scanner.Scan(_sourceFilesPath, resourceFiles, strictMode: false);
@@ -224,7 +225,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act - Normal mode
         var normalResult = _scanner.Scan(_sourceFilesPath, resourceFiles, strictMode: false);
@@ -244,7 +245,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act
         var result = _scanner.Scan(_sourceFilesPath, resourceFiles, strictMode: false);
@@ -265,7 +266,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act
         var result = _scanner.Scan(_sourceFilesPath, resourceFiles, strictMode: false);
@@ -285,7 +286,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act
         var result = _scanner.Scan(_sourceFilesPath, resourceFiles, strictMode: false);
@@ -319,7 +320,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act
         var result = _scanner.Scan(_sourceFilesPath, resourceFiles, strictMode: false);
@@ -344,7 +345,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Act
         var result = _scanner.Scan(_sourceFilesPath, resourceFiles, strictMode: false);
@@ -365,7 +366,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
         var userControllerPath = Path.Combine(_sourceFilesPath, "UserController.cs");
 
         // Act
@@ -393,7 +394,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
         var razorFilePath = Path.Combine(_sourceFilesPath, "LoginPage.razor");
 
         // Act
@@ -421,7 +422,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
         var xamlFilePath = Path.Combine(_sourceFilesPath, "MainWindow.xaml");
 
         // Act
@@ -446,7 +447,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
         var userControllerPath = Path.Combine(_sourceFilesPath, "UserController.cs");
 
         // Act
@@ -466,7 +467,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
         var userControllerPath = Path.Combine(_sourceFilesPath, "UserController.cs");
 
         // Act
@@ -481,7 +482,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
         var userControllerPath = Path.Combine(_sourceFilesPath, "UserController.cs");
 
         // Act
@@ -496,7 +497,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
 
         // Create a .txt file
         var txtFilePath = Path.Combine(_sourceFilesPath, "test.txt");
@@ -519,7 +520,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
         var productServicePath = Path.Combine(_sourceFilesPath, "ProductService.cs");
 
         // Act - Normal mode
@@ -541,7 +542,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
         var userControllerPath = Path.Combine(_sourceFilesPath, "UserController.cs");
 
         // Act
@@ -563,7 +564,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
         var userControllerPath = Path.Combine(_sourceFilesPath, "UserController.cs");
 
         // Act
@@ -584,7 +585,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
         var userControllerPath = Path.Combine(_sourceFilesPath, "UserController.cs");
 
         // Act
@@ -600,7 +601,7 @@ public class ScanCommandIntegrationTests : IDisposable
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(lang => _parser.Parse(lang)).ToList();
+        var resourceFiles = languages.Select(lang => _reader.Read(lang)).ToList();
         var userControllerPath = Path.Combine(_sourceFilesPath, "UserController.cs");
 
         // Act

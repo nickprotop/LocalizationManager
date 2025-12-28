@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Nikolaos Protopapas
 // Licensed under the MIT License
 
-using LocalizationManager.Core;
+using LocalizationManager.Core.Backends.Resx;
 using LocalizationManager.Core.Models;
 using System.Text.RegularExpressions;
 using Xunit;
@@ -11,16 +11,17 @@ namespace LocalizationManager.Tests.IntegrationTests;
 public class ViewCommandIntegrationTests
 {
     private readonly string _testDirectory;
-    private readonly ResourceFileParser _parser;
-    private readonly ResourceDiscovery _discovery;
+    private readonly ResxResourceReader _reader = new();
+    private readonly ResxResourceWriter _writer = new();
+    private readonly ResxResourceDiscovery _discovery = new();
 
     public ViewCommandIntegrationTests()
     {
         // Use persistent TestData folder
         _testDirectory = Path.Combine(AppContext.BaseDirectory, "TestData");
 
-        _parser = new ResourceFileParser();
-        _discovery = new ResourceDiscovery();
+        // Using _reader and _writer initialized above
+        // Using _discovery initialized above
     }
 
     [Fact]
@@ -28,7 +29,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var testKey = "Error.NotFound";
 
         // Act
@@ -49,7 +50,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = "^Error\\..*";
 
         // Act
@@ -71,7 +72,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = "^Success\\..*";
 
         // Act
@@ -92,7 +93,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = "Button\\..*";
 
         // Act
@@ -113,7 +114,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = "Item[0-9]+";
 
         // Act
@@ -135,7 +136,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = ".*Error.*";
 
         // Act
@@ -155,7 +156,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = "^NonExistent\\..*";
 
         // Act
@@ -187,7 +188,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = "^Error\\..*";
 
         // Act
@@ -210,7 +211,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = ".*"; // Match everything
         var limit = 5;
 
@@ -231,7 +232,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = "^Button\\..*";
 
         // Act
@@ -244,7 +245,7 @@ public class ViewCommandIntegrationTests
         // Assert - Check all languages have these keys
         foreach (var lang in languages)
         {
-            var file = _parser.Parse(lang);
+            var file = _reader.Read(lang);
             foreach (var key in matchedKeys)
             {
                 var entry = file.Entries.FirstOrDefault(e => e.Key == key);
@@ -259,7 +260,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = "*";
 
         // Act
@@ -279,7 +280,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = "Error.*";
 
         // Act
@@ -302,7 +303,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = "*.Save";
 
         // Act
@@ -323,7 +324,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = "Button.*";
 
         // Act
@@ -345,7 +346,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = "Item?";
 
         // Act
@@ -368,7 +369,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
         var pattern = "*.*";
 
         // Act
@@ -485,7 +486,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var files = languages.Select(l => _parser.Parse(l)).ToList();
+        var files = languages.Select(l => _reader.Read(l)).ToList();
         var settings = new Commands.ViewCommand.Settings
         {
             Key = "test",
@@ -508,7 +509,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var files = languages.Select(l => _parser.Parse(l)).ToList();
+        var files = languages.Select(l => _reader.Read(l)).ToList();
         var settings = new Commands.ViewCommand.Settings
         {
             Key = "test",
@@ -530,7 +531,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var files = languages.Select(l => _parser.Parse(l)).ToList();
+        var files = languages.Select(l => _reader.Read(l)).ToList();
         var settings = new Commands.ViewCommand.Settings
         {
             Key = "test",
@@ -553,7 +554,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var files = languages.Select(l => _parser.Parse(l)).ToList();
+        var files = languages.Select(l => _reader.Read(l)).ToList();
         var settings = new Commands.ViewCommand.Settings
         {
             Key = "test",
@@ -576,7 +577,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var files = languages.Select(l => _parser.Parse(l)).ToList();
+        var files = languages.Select(l => _reader.Read(l)).ToList();
         var settings = new Commands.ViewCommand.Settings
         {
             Key = "test",
@@ -599,7 +600,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var files = languages.Select(l => _parser.Parse(l)).ToList();
+        var files = languages.Select(l => _reader.Read(l)).ToList();
         var settings = new Commands.ViewCommand.Settings
         {
             Key = "test",
@@ -622,7 +623,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var files = languages.Select(l => _parser.Parse(l)).ToList();
+        var files = languages.Select(l => _reader.Read(l)).ToList();
         var settings = new Commands.ViewCommand.Settings
         {
             Key = "test",
@@ -638,7 +639,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var files = languages.Select(l => _parser.Parse(l)).ToList();
+        var files = languages.Select(l => _reader.Read(l)).ToList();
         var settings = new Commands.ViewCommand.Settings
         {
             Key = "test",
@@ -667,7 +668,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var files = languages.Select(l => _parser.Parse(l)).ToList();
+        var files = languages.Select(l => _reader.Read(l)).ToList();
         var settings = new Commands.ViewCommand.Settings
         {
             Key = "test"
@@ -699,8 +700,8 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
-        var elFile = _parser.Parse(languages.First(l => l.Code == "el"));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
+        var elFile = _reader.Read(languages.First(l => l.Code == "el"));
 
         // Add an extra key to the el file for testing
         elFile.Entries.Add(new Core.Models.ResourceEntry
@@ -727,7 +728,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
 
         // Add an extra key to the default file
         defaultFile.Entries.Add(new Core.Models.ResourceEntry
@@ -751,8 +752,8 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
-        var files = languages.Select(l => _parser.Parse(l)).ToList();
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
+        var files = languages.Select(l => _reader.Read(l)).ToList();
 
         // Act
         var result = Commands.ViewCommand.DetectExtraKeysInFilteredFiles(defaultFile, files);
@@ -777,9 +778,9 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var defaultFile = _parser.Parse(languages.First(l => l.IsDefault));
-        var elFile = _parser.Parse(languages.First(l => l.Code == "el"));
-        var frFile = _parser.Parse(languages.First(l => l.Code == "fr"));
+        var defaultFile = _reader.Read(languages.First(l => l.IsDefault));
+        var elFile = _reader.Read(languages.First(l => l.Code == "el"));
+        var frFile = _reader.Read(languages.First(l => l.Code == "fr"));
 
         // Add extra keys to both non-default files
         elFile.Entries.Add(new Core.Models.ResourceEntry
@@ -816,7 +817,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Act
@@ -837,7 +838,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Find an actual value from test data
@@ -864,7 +865,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Act - search for "Error" which appears in keys like "Error.NotFound"
@@ -886,7 +887,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Act
@@ -907,7 +908,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Get a sample value and use part of it for regex
@@ -937,7 +938,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Act - search for pattern that matches keys starting with "Error" OR values containing "error"
@@ -958,7 +959,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Assuming test data has some French-specific values
@@ -981,7 +982,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Act - should not crash on null/empty values
@@ -1002,7 +1003,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
         var defaultKeys = defaultFile.Entries.Select(e => e.Key).ToHashSet();
 
@@ -1028,7 +1029,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Find a key with a comment
@@ -1056,7 +1057,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Act - search for any comment content
@@ -1084,7 +1085,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Find a pattern that exists in at least one of keys/values/comments
@@ -1112,7 +1113,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
         var allKeys = defaultFile.Entries.Select(e => e.Key).ToList();
 
@@ -1140,7 +1141,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
         var allKeys = defaultFile.Entries.Select(e => e.Key).ToList();
 
@@ -1168,7 +1169,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
         var allKeys = defaultFile.Entries.Select(e => e.Key).ToList();
 
@@ -1192,7 +1193,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
         var allKeys = defaultFile.Entries.Select(e => e.Key).ToList();
 
@@ -1225,7 +1226,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
         var allKeys = defaultFile.Entries.Select(e => e.Key).ToList();
 
@@ -1424,7 +1425,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
         var allKeys = defaultFile.Entries.Select(e => e.Key).ToList();
 
@@ -1452,7 +1453,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
         var allKeys = defaultFile.Entries.Select(e => e.Key).ToList();
 
@@ -1477,7 +1478,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
         var allKeys = defaultFile.Entries.Select(e => e.Key).Take(5).ToList();
 
@@ -1497,7 +1498,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
         var defaultFile = resourceFiles.First(rf => rf.Language.IsDefault);
 
         // Create a test scenario with a key that has valid default
@@ -1565,7 +1566,7 @@ public class ViewCommandIntegrationTests
     {
         // Arrange
         var languages = _discovery.DiscoverLanguages(_testDirectory);
-        var resourceFiles = languages.Select(l => _parser.Parse(l)).ToList();
+        var resourceFiles = languages.Select(l => _reader.Read(l)).ToList();
 
         var settings = new Commands.ViewCommand.Settings
         {

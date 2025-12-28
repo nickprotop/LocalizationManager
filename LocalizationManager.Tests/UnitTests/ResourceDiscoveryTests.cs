@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Nikolaos Protopapas
 // Licensed under the MIT License
 
-using LocalizationManager.Core;
+using LocalizationManager.Core.Backends.Resx;
 using Xunit;
 
 namespace LocalizationManager.Tests.UnitTests;
@@ -9,6 +9,7 @@ namespace LocalizationManager.Tests.UnitTests;
 public class ResourceDiscoveryTests
 {
     private readonly string _testDataPath;
+    private readonly ResxResourceDiscovery _discovery = new();
 
     public ResourceDiscoveryTests()
     {
@@ -18,11 +19,8 @@ public class ResourceDiscoveryTests
     [Fact]
     public void DiscoverLanguages_ValidDirectory_FindsLanguages()
     {
-        // Arrange
-        var discovery = new ResourceDiscovery();
-
         // Act
-        var languages = discovery.DiscoverLanguages(_testDataPath);
+        var languages = _discovery.DiscoverLanguages(_testDataPath);
 
         // Assert
         Assert.NotEmpty(languages);
@@ -32,11 +30,8 @@ public class ResourceDiscoveryTests
     [Fact]
     public void DiscoverLanguages_ValidDirectory_IdentifiesDefaultLanguage()
     {
-        // Arrange
-        var discovery = new ResourceDiscovery();
-
         // Act
-        var languages = discovery.DiscoverLanguages(_testDataPath);
+        var languages = _discovery.DiscoverLanguages(_testDataPath);
 
         // Assert
         var defaultLang = languages.FirstOrDefault(l => l.IsDefault);
@@ -48,11 +43,8 @@ public class ResourceDiscoveryTests
     [Fact]
     public void DiscoverLanguages_ValidDirectory_IdentifiesGreekLanguage()
     {
-        // Arrange
-        var discovery = new ResourceDiscovery();
-
         // Act
-        var languages = discovery.DiscoverLanguages(_testDataPath);
+        var languages = _discovery.DiscoverLanguages(_testDataPath);
 
         // Assert
         var greekLang = languages.FirstOrDefault(l => l.Code == "el");
@@ -66,25 +58,23 @@ public class ResourceDiscoveryTests
     public void DiscoverLanguages_EmptyDirectory_ThrowsDirectoryNotFoundException()
     {
         // Arrange
-        var discovery = new ResourceDiscovery();
         var nonExistentPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
 
         // Act & Assert
-        Assert.Throws<DirectoryNotFoundException>(() => discovery.DiscoverLanguages(nonExistentPath));
+        Assert.Throws<DirectoryNotFoundException>(() => _discovery.DiscoverLanguages(nonExistentPath));
     }
 
     [Fact]
     public void DiscoverLanguages_DirectoryWithNoResxFiles_ReturnsEmptyList()
     {
         // Arrange
-        var discovery = new ResourceDiscovery();
         var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(tempDir);
 
         try
         {
             // Act
-            var languages = discovery.DiscoverLanguages(tempDir);
+            var languages = _discovery.DiscoverLanguages(tempDir);
 
             // Assert
             Assert.Empty(languages);
@@ -102,11 +92,8 @@ public class ResourceDiscoveryTests
     [Fact]
     public void DiscoverLanguages_ValidDirectory_SetsCorrectFilePaths()
     {
-        // Arrange
-        var discovery = new ResourceDiscovery();
-
         // Act
-        var languages = discovery.DiscoverLanguages(_testDataPath);
+        var languages = _discovery.DiscoverLanguages(_testDataPath);
 
         // Assert
         foreach (var lang in languages)

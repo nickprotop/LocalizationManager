@@ -92,4 +92,15 @@ public class JsonResourceBackend : IResourceBackend
         I18nextCompatible = true,
         UseNestedKeys = false  // i18next typically uses flat keys with namespace:key
     };
+
+    /// <inheritdoc />
+    public bool CanHandle(string path)
+    {
+        if (!Directory.Exists(path))
+            return false;
+
+        // Check for JSON files, excluding lrm*.json config files
+        return Directory.GetFiles(path, "*.json", SearchOption.TopDirectoryOnly)
+            .Any(f => !Path.GetFileName(f).StartsWith("lrm", StringComparison.OrdinalIgnoreCase));
+    }
 }
