@@ -103,7 +103,8 @@
 
             if (result.IsSuccess)
             {
-                Navigation.NavigateTo(ReturnUrl ?? "", forceLoad: true);
+                // Don't use forceLoad: true - causes race condition with localStorage persistence
+                Navigation.NavigateTo(ReturnUrl ?? "");
             }
             else
             {

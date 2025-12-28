@@ -1,3 +1,4 @@
+using System.Globalization;
 using Blazored.LocalStorage;
 
 namespace LrmCloud.Web.Services;
@@ -41,14 +42,20 @@ public class TokenStorageService
     {
         var expiry = await _localStorage.GetItemAsStringAsync(TokenExpiryKey);
         if (string.IsNullOrEmpty(expiry)) return null;
-        return DateTime.TryParse(expiry, out var dt) ? dt : null;
+        // Use RoundtripKind to preserve UTC timezone from ISO 8601 "Z" suffix
+        return DateTimeOffset.TryParse(expiry, null, DateTimeStyles.RoundtripKind, out var dt)
+            ? dt.UtcDateTime
+            : null;
     }
 
     public async Task<DateTime?> GetRefreshExpiryAsync()
     {
         var expiry = await _localStorage.GetItemAsStringAsync(RefreshExpiryKey);
         if (string.IsNullOrEmpty(expiry)) return null;
-        return DateTime.TryParse(expiry, out var dt) ? dt : null;
+        // Use RoundtripKind to preserve UTC timezone from ISO 8601 "Z" suffix
+        return DateTimeOffset.TryParse(expiry, null, DateTimeStyles.RoundtripKind, out var dt)
+            ? dt.UtcDateTime
+            : null;
     }
 
     public async Task<bool> IsTokenExpiredAsync()

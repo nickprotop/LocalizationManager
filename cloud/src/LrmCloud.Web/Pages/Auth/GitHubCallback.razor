@@ -1,5 +1,6 @@
 @page "/auth/github/callback"
 @layout AuthLayout
+@using System.Globalization
 @inject AuthService AuthService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
@@ -62,21 +63,21 @@
                 return;
             }
 
-            // Parse dates
-            if (!DateTime.TryParse(Uri.UnescapeDataString(expiresAtStr), out var expiresAt) ||
-                !DateTime.TryParse(Uri.UnescapeDataString(refreshTokenExpiresAtStr), out var refreshTokenExpiresAt))
+            // Parse dates - use RoundtripKind to preserve UTC timezone from ISO 8601 "Z" suffix
+            if (!DateTimeOffset.TryParse(Uri.UnescapeDataString(expiresAtStr), null, DateTimeStyles.RoundtripKind, out var expiresAtOffset) ||
+                !DateTimeOffset.TryParse(Uri.UnescapeDataString(refreshTokenExpiresAtStr), null, DateTimeStyles.RoundtripKind, out var refreshTokenExpiresAtOffset))
             {
                 _errorMessage = "Invalid token expiration data. Please try again.";
                 StateHasChanged();
                 return;
             }
 
-            // Process the tokens
+            // Process the tokens (convert to UTC DateTime)
             var result = await AuthService.ProcessGitHubCallbackAsync(
                 Uri.UnescapeDataString(token),
-                expiresAt,
+                expiresAtOffset.UtcDateTime,
                 Uri.UnescapeDataString(refreshToken),
-                refreshTokenExpiresAt);
+                refreshTokenExpiresAtOffset.UtcDateTime);
 
             if (result.IsSuccess)
             {

@@ -71,8 +71,9 @@ public class LrmAuthStateProvider : AuthenticationStateProvider
         // Try to get user info from cache or fetch from API
         if (_cachedUser == null && !_isInitialized)
         {
-            _isInitialized = true;
             _cachedUser = await FetchCurrentUserAsync();
+            // Only mark as initialized if fetch succeeded - allows retry on failure
+            _isInitialized = _cachedUser != null;
         }
 
         if (_cachedUser == null)
