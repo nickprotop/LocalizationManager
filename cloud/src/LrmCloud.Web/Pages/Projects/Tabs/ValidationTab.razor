@@ -2,11 +2,11 @@
 @inject ResourceService ResourceService
 @inject NotificationService NotificationService
 
-<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
-    <RadzenStack Gap="0">
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem" class="rz-mb-4">
+    <RadzenStack Gap="0" Style="min-width: 200px; flex: 1;">
         <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
             <RadzenIcon Icon="verified" Style="vertical-align: middle;" />
-            <RadzenText TextStyle="TextStyle.H5">Validation Report</RadzenText>
+            <RadzenText TextStyle="TextStyle.H5" Style="margin: 0;">Validation Report</RadzenText>
         </RadzenStack>
         <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
             Identify duplicates, missing translations, empty values, and placeholder mismatches.

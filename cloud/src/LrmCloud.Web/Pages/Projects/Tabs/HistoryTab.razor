@@ -5,11 +5,11 @@
 @inject NotificationService NotificationService
 @inject Radzen.DialogService DialogService
 
-<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
-    <RadzenStack Gap="0">
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem" class="rz-mb-4">
+    <RadzenStack Gap="0" Style="min-width: 200px; flex: 1;">
         <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
             <RadzenIcon Icon="restore" Style="vertical-align: middle;" />
-            <RadzenText TextStyle="TextStyle.H5">Sync History</RadzenText>
+            <RadzenText TextStyle="TextStyle.H5" Style="margin: 0;">Sync History</RadzenText>
         </RadzenStack>
         <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
             View push and revert operations. Click on an entry to see detailed changes, or revert to undo a push.

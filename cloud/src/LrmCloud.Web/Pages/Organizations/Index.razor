@@ -14,8 +14,8 @@
 
 <PageTitle>Organizations - LRM Cloud</PageTitle>
 
-<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
-    <RadzenText TextStyle="TextStyle.H4">Organizations</RadzenText>
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.H4" Style="margin: 0;">Organizations</RadzenText>
     <RadzenButton Variant="Radzen.Variant.Filled" Icon="add" Text="New Organization" Click="@OpenCreateDialog" Disabled="@(!_canCreateOrg)" title="@_limitMessage" />
 </RadzenStack>
 

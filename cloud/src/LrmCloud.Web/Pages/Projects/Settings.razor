@@ -33,12 +33,12 @@ else if (_project == null)
 }
 else
 {
-    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
-        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem" class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem">
             <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
                           Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" />
-            <RadzenText TextStyle="TextStyle.H4">Project Settings</RadzenText>
-            <RadzenText TextStyle="TextStyle.H6" class="rz-color-secondary">@_project.Name</RadzenText>
+            <RadzenText TextStyle="TextStyle.H4" Style="margin: 0;">Project Settings</RadzenText>
+            <RadzenText TextStyle="TextStyle.H6" class="rz-color-secondary" Style="margin: 0;">@_project.Name</RadzenText>
         </RadzenStack>
 
         <RadzenButton ButtonStyle="ButtonStyle.Primary" Icon="save" Text="@(_isSubmitting ? "Saving..." : "Save Changes")"

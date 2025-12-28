@@ -1456,5 +1456,22 @@ ul.rz-profile-menu > li > ul.rz-navigation-menu {
         flex: 1 1 100%;
         min-width: 100% !important;
     }
+
+    /* Make tabs scrollable on mobile */
+    .rz-tabs .rz-tabview-nav {
+        overflow-x: auto !important;
+        flex-wrap: nowrap !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE/Edge */
+    }
+
+    .rz-tabs .rz-tabview-nav::-webkit-scrollbar {
+        display: none; /* Chrome/Safari */
+    }
+
+    .rz-tabs .rz-tabview-nav li {
+        flex-shrink: 0;
+    }
 }
 
