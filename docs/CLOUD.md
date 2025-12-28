@@ -114,6 +114,8 @@ The dashboard provides an overview of your localization projects:
 
 Each project contains your localization resources in a specific format.
 
+![Projects List](../assets/cloud-projects.png)
+
 ![Project Detail](../assets/cloud-project-detail.png)
 
 ### Project Overview
@@ -122,8 +124,11 @@ The project detail page shows:
 
 - **Key Statistics** - Total keys, languages, completion percentage
 - **Language Progress** - Per-language translation status with progress bars
+- **Validation Status** - Real-time validation for duplicates, missing translations, and placeholder mismatches
 - **Project Details** - Format, default language, localization path, sync status
-- **Quick Actions** - Open Editor, View Snapshots, Sync History, Glossary, Translate, Export
+- **Quick Actions** - Open Editor, View Snapshots, Sync History, Glossary, Validation, Translate
+
+![Validation Report](../assets/cloud-validation.png)
 
 ### Creating a Project
 
@@ -208,9 +213,11 @@ To use your own API keys:
 3. Enter your API key
 4. Click **"Save & Test"** to verify
 
+![Translation Providers](../assets/cloud-translation-providers.png)
+
 Project-level overrides are available in **Project Settings** > **Translation** tab.
 
-![Project Settings - Translation](../assets/cloud-project-settings.png)
+![Project Settings](../assets/cloud-project-settings.png)
 
 ## Translation Memory
 
@@ -238,6 +245,8 @@ Translation Memory (TM) automatically stores translations for reuse, saving cost
 ## Glossary
 
 Define approved terminology to ensure consistent translations.
+
+![Project Glossary](../assets/cloud-glossary.png)
 
 ### Use Cases
 
@@ -276,6 +285,21 @@ The Sync History page shows:
 2. Click the **revert** icon
 3. Confirm the revert operation
 4. A new history entry is created for the revert
+
+## Snapshots
+
+Snapshots are point-in-time backups of your project's translations. Use them to track changes and restore to previous states.
+
+![Snapshots](../assets/cloud-snapshots.png)
+
+### Creating Snapshots
+
+1. Go to **Project** > **Snapshots** tab
+2. Click **"Create Snapshot"**
+3. Add an optional description
+4. Click **"Create"**
+
+Snapshots can be viewed, compared, and restored at any time.
 
 ## CLI Sync
 
@@ -321,6 +345,8 @@ See [Cloud Sync Guide](CLOUD_SYNC.md) for complete documentation.
 ## GitHub Integration
 
 Connect your GitHub repository to LRM Cloud for seamless version control integration.
+
+![GitHub Sync](../assets/cloud-github-sync.png)
 
 ### Connecting a Repository
 
@@ -375,6 +401,8 @@ When conflicts occur:
 ## Teams & Organizations
 
 Organizations enable team collaboration on localization projects.
+
+![Organization](../assets/cloud-organization.png)
 
 ### Roles
 
