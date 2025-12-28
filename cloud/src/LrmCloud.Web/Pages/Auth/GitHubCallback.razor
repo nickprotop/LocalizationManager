@@ -15,7 +15,7 @@
         <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false">
             @_errorMessage
         </RadzenAlert>
-        <RadzenButton Text="Back to Login" Click="@(() => Navigation.NavigateTo("/login"))" />
+        <RadzenButton Text="Back to Login" Click="@(() => Navigation.NavigateTo("login"))" />
     }
     else
     {
@@ -82,7 +82,9 @@
             {
                 // Clear the fragment from URL before redirecting (security)
                 await JS.InvokeVoidAsync("clearUrlFragment");
-                Navigation.NavigateTo("/", forceLoad: true);
+                // Navigate to home - use forceLoad to ensure auth state is refreshed
+                // Empty string navigates to app root (base href), not site root
+                Navigation.NavigateTo("", forceLoad: true);
             }
             else
             {
