@@ -12,7 +12,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>LocalizationManager.JsonLocalization.Generator</PackageId>
-    <Version>0.7.4</Version>
+    <Version>0.7.5</Version>
     <Authors>Nikolaos Protopapas</Authors>
     <Company>LocalizationManager</Company>
     <Product>LocalizationManager.JsonLocalization.Generator</Product>
