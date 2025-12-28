@@ -82,9 +82,10 @@
             {
                 // Clear the fragment from URL before redirecting (security)
                 await JS.InvokeVoidAsync("clearUrlFragment");
-                // Navigate to home - use forceLoad to ensure auth state is refreshed
+                // Navigate to home - forceLoad: false lets Blazor handle auth state
+                // Using true would cause race condition with localStorage persistence
                 // Empty string navigates to app root (base href), not site root
-                Navigation.NavigateTo("", forceLoad: true);
+                Navigation.NavigateTo("");
             }
             else
             {
