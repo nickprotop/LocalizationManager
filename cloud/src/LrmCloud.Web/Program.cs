@@ -43,12 +43,19 @@ builder.Services.AddSingleton(jsonOptions);
 var baseUri = new Uri(builder.HostEnvironment.BaseAddress);
 var apiBaseUrl = new Uri($"{baseUri.Scheme}://{baseUri.Authority}/api/");
 
+// HTTP handlers - chain: AuthenticatedHttpHandler -> RateLimitAwareHandler -> HttpClientHandler
 builder.Services.AddScoped<AuthenticatedHttpHandler>();
+builder.Services.AddScoped<RateLimitAwareHandler>();
 builder.Services.AddScoped(sp =>
 {
-    var handler = sp.GetRequiredService<AuthenticatedHttpHandler>();
-    handler.InnerHandler = new HttpClientHandler();
-    return new HttpClient(handler) { BaseAddress = apiBaseUrl };
+    var authHandler = sp.GetRequiredService<AuthenticatedHttpHandler>();
+    var rateLimitHandler = sp.GetRequiredService<RateLimitAwareHandler>();
+
+    // Chain handlers: Auth -> RateLimit -> HttpClient
+    rateLimitHandler.InnerHandler = new HttpClientHandler();
+    authHandler.InnerHandler = rateLimitHandler;
+
+    return new HttpClient(authHandler) { BaseAddress = apiBaseUrl };
 });
 
 // Token refresh coordinator (singleton to coordinate across all service instances)
