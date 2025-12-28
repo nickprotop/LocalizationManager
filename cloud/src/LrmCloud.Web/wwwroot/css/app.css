@@ -1533,20 +1533,29 @@ ul.rz-profile-menu > li > ul.rz-navigation-menu {
     }
 
     .translation-toolbar .rz-button {
-        flex: 1 1 auto;
+        flex: 0 0 auto;
         min-width: 44px;
-        padding-left: 0.5rem;
-        padding-right: 0.5rem;
-    }
-
-    /* Hide button text on very small screens */
-    .translation-toolbar .rz-button .rz-button-text {
-        display: none;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
     }
 
     /* Ensure split button also responsive */
     .translation-toolbar .rz-splitbutton {
         flex: 0 0 auto;
+    }
+
+    /* Button row needs proper gap */
+    .translation-toolbar .rz-stack {
+        gap: 0.5rem !important;
+    }
+}
+
+/* Editor drawer on mobile - make collapsible or smaller */
+@media (max-width: 599px) {
+    .editor-drawer {
+        max-height: 250px;
+        overflow-y: auto;
+        margin-bottom: 0.5rem;
     }
 }
 

@@ -95,10 +95,10 @@
     <hr />
 
     @* Actions *@
-    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" Wrap="FlexWrap.Wrap" Gap="0.5rem">
         <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Danger"
                       Size="ButtonSize.Small" Icon="delete" Text="Delete" Click="@HandleDelete" />
-        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Wrap="FlexWrap.Wrap" Gap="0.5rem">
             <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Primary"
                           Size="ButtonSize.Small" Icon="translate" Text="Translate" Click="@HandleTranslateAll" />
             <RadzenButton ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
