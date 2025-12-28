@@ -188,12 +188,29 @@ public class BillingService : IBillingService
         var provider = GetProviderForUser(user);
         await provider.CancelSubscriptionAsync(user.PaymentSubscriptionId);
 
-        user.CancelAtPeriodEnd = true;
+        // For incomplete subscriptions (abandoned payments), do a full reset
+        // since the subscription was never activated
+        if (user.SubscriptionStatus == "incomplete")
+        {
+            _logger.LogInformation(
+                "Clearing incomplete subscription {SubscriptionId} for user {UserId}",
+                user.PaymentSubscriptionId, userId);
+
+            user.PaymentSubscriptionId = null;
+            user.SubscriptionStatus = "none";
+            user.CancelAtPeriodEnd = false;
+            // Keep the user on their current plan (don't change it)
+        }
+        else
+        {
+            // For active subscriptions, mark for cancellation at period end
+            user.CancelAtPeriodEnd = true;
+            _logger.LogInformation("Subscription {SubscriptionId} marked for cancellation for user {UserId}",
+                user.PaymentSubscriptionId, userId);
+        }
+
         user.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
-
-        _logger.LogInformation("Subscription {SubscriptionId} marked for cancellation for user {UserId}",
-            user.PaymentSubscriptionId, userId);
     }
 
     /// <inheritdoc />
