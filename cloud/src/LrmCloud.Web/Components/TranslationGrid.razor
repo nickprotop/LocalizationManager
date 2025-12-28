@@ -3,9 +3,9 @@
 @inject NotificationService NotificationService
 
 @* Toolbar *@
-<RadzenCard class="rz-mb-2 rz-p-2">
+<RadzenCard class="rz-mb-2 rz-p-2 translation-toolbar">
     <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem" Wrap="FlexWrap.Wrap">
-        <RadzenFormField Variant="Radzen.Variant.Outlined" Style="width: 250px;">
+        <RadzenFormField Variant="Radzen.Variant.Outlined" Style="flex: 1 1 200px; min-width: 150px; max-width: 300px;">
             <Start>
                 <RadzenIcon Icon="search" />
             </Start>
@@ -14,7 +14,7 @@
             </ChildContent>
         </RadzenFormField>
 
-        <RadzenFormField Text="Status" Variant="Radzen.Variant.Outlined" Style="width: 150px;">
+        <RadzenFormField Text="Status" Variant="Radzen.Variant.Outlined" Style="flex: 0 1 150px; min-width: 120px;">
             <ChildContent>
                 <RadzenDropDown TValue="TranslationStatus?" @bind-Value="_statusFilter" Change="@OnStatusFilterChanged"
                                 Data="@_statusOptions" TextProperty="Text" ValueProperty="Value"
@@ -24,7 +24,7 @@
 
         @if (WorkflowEnabled)
         {
-            <RadzenFormField Text="Workflow" Variant="Radzen.Variant.Outlined" Style="width: 150px;">
+            <RadzenFormField Text="Workflow" Variant="Radzen.Variant.Outlined" Style="flex: 0 1 150px; min-width: 120px;">
                 <ChildContent>
                     <RadzenDropDown TValue="string?" @bind-Value="_workflowStatusFilter" Change="@OnWorkflowFilterChanged"
                                     Data="@_workflowOptions" TextProperty="Text" ValueProperty="Value"

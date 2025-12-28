@@ -72,8 +72,8 @@ else
         </RadzenStack>
     }
 
-    <div style="display: flex; gap: 1rem;">
-        <div style="@(_drawerOpen ? "flex: 1; min-width: 0;" : "flex: 1;")">
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
+        <div style="@(_drawerOpen ? "flex: 1 1 300px; min-width: 0;" : "flex: 1;")">
             <TranslationGrid @ref="_translationGrid"
                              ServerDataFunc="@LoadServerData"
                              Languages="@_languages"
@@ -94,7 +94,7 @@ else
 
         @if (_drawerOpen && _selectedRow != null)
         {
-            <RadzenCard Style="width: 400px; height: fit-content; flex-shrink: 0; position: sticky; top: 1rem;">
+            <RadzenCard class="editor-drawer">
                 <RadzenStack Gap="1rem">
                     <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
                         <RadzenText TextStyle="TextStyle.H6">Key Preview</RadzenText>

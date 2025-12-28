@@ -1490,3 +1490,63 @@ ul.rz-profile-menu > li > ul.rz-navigation-menu {
     }
 }
 
+/* =============================================================================
+   Editor Page Responsive
+   ============================================================================= */
+
+/* Editor drawer - desktop */
+.editor-drawer {
+    width: 400px;
+    height: fit-content;
+    flex-shrink: 0;
+    position: sticky;
+    top: 1rem;
+}
+
+/* Editor drawer - tablet */
+@media (max-width: 991px) {
+    .editor-drawer {
+        width: 320px;
+    }
+}
+
+/* Editor drawer - mobile */
+@media (max-width: 768px) {
+    .editor-drawer {
+        width: 100%;
+        flex: 1 1 100%;
+        position: static;
+        order: -1;
+    }
+}
+
+/* Translation toolbar responsive */
+.translation-toolbar .rz-stack {
+    row-gap: 0.5rem;
+}
+
+@media (max-width: 599px) {
+    .translation-toolbar .rz-form-field {
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .translation-toolbar .rz-button {
+        flex: 1 1 auto;
+        min-width: 44px;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+
+    /* Hide button text on very small screens */
+    .translation-toolbar .rz-button .rz-button-text {
+        display: none;
+    }
+
+    /* Ensure split button also responsive */
+    .translation-toolbar .rz-splitbutton {
+        flex: 0 0 auto;
+    }
+}
+
