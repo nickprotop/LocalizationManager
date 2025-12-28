@@ -1133,18 +1133,6 @@ public sealed class PayPalConfiguration
     public PayPalKeySet Live { get; init; } = new();
 
     /// <summary>
-    /// PayPal Plan ID for Team plan ($9/month).
-    /// Create in PayPal Dashboard under Subscriptions > Plans.
-    /// </summary>
-    public string TeamPlanId { get; init; } = "";
-
-    /// <summary>
-    /// PayPal Plan ID for Enterprise plan ($29/month).
-    /// Create in PayPal Dashboard under Subscriptions > Plans.
-    /// </summary>
-    public string EnterprisePlanId { get; init; } = "";
-
-    /// <summary>
     /// Whether PayPal billing is enabled.
     /// </summary>
     public bool Enabled { get; init; } = false;
@@ -1170,6 +1158,18 @@ public sealed class PayPalConfiguration
     /// </summary>
     [JsonIgnore]
     public string WebhookId => Mode.ToLowerInvariant() == "live" ? Live.WebhookId : Sandbox.WebhookId;
+
+    /// <summary>
+    /// Get the active Team plan ID based on current mode.
+    /// </summary>
+    [JsonIgnore]
+    public string TeamPlanId => Mode.ToLowerInvariant() == "live" ? Live.TeamPlanId : Sandbox.TeamPlanId;
+
+    /// <summary>
+    /// Get the active Enterprise plan ID based on current mode.
+    /// </summary>
+    [JsonIgnore]
+    public string EnterprisePlanId => Mode.ToLowerInvariant() == "live" ? Live.EnterprisePlanId : Sandbox.EnterprisePlanId;
 
     /// <summary>
     /// Check if PayPal is properly configured (has required credentials).
@@ -1214,6 +1214,20 @@ public sealed class PayPalKeySet
     /// Get from PayPal Developer Dashboard > Webhooks.
     /// </summary>
     public string WebhookId { get; init; } = "";
+
+    /// <summary>
+    /// PayPal Plan ID for Team plan ($9/month).
+    /// Create in PayPal Dashboard under Subscriptions > Plans.
+    /// Each mode (sandbox/live) requires its own plan ID.
+    /// </summary>
+    public string TeamPlanId { get; init; } = "";
+
+    /// <summary>
+    /// PayPal Plan ID for Enterprise plan ($29/month).
+    /// Create in PayPal Dashboard under Subscriptions > Plans.
+    /// Each mode (sandbox/live) requires its own plan ID.
+    /// </summary>
+    public string EnterprisePlanId { get; init; } = "";
 }
 
 /// <summary>

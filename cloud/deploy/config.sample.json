@@ -105,15 +105,17 @@
       "sandbox": {
         "clientId": "YOUR_PAYPAL_SANDBOX_CLIENT_ID",
         "clientSecret": "YOUR_PAYPAL_SANDBOX_CLIENT_SECRET",
-        "webhookId": "YOUR_PAYPAL_SANDBOX_WEBHOOK_ID"
+        "webhookId": "YOUR_PAYPAL_SANDBOX_WEBHOOK_ID",
+        "teamPlanId": "P-YOUR_PAYPAL_SANDBOX_TEAM_PLAN_ID",
+        "enterprisePlanId": "P-YOUR_PAYPAL_SANDBOX_ENTERPRISE_PLAN_ID"
       },
       "live": {
         "clientId": "YOUR_PAYPAL_LIVE_CLIENT_ID",
         "clientSecret": "YOUR_PAYPAL_LIVE_CLIENT_SECRET",
-        "webhookId": "YOUR_PAYPAL_LIVE_WEBHOOK_ID"
-      },
-      "teamPlanId": "P-YOUR_PAYPAL_TEAM_PLAN_ID",
-      "enterprisePlanId": "P-YOUR_PAYPAL_ENTERPRISE_PLAN_ID"
+        "webhookId": "YOUR_PAYPAL_LIVE_WEBHOOK_ID",
+        "teamPlanId": "P-YOUR_PAYPAL_LIVE_TEAM_PLAN_ID",
+        "enterprisePlanId": "P-YOUR_PAYPAL_LIVE_ENTERPRISE_PLAN_ID"
+      }
     }
   },
   "lrmProvider": {
