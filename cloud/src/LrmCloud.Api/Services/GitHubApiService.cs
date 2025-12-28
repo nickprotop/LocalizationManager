@@ -251,9 +251,9 @@ public class GitHubApiService : IGitHubApiService
 
         try
         {
-            // Get directory contents
+            // Get directory contents (depth 4 to handle structures like ProjectName/Resources/*.resx)
             var path = string.IsNullOrEmpty(basePath) ? "" : basePath;
-            var contents = await GetDirectoryContentsRecursiveAsync(client, owner, repo, branch, path, 2);
+            var contents = await GetDirectoryContentsRecursiveAsync(client, owner, repo, branch, path, 4);
 
             // Check for lrm.json
             var hasLrmConfig = contents.Any(c => c.Name == "lrm.json");
