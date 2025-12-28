@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="LRM OTA (Over-The-Air) Localization SDKs - Update translations in real-time without redeploying. The first OTA solution for .NET.">
+    <meta name="theme-color" content="#6366f1">
+    <title>OTA SDKs - LRM Documentation</title>
+
+    <link rel="icon" type="image/png" href="../favicon.png">
+    <link rel="apple-touch-icon" href="../icon-192.png">
+
+    <style>
+        /* CSS Reset & Base */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #8b5cf6;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --bg-card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --text-light: #94a3b8;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f172a;
+                --bg-alt: #1e293b;
+                --bg-card: #1e293b;
+                --text: #f1f5f9;
+                --text-muted: #94a3b8;
+                --text-light: #64748b;
+                --border: #334155;
+                --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+            }
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        a:hover {
+            color: var(--primary-dark);
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            header {
+                background: rgba(15, 23, 42, 0.9);
+            }
+        }
+
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--text);
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        nav a {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.9375rem;
+            transition: color 0.2s;
+        }
+
+        nav a:hover {
+            color: var(--text);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.9375rem;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px 0 rgba(99, 102, 241, 0.5);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--bg-alt);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            padding: 80px 0 16px;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .breadcrumb a {
+            color: var(--text-muted);
+        }
+
+        .breadcrumb a:hover {
+            color: var(--primary);
+        }
+
+        .breadcrumb span {
+            margin: 0 8px;
+        }
+
+        /* Docs Layout */
+        .docs-layout {
+            display: flex;
+            gap: 48px;
+            padding-bottom: 80px;
+        }
+
+        /* Sidebar */
+        .docs-sidebar {
+            width: 250px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 80px;
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            margin-bottom: 24px;
+        }
+
+        .sidebar-title {
+            font-weight: 600;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+            padding-left: 12px;
+        }
+
+        .sidebar-link {
+            display: block;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+            font-size: 0.9375rem;
+            transition: all 0.2s;
+        }
+
+        .sidebar-link:hover {
+            background: var(--bg-alt);
+            color: var(--text);
+        }
+
+        .sidebar-link.active {
+            background: var(--bg-alt);
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .sidebar-external {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .sidebar-external::after {
+            content: '\2197';
+            font-size: 0.75rem;
+        }
+
+        /* Content */
+        .docs-content {
+            flex: 1;
+            min-width: 0;
+            max-width: 800px;
+        }
+
+        .docs-content h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .docs-content .lead {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+        }
+
+        .docs-content h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 48px;
+            margin-bottom: 16px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .docs-content h2:first-of-type {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+        }
+
+        .docs-content h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 32px;
+            margin-bottom: 12px;
+        }
+
+        .docs-content p {
+            margin-bottom: 16px;
+        }
+
+        .docs-content ul, .docs-content ol {
+            margin-bottom: 16px;
+            padding-left: 24px;
+        }
+
+        .docs-content li {
+            margin-bottom: 8px;
+        }
+
+        .docs-content pre {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+
+        .docs-content code {
+            background: var(--bg-alt);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.875em;
+        }
+
+        .docs-content pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .docs-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+        }
+
+        .docs-content th, .docs-content td {
+            border: 1px solid var(--border);
+            padding: 12px;
+            text-align: left;
+        }
+
+        .docs-content th {
+            background: var(--bg-alt);
+            font-weight: 600;
+        }
+
+        .info-box {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .info-box-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+            border: 1px solid var(--primary);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .highlight-box h3 {
+            margin-top: 0;
+            color: var(--primary);
+        }
+
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .flow-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 12px;
+        }
+
+        .flow-icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .flow-label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            max-width: 120px;
+        }
+
+        .flow-arrow {
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+
+        .sdk-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        .coming-soon-badge {
+            display: inline-block;
+            background: var(--bg-alt);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        /* Footer */
+        footer {
+            padding: 48px 0;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .footer-links a:hover {
+            color: var(--text);
+        }
+
+        .footer-copy {
+            color: var(--text-light);
+            font-size: 0.875rem;
+        }
+
+        /* Mobile Menu */
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        .sidebar-toggle {
+            display: none;
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            margin-bottom: 24px;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            font-size: 0.9375rem;
+            color: var(--text);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .docs-sidebar {
+                display: none;
+            }
+
+            .docs-sidebar.open {
+                display: block;
+                position: fixed;
+                top: 64px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                width: 100%;
+                height: auto;
+                background: var(--bg);
+                z-index: 50;
+                padding: 24px;
+                overflow-y: auto;
+            }
+
+            .sidebar-toggle {
+                display: block;
+            }
+
+            .flow-diagram {
+                flex-direction: column;
+            }
+
+            .flow-arrow {
+                transform: rotate(90deg);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .docs-content h1 {
+                font-size: 1.5rem;
+            }
+
+            .docs-content h2 {
+                font-size: 1.25rem;
+            }
+
+            .footer-inner {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .footer-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="header-inner">
+                <a href="/" class="logo">
+                    <div class="logo-icon">LR</div>
+                    LRM Cloud
+                </a>
+
+                <nav>
+                    <div class="nav-links">
+                        <a href="/#features">Features</a>
+                        <a href="/#pricing">Pricing</a>
+                        <a href="https://github.com/nickprotop/LocalizationManager" target="_blank">GitHub</a>
+                        <a href="/docs/" style="color: var(--primary);">Docs</a>
+                    </div>
+
+                    <div class="nav-buttons" id="nav-buttons">
+                        <a href="/app/login" class="btn btn-secondary" id="nav-login">Log In</a>
+                        <a href="/app/register" class="btn btn-primary" id="nav-register">Get Started</a>
+                    </div>
+
+                    <button class="mobile-menu-btn" aria-label="Menu">&#9776;</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Breadcrumb -->
+        <div class="breadcrumb">
+            <a href="/docs/">Docs</a>
+            <span>/</span>
+            <span>OTA SDKs</span>
+        </div>
+
+        <!-- Mobile sidebar toggle -->
+        <button class="sidebar-toggle" onclick="toggleSidebar()">
+            &#9776; Navigation
+        </button>
+
+        <!-- Docs Layout -->
+        <div class="docs-layout">
+            <!-- Sidebar -->
+            <aside class="docs-sidebar" id="sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-title">OTA Overview</div>
+                    <a href="#overview" class="sidebar-link active">What is OTA?</a>
+                    <a href="#how-it-works" class="sidebar-link">How It Works</a>
+                    <a href="#benefits" class="sidebar-link">Benefits</a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-title">SDKs</div>
+                    <a href="#dotnet" class="sidebar-link">.NET SDK</a>
+                    <a href="#coming-soon" class="sidebar-link">Coming Soon</a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-title">Reference</div>
+                    <a href="#api" class="sidebar-link">API Format</a>
+                    <a href="#samples" class="sidebar-link">Sample Projects</a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-title">Other Docs</div>
+                    <a href="cloud.html" class="sidebar-link">Cloud Platform</a>
+                    <a href="vscode.html" class="sidebar-link">VS Code Extension</a>
+                    <a href="dotnet.html" class="sidebar-link">.NET Libraries</a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-title">GitHub</div>
+                    <a href="https://github.com/nickprotop/LocalizationManager/tree/main/samples/ConsoleApp.OtaDemo" target="_blank" class="sidebar-link sidebar-external">OTA Demo</a>
+                    <a href="https://www.nuget.org/packages/LocalizationManager.JsonLocalization" target="_blank" class="sidebar-link sidebar-external">NuGet Package</a>
+                </div>
+            </aside>
+
+            <!-- Content -->
+            <main class="docs-content">
+                <h1 id="overview">OTA (Over-The-Air) Localization</h1>
+                <p class="lead">Update translations in real-time without redeploying your application. LRM is the <strong>first and only OTA localization solution for .NET!</strong></p>
+
+                <div class="highlight-box">
+                    <h3>Why OTA?</h3>
+                    <p style="margin-bottom: 0;">Traditional localization requires a full deployment cycle to fix a typo or add a new language. With OTA, your app fetches translations from LRM Cloud at runtime, allowing instant updates without touching your codebase.</p>
+                </div>
+
+                <h2 id="how-it-works">How It Works</h2>
+
+                <div class="flow-diagram">
+                    <div class="flow-step">
+                        <div class="flow-icon">&#128187;</div>
+                        <div class="flow-label">App starts with local resources</div>
+                    </div>
+                    <div class="flow-arrow">&#8594;</div>
+                    <div class="flow-step">
+                        <div class="flow-icon">&#128260;</div>
+                        <div class="flow-label">Background service syncs</div>
+                    </div>
+                    <div class="flow-arrow">&#8594;</div>
+                    <div class="flow-step">
+                        <div class="flow-icon">&#9729;&#65039;</div>
+                        <div class="flow-label">Fetches from LRM Cloud</div>
+                    </div>
+                    <div class="flow-arrow">&#8594;</div>
+                    <div class="flow-step">
+                        <div class="flow-icon">&#10004;&#65039;</div>
+                        <div class="flow-label">Live updates applied</div>
+                    </div>
+                </div>
+
+                <ol>
+                    <li><strong>Immediate start</strong> &mdash; Your app launches using embedded or local resources (no network delay)</li>
+                    <li><strong>Background sync</strong> &mdash; A background service fetches the latest translations from LRM Cloud</li>
+                    <li><strong>ETag caching</strong> &mdash; Efficient bandwidth usage; only downloads when content changes</li>
+                    <li><strong>Auto-refresh</strong> &mdash; Syncs automatically every 5 minutes (configurable)</li>
+                    <li><strong>Graceful fallback</strong> &mdash; Uses local resources if cloud is unreachable</li>
+                </ol>
+
+                <h2 id="benefits">Benefits</h2>
+
+                <table>
+                    <tr>
+                        <th>Use Case</th>
+                        <th>Without OTA</th>
+                        <th>With OTA</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Fix a typo</strong></td>
+                        <td>Code change, build, test, deploy</td>
+                        <td>Edit in LRM Cloud, instant fix</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Add new language</strong></td>
+                        <td>Add files, rebuild, redeploy</td>
+                        <td>Translate in cloud, auto-sync</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Emergency update</strong></td>
+                        <td>Hotfix deployment required</td>
+                        <td>Update immediately via web UI</td>
+                    </tr>
+                    <tr>
+                        <td><strong>A/B test copy</strong></td>
+                        <td>Feature flags + deployment</td>
+                        <td>Change translations live</td>
+                    </tr>
+                </table>
+
+                <h2 id="dotnet">.NET SDK <span class="sdk-badge">Available</span></h2>
+
+                <p>The .NET SDK provides full OTA support through the <code>LocalizationManager.JsonLocalization</code> NuGet package.</p>
+
+                <h3>Installation</h3>
+                <pre><code>dotnet add package LocalizationManager.JsonLocalization</code></pre>
+
+                <h3>Quick Setup</h3>
+                <pre><code>// Program.cs
+builder.Services.AddJsonLocalizationWithOta(options =>
+{
+    options.UseOta(
+        endpoint: "https://lrm-cloud.com",
+        apiKey: "lrm_your_read_only_api_key",
+        project: "@username/my-project"  // or "org/project"
+    );
+
+    // Optional: Configure refresh interval (default: 5 minutes)
+    options.Ota!.RefreshInterval = TimeSpan.FromMinutes(5);
+
+    // Optional: Fall back to local resources when offline
+    options.FallbackToLocal = true;
+    options.ResourcesPath = "Resources";  // Local fallback path
+});</code></pre>
+
+                <h3>Creating an API Key</h3>
+                <ol>
+                    <li>Go to <strong>Project Settings</strong> &rarr; <strong>API Keys</strong> in LRM Cloud</li>
+                    <li>Click <strong>"Create API Key"</strong></li>
+                    <li>Select <strong>"Read"</strong> scope (sufficient for OTA)</li>
+                    <li>Copy the key (starts with <code>lrm_</code>)</li>
+                </ol>
+
+                <h3>Configuration Options</h3>
+                <table>
+                    <tr>
+                        <th>Option</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code>Endpoint</code></td>
+                        <td><code>https://lrm-cloud.com</code></td>
+                        <td>LRM Cloud API endpoint</td>
+                    </tr>
+                    <tr>
+                        <td><code>ApiKey</code></td>
+                        <td>&mdash;</td>
+                        <td>API key with read scope (required)</td>
+                    </tr>
+                    <tr>
+                        <td><code>Project</code></td>
+                        <td>&mdash;</td>
+                        <td>Project path: <code>@user/project</code> or <code>org/project</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>RefreshInterval</code></td>
+                        <td>5 minutes</td>
+                        <td>How often to check for updates</td>
+                    </tr>
+                    <tr>
+                        <td><code>FallbackToLocal</code></td>
+                        <td><code>true</code></td>
+                        <td>Use local resources when offline</td>
+                    </tr>
+                    <tr>
+                        <td><code>Timeout</code></td>
+                        <td>10 seconds</td>
+                        <td>HTTP request timeout</td>
+                    </tr>
+                    <tr>
+                        <td><code>MaxRetries</code></td>
+                        <td>3</td>
+                        <td>Retry attempts for failed requests</td>
+                    </tr>
+                </table>
+
+                <h3>Supported Platforms</h3>
+                <p>OTA works with the entire .NET ecosystem:</p>
+                <ul>
+                    <li>ASP.NET Core (Web APIs, MVC, Razor Pages)</li>
+                    <li>Blazor (Server + WebAssembly)</li>
+                    <li>.NET MAUI (iOS, Android, Windows, macOS)</li>
+                    <li>Avalonia (Cross-platform desktop)</li>
+                    <li>WPF and WinForms</li>
+                    <li>Console applications</li>
+                    <li>Azure Functions / AWS Lambda</li>
+                    <li>Worker Services</li>
+                </ul>
+
+                <h3>Network Resilience</h3>
+                <p>The OTA client includes built-in resilience features:</p>
+                <ul>
+                    <li><strong>Retry with exponential backoff</strong> &mdash; Automatically retries failed requests</li>
+                    <li><strong>Circuit breaker</strong> &mdash; Stops requests after repeated failures, auto-recovers</li>
+                    <li><strong>ETag caching</strong> &mdash; Efficient bandwidth usage, only fetches when changed</li>
+                    <li><strong>Graceful fallback</strong> &mdash; Uses local resources when cloud is unavailable</li>
+                </ul>
+
+                <h3>Source Generator Compatibility</h3>
+                <p>When using OTA with the <code>LocalizationManager.JsonLocalization.Generator</code> package:</p>
+                <ul>
+                    <li>Generated classes work for compile-time keys</li>
+                    <li>New OTA keys use dynamic access: <code>Strings.Localizer["NewKey"]</code></li>
+                </ul>
+
+                <h2 id="coming-soon">Coming Soon <span class="coming-soon-badge">Future</span></h2>
+
+                <p>We're working on OTA SDKs for additional platforms:</p>
+
+                <table>
+                    <tr>
+                        <th>SDK</th>
+                        <th>Status</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Python SDK</strong></td>
+                        <td>Planned</td>
+                        <td>OTA for Django, Flask, FastAPI applications</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Node.js SDK</strong></td>
+                        <td>Planned</td>
+                        <td>OTA for Express, Next.js, React applications</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Swift SDK</strong></td>
+                        <td>Planned</td>
+                        <td>OTA for iOS and macOS native apps</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Kotlin SDK</strong></td>
+                        <td>Planned</td>
+                        <td>OTA for Android native apps</td>
+                    </tr>
+                </table>
+
+                <div class="info-box">
+                    <div class="info-box-title">Want an SDK for your platform?</div>
+                    <p style="margin-bottom: 0;">Let us know! <a href="https://github.com/nickprotop/LocalizationManager/issues" target="_blank">Open an issue on GitHub</a> to request an SDK for your platform.</p>
+                </div>
+
+                <h2 id="api">API Format</h2>
+
+                <p>The OTA endpoint returns a JSON bundle containing all translations for a project:</p>
+
+                <h3>Endpoint</h3>
+                <pre><code>GET /api/ota/{owner}/{project}/bundle
+Authorization: Bearer lrm_your_api_key</code></pre>
+
+                <h3>Response Format</h3>
+                <pre><code>{
+  "version": "2025-01-15T10:30:00.000Z",
+  "project": "@username/my-project",
+  "defaultLanguage": "en",
+  "languages": ["en", "fr", "de", "es"],
+  "deleted": [],
+  "translations": {
+    "en": {
+      "Welcome": "Welcome to our app!",
+      "Greeting": "Hello, {0}!",
+      "Items": {
+        "one": "{0} item",
+        "other": "{0} items"
+      }
+    },
+    "fr": {
+      "Welcome": "Bienvenue dans notre application!",
+      "Greeting": "Bonjour, {0}!",
+      "Items": {
+        "one": "{0} article",
+        "other": "{0} articles"
+      }
+    }
+  }
+}</code></pre>
+
+                <h3>ETag Caching</h3>
+                <p>The API supports ETag-based caching for efficient polling:</p>
+                <pre><code>// Initial request
+GET /api/ota/@user/project/bundle
+Response: 200 OK
+ETag: "abc123"
+
+// Subsequent request with If-None-Match
+GET /api/ota/@user/project/bundle
+If-None-Match: "abc123"
+Response: 304 Not Modified (no body, bandwidth saved)</code></pre>
+
+                <h2 id="samples">Sample Projects</h2>
+
+                <table>
+                    <tr>
+                        <th>Sample</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><a href="https://github.com/nickprotop/LocalizationManager/tree/main/samples/ConsoleApp.OtaDemo" target="_blank">ConsoleApp.OtaDemo</a></td>
+                        <td>Complete OTA demo with mock HTTP handler (no server required). Demonstrates bundle fetching, ETag caching, culture switching, pluralization, live updates, and fallback.</td>
+                    </tr>
+                </table>
+
+                <h3>Running the Demo</h3>
+                <pre><code># Clone the repository
+git clone https://github.com/nickprotop/LocalizationManager.git
+cd LocalizationManager
+
+# Run the OTA demo
+cd samples/ConsoleApp.OtaDemo
+dotnet run</code></pre>
+
+                <p>The demo uses a <code>MockOtaHandler</code> that simulates the LRM Cloud API, so you can explore all OTA features without needing a real server connection.</p>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-links">
+                    <a href="/docs/">Documentation</a>
+                    <a href="https://github.com/nickprotop/LocalizationManager" target="_blank">GitHub</a>
+                    <a href="/privacy.html">Privacy</a>
+                    <a href="/terms.html">Terms</a>
+                </div>
+                <div class="footer-copy">
+                    &copy; 2025 LRM Cloud. All rights reserved.
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Check authentication state
+        (function() {
+            let token = localStorage.getItem('lrm_access_token');
+            let expiry = localStorage.getItem('lrm_token_expiry');
+
+            try {
+                if (token && token.startsWith('"')) token = JSON.parse(token);
+                if (expiry && expiry.startsWith('"')) expiry = JSON.parse(expiry);
+            } catch (e) {}
+
+            let expiryDate = null;
+            if (expiry) {
+                const normalizedExpiry = expiry.replace(/\.(\d{3})\d*Z$/, '.$1Z');
+                expiryDate = new Date(normalizedExpiry);
+            }
+
+            const isLoggedIn = token && expiryDate && !isNaN(expiryDate.getTime()) && expiryDate > new Date();
+
+            if (isLoggedIn) {
+                const navButtons = document.getElementById('nav-buttons');
+                if (navButtons) {
+                    navButtons.innerHTML = '<a href="/app/" class="btn btn-primary">Dashboard</a>';
+                }
+            }
+        })();
+
+        // Toggle sidebar on mobile
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        // Highlight active sidebar link on scroll
+        document.addEventListener('scroll', function() {
+            const sections = document.querySelectorAll('h1[id], h2[id]');
+            const links = document.querySelectorAll('.sidebar-link');
+
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 100;
+                if (scrollY >= sectionTop) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            links.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
