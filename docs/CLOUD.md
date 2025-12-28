@@ -439,6 +439,99 @@ Organizations enable team collaboration on localization projects.
 3. **Import Resources** - Upload ZIP or push via CLI
 4. **Start Translating** - Use the web editor or CLI
 
+## OTA (Over-The-Air) Localization
+
+Update translations in real-time without redeploying your .NET application. LRM is the **first and only OTA localization solution for .NET**!
+
+### How OTA Works
+
+1. Your .NET app starts and loads local/embedded resources
+2. Background service fetches translations from LRM Cloud
+3. Translations sync automatically (default: every 5 minutes)
+4. Changes in LRM Cloud reflect in your app without redeployment
+
+### Quick Setup
+
+```csharp
+// Program.cs
+builder.Services.AddJsonLocalizationWithOta(options =>
+{
+    options.UseOta(
+        endpoint: "https://lrm-cloud.com",
+        apiKey: "lrm_your_read_only_api_key",
+        project: "@username/my-project"  // or "org/project"
+    );
+});
+```
+
+### Creating an API Key
+
+1. Go to **Project Settings** > **API Keys**
+2. Click **"Create API Key"**
+3. Select **"Read"** scope (sufficient for OTA)
+4. Copy the key (`lrm_...`)
+
+### OTA Configuration Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `Endpoint` | `https://lrm-cloud.com` | LRM Cloud API endpoint |
+| `ApiKey` | - | API key with read scope (required) |
+| `Project` | - | Project path: `@user/project` or `org/project` |
+| `RefreshInterval` | 5 minutes | How often to check for updates |
+| `FallbackToLocal` | true | Use local resources when offline |
+| `Timeout` | 10 seconds | HTTP request timeout |
+| `MaxRetries` | 3 | Retry attempts for failed requests |
+
+### Supported Platforms
+
+OTA works with the entire .NET ecosystem:
+
+- ASP.NET Core (Web APIs, MVC, Razor Pages)
+- Blazor (Server + WebAssembly)
+- .NET MAUI (iOS, Android, Windows, macOS)
+- Avalonia (Cross-platform desktop)
+- WPF and WinForms
+- Console applications
+- Azure Functions / AWS Lambda
+- Worker Services
+
+### Network Resilience
+
+The OTA client includes:
+
+- **Retry with exponential backoff** - Automatically retries failed requests
+- **Circuit breaker** - Stops requests after repeated failures, auto-recovers
+- **ETag caching** - Efficient bandwidth usage, only fetches when changed
+- **Graceful fallback** - Uses local resources when cloud is unavailable
+
+### Generator Package Compatibility
+
+When using OTA with `LocalizationManager.JsonLocalization.Generator`:
+
+- Generated classes work for compile-time keys
+- New OTA keys use dynamic access: `Strings.Localizer["NewKey"]`
+
+### Sample Project
+
+The [ConsoleApp.OtaDemo](https://github.com/nickprotop/LocalizationManager/tree/main/samples/ConsoleApp.OtaDemo) sample demonstrates all OTA features using a mock HTTP handler - **no real LRM Cloud server required**:
+
+- Initial bundle fetch
+- ETag caching (304 Not Modified)
+- Multi-language support
+- CLDR pluralization
+- Live translation updates
+- Fallback to embedded resources
+
+Run it directly to see OTA in action:
+
+```bash
+cd samples/ConsoleApp.OtaDemo
+dotnet run
+```
+
+See the [NuGet package documentation](https://www.nuget.org/packages/LocalizationManager.JsonLocalization) for full OTA API details.
+
 ## See Also
 
 - [Cloud Sync Guide](CLOUD_SYNC.md) - Complete CLI sync documentation

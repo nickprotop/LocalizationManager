@@ -547,6 +547,7 @@
                     <a href="#installation" class="sidebar-link">Installation</a>
                     <a href="#standalone" class="sidebar-link">Standalone Usage</a>
                     <a href="#aspnetcore" class="sidebar-link">ASP.NET Core</a>
+                    <a href="#ota" class="sidebar-link">OTA Localization</a>
                     <a href="#pluralization" class="sidebar-link">Pluralization</a>
                     <a href="#source-generator" class="sidebar-link">Source Generator</a>
                     <a href="#samples" class="sidebar-link">Sample Projects</a>
@@ -726,6 +727,131 @@ builder.Services.AddJsonLocalization(options =>
     // Assembly for embedded resources
     options.ResourceAssembly = typeof(Program).Assembly;
 });</code></pre>
+
+                <h2 id="ota">OTA (Over-The-Air) Localization</h2>
+                <p>Update translations in real-time without redeploying your application. LRM is the <strong>first and only OTA localization solution for .NET!</strong></p>
+
+                <div class="info-box">
+                    <div class="info-box-title">What is OTA?</div>
+                    <p>OTA localization allows your .NET application to fetch translations from LRM Cloud at runtime, automatically syncing updates without code changes or redeployment.</p>
+                </div>
+
+                <h3>How It Works</h3>
+                <ol>
+                    <li>Your app starts and uses embedded/local resources immediately</li>
+                    <li>A background service fetches translations from LRM Cloud</li>
+                    <li>Translations sync automatically (default: every 5 minutes)</li>
+                    <li>Changes in LRM Cloud reflect in your app without redeployment</li>
+                </ol>
+
+                <h3>Quick Setup</h3>
+                <pre><code>// Program.cs
+builder.Services.AddJsonLocalizationWithOta(options =>
+{
+    options.UseOta(
+        endpoint: "https://lrm-cloud.com",
+        apiKey: "lrm_your_read_only_api_key",
+        project: "@username/my-project"  // or "org/project"
+    );
+
+    // Optional: Configure refresh interval (default: 5 minutes)
+    options.Ota!.RefreshInterval = TimeSpan.FromMinutes(5);
+
+    // Optional: Fall back to local resources when offline
+    options.FallbackToLocal = true;
+    options.ResourcesPath = "Resources";  // Local fallback path
+});</code></pre>
+
+                <h3>Creating an API Key</h3>
+                <ol>
+                    <li>Go to <strong>Project Settings</strong> &rarr; <strong>API Keys</strong> in LRM Cloud</li>
+                    <li>Click <strong>"Create API Key"</strong></li>
+                    <li>Select <strong>"Read"</strong> scope (sufficient for OTA)</li>
+                    <li>Copy the key (starts with <code>lrm_</code>)</li>
+                </ol>
+
+                <h3>Configuration Options</h3>
+                <table>
+                    <tr>
+                        <th>Option</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code>Endpoint</code></td>
+                        <td><code>https://lrm-cloud.com</code></td>
+                        <td>LRM Cloud API endpoint</td>
+                    </tr>
+                    <tr>
+                        <td><code>ApiKey</code></td>
+                        <td>-</td>
+                        <td>API key with read scope (required)</td>
+                    </tr>
+                    <tr>
+                        <td><code>Project</code></td>
+                        <td>-</td>
+                        <td>Project path: <code>@user/project</code> or <code>org/project</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>RefreshInterval</code></td>
+                        <td>5 minutes</td>
+                        <td>How often to check for updates</td>
+                    </tr>
+                    <tr>
+                        <td><code>FallbackToLocal</code></td>
+                        <td><code>true</code></td>
+                        <td>Use local resources when offline</td>
+                    </tr>
+                    <tr>
+                        <td><code>Timeout</code></td>
+                        <td>10 seconds</td>
+                        <td>HTTP request timeout</td>
+                    </tr>
+                    <tr>
+                        <td><code>MaxRetries</code></td>
+                        <td>3</td>
+                        <td>Retry attempts for failed requests</td>
+                    </tr>
+                </table>
+
+                <h3>Supported Platforms</h3>
+                <p>OTA works with the entire .NET ecosystem:</p>
+                <ul>
+                    <li>ASP.NET Core (Web APIs, MVC, Razor Pages)</li>
+                    <li>Blazor (Server + WebAssembly)</li>
+                    <li>.NET MAUI (iOS, Android, Windows, macOS)</li>
+                    <li>Avalonia (Cross-platform desktop)</li>
+                    <li>WPF and WinForms</li>
+                    <li>Console applications</li>
+                    <li>Azure Functions / AWS Lambda</li>
+                    <li>Worker Services</li>
+                </ul>
+
+                <h3>Network Resilience</h3>
+                <p>The OTA client includes built-in resilience features:</p>
+                <ul>
+                    <li><strong>Retry with exponential backoff</strong> - Automatically retries failed requests</li>
+                    <li><strong>Circuit breaker</strong> - Stops requests after repeated failures, auto-recovers</li>
+                    <li><strong>ETag caching</strong> - Efficient bandwidth usage, only fetches when changed</li>
+                    <li><strong>Graceful fallback</strong> - Uses local resources when cloud is unavailable</li>
+                </ul>
+
+                <h3>Generator Package Compatibility</h3>
+                <p>When using OTA with the source generator package:</p>
+                <ul>
+                    <li>Generated classes work for compile-time keys</li>
+                    <li>New OTA keys use dynamic access: <code>Strings.Localizer["NewKey"]</code></li>
+                </ul>
+
+                <div class="info-box">
+                    <div class="info-box-title">Use Cases</div>
+                    <ul style="margin-bottom: 0;">
+                        <li><strong>Fix typos instantly</strong> - No redeployment needed</li>
+                        <li><strong>Add new languages</strong> - Without code changes</li>
+                        <li><strong>A/B test translations</strong> - Update specific strings</li>
+                        <li><strong>Emergency updates</strong> - Correct mistakes immediately</li>
+                    </ul>
+                </div>
 
                 <h2 id="pluralization">Pluralization</h2>
                 <p>The library supports CLDR plural rules for 30+ languages with the following categories:</p>

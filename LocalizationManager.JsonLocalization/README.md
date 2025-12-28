@@ -155,6 +155,52 @@ app.MapGet("/items/{count}", (int count, JsonLocalizer localizer) =>
 });
 ```
 
+### 4. OTA (Over-The-Air) Localization with LRM Cloud
+
+Update translations in real-time without redeploying your application. The FIRST OTA localization solution for .NET!
+
+```csharp
+// Program.cs
+var builder = WebApplication.CreateBuilder(args);
+
+// Add JSON localization with OTA support
+builder.Services.AddJsonLocalizationWithOta(options =>
+{
+    options.UseOta(
+        endpoint: "https://lrm-cloud.com",
+        apiKey: "lrm_your_read_only_api_key",
+        project: "@username/my-project"  // or "org/project" for organizations
+    );
+
+    // Optional: Configure refresh interval (default: 5 minutes)
+    options.Ota!.RefreshInterval = TimeSpan.FromMinutes(5);
+
+    // Optional: Fall back to local resources when offline
+    options.FallbackToLocal = true;
+    options.ResourcesPath = "Resources";  // Local fallback path
+});
+```
+
+**How it works:**
+1. App starts → Uses embedded/local resources immediately
+2. Background service fetches translations from LRM Cloud
+3. Translations sync automatically every 5 minutes (configurable)
+4. Changes in LRM Cloud are reflected in your app without redeployment
+
+**Requirements:**
+- Create a read-only API key in your LRM Cloud project settings
+- API key must have `read` scope
+
+**Benefits:**
+- Fix typos instantly in production
+- Add new languages without code changes
+- A/B test translations
+- Works with all .NET platforms (ASP.NET Core, Blazor, MAUI, WPF, etc.)
+
+**Note:** When using with the [Generator package](https://www.nuget.org/packages/LocalizationManager.JsonLocalization.Generator), generated classes work for compile-time keys. For new keys added via OTA, use dynamic access: `Strings.Localizer["NewKey"]`.
+
+**Try it locally:** The [ConsoleApp.OtaDemo](https://github.com/nickprotop/LocalizationManager/tree/main/samples/ConsoleApp.OtaDemo) sample demonstrates OTA features using a mock HTTP handler - no real server required.
+
 ## Configuration Options
 
 | Option | Type | Default | Description |
@@ -385,6 +431,7 @@ Complete working examples are available in the GitHub repository:
 | [ConsoleApp.Standalone](https://github.com/nickprotop/LocalizationManager/tree/main/samples/ConsoleApp.Standalone) | File system resources, standalone API |
 | [ConsoleApp.Embedded](https://github.com/nickprotop/LocalizationManager/tree/main/samples/ConsoleApp.Embedded) | Embedded resources in assembly |
 | [ConsoleApp.SourceGenerator](https://github.com/nickprotop/LocalizationManager/tree/main/samples/ConsoleApp.SourceGenerator) | Compile-time strongly-typed access |
+| [ConsoleApp.OtaDemo](https://github.com/nickprotop/LocalizationManager/tree/main/samples/ConsoleApp.OtaDemo) | OTA localization with mock server (no real server needed) |
 | [WebApp.AspNetCore](https://github.com/nickprotop/LocalizationManager/tree/main/samples/WebApp.AspNetCore) | ASP.NET Core with DI integration |
 
 ## API Reference

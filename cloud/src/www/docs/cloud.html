@@ -550,6 +550,7 @@
                     <a href="#translation-memory" class="sidebar-link">Translation Memory</a>
                     <a href="#glossary" class="sidebar-link">Glossary</a>
                     <a href="#cli-sync" class="sidebar-link">CLI Sync</a>
+                    <a href="#ota" class="sidebar-link">OTA Localization</a>
                     <a href="#teams" class="sidebar-link">Teams & Organizations</a>
                     <a href="#billing" class="sidebar-link">Billing & Plans</a>
                 </div>
@@ -943,6 +944,78 @@ lrm cloud snapshot diff &lt;from-id&gt; &lt;to-id&gt;</code></pre>
                 <div class="info-box">
                     <div class="info-box-title">Full Documentation</div>
                     <p>See the <a href="https://github.com/nickprotop/LocalizationManager/blob/main/docs/CLOUD_SYNC.md" target="_blank">Cloud Sync Guide</a> for complete CLI documentation.</p>
+                </div>
+
+                <h2 id="ota">OTA (Over-The-Air) Localization</h2>
+                <p>Update translations in your .NET applications in real-time without redeploying. LRM is the <strong>first and only OTA localization solution for .NET!</strong></p>
+
+                <h3>What is OTA?</h3>
+                <p>OTA localization allows your .NET application to fetch translations directly from LRM Cloud at runtime. When you update translations in the web editor, your app automatically receives the changes without any code deployment.</p>
+
+                <h3>OTA vs CLI Sync</h3>
+                <table>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>CLI Sync</th>
+                        <th>OTA</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Update Method</strong></td>
+                        <td>Pull to local files, rebuild & deploy</td>
+                        <td>Automatic at runtime</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Deployment</strong></td>
+                        <td>Required for changes</td>
+                        <td>Not required</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Offline Support</strong></td>
+                        <td>Full (embedded resources)</td>
+                        <td>Fallback to local</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Best For</strong></td>
+                        <td>CI/CD workflows, version control</td>
+                        <td>Quick fixes, live updates</td>
+                    </tr>
+                </table>
+
+                <h3>Quick Setup (.NET)</h3>
+                <pre><code>// Install the NuGet package
+// dotnet add package LocalizationManager.JsonLocalization
+
+// Program.cs
+builder.Services.AddJsonLocalizationWithOta(options =>
+{
+    options.UseOta(
+        endpoint: "https://lrm-cloud.com",
+        apiKey: "lrm_your_read_only_api_key",
+        project: "@username/my-project"  // or "org/project"
+    );
+});</code></pre>
+
+                <h3>Creating an API Key</h3>
+                <ol>
+                    <li>Go to <strong>Project Settings</strong> &rarr; <strong>API Keys</strong></li>
+                    <li>Click <strong>"Create API Key"</strong></li>
+                    <li>Select <strong>"Read"</strong> scope (minimum required for OTA)</li>
+                    <li>Copy the key (format: <code>lrm_xxxxxxxx</code>)</li>
+                </ol>
+
+                <h3>Supported Platforms</h3>
+                <p>OTA works with the entire .NET ecosystem:</p>
+                <ul>
+                    <li>ASP.NET Core (Web APIs, MVC, Razor Pages, Blazor)</li>
+                    <li>.NET MAUI (iOS, Android, Windows, macOS)</li>
+                    <li>Avalonia, WPF, WinForms</li>
+                    <li>Console apps, Worker Services</li>
+                    <li>Azure Functions, AWS Lambda</li>
+                </ul>
+
+                <div class="info-box">
+                    <div class="info-box-title">.NET Documentation</div>
+                    <p>For complete OTA setup instructions, configuration options, and code examples, see the <a href="dotnet.html#ota">.NET Libraries OTA documentation</a>.</p>
                 </div>
 
                 <h2 id="teams">Teams & Organizations</h2>
