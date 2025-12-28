@@ -15,7 +15,7 @@
 
 <PageTitle>Dashboard - LRM Cloud</PageTitle>
 
-<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem" class="rz-mb-4">
     <RadzenText TextStyle="TextStyle.H4" Style="margin: 0;">Dashboard</RadzenText>
     <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
         <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Filter:</RadzenText>
@@ -75,9 +75,9 @@ else
     </RadzenStack>
 }
 
-<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mt-6 rz-mb-4">
-    <RadzenText TextStyle="TextStyle.H5">Recent Projects</RadzenText>
-    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem" class="rz-mt-6 rz-mb-4">
+    <RadzenText TextStyle="TextStyle.H5" Style="margin: 0;">Recent Projects</RadzenText>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Wrap="FlexWrap.Wrap" Gap="0.5rem">
         <RadzenButton Variant="Radzen.Variant.Outlined" Icon="upload" Text="Import" Click="@OpenImportDialog" />
         <RadzenButton Variant="Radzen.Variant.Filled" Icon="add" Text="New Project" Click="@OpenCreateDialog" />
     </RadzenStack>

@@ -1358,3 +1358,103 @@ ul.rz-profile-menu > li > ul.rz-navigation-menu {
     }
 }
 
+/* =============================================================================
+   Page Header - Responsive title + buttons layout
+   ============================================================================= */
+
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--lrm-space-3);
+    margin-bottom: var(--lrm-space-4);
+}
+
+.page-header h1,
+.page-header h2,
+.page-header h3,
+.page-header h4,
+.page-header .rz-text-h4,
+.page-header .rz-text-h5,
+.page-header .rz-text-h6 {
+    margin: 0;
+    flex: 1 1 auto;
+    min-width: 150px;
+}
+
+.page-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--lrm-space-2);
+    align-items: center;
+}
+
+@media (max-width: 599px) {
+    .page-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .page-header h1,
+    .page-header h2,
+    .page-header h3,
+    .page-header h4,
+    .page-header .rz-text-h4,
+    .page-header .rz-text-h5 {
+        min-width: 100%;
+        text-align: left;
+    }
+
+    .page-header-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .page-header-actions .rz-button {
+        flex: 1 1 auto;
+        max-width: none;
+    }
+}
+
+/* Fix for RadzenStack horizontal containers to wrap on mobile */
+@media (max-width: 599px) {
+    /* Force all horizontal stacks with space-between to wrap */
+    .rz-stack.rz-orientation-horizontal.rz-justify-content-space-between {
+        flex-wrap: wrap !important;
+        gap: 0.75rem !important;
+    }
+
+    /* Headers take full width when wrapped */
+    .rz-stack.rz-orientation-horizontal.rz-justify-content-space-between > .rz-text-h4,
+    .rz-stack.rz-orientation-horizontal.rz-justify-content-space-between > .rz-text-h5,
+    .rz-stack.rz-orientation-horizontal.rz-justify-content-space-between > .rz-text-h6 {
+        flex: 1 1 100%;
+        min-width: 100%;
+    }
+
+    /* Nested horizontal stacks (button groups) also wrap */
+    .rz-stack.rz-orientation-horizontal.rz-justify-content-space-between > .rz-stack.rz-orientation-horizontal {
+        flex-wrap: wrap !important;
+        width: 100%;
+    }
+
+    /* Buttons in mobile header take more space */
+    .rz-stack.rz-orientation-horizontal.rz-justify-content-space-between .rz-button {
+        flex: 1 1 auto;
+        min-width: 100px;
+        justify-content: center;
+    }
+
+    /* Search/filter rows should stack */
+    .rz-stack.rz-orientation-horizontal:has(.rz-textbox):has(.rz-dropdown) {
+        flex-wrap: wrap !important;
+    }
+
+    .rz-stack.rz-orientation-horizontal:has(.rz-textbox):has(.rz-dropdown) > .rz-textbox,
+    .rz-stack.rz-orientation-horizontal:has(.rz-textbox):has(.rz-dropdown) > .rz-dropdown {
+        flex: 1 1 100%;
+        min-width: 100% !important;
+    }
+}
+

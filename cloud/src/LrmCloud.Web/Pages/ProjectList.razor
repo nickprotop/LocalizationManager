@@ -10,13 +10,13 @@
 
 <PageTitle>Projects - LRM Cloud</PageTitle>
 
-<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
-    <RadzenText TextStyle="TextStyle.H4">Projects</RadzenText>
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.H4" Style="margin: 0;">Projects</RadzenText>
     <RadzenButton Variant="Radzen.Variant.Filled" Icon="add" Text="New Project" Click="@OpenCreateDialog" Disabled="@(!_canCreateProject)" title="@_limitMessage" />
 </RadzenStack>
 
-<RadzenStack Orientation="Radzen.Orientation.Horizontal" class="rz-mb-4" Gap="0.5rem">
-    <RadzenTextBox @bind-Value="_searchText" Placeholder="Search projects..." Style="flex: 1;" Change="@(_ => StateHasChanged())" />
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" Wrap="FlexWrap.Wrap" class="rz-mb-4" Gap="0.5rem">
+    <RadzenTextBox @bind-Value="_searchText" Placeholder="Search projects..." Style="flex: 1; min-width: 200px;" Change="@(_ => StateHasChanged())" />
     <RadzenDropDown @bind-Value="_formatFilter" Data="@_formatOptions" TextProperty="Text" ValueProperty="Value" Style="min-width: 150px;" Placeholder="All Formats" AllowClear="true" Change="@(_ => StateHasChanged())" />
 </RadzenStack>
 

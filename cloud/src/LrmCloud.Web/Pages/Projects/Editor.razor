@@ -34,15 +34,15 @@ else if (_project == null)
 }
 else
 {
-    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" class="rz-mb-4">
-        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem" class="rz-mb-4">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem">
             <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
                           Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" />
-            <RadzenText TextStyle="TextStyle.H5">@_project.Name</RadzenText>
+            <RadzenText TextStyle="TextStyle.H5" Style="margin: 0;">@_project.Name</RadzenText>
             <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(_project.Format)" Text="@_project.Format" />
         </RadzenStack>
 
-        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Wrap="FlexWrap.Wrap" Gap="0.5rem">
             @if (_hasUnsavedChanges)
             {
                 <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Unsaved changes" />
