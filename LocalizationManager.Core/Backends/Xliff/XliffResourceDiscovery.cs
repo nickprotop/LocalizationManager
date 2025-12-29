@@ -38,9 +38,11 @@ public class XliffResourceDiscovery : IResourceDiscovery
 
         var languageMap = new Dictionary<string, LanguageInfo>(StringComparer.OrdinalIgnoreCase);
 
-        // Find all XLIFF files
+        // Find all XLIFF files, excluding backup/metadata directories
         var xliffFiles = Directory.GetFiles(searchPath, "*.xliff", SearchOption.AllDirectories)
             .Concat(Directory.GetFiles(searchPath, "*.xlf", SearchOption.AllDirectories))
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}.lrm{Path.DirectorySeparatorChar}"))
+            .Where(f => !f.Contains($"{Path.AltDirectorySeparatorChar}.lrm{Path.AltDirectorySeparatorChar}"))
             .ToList();
 
         foreach (var filePath in xliffFiles)
@@ -302,9 +304,15 @@ public class XliffResourceDiscovery : IResourceDiscovery
     {
         var result = new XliffDiscoveryResult();
 
-        // Find XLIFF files
-        var xliffFiles = Directory.GetFiles(path, "*.xliff", SearchOption.AllDirectories).ToList();
-        var xlfFiles = Directory.GetFiles(path, "*.xlf", SearchOption.AllDirectories).ToList();
+        // Find XLIFF files, excluding backup/metadata directories
+        var xliffFiles = Directory.GetFiles(path, "*.xliff", SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}.lrm{Path.DirectorySeparatorChar}"))
+            .Where(f => !f.Contains($"{Path.AltDirectorySeparatorChar}.lrm{Path.AltDirectorySeparatorChar}"))
+            .ToList();
+        var xlfFiles = Directory.GetFiles(path, "*.xlf", SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}.lrm{Path.DirectorySeparatorChar}"))
+            .Where(f => !f.Contains($"{Path.AltDirectorySeparatorChar}.lrm{Path.AltDirectorySeparatorChar}"))
+            .ToList();
 
         result.FileExtension = xliffFiles.Count >= xlfFiles.Count ? ".xliff" : ".xlf";
 

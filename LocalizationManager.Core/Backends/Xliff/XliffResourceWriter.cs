@@ -117,20 +117,24 @@ public class XliffResourceWriter : IResourceWriter
             ? CreateXliff20Document(file)
             : CreateXliff12Document(file);
 
+        // Use UTF-8 without BOM to avoid double-BOM issues when file is rewritten
+        var utf8NoBom = new UTF8Encoding(false);
         var settings = new XmlWriterSettings
         {
             Indent = true,
             IndentChars = "  ",
-            Encoding = Encoding.UTF8,
+            Encoding = utf8NoBom,
             OmitXmlDeclaration = false
         };
 
-        using var sw = new StringWriter();
-        using (var writer = XmlWriter.Create(sw, settings))
+        // Use MemoryStream instead of StringWriter to properly handle UTF-8 encoding
+        // StringWriter always reports UTF-16 encoding regardless of XmlWriterSettings
+        using var ms = new MemoryStream();
+        using (var writer = XmlWriter.Create(ms, settings))
         {
             doc.Save(writer);
-        } // XmlWriter is disposed and flushed here
-        return sw.ToString();
+        }
+        return utf8NoBom.GetString(ms.ToArray());
     }
 
     /// <summary>
@@ -140,17 +144,19 @@ public class XliffResourceWriter : IResourceWriter
     {
         var root = new XElement(Ns12 + "xliff",
             new XAttribute("version", "1.2"),
-            new XAttribute(XNamespace.Xmlns + "xsi", "http://www.w3.org/2001/XMLSchema-instance"),
             new XAttribute("xmlns", Ns12.NamespaceName));
 
+        // For XLIFF, we always use the language code for both source and target
+        // Even for default language files, we write target-language to preserve bilingual structure
         var sourceLanguage = file.Language.IsDefault ? file.Language.Code : "en";
-        var targetLanguage = file.Language.IsDefault ? "" : file.Language.Code;
+        var targetLanguage = file.Language.Code;
 
         var fileElement = new XElement(Ns12 + "file",
             new XAttribute("original", file.Language.BaseName ?? "resources"),
             new XAttribute("source-language", sourceLanguage),
             new XAttribute("datatype", "plaintext"));
 
+        // Always write target-language attribute to preserve bilingual structure
         if (!string.IsNullOrEmpty(targetLanguage))
         {
             fileElement.Add(new XAttribute("target-language", targetLanguage));
@@ -187,22 +193,17 @@ public class XliffResourceWriter : IResourceWriter
 
     /// <summary>
     /// Creates a trans-unit element for XLIFF 1.2.
+    /// Always creates both source and target elements to preserve bilingual structure.
     /// </summary>
     private XElement CreateTransUnit12(ResourceEntry entry, bool isDefault)
     {
         var unit = new XElement(Ns12 + "trans-unit",
             new XAttribute("id", entry.Key));
 
-        // Source is the key for default language, or include bilingual content
-        if (isDefault || _config.Bilingual)
-        {
-            unit.Add(new XElement(Ns12 + "source", entry.Value ?? ""));
-        }
-        else
-        {
-            unit.Add(new XElement(Ns12 + "source", entry.Key));
-            unit.Add(new XElement(Ns12 + "target", entry.Value ?? ""));
-        }
+        // Always write both source (key) and target (value) for proper bilingual structure
+        // Source contains the key identifier, target contains the translated value
+        unit.Add(new XElement(Ns12 + "source", entry.Key));
+        unit.Add(new XElement(Ns12 + "target", entry.Value ?? ""));
 
         if (!string.IsNullOrEmpty(entry.Comment))
         {
@@ -272,6 +273,7 @@ public class XliffResourceWriter : IResourceWriter
 
     /// <summary>
     /// Creates a unit element for XLIFF 2.0.
+    /// Always creates both source and target elements to preserve bilingual structure.
     /// </summary>
     private XElement CreateUnit20(ResourceEntry entry, bool isDefault)
     {
@@ -299,18 +301,10 @@ public class XliffResourceWriter : IResourceWriter
         }
         else
         {
-            var segment = new XElement(Ns20 + "segment");
-
-            if (isDefault)
-            {
-                segment.Add(new XElement(Ns20 + "source", entry.Value ?? ""));
-            }
-            else
-            {
-                segment.Add(new XElement(Ns20 + "source", entry.Key));
-                segment.Add(new XElement(Ns20 + "target", entry.Value ?? ""));
-            }
-
+            // Always write both source (key) and target (value) for proper bilingual structure
+            var segment = new XElement(Ns20 + "segment",
+                new XElement(Ns20 + "source", entry.Key),
+                new XElement(Ns20 + "target", entry.Value ?? ""));
             unit.Add(segment);
         }
 

@@ -188,9 +188,9 @@ public class XliffResourceReader : IResourceReader
         // Get state for translation status
         var state = unit.Element(ns + "target")?.Attribute("state")?.Value;
 
-        // For default/source language, return source value
-        // For translation languages, return target with fallback to source
-        var value = metadata.IsDefault ? (source ?? "") : (target ?? source ?? "");
+        // Always prefer target value (which contains the localized text)
+        // Fall back to source if target is not present
+        var value = target ?? source ?? "";
 
         return new ResourceEntry
         {
@@ -220,8 +220,8 @@ public class XliffResourceReader : IResourceReader
             var source = unit.Element(ns + "source")?.Value;
             var target = unit.Element(ns + "target")?.Value;
 
-            // For default/source language, use source value; for translations, use target
-            var pluralValue = metadata.IsDefault ? source : (target ?? source);
+            // Always prefer target value (which contains the localized text)
+            var pluralValue = target ?? source;
 
             if (!string.IsNullOrEmpty(pluralId) && pluralValue != null)
             {
@@ -314,8 +314,8 @@ public class XliffResourceReader : IResourceReader
 
             if (directSource != null || directTarget != null)
             {
-                // For default/source language, return source value
-                var directValue = metadata.IsDefault ? (directSource ?? "") : (directTarget ?? directSource ?? "");
+                // Always prefer target value (which contains the localized text)
+                var directValue = directTarget ?? directSource ?? "";
                 return new ResourceEntry
                 {
                     Key = id,
@@ -331,8 +331,8 @@ public class XliffResourceReader : IResourceReader
         {
             var target = segment.Element(ns + "target")?.Value;
             var source = segment.Element(ns + "source")?.Value;
-            // For default/source language, return source value
-            values.Add(metadata.IsDefault ? (source ?? "") : (target ?? source ?? ""));
+            // Always prefer target value (which contains the localized text)
+            values.Add(target ?? source ?? "");
         }
         var value = string.Join("", values);
 
