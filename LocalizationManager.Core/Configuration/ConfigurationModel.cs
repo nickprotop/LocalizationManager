@@ -66,6 +66,18 @@ public class ConfigurationModel
     /// Only applicable when ResourceFormat is "ios".
     /// </summary>
     public IosFormatConfiguration? Ios { get; set; }
+
+    /// <summary>
+    /// PO (GNU gettext) format configuration settings.
+    /// Only applicable when ResourceFormat is "po".
+    /// </summary>
+    public PoFormatConfiguration? Po { get; set; }
+
+    /// <summary>
+    /// XLIFF format configuration settings.
+    /// Only applicable when ResourceFormat is "xliff".
+    /// </summary>
+    public XliffFormatConfiguration? Xliff { get; set; }
 }
 
 /// <summary>
@@ -672,4 +684,73 @@ public class IosFormatConfiguration
     /// Default: "Localizable"
     /// </summary>
     public string BaseName { get; set; } = "Localizable";
+}
+
+/// <summary>
+/// Configuration settings for PO (GNU gettext) resource format.
+/// </summary>
+public class PoFormatConfiguration
+{
+    /// <summary>
+    /// Message domain name (e.g., "messages", "app").
+    /// Used for PO/POT file naming in GNU structure.
+    /// Default: "messages"
+    /// </summary>
+    public string Domain { get; set; } = "messages";
+
+    /// <summary>
+    /// Folder structure type: "gnu" (locale/{lang}/LC_MESSAGES/{domain}.po)
+    /// or "flat" ({lang}.po or po/{lang}.po).
+    /// Default: "gnu"
+    /// </summary>
+    public string FolderStructure { get; set; } = "gnu";
+
+    /// <summary>
+    /// Whether to generate/update POT template files when writing.
+    /// Default: true
+    /// </summary>
+    public bool GeneratePot { get; set; } = true;
+
+    /// <summary>
+    /// Whether to preserve fuzzy flag on entries during operations.
+    /// When false, fuzzy flags are removed on save.
+    /// Default: true
+    /// </summary>
+    public bool PreserveFuzzy { get; set; } = true;
+
+    /// <summary>
+    /// Strategy for generating resource keys from PO entries.
+    /// - "auto": Use msgctxt|msgid if context exists, otherwise msgid
+    /// - "msgid": Always use msgid as key
+    /// - "context": Always use msgctxt as key (falls back to msgid if no context)
+    /// - "hash": Generate SHA256 hash for very long keys
+    /// Default: "auto"
+    /// </summary>
+    public string KeyStrategy { get; set; } = "auto";
+}
+
+/// <summary>
+/// Configuration settings for XLIFF resource format.
+/// </summary>
+public class XliffFormatConfiguration
+{
+    /// <summary>
+    /// XLIFF version to use when writing files: "1.2" or "2.0".
+    /// Both versions are supported for reading.
+    /// Default: "2.0"
+    /// </summary>
+    public string Version { get; set; } = "2.0";
+
+    /// <summary>
+    /// Whether to create bilingual files (include source in all target files).
+    /// When true, target files include both source and target elements.
+    /// Default: false
+    /// </summary>
+    public bool Bilingual { get; set; } = false;
+
+    /// <summary>
+    /// File extension to use: ".xliff" or ".xlf".
+    /// Default: ".xliff"
+    /// </summary>
+    public string FileExtension { get; set; } = ".xliff";
 }

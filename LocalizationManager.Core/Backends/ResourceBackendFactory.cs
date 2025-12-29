@@ -23,7 +23,9 @@ using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Backends.Android;
 using LocalizationManager.Core.Backends.iOS;
 using LocalizationManager.Core.Backends.Json;
+using LocalizationManager.Core.Backends.Po;
 using LocalizationManager.Core.Backends.Resx;
+using LocalizationManager.Core.Backends.Xliff;
 using LocalizationManager.Core.Configuration;
 
 namespace LocalizationManager.Core.Backends;
@@ -39,7 +41,9 @@ public class ResourceBackendFactory : IResourceBackendFactory
         ["resx"] = () => new ResxResourceBackend(),
         ["json"] = () => new JsonResourceBackend(),
         ["android"] = () => new AndroidResourceBackend(),
-        ["ios"] = () => new IosResourceBackend()
+        ["ios"] = () => new IosResourceBackend(),
+        ["po"] = () => new PoResourceBackend(),
+        ["xliff"] = () => new XliffResourceBackend()
     };
 
     /// <inheritdoc />
@@ -64,6 +68,8 @@ public class ResourceBackendFactory : IResourceBackendFactory
             "ios" => new IosResourceBackend(
                 (config?.Ios?.BaseName ?? "Localizable") + ".strings",
                 config?.DefaultLanguageCode),
+            "po" or "gettext" => new PoResourceBackend(config?.Po, config?.DefaultLanguageCode),
+            "xliff" or "xlf" => new XliffResourceBackend(config?.Xliff),
             _ => throw new NotSupportedException(
                 $"Backend '{name}' is not supported. Available: {string.Join(", ", _backends.Keys)}")
         };
@@ -81,15 +87,24 @@ public class ResourceBackendFactory : IResourceBackendFactory
         if (!Directory.Exists(path))
             return GetBackend("resx", config); // Default fallback
 
-        // Priority order: most specific first (Android/iOS before JSON/RESX)
+        // Priority order: most specific first (Android/iOS before PO/XLIFF/JSON/RESX)
+        // PO and XLIFF are before JSON because some projects may have JSON config files
         // JSON backend needs special handling for auto-detection of i18next format
-        var priorities = new[] { "android", "ios", "json", "resx" };
+        var priorities = new[] { "android", "ios", "po", "xliff", "json", "resx" };
 
         foreach (var name in priorities)
         {
             var backend = GetBackend(name, config);
             if (backend.CanHandle(path))
             {
+                // For PO, recreate with path for auto-detection of folder structure
+                if (name == "po")
+                    return new PoResourceBackend(path, config?.DefaultLanguageCode);
+
+                // For XLIFF, recreate with path for auto-detection of version/format
+                if (name == "xliff")
+                    return new XliffResourceBackend(path);
+
                 // For JSON, recreate with path for auto-detection of i18next format
                 if (name == "json")
                     return new JsonResourceBackend(path);

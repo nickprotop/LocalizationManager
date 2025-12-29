@@ -104,18 +104,12 @@ public class BaseCommandSettings : CommandSettings
         // Priority 2: Configuration file
         if (LoadedConfiguration?.ResourceFormat != null)
         {
-            // For JSON format, pass the config so i18next mode and other settings work
-            if (LoadedConfiguration.ResourceFormat.Equals("json", StringComparison.OrdinalIgnoreCase))
-            {
-                _cachedBackend = new JsonResourceBackend(LoadedConfiguration.Json);
-                return _cachedBackend;
-            }
-            _cachedBackend = factory.GetBackend(LoadedConfiguration.ResourceFormat);
+            _cachedBackend = factory.GetBackend(LoadedConfiguration.ResourceFormat, LoadedConfiguration);
             return _cachedBackend;
         }
 
         // Priority 3: Auto-detect from path
-        _cachedBackend = factory.ResolveFromPath(GetResourcePath());
+        _cachedBackend = factory.ResolveFromPath(GetResourcePath(), LoadedConfiguration);
         return _cachedBackend;
     }
 

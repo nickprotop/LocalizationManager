@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+  <file original="resources" source-language="en" target-language="fr" datatype="plaintext">
+    <header>
+      <tool tool-id="test" tool-name="Test" tool-version="1.0"/>
+    </header>
+    <body>
+      <trans-unit id="greeting">
+        <source>Hello</source>
+        <target>Bonjour</target>
+        <note>A simple greeting</note>
+      </trans-unit>
+      <trans-unit id="welcome">
+        <source>Welcome to the application</source>
+        <target>Bienvenue dans l'application</target>
+      </trans-unit>
+      <trans-unit id="farewell">
+        <source>Goodbye</source>
+        <target>Au revoir</target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>

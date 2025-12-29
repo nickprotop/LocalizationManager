@@ -1,0 +1,20 @@
+# Test PO file with plurals
+msgid ""
+msgstr ""
+"Project-Id-Version: test\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/files.cs:10
+msgid "%d file"
+msgid_plural "%d files"
+msgstr[0] "%d file"
+msgstr[1] "%d files"
+
+#: src/messages.cs:20
+msgid "You have %d new message"
+msgid_plural "You have %d new messages"
+msgstr[0] "You have %d new message"
+msgstr[1] "You have %d new messages"
