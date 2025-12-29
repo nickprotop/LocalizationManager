@@ -120,8 +120,8 @@ public class ProjectService : IProjectService
                 SyncStatus = SyncStatus.Pending,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
-                // Auto-generate default config based on format
-                ConfigJson = GenerateDefaultConfig(format, request.DefaultLanguage),
+                // Auto-generate default config based on format and options
+                ConfigJson = GenerateDefaultConfig(format, request.DefaultLanguage, request.FormatOptions),
                 ConfigVersion = Guid.NewGuid().ToString(),
                 ConfigUpdatedAt = DateTime.UtcNow,
                 ConfigUpdatedBy = userId
@@ -915,7 +915,7 @@ public class ProjectService : IProjectService
     /// <summary>
     /// Generates a default lrm.json configuration based on project format.
     /// </summary>
-    internal static string GenerateDefaultConfig(string format, string defaultLanguage)
+    internal static string GenerateDefaultConfig(string format, string defaultLanguage, FormatOptionsDto? options = null)
     {
         var config = new Dictionary<string, object?>
         {
@@ -928,31 +928,47 @@ public class ProjectService : IProjectService
         {
             config["Json"] = new Dictionary<string, object>
             {
-                ["I18nextCompatible"] = format == "i18next"
+                ["I18nextCompatible"] = format == "i18next",
+                ["UseNestedKeys"] = options?.JsonNestedKeys ?? false
             };
         }
         else if (format == "resx")
         {
-            // RESX: Use SharedResource as default per ASP.NET Core convention
             config["Resx"] = new Dictionary<string, object>
             {
-                ["BaseName"] = "SharedResource"
+                ["BaseName"] = options?.BaseName ?? "SharedResource"
             };
         }
         else if (format == "android")
         {
-            // Android: Use strings as default base name
             config["Android"] = new Dictionary<string, object>
             {
-                ["BaseName"] = "strings"
+                ["BaseName"] = options?.BaseName ?? "strings"
             };
         }
         else if (format == "ios")
         {
-            // iOS: Use Localizable as default base name
             config["Ios"] = new Dictionary<string, object>
             {
-                ["BaseName"] = "Localizable"
+                ["BaseName"] = options?.BaseName ?? "Localizable"
+            };
+        }
+        else if (format == "po")
+        {
+            config["Po"] = new Dictionary<string, object>
+            {
+                ["Domain"] = options?.PoDomain ?? "messages",
+                ["FolderStructure"] = options?.PoFolderStructure ?? "gnu",
+                ["KeyStrategy"] = options?.PoKeyStrategy ?? "auto"
+            };
+        }
+        else if (format == "xliff")
+        {
+            config["Xliff"] = new Dictionary<string, object>
+            {
+                ["Version"] = options?.XliffVersion ?? "2.0",
+                ["Bilingual"] = options?.XliffBilingual ?? false,
+                ["FileExtension"] = ".xliff"
             };
         }
 

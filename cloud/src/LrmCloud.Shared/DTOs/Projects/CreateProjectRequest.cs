@@ -49,4 +49,28 @@ public class CreateProjectRequest
 
     [MaxLength(100, ErrorMessage = "GitHub default branch must not exceed 100 characters")]
     public string? GitHubDefaultBranch { get; set; }
+
+    // Format-specific options (optional)
+    public FormatOptionsDto? FormatOptions { get; set; }
+}
+
+/// <summary>
+/// Format-specific configuration options for project creation.
+/// </summary>
+public class FormatOptionsDto
+{
+    // PO options
+    public string? PoDomain { get; set; }
+    public string? PoFolderStructure { get; set; }  // "gnu" or "flat"
+    public string? PoKeyStrategy { get; set; }      // "auto", "msgid", "context"
+
+    // XLIFF options
+    public string? XliffVersion { get; set; }       // "1.2" or "2.0"
+    public bool? XliffBilingual { get; set; }
+
+    // JSON options
+    public bool? JsonNestedKeys { get; set; }
+
+    // Common options (base filename)
+    public string? BaseName { get; set; }
 }

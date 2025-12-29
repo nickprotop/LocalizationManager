@@ -500,6 +500,18 @@ public class GitHubSyncService : IGitHubSyncService
                 ? dirName[..^6]
                 : null,
 
+            // PO: fr.po → fr, messages.pot → default
+            "po" or "gettext" => fileName.EndsWith(".pot", StringComparison.OrdinalIgnoreCase)
+                ? "default"
+                : Path.GetFileNameWithoutExtension(fileName),
+
+            // XLIFF: messages.fr.xliff → fr, messages.xliff → default
+            "xliff" or "xlf" => fileName.Contains('.')
+                ? fileName.Split('.').Length > 2
+                    ? fileName.Split('.')[^2]
+                    : "default"
+                : null,
+
             _ => null
         };
     }

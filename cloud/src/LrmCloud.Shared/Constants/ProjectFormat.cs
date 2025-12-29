@@ -31,9 +31,19 @@ public static class ProjectFormat
     public const string Ios = "ios";
 
     /// <summary>
+    /// GNU gettext PO format
+    /// </summary>
+    public const string Po = "po";
+
+    /// <summary>
+    /// OASIS XLIFF format
+    /// </summary>
+    public const string Xliff = "xliff";
+
+    /// <summary>
     /// All valid formats
     /// </summary>
-    public static readonly string[] All = { Resx, Json, I18Next, Android, Ios };
+    public static readonly string[] All = { Resx, Json, I18Next, Android, Ios, Po, Xliff };
 
     /// <summary>
     /// Check if a format is valid
@@ -54,6 +64,8 @@ public static class ProjectFormat
             Json or I18Next => new[] { ".json" },
             Android => new[] { ".xml" },
             Ios => new[] { ".strings", ".stringsdict" },
+            Po => new[] { ".po", ".pot" },
+            Xliff => new[] { ".xliff", ".xlf" },
             _ => Array.Empty<string>()
         };
     }

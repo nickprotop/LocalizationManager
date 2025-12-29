@@ -35,8 +35,8 @@
             <RadzenFormField Text="Format" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
                 <ChildContent>
                     <RadzenDropDown @bind-Value="_model.Format" Style="width: 100%;"
-                                    Data="@_formatOptions" TextProperty="Text" ValueProperty="Value"
-                                    Disabled="@_isSubmitting" />
+                                    Data="@_formatDropdownOptions" TextProperty="Text" ValueProperty="Value"
+                                    Disabled="@_isSubmitting" Change="@OnFormatChanged" />
                 </ChildContent>
             </RadzenFormField>
 
@@ -59,6 +59,85 @@
                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Relative path to localization files</RadzenText>
                 </Helper>
             </RadzenFormField>
+
+            @* Format-specific options *@
+            @if (HasFormatOptions)
+            {
+                <details open="@_formatOptionsOpen">
+                    <summary style="cursor: pointer; font-weight: 500; margin-bottom: 0.5rem;" @onclick="() => _formatOptionsOpen = !_formatOptionsOpen">Format Options</summary>
+                    <RadzenStack Gap="0.75rem" Style="margin-top: 0.5rem;">
+                        @switch (_model.Format)
+                        {
+                            case "po":
+                                <RadzenFormField Text="Domain" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                    <ChildContent>
+                                        <RadzenTextBox @bind-Value="_formatOptions.PoDomain" Placeholder="messages"
+                                                       Disabled="@_isSubmitting" Style="width: 100%;" />
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">PO file domain name (e.g., messages, django)</RadzenText>
+                                    </Helper>
+                                </RadzenFormField>
+                                <RadzenFormField Text="Folder Structure" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                    <ChildContent>
+                                        <RadzenDropDown @bind-Value="_formatOptions.PoFolderStructure" Style="width: 100%;"
+                                                        Data="@_poFolderOptions" TextProperty="Text" ValueProperty="Value"
+                                                        Disabled="@_isSubmitting" />
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">GNU: locale/{'{'}lang{'}'}/LC_MESSAGES/, Flat: po/{'{'}lang{'}'}.po</RadzenText>
+                                    </Helper>
+                                </RadzenFormField>
+                                <RadzenFormField Text="Key Strategy" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                    <ChildContent>
+                                        <RadzenDropDown @bind-Value="_formatOptions.PoKeyStrategy" Style="width: 100%;"
+                                                        Data="@_poKeyStrategyOptions" TextProperty="Text" ValueProperty="Value"
+                                                        Disabled="@_isSubmitting" />
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">How to derive keys from PO entries</RadzenText>
+                                    </Helper>
+                                </RadzenFormField>
+                                break;
+
+                            case "xliff":
+                                <RadzenFormField Text="XLIFF Version" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                    <ChildContent>
+                                        <RadzenDropDown @bind-Value="_formatOptions.XliffVersion" Style="width: 100%;"
+                                                        Data="@_xliffVersionOptions" TextProperty="Text" ValueProperty="Value"
+                                                        Disabled="@_isSubmitting" />
+                                    </ChildContent>
+                                </RadzenFormField>
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                    <RadzenCheckBox @bind-Value="_formatOptions.XliffBilingual" Disabled="@_isSubmitting" />
+                                    <RadzenText>Bilingual files (include source text in all files)</RadzenText>
+                                </RadzenStack>
+                                break;
+
+                            case "json":
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                    <RadzenCheckBox @bind-Value="_formatOptions.JsonNestedKeys" Disabled="@_isSubmitting" />
+                                    <RadzenText>Use nested keys (e.g., common.buttons.save)</RadzenText>
+                                </RadzenStack>
+                                break;
+
+                            case "resx":
+                            case "android":
+                            case "ios":
+                                <RadzenFormField Text="Base Filename" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                                    <ChildContent>
+                                        <RadzenTextBox @bind-Value="_formatOptions.BaseName" Placeholder="@GetDefaultBaseName()"
+                                                       Disabled="@_isSubmitting" Style="width: 100%;" />
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@GetBaseNameHelp()</RadzenText>
+                                    </Helper>
+                                </RadzenFormField>
+                                break;
+                        }
+                    </RadzenStack>
+                </details>
+            }
 
             <details>
                 <summary style="cursor: pointer; font-weight: 500; margin-bottom: 0.5rem;">GitHub Integration (Optional)</summary>
@@ -106,16 +185,69 @@
     public EventCallback<ProjectDto> OnProjectCreated { get; set; }
 
     private bool _isSubmitting;
+    private bool _formatOptionsOpen = true;
     private string? _errorMessage;
     private CreateProjectRequest _model = new() { Slug = "", Name = "", Format = "resx", DefaultLanguage = "en", LocalizationPath = "." };
+    private FormatOptionsDto _formatOptions = new();
 
-    private readonly List<object> _formatOptions = new()
+    private readonly List<object> _formatDropdownOptions = new()
     {
         new { Value = "resx", Text = ".resx (C#/.NET)" },
         new { Value = "json", Text = "JSON Localization" },
         new { Value = "i18next", Text = "i18next (JS/React)" },
         new { Value = "android", Text = "Android strings.xml" },
-        new { Value = "ios", Text = "iOS .strings/.stringsdict" }
+        new { Value = "ios", Text = "iOS .strings/.stringsdict" },
+        new { Value = "po", Text = "GNU gettext (.po/.pot)" },
+        new { Value = "xliff", Text = "XLIFF (.xliff/.xlf)" }
+    };
+
+    private readonly List<object> _poFolderOptions = new()
+    {
+        new { Value = "gnu", Text = "GNU (locale/{lang}/LC_MESSAGES/)" },
+        new { Value = "flat", Text = "Flat (po/{lang}.po)" }
+    };
+
+    private readonly List<object> _poKeyStrategyOptions = new()
+    {
+        new { Value = "auto", Text = "Auto (context if available, else msgid)" },
+        new { Value = "msgid", Text = "Use msgid (source text as key)" },
+        new { Value = "context", Text = "Use msgctxt (context as key)" }
+    };
+
+    private readonly List<object> _xliffVersionOptions = new()
+    {
+        new { Value = "2.0", Text = "XLIFF 2.0 (Recommended)" },
+        new { Value = "1.2", Text = "XLIFF 1.2 (Legacy)" }
+    };
+
+    private bool HasFormatOptions => _model.Format is "po" or "xliff" or "json" or "resx" or "android" or "ios";
+
+    private void OnFormatChanged(object value)
+    {
+        // Reset format options when format changes
+        _formatOptions = new FormatOptionsDto
+        {
+            PoFolderStructure = "gnu",
+            PoKeyStrategy = "auto",
+            XliffVersion = "2.0"
+        };
+        StateHasChanged();
+    }
+
+    private string GetDefaultBaseName() => _model.Format switch
+    {
+        "resx" => "SharedResource",
+        "android" => "strings",
+        "ios" => "Localizable",
+        _ => ""
+    };
+
+    private string GetBaseNameHelp() => _model.Format switch
+    {
+        "resx" => "e.g., SharedResource, Resources, Strings",
+        "android" => "e.g., strings, messages",
+        "ios" => "e.g., Localizable, InfoPlist",
+        _ => ""
     };
 
     private void Close()
@@ -130,6 +262,8 @@
 
         try
         {
+            // Attach format options to the model
+            _model.FormatOptions = _formatOptions;
             var result = await ProjectService.CreateProjectAsync(_model);
 
             if (result.IsSuccess && result.Data != null)
