@@ -72,18 +72,9 @@ else
                                     </ChildContent>
                                 </RadzenFormField>
 
-                                <RadzenFormField Text="Format" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
-                                    <ChildContent>
-                                        <RadzenTextBox Value="@GetFormatDisplayName(_model.Format)" Disabled="true" ReadOnly="true" Style="width: 100%;" />
-                                    </ChildContent>
-                                    <Helper>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Format cannot be changed after project creation</RadzenText>
-                                    </Helper>
-                                </RadzenFormField>
-
                                 <RadzenFormField Text="Default Language" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
                                     <ChildContent>
-                                        <RadzenTextBox Value="@_model.DefaultLanguage" Disabled="true" ReadOnly="true" Style="width: 100%;" />
+                                        <RadzenTextBox Value="@_project?.DefaultLanguage" Disabled="true" ReadOnly="true" Style="width: 100%;" />
                                     </ChildContent>
                                     <Helper>
                                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Default language cannot be changed after project creation</RadzenText>
@@ -654,11 +645,10 @@ else
                 {
                     Name = _project.Name,
                     Description = _project.Description,
-                    Format = _project.Format,
-                    DefaultLanguage = _project.DefaultLanguage,
-                    LocalizationPath = _project.LocalizationPath,
                     GitHubRepo = _project.GitHubRepo,
-                    GitHubDefaultBranch = _project.GitHubDefaultBranch
+                    GitHubDefaultBranch = _project.GitHubDefaultBranch,
+                    GitHubBasePath = _project.GitHubBasePath,
+                    GitHubFormat = _project.GitHubFormat
                 };
                 _selectedOrganizationId = _project.OrganizationId;
                 _originalOrganizationId = _project.OrganizationId;

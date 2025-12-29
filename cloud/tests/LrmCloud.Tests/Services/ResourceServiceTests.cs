@@ -69,7 +69,6 @@ public class ResourceServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = userId,
-            Format = ProjectFormat.Json,
             DefaultLanguage = "en",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow

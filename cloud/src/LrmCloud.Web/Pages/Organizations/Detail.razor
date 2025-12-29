@@ -157,7 +157,6 @@ else
                         <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Start">
                             <RadzenText TextStyle="TextStyle.Subtitle1">@project.Name</RadzenText>
                             <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem" AlignItems="Radzen.AlignItems.Center">
-                                <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(project.Format)" Text="@project.Format" />
                                 @if (project.ValidationErrors > 0 || project.ValidationWarnings > 0)
                                 {
                                     <span title="@UiHelpers.GetValidationTooltip(project)" style="display: flex; gap: 0.125rem;">

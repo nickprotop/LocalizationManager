@@ -128,7 +128,6 @@ public class CloudTranslationServiceTests : IDisposable
             Name = "Test Project",
             UserId = userId,
             OrganizationId = orgId,
-            Format = "json",
             DefaultLanguage = defaultLanguage,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -373,7 +372,6 @@ public class CloudTranslationServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
-            Format = "json",
             DefaultLanguage = "en",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow

@@ -19,17 +19,20 @@ public class GitHubSyncService : IGitHubSyncService
 {
     private readonly AppDbContext _db;
     private readonly IFileExportService _exportService;
+    private readonly IGitHubFormatResolver _formatResolver;
     private readonly CloudConfiguration _config;
     private readonly ILogger<GitHubSyncService> _logger;
 
     public GitHubSyncService(
         AppDbContext db,
         IFileExportService exportService,
+        IGitHubFormatResolver formatResolver,
         CloudConfiguration config,
         ILogger<GitHubSyncService> logger)
     {
         _db = db;
         _exportService = exportService;
+        _formatResolver = formatResolver;
         _config = config;
         _logger = logger;
     }
@@ -68,10 +71,15 @@ public class GitHubSyncService : IGitHubSyncService
 
             var owner = repoParts[0];
             var repo = repoParts[1];
+            var basePath = project.GitHubBasePath ?? ".";
+            var baseBranch = project.GitHubDefaultBranch;
+
+            // Resolve format for GitHub operations
+            // Priority: GitHubFormat explicit > lrm.json in repo > auto-detect from files
+            var format = await _formatResolver.ResolveFormatAsync(project, userId, owner, repo, baseBranch, basePath);
 
             // Export translations to file content
-            var basePath = project.GitHubBasePath ?? ".";
-            var files = await _exportService.ExportProjectAsync(projectId, basePath);
+            var files = await _exportService.ExportProjectAsync(projectId, basePath, format);
 
             if (files.Count == 0)
                 return new GitHubSyncResult(false, null, 0, "No translation files to sync");
@@ -87,7 +95,6 @@ public class GitHubSyncService : IGitHubSyncService
 
             // Create branch name with timestamp including milliseconds to prevent collision
             var branchName = $"lrm/translations-{DateTime.UtcNow:yyyyMMdd-HHmmss-fff}";
-            var baseBranch = project.GitHubDefaultBranch;
 
             try
             {
@@ -142,7 +149,7 @@ public class GitHubSyncService : IGitHubSyncService
                     if (createPr)
                     {
                         // Build PR body with summary
-                        var prBody = BuildPullRequestBody(project, files);
+                        var prBody = BuildPullRequestBody(project, files, format);
 
                         var newPr = new NewPullRequest(
                             $"Update translations from LRM Cloud",
@@ -434,10 +441,10 @@ public class GitHubSyncService : IGitHubSyncService
     /// <summary>
     /// Builds the Pull Request body with a summary of changes.
     /// </summary>
-    private static string BuildPullRequestBody(Project project, Dictionary<string, string> files)
+    private static string BuildPullRequestBody(Project project, Dictionary<string, string> files, string format)
     {
         var languageFiles = files.Keys
-            .Select(path => ExtractLanguageFromPath(path, project.Format))
+            .Select(path => ExtractLanguageFromPath(path, format))
             .Where(lang => !string.IsNullOrEmpty(lang))
             .Distinct()
             .OrderBy(lang => lang)
@@ -449,7 +456,7 @@ public class GitHubSyncService : IGitHubSyncService
             This PR updates translations from [LRM Cloud](https://lrmcloud.com).
 
             **Project:** {project.Name}
-            **Format:** {project.Format}
+            **Format:** {format}
             **Files updated:** {files.Count}
 
             ### Languages

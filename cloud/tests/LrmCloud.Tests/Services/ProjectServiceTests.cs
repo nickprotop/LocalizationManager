@@ -128,7 +128,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "my-project",
             Name = "My Project",
             Description = "Test project",
-            Format = ProjectFormat.Json,
             DefaultLanguage = "en"
         };
 
@@ -142,7 +141,6 @@ public class ProjectServiceTests : IDisposable
         Assert.Equal("My Project", project.Name);
         Assert.Equal(user.Id, project.UserId);
         Assert.Null(project.OrganizationId);
-        Assert.Equal(ProjectFormat.Json, project.Format);
         Assert.Equal(SyncStatus.Pending, project.SyncStatus);
     }
 
@@ -161,7 +159,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "org-project",
             Name = "Org Project",
             OrganizationId = org.Id,
-            Format = ProjectFormat.Resx
         };
 
         // Act
@@ -191,7 +188,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "org-project",
             Name = "Org Project",
             OrganizationId = org.Id,
-            Format = ProjectFormat.Json
         };
 
         // Act
@@ -212,7 +208,6 @@ public class ProjectServiceTests : IDisposable
         {
             Slug = "my-project",
             Name = "My Project",
-            Format = "invalid-format"
         };
 
         // Act
@@ -234,7 +229,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -261,7 +255,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = owner.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -289,7 +282,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Personal Project",
             UserId = user.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -301,7 +293,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Org Project",
             OrganizationId = org.Id,
-            Format = ProjectFormat.Resx,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -327,7 +318,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
-            Format = ProjectFormat.Json,
             AutoTranslate = false,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -363,7 +353,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = owner.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -392,7 +381,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -422,7 +410,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = owner.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -451,7 +438,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -476,7 +462,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = owner.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -502,7 +487,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Org Project",
             OrganizationId = org.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -529,7 +513,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -555,7 +538,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Org Project",
             OrganizationId = org.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -584,7 +566,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Org Project",
             OrganizationId = org.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -613,7 +594,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Org Project",
             OrganizationId = org.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -642,7 +622,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Org Project",
             OrganizationId = org.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -673,7 +652,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
-            Format = ProjectFormat.Json,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -727,7 +705,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
-            Format = ProjectFormat.Json,
             GitHubRepo = null, // No GitHub repo configured
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -753,7 +730,6 @@ public class ProjectServiceTests : IDisposable
             Slug = "test-project",
             Name = "Test Project",
             UserId = user.Id,
-            Format = ProjectFormat.Json,
             GitHubRepo = "owner/repo",
             SyncStatus = SyncStatus.Pending,
             CreatedAt = DateTime.UtcNow,

@@ -28,14 +28,14 @@ public class FileExportService : IFileExportService
     }
 
     /// <inheritdoc />
-    public async Task<Dictionary<string, string>> ExportProjectAsync(int projectId, string basePath)
+    public async Task<Dictionary<string, string>> ExportProjectAsync(int projectId, string basePath, string format)
     {
-        return await ExportProjectAsync(projectId, basePath, null);
+        return await ExportProjectAsync(projectId, basePath, format, null);
     }
 
     /// <inheritdoc />
     public async Task<Dictionary<string, string>> ExportProjectAsync(
-        int projectId, string basePath, IEnumerable<string>? languages)
+        int projectId, string basePath, string format, IEnumerable<string>? languages)
     {
         var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId);
         if (project == null)
@@ -72,25 +72,25 @@ public class FileExportService : IFileExportService
         }
 
         var result = new Dictionary<string, string>();
-        var writer = GetWriter(project.Format);
+        var writer = GetWriter(format);
 
         foreach (var languageCode in targetLanguages)
         {
             var isDefault = languageCode == project.DefaultLanguage;
-            var resourceFile = BuildResourceFile(keys, languageCode, isDefault, project.Format);
+            var resourceFile = BuildResourceFile(keys, languageCode, isDefault, format);
 
             if (!resourceFile.Entries.Any())
             {
                 continue; // Skip empty language files
             }
 
-            var filePath = GetFilePath(basePath, project.Format, languageCode, isDefault);
+            var filePath = GetFilePath(basePath, format, languageCode, isDefault);
             var content = writer.SerializeToString(resourceFile);
 
             result[filePath] = content;
 
             // For iOS, also generate .stringsdict if there are plurals
-            if (project.Format.Equals("ios", StringComparison.OrdinalIgnoreCase))
+            if (format.Equals("ios", StringComparison.OrdinalIgnoreCase))
             {
                 var iosWriter = (IosResourceWriter)writer;
                 var stringsdictContent = iosWriter.SerializeToStringdict(resourceFile);
@@ -102,7 +102,7 @@ public class FileExportService : IFileExportService
             }
         }
 
-        _logger.LogInformation("Exported {FileCount} files for project {ProjectId}", result.Count, projectId);
+        _logger.LogInformation("Exported {FileCount} files for project {ProjectId} using format {Format}", result.Count, projectId, format);
         return result;
     }
 

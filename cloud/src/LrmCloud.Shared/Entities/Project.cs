@@ -71,6 +71,15 @@ public class Project
     public string? GitHubBasePath { get; set; }
 
     /// <summary>
+    /// Resource format for GitHub operations.
+    /// Null or "auto" = auto-detect from files or read from repo's lrm.json.
+    /// Explicit values: "resx", "json", "i18next", "android", "ios", "po", "xliff".
+    /// </summary>
+    [MaxLength(50)]
+    [Column("github_format")]
+    public string? GitHubFormat { get; set; }
+
+    /// <summary>
     /// Encrypted GitHub access token for project-specific access (e.g., PAT).
     /// Checked before organization token and user's OAuth token.
     /// </summary>
@@ -87,15 +96,6 @@ public class Project
     public User? GitHubConnectedByUser { get; set; }
 
     // Localization settings
-    [MaxLength(500)]
-    [Column("localization_path")]
-    public string LocalizationPath { get; set; } = ".";
-
-    [Required]
-    [MaxLength(50)]
-    [Column("format")]
-    public required string Format { get; set; } // resx, json, i18next, android, ios
-
     [MaxLength(10)]
     [Column("default_language")]
     public string DefaultLanguage { get; set; } = "en";
@@ -139,23 +139,6 @@ public class Project
 
     [Column("sync_error")]
     public string? SyncError { get; set; }
-
-    // Configuration storage (lrm.json)
-    [Column("config_json", TypeName = "jsonb")]
-    public string? ConfigJson { get; set; }
-
-    [MaxLength(40)]
-    [Column("config_version")]
-    public string? ConfigVersion { get; set; }
-
-    [Column("config_updated_at")]
-    public DateTime? ConfigUpdatedAt { get; set; }
-
-    [Column("config_updated_by")]
-    public int? ConfigUpdatedBy { get; set; }
-
-    [ForeignKey(nameof(ConfigUpdatedBy))]
-    public User? ConfigUpdater { get; set; }
 
     // Glossary settings
     /// <summary>

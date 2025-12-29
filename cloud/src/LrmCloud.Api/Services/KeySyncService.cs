@@ -130,20 +130,14 @@ public class KeySyncService : IKeySyncService
                 return response;
             }
 
-            // Process config changes if provided
-            if (request.Config != null)
-            {
-                var configResult = await ApplyConfigChangesAsync(projectId, request.Config, ct);
-                response.ConfigApplied = configResult.Applied;
-                response.NewConfigHashes = configResult.NewHashes;
-            }
+            // Note: Config sync removed - CLI manages lrm.json locally (client-agnostic API)
 
             await _db.SaveChangesAsync(ct);
 
             // Record push in history (only if there were changes)
             if (historyChanges.Count > 0)
             {
-                await _historyService.RecordPushAsync(projectId, userId, request.Message, historyChanges, "push", ct);
+                await _historyService.RecordPushAsync(projectId, userId, request.Message, historyChanges, operationType: "push", source: "cli", ct: ct);
             }
 
             await transaction.CommitAsync(ct);
@@ -306,11 +300,7 @@ public class KeySyncService : IKeySyncService
         // Add project's default language
         response.DefaultLanguage = project.DefaultLanguage;
 
-        // Add config if exists
-        if (!string.IsNullOrEmpty(project.ConfigJson))
-        {
-            response.Config = ExtractConfigData(project.ConfigJson);
-        }
+        // Note: Config sync removed - CLI manages lrm.json locally (client-agnostic API)
 
         return response;
     }
@@ -724,153 +714,6 @@ public class KeySyncService : IKeySyncService
         public string? DeletedLang { get; set; }
     }
 
-    private async Task<(bool Applied, Dictionary<string, string> NewHashes)> ApplyConfigChangesAsync(
-        int projectId,
-        ConfigChangesDto config,
-        CancellationToken ct)
-    {
-        var project = await _db.Projects.FindAsync(new object[] { projectId }, ct);
-        if (project == null)
-        {
-            return (false, new Dictionary<string, string>());
-        }
-
-        // Parse existing config or create new
-        Dictionary<string, object>? existingConfig = null;
-        if (!string.IsNullOrEmpty(project.ConfigJson))
-        {
-            try
-            {
-                existingConfig = JsonSerializer.Deserialize<Dictionary<string, object>>(project.ConfigJson);
-            }
-            catch
-            {
-                existingConfig = null;
-            }
-        }
-        existingConfig ??= new Dictionary<string, object>();
-
-        var newHashes = new Dictionary<string, string>();
-
-        // Critical settings that are immutable after project creation
-        // These are stored in database columns and should not be synced via config_json
-        // Note: LocalizationPath is NOT immutable - it can be changed safely
-        var immutableSettings = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "ResourceFormat",
-            "DefaultLanguageCode"
-        };
-
-        // Apply changes (skip immutable settings)
-        foreach (var change in config.Changes)
-        {
-            // Skip immutable settings - these are set at project creation only
-            if (immutableSettings.Contains(change.Path))
-            {
-                continue;
-            }
-
-            // Parse the JSON value
-            object? value;
-            try
-            {
-                value = JsonSerializer.Deserialize<object>(change.Value);
-            }
-            catch
-            {
-                // Use raw string if JSON parse fails
-                value = change.Value;
-            }
-
-            SetNestedProperty(existingConfig, change.Path, value);
-            newHashes[change.Path] = EntryHasher.ComputeConfigHash(change.Value);
-        }
-
-        // Apply deletions (skip immutable settings)
-        foreach (var deletion in config.Deletions)
-        {
-            if (immutableSettings.Contains(deletion.Path))
-            {
-                continue;
-            }
-            RemoveNestedProperty(existingConfig, deletion.Path);
-        }
-
-        // Save updated config
-        var options = new JsonSerializerOptions { WriteIndented = true };
-        project.ConfigJson = JsonSerializer.Serialize(existingConfig, options);
-
-        return (true, newHashes);
-    }
-
-    private static void SetNestedProperty(Dictionary<string, object> config, string path, object? value)
-    {
-        var parts = path.Split('.');
-        var current = config;
-
-        for (int i = 0; i < parts.Length - 1; i++)
-        {
-            if (!current.TryGetValue(parts[i], out var existing))
-            {
-                var newDict = new Dictionary<string, object>();
-                current[parts[i]] = newDict;
-                current = newDict;
-            }
-            else if (existing is Dictionary<string, object> existingDict)
-            {
-                current = existingDict;
-            }
-            else if (existing is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Object)
-            {
-                // Convert JsonElement to Dictionary
-                var newDict = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonElement.GetRawText())
-                    ?? new Dictionary<string, object>();
-                current[parts[i]] = newDict;
-                current = newDict;
-            }
-            else
-            {
-                // Not a dictionary, create new
-                var newDict = new Dictionary<string, object>();
-                current[parts[i]] = newDict;
-                current = newDict;
-            }
-        }
-
-        current[parts[^1]] = value!;
-    }
-
-    private static void RemoveNestedProperty(Dictionary<string, object> config, string path)
-    {
-        var parts = path.Split('.');
-        var current = config;
-
-        for (int i = 0; i < parts.Length - 1; i++)
-        {
-            if (!current.TryGetValue(parts[i], out var existing))
-            {
-                return; // Path doesn't exist
-            }
-            else if (existing is Dictionary<string, object> existingDict)
-            {
-                current = existingDict;
-            }
-            else if (existing is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Object)
-            {
-                var newDict = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonElement.GetRawText())
-                    ?? new Dictionary<string, object>();
-                current[parts[i]] = newDict;
-                current = newDict;
-            }
-            else
-            {
-                return; // Not a dictionary, can't navigate further
-            }
-        }
-
-        current.Remove(parts[^1]);
-    }
-
     private async Task ApplyEntryResolutionAsync(
         int projectId,
         ConflictResolutionDto resolution,
@@ -955,52 +798,6 @@ public class KeySyncService : IKeySyncService
             hashes[key] = new Dictionary<string, string>();
         }
         hashes[key][lang] = hash;
-    }
-
-    private static ConfigDataDto? ExtractConfigData(string configJson)
-    {
-        try
-        {
-            var config = new ConfigDataDto();
-
-            using var doc = JsonDocument.Parse(configJson);
-            ExtractPropertiesRecursive(doc.RootElement, "", config.Properties);
-
-            return config;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static void ExtractPropertiesRecursive(
-        JsonElement element,
-        string path,
-        Dictionary<string, ConfigPropertyDataDto> properties)
-    {
-        foreach (var prop in element.EnumerateObject())
-        {
-            var propPath = string.IsNullOrEmpty(path) ? prop.Name : $"{path}.{prop.Name}";
-
-            if (prop.Value.ValueKind == JsonValueKind.Object)
-            {
-                // Recurse into nested objects
-                ExtractPropertiesRecursive(prop.Value, propPath, properties);
-            }
-            else
-            {
-                // Extract leaf value
-                var value = prop.Value.GetRawText();
-                var hash = EntryHasher.ComputeConfigHash(value);
-
-                properties[propPath] = new ConfigPropertyDataDto
-                {
-                    Value = value,
-                    Hash = hash
-                };
-            }
-        }
     }
 
     #endregion

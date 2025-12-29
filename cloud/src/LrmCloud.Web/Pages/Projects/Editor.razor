@@ -39,7 +39,6 @@ else
             <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
                           Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}"))" />
             <RadzenText TextStyle="TextStyle.H5" Style="margin: 0;">@_project.Name</RadzenText>
-            <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(_project.Format)" Text="@_project.Format" />
         </RadzenStack>
 
         <RadzenStack Orientation="Radzen.Orientation.Horizontal" Wrap="FlexWrap.Wrap" Gap="0.5rem">
@@ -142,13 +141,9 @@ else
     // Validation
     private Dictionary<string, List<ValidationIssue>>? _validationIssuesByKey;
 
-    private bool SupportsPluralKeys => _project?.Format?.ToLowerInvariant() switch
-    {
-        "json" => true,
-        "i18next" => true,
-        "resx" => false,
-        _ => false
-    };
+    // Note: Plural keys are supported in most formats (json, i18next, android, ios)
+    // With format-agnostic API, we enable plural support by default
+    private bool SupportsPluralKeys => true;
 
     private static BadgeStyle GetCompletionBadgeStyle(double percentage) => percentage switch
     {
@@ -679,7 +674,6 @@ else
                 { "Row", editingRow },
                 { "Languages", _languages },
                 { "DefaultLanguage", _project.DefaultLanguage },
-                { "ProjectFormat", _project.Format },
                 { "SupportsPluralKeys", SupportsPluralKeys },
                 { "OnTranslate", EventCallback.Factory.Create<TranslationGridRow>(this, TranslateKeyInDialog) }
             },

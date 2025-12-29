@@ -47,6 +47,13 @@ public class SyncHistory
     public required string OperationType { get; set; }
 
     /// <summary>
+    /// Source of the sync operation: "cli", "web-edit", "github".
+    /// </summary>
+    [MaxLength(20)]
+    [Column("source")]
+    public string Source { get; set; } = "cli";
+
+    /// <summary>
     /// User-provided message describing the changes (from --message flag).
     /// </summary>
     [MaxLength(500)]

@@ -20,6 +20,7 @@ public class GitHubPullService : IGitHubPullService
     private readonly AppDbContext _db;
     private readonly IGitHubApiService _githubApi;
     private readonly IFileImportService _importService;
+    private readonly IGitHubFormatResolver _formatResolver;
     private readonly CloudConfiguration _config;
     private readonly ILogger<GitHubPullService> _logger;
 
@@ -41,12 +42,14 @@ public class GitHubPullService : IGitHubPullService
         AppDbContext db,
         IGitHubApiService githubApi,
         IFileImportService importService,
+        IGitHubFormatResolver formatResolver,
         CloudConfiguration config,
         ILogger<GitHubPullService> logger)
     {
         _db = db;
         _githubApi = githubApi;
         _importService = importService;
+        _formatResolver = formatResolver;
         _config = config;
         _logger = logger;
     }
@@ -89,15 +92,19 @@ public class GitHubPullService : IGitHubPullService
             var branch = project.GitHubDefaultBranch;
             var basePath = project.GitHubBasePath ?? ".";
 
+            // Resolve format for GitHub operations
+            // Priority: GitHubFormat explicit > lrm.json in repo > auto-detect from files
+            var format = await _formatResolver.ResolveFormatAsync(project, userId, owner, repo, branch, basePath);
+
             // 1. Fetch files from GitHub
-            _logger.LogInformation("Fetching files from GitHub {Owner}/{Repo} branch {Branch}", owner, repo, branch);
-            var githubFiles = await FetchTranslationFilesAsync(userId, owner, repo, branch, basePath, project.Format);
+            _logger.LogInformation("Fetching files from GitHub {Owner}/{Repo} branch {Branch} using format {Format}", owner, repo, branch, format);
+            var githubFiles = await FetchTranslationFilesAsync(userId, owner, repo, branch, basePath, format);
 
             if (!githubFiles.Any())
                 return CreateErrorResult("No translation files found in the repository");
 
             // 2. Parse files into entries
-            var githubEntries = _importService.ParseFiles(project.Format, githubFiles, project.DefaultLanguage);
+            var githubEntries = _importService.ParseFiles(format, githubFiles, project.DefaultLanguage);
 
             // 3. Load DB entries
             var dbEntries = await LoadDbEntriesAsync(projectId);

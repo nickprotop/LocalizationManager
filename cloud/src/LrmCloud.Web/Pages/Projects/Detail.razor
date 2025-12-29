@@ -37,7 +37,6 @@ else
         <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem">
             <RadzenButton Icon="arrow_back" Variant="Radzen.Variant.Text" Click="@(() => Navigation.NavigateTo(""))" Size="ButtonSize.Small" />
             <RadzenText TextStyle="TextStyle.H4" Style="margin: 0;">@_project.Name</RadzenText>
-            <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(_project.Format)" Text="@_project.Format" />
             @if (!string.IsNullOrEmpty(_project.GitHubRepo))
             {
                 <RadzenBadge BadgeStyle="BadgeStyle.Dark"
@@ -332,7 +331,7 @@ else
                     <Items>
                         <RadzenRadioButtonListItem Text="JSON (all languages in one file)" Value="@("json")" />
                         <RadzenRadioButtonListItem Text="CSV (spreadsheet compatible)" Value="@("csv")" />
-                        <RadzenRadioButtonListItem Text="@($"Native format ({_project?.Format} files)")" Value="@("native")" />
+                        <RadzenRadioButtonListItem Text="@($"Native format ({_project?.GitHubFormat ?? "auto-detect"} files)")" Value="@("native")" />
                     </Items>
                 </RadzenRadioButtonList>
 

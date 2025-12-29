@@ -51,64 +51,6 @@ public class OrgProjectsController : ApiControllerBase
     }
 
     /// <summary>
-    /// Gets the project configuration (lrm.json).
-    /// </summary>
-    [HttpGet("configuration")]
-    [ProducesResponseType(typeof(ApiResponse<ConfigurationDto>), 200)]
-    [ProducesResponseType(typeof(ProblemDetails), 404)]
-    public async Task<ActionResult<ApiResponse<ConfigurationDto>>> GetConfiguration(string orgSlug, string projectSlug)
-    {
-        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var project = await _projectService.GetProjectByOrgSlugAsync(orgSlug, projectSlug, userId);
-
-        if (project == null)
-            return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
-
-        var configuration = await _projectService.GetConfigurationAsync(project.Id, userId);
-
-        if (configuration == null)
-            return NotFound("CFG_NOT_FOUND", "Configuration not found");
-
-        return Success(configuration);
-    }
-
-    /// <summary>
-    /// Updates the project configuration (lrm.json).
-    /// </summary>
-    [HttpPut("configuration")]
-    [ProducesResponseType(typeof(ApiResponse<ConfigurationDto>), 200)]
-    [ProducesResponseType(typeof(ProblemDetails), 400)]
-    [ProducesResponseType(typeof(ProblemDetails), 404)]
-    [ProducesResponseType(typeof(ProblemDetails), 409)]
-    public async Task<ActionResult<ApiResponse<ConfigurationDto>>> UpdateConfiguration(
-        string orgSlug,
-        string projectSlug,
-        [FromBody] UpdateConfigurationRequest request)
-    {
-        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var project = await _projectService.GetProjectByOrgSlugAsync(orgSlug, projectSlug, userId);
-
-        if (project == null)
-            return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
-
-        var (success, configuration, errorMessage) = await _projectService.UpdateConfigurationAsync(project.Id, userId, request);
-
-        if (!success)
-        {
-            if (errorMessage == "Configuration not found")
-                return NotFound("CFG_NOT_FOUND", errorMessage);
-
-            if (errorMessage == "Configuration conflict")
-                return Conflict("CFG_CONFLICT", "Configuration has been modified by another user. Please pull and merge changes.");
-
-            return BadRequest("CFG_UPDATE_FAILED", errorMessage!);
-        }
-
-        _logger.LogInformation("User {UserId} updated configuration for project {ProjectId} via org/project route", userId, project.Id);
-        return Success(configuration!);
-    }
-
-    /// <summary>
     /// Gets all resources for the project.
     /// </summary>
     [HttpGet("resources")]
@@ -151,28 +93,4 @@ public class OrgProjectsController : ApiControllerBase
         return Success(status);
     }
 
-    /// <summary>
-    /// Gets configuration history.
-    /// </summary>
-    [HttpGet("configuration/history")]
-    [ProducesResponseType(typeof(ApiResponse<List<ConfigurationHistoryDto>>), 200)]
-    [ProducesResponseType(typeof(ProblemDetails), 404)]
-    public async Task<ActionResult<ApiResponse<List<ConfigurationHistoryDto>>>> GetConfigurationHistory(
-        string orgSlug,
-        string projectSlug,
-        [FromQuery] int limit = 50)
-    {
-        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var project = await _projectService.GetProjectByOrgSlugAsync(orgSlug, projectSlug, userId);
-
-        if (project == null)
-            return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
-
-        var history = await _projectService.GetConfigurationHistoryAsync(project.Id, userId, limit);
-
-        if (history == null)
-            return NotFound("PRJ_NOT_FOUND", "Project not found or access denied");
-
-        return Success(history);
-    }
 }

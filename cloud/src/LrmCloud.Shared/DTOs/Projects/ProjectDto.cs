@@ -2,6 +2,7 @@ namespace LrmCloud.Shared.DTOs.Projects;
 
 /// <summary>
 /// Project data transfer object.
+/// Format is a client concern - server only stores entries, not files.
 /// </summary>
 public class ProjectDto
 {
@@ -23,12 +24,23 @@ public class ProjectDto
     public int? OrganizationId { get; set; }
     public string? OrganizationName { get; set; }
 
-    public required string Format { get; set; }
+    /// <summary>
+    /// Default/source language for translations (immutable after creation).
+    /// </summary>
     public string DefaultLanguage { get; set; } = "en";
-    public string LocalizationPath { get; set; } = ".";
 
     public string? GitHubRepo { get; set; }
     public string? GitHubDefaultBranch { get; set; }
+
+    /// <summary>
+    /// Path in the GitHub repo where resource files are located.
+    /// </summary>
+    public string? GitHubBasePath { get; set; }
+
+    /// <summary>
+    /// Resource format for GitHub operations (null = auto-detect).
+    /// </summary>
+    public string? GitHubFormat { get; set; }
 
     public bool AutoTranslate { get; set; }
     public bool AutoCreatePr { get; set; }

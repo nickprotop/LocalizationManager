@@ -59,7 +59,6 @@ public class GlossaryServiceTests : IDisposable
             Name = "Test Project",
             UserId = orgId == null ? userId : null,
             OrganizationId = orgId,
-            Format = ProjectFormat.Json,
             DefaultLanguage = "en",
             InheritOrganizationGlossary = inheritGlossary,
             CreatedAt = DateTime.UtcNow,

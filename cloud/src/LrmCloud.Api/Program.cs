@@ -142,6 +142,7 @@ public class Program
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IGitHubAuthService, GitHubAuthService>();
             builder.Services.AddScoped<IGitHubApiService, GitHubApiService>();
+            builder.Services.AddScoped<IGitHubFormatResolver, GitHubFormatResolver>();
             builder.Services.AddScoped<IFileExportService, FileExportService>();
             builder.Services.AddScoped<IFileImportService, FileImportService>();
             builder.Services.AddScoped<IGitHubSyncService, GitHubSyncService>();

@@ -57,7 +57,6 @@ public class OtaServiceTests : IDisposable
             Name = "Test Project",
             UserId = userId,
             OrganizationId = orgId,
-            Format = "json",
             DefaultLanguage = "en",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow

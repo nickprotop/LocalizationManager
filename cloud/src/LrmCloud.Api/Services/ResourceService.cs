@@ -1340,7 +1340,8 @@ public class ResourceService : IResourceService
                     userId,
                     message,
                     changes,
-                    "web-edit" // Operation type to distinguish from CLI push
+                    operationType: "push",
+                    source: "web-edit"
                 );
 
                 response.HistoryId = history.HistoryId;

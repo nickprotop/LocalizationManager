@@ -38,12 +38,6 @@ public class ProjectService : IProjectService
     {
         try
         {
-            // Validate format
-            if (!ProjectFormat.IsValid(request.Format))
-            {
-                return (false, null, $"Invalid format. Must be one of: {string.Join(", ", ProjectFormat.All)}");
-            }
-
             // Determine ownership
             int? projectUserId = null;
             int? projectOrganizationId = null;
@@ -103,8 +97,7 @@ public class ProjectService : IProjectService
                 return (false, null, "A project with this slug already exists");
             }
 
-            // Create project with auto-generated config
-            var format = request.Format.ToLowerInvariant();
+            // Create project (format is client concern, not stored on server)
             var project = new Project
             {
                 Slug = slugLower,
@@ -112,19 +105,14 @@ public class ProjectService : IProjectService
                 Description = request.Description,
                 UserId = projectUserId,
                 OrganizationId = projectOrganizationId,
-                Format = format,
                 DefaultLanguage = request.DefaultLanguage,
-                LocalizationPath = request.LocalizationPath,
                 GitHubRepo = request.GitHubRepo,
                 GitHubDefaultBranch = request.GitHubDefaultBranch ?? "main",
+                GitHubBasePath = request.GitHubBasePath,
+                GitHubFormat = request.GitHubFormat,
                 SyncStatus = SyncStatus.Pending,
                 CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-                // Auto-generate default config based on format and options
-                ConfigJson = GenerateDefaultConfig(format, request.DefaultLanguage, request.FormatOptions),
-                ConfigVersion = Guid.NewGuid().ToString(),
-                ConfigUpdatedAt = DateTime.UtcNow,
-                ConfigUpdatedBy = userId
+                UpdatedAt = DateTime.UtcNow
             };
 
             _db.Projects.Add(project);
@@ -337,9 +325,6 @@ public class ProjectService : IProjectService
             "updatedat" => sortDescending
                 ? query.OrderByDescending(p => p.UpdatedAt)
                 : query.OrderBy(p => p.UpdatedAt),
-            "format" => sortDescending
-                ? query.OrderByDescending(p => p.Format)
-                : query.OrderBy(p => p.Format),
             _ => sortDescending
                 ? query.OrderBy(p => p.CreatedAt)
                 : query.OrderByDescending(p => p.CreatedAt)
@@ -396,14 +381,7 @@ public class ProjectService : IProjectService
                 project.Description = request.Description;
             }
 
-            // Format is immutable after creation (removed format update logic)
             // DefaultLanguage is immutable after creation - changes would corrupt translation data
-
-            // LocalizationPath can be changed - it only affects where CLI writes files
-            if (!string.IsNullOrWhiteSpace(request.LocalizationPath))
-            {
-                project.LocalizationPath = request.LocalizationPath;
-            }
 
             if (request.GitHubRepo != null)
             {
@@ -733,11 +711,11 @@ public class ProjectService : IProjectService
             UserId = project.UserId,
             OrganizationId = project.OrganizationId,
             OrganizationName = project.Organization?.Name,
-            Format = project.Format,
             DefaultLanguage = project.DefaultLanguage,
-            LocalizationPath = project.LocalizationPath,
             GitHubRepo = project.GitHubRepo,
             GitHubDefaultBranch = project.GitHubDefaultBranch,
+            GitHubBasePath = project.GitHubBasePath,
+            GitHubFormat = project.GitHubFormat,
             AutoTranslate = project.AutoTranslate,
             AutoCreatePr = project.AutoCreatePr,
             InheritOrganizationGlossary = project.InheritOrganizationGlossary,
@@ -752,123 +730,6 @@ public class ProjectService : IProjectService
             ValidationErrors = validationErrors,
             ValidationWarnings = validationWarnings
         };
-    }
-
-    // ============================================================
-    // Configuration Management
-    // ============================================================
-
-    public async Task<ConfigurationDto?> GetConfigurationAsync(int projectId, int userId)
-    {
-        if (!await CanViewProjectAsync(projectId, userId))
-        {
-            return null;
-        }
-
-        var project = await _db.Projects
-            .Include(p => p.ConfigUpdater)
-            .FirstOrDefaultAsync(p => p.Id == projectId);
-
-        if (project == null || string.IsNullOrWhiteSpace(project.ConfigJson))
-        {
-            return null;
-        }
-
-        return new ConfigurationDto
-        {
-            ConfigJson = project.ConfigJson,
-            Version = project.ConfigVersion ?? Guid.NewGuid().ToString(),
-            UpdatedAt = project.ConfigUpdatedAt ?? project.UpdatedAt,
-            UpdatedBy = project.ConfigUpdater?.Username ?? "system"
-        };
-    }
-
-    public async Task<(bool Success, ConfigurationDto? Configuration, string? ErrorMessage)> UpdateConfigurationAsync(
-        int projectId, int userId, UpdateConfigurationRequest request)
-    {
-        if (!await CanEditProjectAsync(projectId, userId))
-        {
-            return (false, null, "Configuration not found");
-        }
-
-        var project = await _db.Projects
-            .Include(p => p.ConfigUpdater)
-            .FirstOrDefaultAsync(p => p.Id == projectId);
-
-        if (project == null)
-        {
-            return (false, null, "Configuration not found");
-        }
-
-        // Check for optimistic locking conflict
-        if (!string.IsNullOrWhiteSpace(request.BaseVersion))
-        {
-            if (project.ConfigVersion != request.BaseVersion)
-            {
-                return (false, null, "Configuration conflict");
-            }
-        }
-
-        // Update configuration only if a new config is provided
-        // Don't overwrite existing config with null (CLI may push without local lrm.json)
-        if (!string.IsNullOrWhiteSpace(request.ConfigJson))
-        {
-            project.ConfigJson = request.ConfigJson;
-            project.ConfigVersion = Guid.NewGuid().ToString();
-            project.ConfigUpdatedAt = DateTime.UtcNow;
-            project.ConfigUpdatedBy = userId;
-        }
-
-        await _db.SaveChangesAsync();
-
-        // Create audit log
-        _db.AuditLogs.Add(new AuditLog
-        {
-            UserId = userId,
-            ProjectId = projectId,
-            Action = "update_configuration",
-            EntityType = "project",
-            EntityId = projectId,
-            CreatedAt = DateTime.UtcNow
-        });
-
-        await _db.SaveChangesAsync();
-
-        var user = await _db.Users.FindAsync(userId);
-
-        return (true, new ConfigurationDto
-        {
-            ConfigJson = project.ConfigJson,
-            Version = project.ConfigVersion,
-            UpdatedAt = project.ConfigUpdatedAt.Value,
-            UpdatedBy = user?.Username ?? "unknown"
-        }, null);
-    }
-
-    public async Task<List<ConfigurationHistoryDto>?> GetConfigurationHistoryAsync(int projectId, int userId, int limit)
-    {
-        if (!await CanViewProjectAsync(projectId, userId))
-        {
-            return null;
-        }
-
-        // Get configuration update audit logs
-        var history = await _db.AuditLogs
-            .Include(a => a.User)
-            .Where(a => a.ProjectId == projectId && a.Action == "update_configuration")
-            .OrderByDescending(a => a.CreatedAt)
-            .Take(limit)
-            .Select(a => new ConfigurationHistoryDto
-            {
-                Version = a.Id.ToString(), // Using audit log ID as version for now
-                ConfigJson = a.NewValue ?? "", // Configuration JSON stored in NewValue
-                UpdatedAt = a.CreatedAt,
-                UpdatedBy = a.User!.Username,
-                Message = a.Action
-            })
-            .ToListAsync();
-
-        return history;
     }
 
     public async Task<SyncStatusDto?> GetSyncStatusAsync(int projectId, int userId)
@@ -910,72 +771,5 @@ public class ProjectService : IProjectService
             LocalChanges = localChanges,
             RemoteChanges = remoteChanges
         };
-    }
-
-    /// <summary>
-    /// Generates a default lrm.json configuration based on project format.
-    /// </summary>
-    internal static string GenerateDefaultConfig(string format, string defaultLanguage, FormatOptionsDto? options = null)
-    {
-        var config = new Dictionary<string, object?>
-        {
-            ["DefaultLanguageCode"] = defaultLanguage,
-            ["ResourceFormat"] = format == "i18next" ? "json" : format
-        };
-
-        // Add format-specific configuration
-        if (format == "json" || format == "i18next")
-        {
-            config["Json"] = new Dictionary<string, object>
-            {
-                ["I18nextCompatible"] = format == "i18next",
-                ["UseNestedKeys"] = options?.JsonNestedKeys ?? false
-            };
-        }
-        else if (format == "resx")
-        {
-            config["Resx"] = new Dictionary<string, object>
-            {
-                ["BaseName"] = options?.BaseName ?? "SharedResource"
-            };
-        }
-        else if (format == "android")
-        {
-            config["Android"] = new Dictionary<string, object>
-            {
-                ["BaseName"] = options?.BaseName ?? "strings"
-            };
-        }
-        else if (format == "ios")
-        {
-            config["Ios"] = new Dictionary<string, object>
-            {
-                ["BaseName"] = options?.BaseName ?? "Localizable"
-            };
-        }
-        else if (format == "po")
-        {
-            config["Po"] = new Dictionary<string, object>
-            {
-                ["Domain"] = options?.PoDomain ?? "messages",
-                ["FolderStructure"] = options?.PoFolderStructure ?? "gnu",
-                ["KeyStrategy"] = options?.PoKeyStrategy ?? "auto"
-            };
-        }
-        else if (format == "xliff")
-        {
-            config["Xliff"] = new Dictionary<string, object>
-            {
-                ["Version"] = options?.XliffVersion ?? "2.0",
-                ["Bilingual"] = options?.XliffBilingual ?? false,
-                ["FileExtension"] = ".xliff"
-            };
-        }
-
-        return System.Text.Json.JsonSerializer.Serialize(config, new System.Text.Json.JsonSerializerOptions
-        {
-            WriteIndented = true,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-        });
     }
 }

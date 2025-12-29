@@ -9,7 +9,6 @@
             <div class="project-card-org">@(Project.OrganizationName ?? "Personal")</div>
         </div>
         <div class="project-card-badges">
-            <RadzenBadge BadgeStyle="@UiHelpers.GetFormatBadgeStyle(Project.Format)" Text="@Project.Format" />
             @if (!string.IsNullOrEmpty(Project.GitHubRepo))
             {
                 <span @onclick="NavigateToGitHub" @onclick:stopPropagation="true">

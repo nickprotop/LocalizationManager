@@ -267,6 +267,7 @@ public class SyncController : ApiControllerBase
                 {
                     HistoryId = revertHistory.HistoryId,
                     OperationType = revertHistory.OperationType,
+                    Source = revertHistory.Source,
                     Message = revertHistory.Message,
                     EntriesAdded = revertHistory.EntriesAdded,
                     EntriesModified = revertHistory.EntriesModified,

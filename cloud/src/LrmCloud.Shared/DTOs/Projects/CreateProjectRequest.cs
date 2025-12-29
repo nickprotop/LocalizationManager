@@ -4,6 +4,7 @@ namespace LrmCloud.Shared.DTOs.Projects;
 
 /// <summary>
 /// Request to create a new project.
+/// Format is a client concern - server only stores entries, not files.
 /// </summary>
 public class CreateProjectRequest
 {
@@ -33,15 +34,11 @@ public class CreateProjectRequest
     /// </summary>
     public int? OrganizationId { get; set; }
 
-    [Required(ErrorMessage = "Format is required")]
-    [MaxLength(50, ErrorMessage = "Format must not exceed 50 characters")]
-    public required string Format { get; set; }  // resx, json, i18next
-
+    /// <summary>
+    /// Default/source language for translations (immutable after creation).
+    /// </summary>
     [MaxLength(10, ErrorMessage = "Default language must not exceed 10 characters")]
     public string DefaultLanguage { get; set; } = "en";
-
-    [MaxLength(500, ErrorMessage = "Localization path must not exceed 500 characters")]
-    public string LocalizationPath { get; set; } = ".";
 
     // GitHub integration (optional)
     [MaxLength(255, ErrorMessage = "GitHub repo must not exceed 255 characters")]
@@ -50,27 +47,17 @@ public class CreateProjectRequest
     [MaxLength(100, ErrorMessage = "GitHub default branch must not exceed 100 characters")]
     public string? GitHubDefaultBranch { get; set; }
 
-    // Format-specific options (optional)
-    public FormatOptionsDto? FormatOptions { get; set; }
-}
+    /// <summary>
+    /// Path in the GitHub repo where resource files are located.
+    /// Only used when connecting to GitHub.
+    /// </summary>
+    [MaxLength(500, ErrorMessage = "GitHub base path must not exceed 500 characters")]
+    public string? GitHubBasePath { get; set; }
 
-/// <summary>
-/// Format-specific configuration options for project creation.
-/// </summary>
-public class FormatOptionsDto
-{
-    // PO options
-    public string? PoDomain { get; set; }
-    public string? PoFolderStructure { get; set; }  // "gnu" or "flat"
-    public string? PoKeyStrategy { get; set; }      // "auto", "msgid", "context"
-
-    // XLIFF options
-    public string? XliffVersion { get; set; }       // "1.2" or "2.0"
-    public bool? XliffBilingual { get; set; }
-
-    // JSON options
-    public bool? JsonNestedKeys { get; set; }
-
-    // Common options (base filename)
-    public string? BaseName { get; set; }
+    /// <summary>
+    /// Resource format for GitHub operations (null = auto-detect).
+    /// Only used when connecting to GitHub with no existing files.
+    /// </summary>
+    [MaxLength(50, ErrorMessage = "GitHub format must not exceed 50 characters")]
+    public string? GitHubFormat { get; set; }
 }

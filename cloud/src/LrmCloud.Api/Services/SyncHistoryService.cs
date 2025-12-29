@@ -32,12 +32,20 @@ public class SyncHistoryService : ISyncHistoryService
     /// <summary>
     /// Records a push operation in history.
     /// </summary>
+    /// <param name="projectId">Project ID</param>
+    /// <param name="userId">User who performed the operation</param>
+    /// <param name="message">User-provided message</param>
+    /// <param name="changes">List of changes made</param>
+    /// <param name="operationType">Type of operation (push, revert)</param>
+    /// <param name="source">Source of the sync: "cli", "web-edit", "github"</param>
+    /// <param name="ct">Cancellation token</param>
     public async Task<SyncHistory> RecordPushAsync(
         int projectId,
         int userId,
         string? message,
         List<SyncChangeEntry> changes,
         string operationType = "push",
+        string source = "cli",
         CancellationToken ct = default)
     {
         var history = new SyncHistory
@@ -46,6 +54,7 @@ public class SyncHistoryService : ISyncHistoryService
             ProjectId = projectId,
             UserId = userId,
             OperationType = operationType,
+            Source = source,
             Message = message,
             EntriesAdded = changes.Count(c => c.ChangeType == "added"),
             EntriesModified = changes.Count(c => c.ChangeType == "modified"),
@@ -95,6 +104,7 @@ public class SyncHistoryService : ISyncHistoryService
             {
                 HistoryId = h.HistoryId,
                 OperationType = h.OperationType,
+                Source = h.Source,
                 Message = h.Message,
                 UserEmail = h.User != null ? h.User.Email : null,
                 UserName = h.User != null ? h.User.DisplayName ?? h.User.Username : null,
@@ -151,6 +161,7 @@ public class SyncHistoryService : ISyncHistoryService
         {
             HistoryId = history.HistoryId,
             OperationType = history.OperationType,
+            Source = history.Source,
             Message = history.Message,
             UserEmail = history.User?.Email,
             UserName = history.User?.DisplayName ?? history.User?.Username,
@@ -380,7 +391,7 @@ public class SyncHistoryService : ISyncHistoryService
 /// </summary>
 public interface ISyncHistoryService
 {
-    Task<SyncHistory> RecordPushAsync(int projectId, int userId, string? message, List<SyncChangeEntry> changes, string operationType = "push", CancellationToken ct = default);
+    Task<SyncHistory> RecordPushAsync(int projectId, int userId, string? message, List<SyncChangeEntry> changes, string operationType = "push", string source = "cli", CancellationToken ct = default);
     Task<SyncHistoryListResponse> GetHistoryAsync(int projectId, int userId, int page = 1, int pageSize = 20, CancellationToken ct = default);
     Task<SyncHistoryDetailDto?> GetHistoryDetailAsync(int projectId, string historyId, int userId, CancellationToken ct = default);
     Task<SyncHistory> RevertToAsync(int projectId, string historyId, int userId, string? message, CancellationToken ct = default);

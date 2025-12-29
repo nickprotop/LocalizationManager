@@ -1185,21 +1185,15 @@ public class CloudTranslationService : ICloudTranslationService
 
     /// <summary>
     /// Gets the language code used in database for the source language.
-    /// RESX/Android/iOS formats store default language translations with LanguageCode = "".
-    /// JSON/i18next formats store with actual language code (e.g., "en").
+    /// Note: The API is now format-agnostic. Clients may store translations differently:
+    /// - Some clients store default language as empty string ""
+    /// - Some clients store default language with actual code (e.g., "en")
+    /// For source language lookup, if it matches the project default, prefer "" for backward compatibility.
     /// </summary>
     private static string GetSourceLanguageDbCode(Project project, string sourceLanguage)
     {
-        var format = project.Format?.ToLowerInvariant();
-
-        // JSON and i18next store actual language codes
-        if (format is "json" or "jsonlocalization" or "i18next")
-        {
-            return sourceLanguage;
-        }
-
-        // RESX, Android, iOS store default language as empty string
-        // If sourceLanguage matches project's default, use "" for DB lookup
+        // If sourceLanguage matches project's default language, use "" for DB lookup
+        // This maintains backward compatibility with clients that store default language as ""
         if (string.Equals(sourceLanguage, project.DefaultLanguage, StringComparison.OrdinalIgnoreCase))
         {
             return "";

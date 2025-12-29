@@ -503,6 +503,11 @@ public class SyncHistoryDto
     public required string OperationType { get; set; }
 
     /// <summary>
+    /// Source of the sync: "cli", "web-edit", "github".
+    /// </summary>
+    public string Source { get; set; } = "cli";
+
+    /// <summary>
     /// User-provided message.
     /// </summary>
     public string? Message { get; set; }

@@ -97,7 +97,6 @@ else
         .Where(p => string.IsNullOrEmpty(_searchText) ||
                     p.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
                     (p.Description?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false))
-        .Where(p => string.IsNullOrEmpty(_formatFilter) || p.Format == _formatFilter)
         .OrderByDescending(p => p.UpdatedAt);
 
     protected override async Task OnInitializedAsync()
