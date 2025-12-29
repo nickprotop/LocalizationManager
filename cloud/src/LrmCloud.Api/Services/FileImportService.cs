@@ -2,7 +2,9 @@ using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Backends.Android;
 using LocalizationManager.Core.Backends.iOS;
 using LocalizationManager.Core.Backends.Json;
+using LocalizationManager.Core.Backends.Po;
 using LocalizationManager.Core.Backends.Resx;
+using LocalizationManager.Core.Backends.Xliff;
 using LocalizationManager.Core.Cloud;
 using LocalizationManager.Core.Configuration;
 using LocalizationManager.Core.Models;
@@ -67,6 +69,9 @@ public class FileImportService : IFileImportService
                         Comment = entry.Comment,
                         IsPlural = true,
                         PluralForms = entry.PluralForms,
+                        // For PO: SourcePluralText is msgid_plural
+                        // For other formats: use "other" form from source language
+                        SourcePluralText = entry.SourcePluralText ?? entry.PluralForms.GetValueOrDefault("other"),
                         Hash = pluralHash
                     });
                 }
@@ -207,6 +212,8 @@ public class FileImportService : IFileImportService
                             Comment = null,
                             IsPlural = true,
                             PluralForms = entry.PluralForms,
+                            // iOS stringsdict: use "other" form as source plural text
+                            SourcePluralText = entry.PluralForms.GetValueOrDefault("other"),
                             Hash = pluralHash
                         };
                     }
@@ -247,6 +254,8 @@ public class FileImportService : IFileImportService
             "i18next" => DetectI18nextLanguage(fileName, defaultLanguage),
             "android" => DetectAndroidLanguage(dirName, defaultLanguage),
             "ios" => DetectIosLanguage(dirName, defaultLanguage),
+            "po" or "gettext" => DetectPoLanguage(filePath, defaultLanguage),
+            "xliff" or "xlf" => DetectXliffLanguage(filePath, defaultLanguage),
             _ => throw new NotSupportedException($"Format '{format}' is not supported for import")
         };
     }
@@ -374,6 +383,74 @@ public class FileImportService : IFileImportService
     }
 
     /// <summary>
+    /// Detects language from PO file path.
+    /// locale/fr/LC_MESSAGES/messages.po → fr
+    /// po/fr.po → fr
+    /// messages.pot → default (template)
+    /// </summary>
+    private static (string languageCode, bool isDefault) DetectPoLanguage(string filePath, string defaultLanguage)
+    {
+        var normalizedDefault = NormalizeLanguageCode(defaultLanguage);
+        var fileName = Path.GetFileName(filePath);
+
+        // POT files are templates (default language)
+        if (fileName.EndsWith(".pot", StringComparison.OrdinalIgnoreCase))
+            return (normalizedDefault, true);
+
+        // Check for GNU gettext structure: locale/{lang}/LC_MESSAGES/...
+        var parts = filePath.Replace("\\", "/").Split('/');
+        for (int i = 0; i < parts.Length - 1; i++)
+        {
+            if (parts[i].Equals("locale", StringComparison.OrdinalIgnoreCase) ||
+                parts[i].Equals("locales", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 < parts.Length)
+                {
+                    var lang = NormalizeLanguageCode(parts[i + 1]);
+                    return (lang, lang.Equals(normalizedDefault, StringComparison.Ordinal));
+                }
+            }
+        }
+
+        // Check for flat structure: {lang}.po
+        var langFromFileName = Path.GetFileNameWithoutExtension(fileName);
+        if (!string.IsNullOrEmpty(langFromFileName) && langFromFileName.Length <= 5)
+        {
+            var lang = NormalizeLanguageCode(langFromFileName);
+            return (lang, lang.Equals(normalizedDefault, StringComparison.Ordinal));
+        }
+
+        return (normalizedDefault, true);
+    }
+
+    /// <summary>
+    /// Detects language from XLIFF file path or content.
+    /// messages.fr.xliff → fr
+    /// Extracts trgLang/target-language from content if available.
+    /// </summary>
+    private static (string languageCode, bool isDefault) DetectXliffLanguage(string filePath, string defaultLanguage)
+    {
+        var normalizedDefault = NormalizeLanguageCode(defaultLanguage);
+        var fileName = Path.GetFileName(filePath);
+        var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+
+        // Check for language code in filename: messages.fr.xliff or messages.fr.xlf
+        var parts = nameWithoutExt.Split('.');
+        if (parts.Length >= 2)
+        {
+            var possibleLang = parts[^1]; // Last part before extension
+            if (possibleLang.Length <= 5) // Reasonable language code length
+            {
+                var lang = NormalizeLanguageCode(possibleLang);
+                return (lang, lang.Equals(normalizedDefault, StringComparison.Ordinal));
+            }
+        }
+
+        // Default to project default language
+        return (normalizedDefault, true);
+    }
+
+    /// <summary>
     /// Gets the appropriate reader for the format.
     /// </summary>
     private static IResourceReader GetReader(string format)
@@ -385,6 +462,8 @@ public class FileImportService : IFileImportService
             "i18next" => new JsonResourceReader(new JsonFormatConfiguration { I18nextCompatible = true }),
             "android" => new AndroidResourceReader(),
             "ios" => new IosResourceReader(),
+            "po" or "gettext" => new PoResourceReader(),
+            "xliff" or "xlf" => new XliffResourceReader(),
             _ => throw new NotSupportedException($"Format '{format}' is not supported for import")
         };
     }

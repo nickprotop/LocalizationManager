@@ -9,6 +9,10 @@ public class ResourceKeyDto
     public required string KeyName { get; set; }
     public string? KeyPath { get; set; }
     public bool IsPlural { get; set; }
+    /// <summary>
+    /// For plural keys, the source plural text pattern (PO msgid_plural or "other" form).
+    /// </summary>
+    public string? SourcePluralText { get; set; }
     public string? Comment { get; set; }
     public int Version { get; set; }
     public int TranslationCount { get; set; }

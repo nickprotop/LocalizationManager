@@ -12,6 +12,10 @@ public class GitHubEntry
     public string? Comment { get; init; }
     public bool IsPlural { get; init; }
     public Dictionary<string, string>? PluralForms { get; init; }
+    /// <summary>
+    /// For plural keys, the source plural text pattern (PO msgid_plural or "other" form).
+    /// </summary>
+    public string? SourcePluralText { get; init; }
     public required string Hash { get; init; }
 }
 

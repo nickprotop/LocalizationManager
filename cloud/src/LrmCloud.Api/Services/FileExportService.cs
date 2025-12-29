@@ -2,7 +2,9 @@ using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Backends.Android;
 using LocalizationManager.Core.Backends.iOS;
 using LocalizationManager.Core.Backends.Json;
+using LocalizationManager.Core.Backends.Po;
 using LocalizationManager.Core.Backends.Resx;
+using LocalizationManager.Core.Backends.Xliff;
 using LocalizationManager.Core.Configuration;
 using LocalizationManager.Core.Models;
 using LrmCloud.Api.Data;
@@ -151,7 +153,10 @@ public class FileExportService : IFileExportService
                     Value = pluralForms.GetValueOrDefault("other", ""),
                     Comment = key.Comment,
                     IsPlural = true,
-                    PluralForms = pluralForms
+                    PluralForms = pluralForms,
+                    // For PO format: SourcePluralText is msgid_plural
+                    // For other formats: this is the "other" plural form from source language
+                    SourcePluralText = key.SourcePluralText
                 });
             }
             else
@@ -192,6 +197,8 @@ public class FileExportService : IFileExportService
             "i18next" => new JsonResourceWriter(new JsonFormatConfiguration { I18nextCompatible = true }),
             "android" => new AndroidResourceWriter(),
             "ios" => new IosResourceWriter(),
+            "po" or "gettext" => new PoResourceWriter(),
+            "xliff" or "xlf" => new XliffResourceWriter(),
             _ => throw new NotSupportedException($"Format '{format}' is not supported for export")
         };
     }
@@ -234,6 +241,16 @@ public class FileExportService : IFileExportService
 
             // iOS: {basePath}/{lang}.lproj/Localizable.strings
             "ios" => $"{basePath}/{IosCultureMapper.CodeToLproj(hasLanguageCode ? languageCode : "Base")}/Localizable.strings",
+
+            // PO: {basePath}/messages.pot for default, {basePath}/{lang}.po for translations
+            "po" or "gettext" => useDefaultPath
+                ? $"{basePath}/messages.pot"
+                : $"{basePath}/{languageCode}.po",
+
+            // XLIFF: {basePath}/messages.xliff for default, {basePath}/messages.{lang}.xliff for translations
+            "xliff" or "xlf" => useDefaultPath
+                ? $"{basePath}/messages.xliff"
+                : $"{basePath}/messages.{languageCode}.xliff",
 
             _ => throw new NotSupportedException($"Format '{format}' is not supported")
         };

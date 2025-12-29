@@ -63,6 +63,21 @@
         </Helper>
     </RadzenFormField>
 
+    @* Source Plural Text (for PO format - shows msgid_plural for translators) *@
+    @if (Row.IsPlural && !string.IsNullOrEmpty(Row.SourcePluralText))
+    {
+        <RadzenCard Style="background-color: var(--rz-info-lighter); padding: 0.75rem;">
+            <RadzenStack Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" Style="font-weight: 500;">
+                    Source Plural Text
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2" Style="font-family: monospace;">
+                    @Row.SourcePluralText
+                </RadzenText>
+            </RadzenStack>
+        </RadzenCard>
+    }
+
     @* Translations Section Header *@
     <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center">
         <RadzenText TextStyle="TextStyle.H6">Translations</RadzenText>

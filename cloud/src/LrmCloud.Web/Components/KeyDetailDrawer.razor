@@ -19,6 +19,17 @@
         }
     </RadzenStack>
 
+    @* Source Plural Text (for PO format - shows msgid_plural for translators) *@
+    @if (Row.IsPlural && !string.IsNullOrEmpty(Row.SourcePluralText))
+    {
+        <RadzenStack Gap="0">
+            <RadzenText TextStyle="TextStyle.Overline" class="rz-color-secondary">Source Plural Text</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" Style="background: var(--rz-base-200); padding: 0.5rem; border-radius: 4px; font-family: monospace;">
+                @Row.SourcePluralText
+            </RadzenText>
+        </RadzenStack>
+    }
+
     @* Comment Preview *@
     @if (!string.IsNullOrEmpty(Row.Comment))
     {

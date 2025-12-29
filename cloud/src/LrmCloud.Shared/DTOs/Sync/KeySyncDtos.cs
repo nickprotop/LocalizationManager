@@ -69,6 +69,12 @@ public class EntryChangeDto
     public Dictionary<string, string>? PluralForms { get; set; }
 
     /// <summary>
+    /// For plural keys, the source plural text pattern (PO msgid_plural or "other" form).
+    /// Only set when pushing from source/default language.
+    /// </summary>
+    public string? SourcePluralText { get; set; }
+
+    /// <summary>
     /// Hash of the entry from last sync (for conflict detection).
     /// Null if this is a new entry.
     /// </summary>
@@ -258,6 +264,11 @@ public class EntryDataDto
     /// Whether this key has plural forms.
     /// </summary>
     public bool IsPlural { get; set; }
+
+    /// <summary>
+    /// For plural keys, the source plural text pattern (PO msgid_plural or "other" form).
+    /// </summary>
+    public string? SourcePluralText { get; set; }
 
     /// <summary>
     /// Translations by language code.

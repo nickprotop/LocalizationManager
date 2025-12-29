@@ -30,7 +30,11 @@ public class GitHubPullService : IGitHubPullService
         ["json"] = new[] { ".json" },
         ["i18next"] = new[] { ".json" },
         ["android"] = new[] { "strings.xml" },
-        ["ios"] = new[] { "Localizable.strings", "Localizable.stringsdict" }
+        ["ios"] = new[] { "Localizable.strings", "Localizable.stringsdict" },
+        ["po"] = new[] { ".po", ".pot" },
+        ["gettext"] = new[] { ".po", ".pot" },
+        ["xliff"] = new[] { ".xliff", ".xlf" },
+        ["xlf"] = new[] { ".xliff", ".xlf" }
     };
 
     public GitHubPullService(
@@ -703,10 +707,17 @@ public class GitHubPullService : IGitHubPullService
                     ProjectId = projectId,
                     KeyName = entry.Key,
                     IsPlural = entry.IsPlural,
-                    Comment = entry.Comment
+                    Comment = entry.Comment,
+                    // For plural keys, store the source plural text (PO msgid_plural or "other" form)
+                    SourcePluralText = entry.IsPlural ? entry.SourcePluralText : null
                 };
                 _db.ResourceKeys.Add(key);
                 await _db.SaveChangesAsync();
+            }
+            else if (entry.IsPlural && key.SourcePluralText == null && entry.SourcePluralText != null)
+            {
+                // Update SourcePluralText if not set yet
+                key.SourcePluralText = entry.SourcePluralText;
             }
 
             // Upsert translation with "pending" status

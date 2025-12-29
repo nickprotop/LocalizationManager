@@ -234,7 +234,8 @@ public class KeySyncService : IKeySyncService
             {
                 Key = key.KeyName,
                 Comment = key.Comment,
-                IsPlural = key.IsPlural
+                IsPlural = key.IsPlural,
+                SourcePluralText = key.SourcePluralText
             };
 
             if (key.IsPlural)
@@ -381,6 +382,8 @@ public class KeySyncService : IKeySyncService
                 KeyName = entry.Key,
                 IsPlural = entry.IsPlural,
                 Comment = entry.Comment,
+                // For plural keys, store source plural text (PO msgid_plural or "other" form)
+                SourcePluralText = entry.IsPlural ? entry.SourcePluralText : null,
                 Version = 1,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -394,6 +397,12 @@ public class KeySyncService : IKeySyncService
             if (resourceKey.IsPlural != entry.IsPlural)
             {
                 resourceKey.IsPlural = entry.IsPlural;
+                resourceKey.UpdatedAt = DateTime.UtcNow;
+            }
+            // Update SourcePluralText if not set yet
+            if (entry.IsPlural && resourceKey.SourcePluralText == null && entry.SourcePluralText != null)
+            {
+                resourceKey.SourcePluralText = entry.SourcePluralText;
                 resourceKey.UpdatedAt = DateTime.UtcNow;
             }
         }

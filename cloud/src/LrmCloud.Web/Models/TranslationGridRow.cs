@@ -33,6 +33,11 @@ public class TranslationGridRow
     public required string KeyName { get; set; }
     public string? KeyPath { get; set; }
     public bool IsPlural { get; set; }
+    /// <summary>
+    /// For plural keys, the source plural text pattern (PO msgid_plural or "other" form).
+    /// Used to display the correct source text for translators.
+    /// </summary>
+    public string? SourcePluralText { get; set; }
     public string? Comment { get; set; }
     public int Version { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -151,6 +156,7 @@ public class TranslationGridRow
             KeyName = KeyName,
             KeyPath = KeyPath,
             IsPlural = IsPlural,
+            SourcePluralText = SourcePluralText,
             Comment = Comment,
             Version = Version,
             UpdatedAt = UpdatedAt,
@@ -186,6 +192,7 @@ public class TranslationGridRow
     {
         Comment = source.Comment;
         IsPlural = source.IsPlural;
+        SourcePluralText = source.SourcePluralText;
         // Note: OriginalComment and OriginalIsPlural are preserved from this row,
         // not copied from source, so dirty detection works correctly
 

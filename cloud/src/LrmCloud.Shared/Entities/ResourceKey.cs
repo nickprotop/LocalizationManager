@@ -32,6 +32,15 @@ public class ResourceKey
     [Column("is_plural")]
     public bool IsPlural { get; set; }
 
+    /// <summary>
+    /// For plural keys, stores the source plural text pattern.
+    /// For PO format: this is the msgid_plural value.
+    /// For other formats: this is the "other" plural form from the source language.
+    /// Used to display the correct source text for translators.
+    /// </summary>
+    [Column("source_plural_text")]
+    public string? SourcePluralText { get; set; }
+
     [Column("comment")]
     public string? Comment { get; set; }
 
