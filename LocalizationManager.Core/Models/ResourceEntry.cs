@@ -55,6 +55,13 @@ public class ResourceEntry
     public Dictionary<string, string>? PluralForms { get; set; }
 
     /// <summary>
+    /// Source text for plural forms (PO format: msgid_plural).
+    /// Used for translation when the source differs from the key.
+    /// For non-PO formats, this is typically null as PluralForms contains the source.
+    /// </summary>
+    public string? SourcePluralText { get; set; }
+
+    /// <summary>
     /// Indicates if this entry is empty/null.
     /// For plural entries, checks if all plural forms are empty.
     /// </summary>

@@ -354,40 +354,111 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
                     // Check if this is a plural key
                     if (key.IsPlural && key.PluralForms != null && key.PluralForms.Count > 0)
                     {
-                        // Translate each plural form
                         var translatedForms = new Dictionary<string, string>();
                         var anyFromCache = false;
                         var anyFromApi = false;
+                        var isPo = settings.GetBackendName().Equals("po", StringComparison.OrdinalIgnoreCase);
 
-                        foreach (var (formName, formValue) in key.PluralForms)
+                        if (isPo && !string.IsNullOrEmpty(key.SourcePluralText))
                         {
-                            if (string.IsNullOrWhiteSpace(formValue))
-                                continue;
+                            // PO format: translate msgid (singular) and msgid_plural (plural) separately
+                            // msgid (Key) → "one" form
+                            // msgid_plural (SourcePluralText) → "other" and remaining forms
 
-                            var request = new TranslationRequest
+                            // Translate singular (msgid → "one")
+                            var singularRequest = new TranslationRequest
                             {
-                                SourceText = formValue,
+                                SourceText = key.Key,
                                 SourceLanguage = sourceLanguage,
                                 TargetLanguage = targetLang,
                                 TargetLanguageName = targetLanguageInfo.Name,
-                                Context = $"Plural form '{formName}' of key '{key.Key}'"
+                                Context = $"Singular form of plural key"
                             };
 
-                            TranslationResponse response;
-
-                            if (cache != null && cache.TryGet(request, provider.Name, out var cachedResponse))
+                            TranslationResponse singularResponse;
+                            if (cache != null && cache.TryGet(singularRequest, provider.Name, out var cachedSingular))
                             {
-                                response = cachedResponse!;
+                                singularResponse = cachedSingular!;
                                 anyFromCache = true;
                             }
                             else
                             {
-                                response = await provider.TranslateAsync(request, cancellationToken);
-                                cache?.Store(request, response);
+                                singularResponse = await provider.TranslateAsync(singularRequest, cancellationToken);
+                                cache?.Store(singularRequest, singularResponse);
                                 anyFromApi = true;
                             }
+                            translatedForms["one"] = singularResponse.TranslatedText;
 
-                            translatedForms[formName] = response.TranslatedText;
+                            // Translate plural (msgid_plural → "other")
+                            var pluralRequest = new TranslationRequest
+                            {
+                                SourceText = key.SourcePluralText,
+                                SourceLanguage = sourceLanguage,
+                                TargetLanguage = targetLang,
+                                TargetLanguageName = targetLanguageInfo.Name,
+                                Context = $"Plural form of plural key"
+                            };
+
+                            TranslationResponse pluralResponse;
+                            if (cache != null && cache.TryGet(pluralRequest, provider.Name, out var cachedPlural))
+                            {
+                                pluralResponse = cachedPlural!;
+                                anyFromCache = true;
+                            }
+                            else
+                            {
+                                pluralResponse = await provider.TranslateAsync(pluralRequest, cancellationToken);
+                                cache?.Store(pluralRequest, pluralResponse);
+                                anyFromApi = true;
+                            }
+                            translatedForms["other"] = pluralResponse.TranslatedText;
+
+                            // For languages with more plural forms (few, many, zero, two),
+                            // copy the "other" form as a reasonable default
+                            foreach (var category in key.PluralForms.Keys)
+                            {
+                                if (!translatedForms.ContainsKey(category))
+                                {
+                                    // Use singular for "one", plural for everything else
+                                    translatedForms[category] = category == "one"
+                                        ? singularResponse.TranslatedText
+                                        : pluralResponse.TranslatedText;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Non-PO formats: translate each plural form value directly
+                            foreach (var (formName, formValue) in key.PluralForms)
+                            {
+                                if (string.IsNullOrWhiteSpace(formValue))
+                                    continue;
+
+                                var request = new TranslationRequest
+                                {
+                                    SourceText = formValue,
+                                    SourceLanguage = sourceLanguage,
+                                    TargetLanguage = targetLang,
+                                    TargetLanguageName = targetLanguageInfo.Name,
+                                    Context = $"Plural form '{formName}' of key '{key.Key}'"
+                                };
+
+                                TranslationResponse response;
+
+                                if (cache != null && cache.TryGet(request, provider.Name, out var cachedResponse))
+                                {
+                                    response = cachedResponse!;
+                                    anyFromCache = true;
+                                }
+                                else
+                                {
+                                    response = await provider.TranslateAsync(request, cancellationToken);
+                                    cache?.Store(request, response);
+                                    anyFromApi = true;
+                                }
+
+                                translatedForms[formName] = response.TranslatedText;
+                            }
                         }
 
                         // Update or add entry with plural forms
@@ -396,6 +467,8 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
                             targetDict[key.Key].IsPlural = true;
                             targetDict[key.Key].PluralForms = translatedForms;
                             targetDict[key.Key].Value = translatedForms.GetValueOrDefault("other") ?? translatedForms.Values.FirstOrDefault() ?? "";
+                            // Preserve SourcePluralText for PO format round-trip
+                            targetDict[key.Key].SourcePluralText = key.SourcePluralText;
                         }
                         else
                         {
@@ -405,7 +478,9 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
                                 Value = translatedForms.GetValueOrDefault("other") ?? translatedForms.Values.FirstOrDefault() ?? "",
                                 Comment = key.Comment,
                                 IsPlural = true,
-                                PluralForms = translatedForms
+                                PluralForms = translatedForms,
+                                // Preserve SourcePluralText for PO format round-trip
+                                SourcePluralText = key.SourcePluralText
                             });
                         }
 
@@ -421,9 +496,14 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
                     else
                     {
                         // Regular (non-plural) translation
+                        // For PO format, the Key (msgid) IS the source text, not the Value (msgstr)
+                        var sourceText = settings.GetBackendName().Equals("po", StringComparison.OrdinalIgnoreCase)
+                            ? key.Key
+                            : (key.Value ?? string.Empty);
+
                         var request = new TranslationRequest
                         {
-                            SourceText = key.Value ?? string.Empty,
+                            SourceText = sourceText,
                             SourceLanguage = sourceLanguage,
                             TargetLanguage = targetLang,
                             TargetLanguageName = targetLanguageInfo.Name
