@@ -2,7 +2,7 @@
   "name": "localization-manager",
   "displayName": "LRM - .NET Localization",
   "description": "Manage .NET localization files (.resx and JSON) with real-time validation, translation, and code scanning",
-  "version": "0.7.6",
+  "version": "0.7.7",
   "icon": "images/icon.png",
   "publisher": "nickprotop",
   "repository": {

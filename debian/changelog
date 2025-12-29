@@ -1,7 +1,5 @@
-lrm (0.7.6-1) noble; urgency=medium
+lrm (0.7.7-1) noble; urgency=medium
 
-  * Fixed: Fix XLIFF backend encoding and structure issues\n- Fix token refresh race condition causing login loop\n- Fix button overlap in KeyDetailDrawer, limit drawer height on mobile\n- Fix Editor page mobile responsiveness: toolbar wrapping, flexible widths, responsive drawer\n- Fix RadzenTabs mobile scrolling with broader CSS selectors\n- Fix mobile responsiveness for project tabs, settings, organizations, and scrollable tab navigation\n- Fix mobile responsiveness: wrap page headers and search/filter rows on small screens\n- Fix cancel upgrade for incomplete subscriptions: fully reset state instead of just setting CancelAtPeriodEnd\n- Fix billing UI: hide Cancel Subscription for incomplete, show PayPal without email\n- Fix billing page: add cancel button for incomplete subscriptions, fix PayPal button\n- Fix PayPal plan IDs to be per-mode (sandbox/live)\n- Fix intermittent login loop caused by timezone and race condition bugs\n- Fix GitHub OAuth login loop caused by forceLoad race condition\n- Fix GitHub OAuth callback navigation paths\n- Fix security issue: GitHub OAuth callback now redirects instead of exposing tokens\n
-  * Added: Add dev.to blog post link to README\n- Add PO and XLIFF format support to cloud project creation\n- Add SourcePluralText support to cloud platform\n- Add SourcePluralText support for PO plural translation\n- Add PO and XLIFF format backends\n- Add centralized rate limit handler to prevent request storms\n
-  * Changed: Refactor cloud sync with language code normalization\n- Refactor: Make API client-agnostic by removing Format from Project entity\n- Handle PayPal subscription NotFound on cancel (incomplete payments)\n
+  * Changed: Update CloudSyncValidator tests for client-agnostic API design\n
 
- -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Tue, 30 Dec 2025 01:21:41 +0200
+ -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Tue, 30 Dec 2025 01:25:51 +0200
