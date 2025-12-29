@@ -32,6 +32,20 @@ public class AuthenticatedHttpHandler : DelegatingHandler
 
         if (!isAuthEndpoint)
         {
+            // Wait if a refresh is in progress before adding auth header
+            // This prevents sending requests with stale tokens during refresh
+            var coordinator = _serviceProvider.GetService<TokenRefreshCoordinator>();
+            if (coordinator?.IsRefreshInProgress == true)
+            {
+                await coordinator.WaitForRefreshAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            }
+
+            // Proactive refresh: if token is expired or about to expire, refresh before sending
+            if (await _tokenStorage.IsTokenExpiredAsync() && await _tokenStorage.CanRefreshAsync())
+            {
+                await TryRefreshTokenAsync();
+            }
+
             await AddAuthHeaderAsync(request);
         }
 
