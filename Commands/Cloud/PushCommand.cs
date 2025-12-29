@@ -29,16 +29,6 @@ public class PushCommandSettings : BaseCommandSettings
     [DefaultValue(false)]
     public bool Force { get; set; }
 
-    [CommandOption("--config-only")]
-    [Description("Push only configuration (lrm.json), skip resources")]
-    [DefaultValue(false)]
-    public bool ConfigOnly { get; set; }
-
-    [CommandOption("--resources-only")]
-    [Description("Push only resources, skip configuration")]
-    [DefaultValue(false)]
-    public bool ResourcesOnly { get; set; }
-
     [CommandOption("-i|--interactive")]
     [Description("Interactively resolve conflicts one by one")]
     [DefaultValue(false)]
@@ -87,13 +77,6 @@ public class PushCommand : Command<PushCommandSettings>
 
             AnsiConsole.MarkupLine($"[dim]Remote: {remoteUrl!.ToString().EscapeMarkup()}[/]");
             AnsiConsole.WriteLine();
-
-            // Validate conflicting options
-            if (settings.ConfigOnly && settings.ResourcesOnly)
-            {
-                AnsiConsole.MarkupLine("[red]✗ Cannot use --config-only and --resources-only together![/]");
-                return 1;
-            }
 
             // Load and validate configuration (lrm.json)
             var config = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
@@ -202,16 +185,25 @@ public class PushCommand : Command<PushCommandSettings>
                 // Legacy sync state will be migrated after successful push
             }
 
-            // Get backend for the format
+            // Get backend for the local format (client-agnostic: format is determined locally)
             var backendFactory = new Core.Backends.ResourceBackendFactory();
             Core.Abstractions.IResourceBackend backend;
             try
             {
-                backend = backendFactory.GetBackend(remoteProject!.Format, config);
+                // Use local config format or auto-detect from files
+                if (!string.IsNullOrEmpty(config.ResourceFormat))
+                {
+                    backend = backendFactory.GetBackend(config.ResourceFormat, config);
+                }
+                else
+                {
+                    backend = backendFactory.ResolveFromPath(projectDirectory, config);
+                }
             }
-            catch (NotSupportedException)
+            catch (NotSupportedException ex)
             {
-                AnsiConsole.MarkupLine($"[red]✗ Unsupported format: {remoteProject.Format}[/]");
+                AnsiConsole.MarkupLine($"[red]✗ {ex.Message}[/]");
+                AnsiConsole.MarkupLine("[dim]Set 'format' in lrm.json or ensure resource files exist.[/]");
                 return 1;
             }
 
@@ -232,25 +224,10 @@ public class PushCommand : Command<PushCommandSettings>
             var merger = new KeyLevelMerger();
             var pushChanges = merger.ComputePushChanges(localEntries, syncState);
 
-            // Handle config changes
-            ConfigChanges? configChanges = null;
-            if (!settings.ResourcesOnly)
-            {
-                var configPath = Path.Combine(projectDirectory, "lrm.json");
-                if (File.Exists(configPath))
-                {
-                    var configMerger = new ConfigMerger();
-                    var configJson = File.ReadAllText(configPath);
-                    var localProps = configMerger.ExtractConfigProperties(configJson);
-                    configChanges = configMerger.ComputePushChanges(localProps, syncState);
-                }
-            }
-
             // Show summary
             var hasEntryChanges = pushChanges.Entries.Any() || pushChanges.Deletions.Count > 0;
-            var hasConfigChanges = configChanges?.HasChanges == true;
 
-            if (!hasEntryChanges && !hasConfigChanges)
+            if (!hasEntryChanges)
             {
                 AnsiConsole.MarkupLine("[green]✓ Already up to date - nothing to push[/]");
                 return 0;
@@ -258,43 +235,30 @@ public class PushCommand : Command<PushCommandSettings>
 
             AnsiConsole.MarkupLine("[blue]Changes to push:[/]");
             var entryCount = pushChanges.Entries.Count();
-            if (!settings.ConfigOnly && entryCount > 0)
+            if (entryCount > 0)
             {
                 AnsiConsole.MarkupLine($"  [green]+ {entryCount} entry change(s)[/]");
             }
-            if (!settings.ConfigOnly && pushChanges.Deletions.Count > 0)
+            if (pushChanges.Deletions.Count > 0)
             {
                 AnsiConsole.MarkupLine($"  [red]- {pushChanges.Deletions.Count} deletion(s)[/]");
-            }
-            if (hasConfigChanges)
-            {
-                AnsiConsole.MarkupLine($"  [blue]~ {configChanges!.Changes.Count} config change(s)[/]");
             }
             AnsiConsole.WriteLine();
 
             if (settings.DryRun)
             {
                 AnsiConsole.MarkupLine("[yellow]Dry run - no changes will be made[/]");
-                ShowDetailedChanges(pushChanges, configChanges, settings);
+                ShowDetailedChanges(pushChanges);
                 return 0;
             }
 
             // Build push request
             var request = new KeySyncPushRequest
             {
-                Message = settings.Message
+                Message = settings.Message,
+                Entries = pushChanges.Entries.ToList(),
+                Deletions = pushChanges.Deletions
             };
-
-            if (!settings.ConfigOnly)
-            {
-                request.Entries = pushChanges.Entries.ToList();
-                request.Deletions = pushChanges.Deletions;
-            }
-
-            if (!settings.ResourcesOnly && hasConfigChanges)
-            {
-                request.Config = configChanges;
-            }
 
             // Push to server
             KeySyncPushResponse? response = null;
@@ -403,7 +367,7 @@ public class PushCommand : Command<PushCommandSettings>
             }
 
             // Update sync state with new hashes
-            var newSyncState = UpdateSyncState(syncState, response, localEntries, configChanges);
+            var newSyncState = UpdateSyncState(syncState, response, localEntries);
             SyncStateManager.SaveAsync(projectDirectory, newSyncState, cancellationToken).GetAwaiter().GetResult();
 
             // Show success
@@ -417,10 +381,6 @@ public class PushCommand : Command<PushCommandSettings>
             if (response.Deleted > 0)
             {
                 AnsiConsole.MarkupLine($"  [dim]Deleted: {response.Deleted} entries[/]");
-            }
-            if (response.ConfigApplied)
-            {
-                AnsiConsole.MarkupLine($"  [dim]Configuration updated[/]");
             }
 
             return 0;
@@ -453,10 +413,10 @@ public class PushCommand : Command<PushCommandSettings>
         }
     }
 
-    private void ShowDetailedChanges(PushChanges pushChanges, ConfigChanges? configChanges, PushCommandSettings settings)
+    private void ShowDetailedChanges(PushChanges pushChanges)
     {
         var entries = pushChanges.Entries.ToList();
-        if (!settings.ConfigOnly && entries.Count > 0)
+        if (entries.Count > 0)
         {
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("[blue]Entry changes:[/]");
@@ -471,7 +431,7 @@ public class PushCommand : Command<PushCommandSettings>
             }
         }
 
-        if (!settings.ConfigOnly && pushChanges.Deletions.Count > 0)
+        if (pushChanges.Deletions.Count > 0)
         {
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("[red]Deletions:[/]");
@@ -484,31 +444,18 @@ public class PushCommand : Command<PushCommandSettings>
                 AnsiConsole.MarkupLine($"  [dim]... and {pushChanges.Deletions.Count - 20} more[/]");
             }
         }
-
-        if (configChanges?.HasChanges == true)
-        {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[blue]Config changes:[/]");
-            foreach (var change in configChanges.Changes)
-            {
-                var status = change.BaseHash == null ? "[green]+[/]" : "[yellow]~[/]";
-                AnsiConsole.MarkupLine($"  {status} {change.Path.EscapeMarkup()}");
-            }
-        }
     }
 
     private SyncState UpdateSyncState(
         SyncState? existing,
         KeySyncPushResponse response,
-        List<LocalEntry> localEntries,
-        ConfigChanges? configChanges)
+        List<LocalEntry> localEntries)
     {
         var newState = new SyncState
         {
             Version = 2,
             Timestamp = DateTime.UtcNow,
-            Entries = existing?.Entries ?? new Dictionary<string, Dictionary<string, string>>(),
-            ConfigProperties = existing?.ConfigProperties ?? new Dictionary<string, string>()
+            Entries = existing?.Entries ?? new Dictionary<string, Dictionary<string, string>>()
         };
 
         // Update entry hashes from response
@@ -536,12 +483,6 @@ public class PushCommand : Command<PushCommandSettings>
             {
                 newState.Entries[entry.Key][entry.Lang] = entry.Hash;
             }
-        }
-
-        // Update config hashes
-        foreach (var (path, hash) in response.NewConfigHashes)
-        {
-            newState.ConfigProperties[path] = hash;
         }
 
         return newState;

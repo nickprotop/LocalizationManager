@@ -47,6 +47,11 @@ public class FileRegenerator
             l => l.Code,
             l => l);
 
+        // Check if the backend uses explicit language codes for the default language
+        // (e.g., XLIFF uses "en" while RESX/Android use "")
+        var defaultLangFile = existingLanguages.FirstOrDefault(l => l.IsDefault);
+        var backendUsesExplicitDefaultLang = defaultLangFile != null && !string.IsNullOrEmpty(defaultLangFile.Code);
+
         // Use temp directory for atomic writes
         var tempDir = SyncStateManager.GetTempDirectory(_projectDirectory);
 
@@ -56,7 +61,23 @@ public class FileRegenerator
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (existingLangFiles.TryGetValue(lang, out var existingLang))
+                // Resolve language code - handle case where merged entries use ""
+                // but backend uses explicit codes like "en" for default language
+                var resolvedLang = lang;
+                LanguageInfo? existingLang = null;
+
+                if (existingLangFiles.TryGetValue(lang, out existingLang))
+                {
+                    // Direct match found
+                }
+                else if (string.IsNullOrEmpty(lang) && backendUsesExplicitDefaultLang && defaultLangFile != null)
+                {
+                    // Merged entries use "" for default, but backend uses explicit code
+                    existingLang = defaultLangFile;
+                    resolvedLang = defaultLangFile.Code;
+                }
+
+                if (existingLang != null)
                 {
                     // Update existing file
                     await UpdateExistingFileAsync(
@@ -70,7 +91,7 @@ public class FileRegenerator
                 {
                     // Create new language file
                     await CreateNewLanguageFileAsync(
-                        lang,
+                        resolvedLang,
                         entries,
                         tempDir,
                         result,
@@ -349,6 +370,12 @@ public class FileRegenerator
             "i18next" => isDefaultLang
                 ? Path.Combine(_projectDirectory, "en.json")
                 : Path.Combine(_projectDirectory, $"{lang}.json"),
+            "xliff" => isDefaultLang
+                ? Path.Combine(_projectDirectory, "messages.xlf")
+                : Path.Combine(_projectDirectory, $"messages.{lang}.xlf"),
+            "po" or "gettext" => isDefaultLang
+                ? Path.Combine(_projectDirectory, "messages.pot")
+                : Path.Combine(_projectDirectory, $"{lang}.po"),
             _ => isDefaultLang
                 ? Path.Combine(_projectDirectory, $"strings.{backendName}")
                 : Path.Combine(_projectDirectory, $"strings.{lang}.{backendName}")

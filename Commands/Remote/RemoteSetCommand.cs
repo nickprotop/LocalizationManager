@@ -332,11 +332,13 @@ public class RemoteSetCommand : Command<RemoteSetCommandSettings>
         }
 
         // Check format matches (json and i18next are compatible)
+        // Skip validation if remote format is empty (client-agnostic API)
         var localFmt = localConfig.ResourceFormat?.ToLowerInvariant();
-        if (!string.IsNullOrEmpty(localFmt))
+        var remoteFmt = remoteProject.Format?.ToLowerInvariant();
+        if (!string.IsNullOrEmpty(localFmt) && !string.IsNullOrEmpty(remoteFmt))
         {
             var normalizedLocal = NormalizeJsonFormat(localFmt);
-            var normalizedRemote = NormalizeJsonFormat(remoteProject.Format);
+            var normalizedRemote = NormalizeJsonFormat(remoteFmt);
             if (normalizedLocal != normalizedRemote)
             {
                 result.AddError($"Format mismatch: local lrm.json specifies '{localConfig.ResourceFormat}', but remote project uses '{remoteProject.Format}'");

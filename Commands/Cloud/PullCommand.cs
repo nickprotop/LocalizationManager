@@ -7,7 +7,6 @@ using LocalizationManager.Core.Configuration;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using System.ComponentModel;
-using System.Text.Json;
 
 namespace LocalizationManager.Commands.Cloud;
 
@@ -35,16 +34,6 @@ public class PullCommandSettings : BaseCommandSettings
     [Description("Conflict resolution strategy: local, remote, prompt, abort (default: prompt)")]
     [DefaultValue("prompt")]
     public string Strategy { get; set; } = "prompt";
-
-    [CommandOption("--config-only")]
-    [Description("Pull only configuration (lrm.json), skip resources")]
-    [DefaultValue(false)]
-    public bool ConfigOnly { get; set; }
-
-    [CommandOption("--resources-only")]
-    [Description("Pull only resources, skip configuration")]
-    [DefaultValue(false)]
-    public bool ResourcesOnly { get; set; }
 
     [CommandOption("--include-unapproved")]
     [Description("Include translations that haven't been approved yet (when project has review workflow enabled)")]
@@ -94,13 +83,6 @@ public class PullCommand : Command<PullCommandSettings>
 
             AnsiConsole.MarkupLine($"[dim]Remote: {remoteUrl!.ToString().EscapeMarkup()}[/]");
             AnsiConsole.WriteLine();
-
-            // Validate conflicting options
-            if (settings.ConfigOnly && settings.ResourcesOnly)
-            {
-                AnsiConsole.MarkupLine("[red]✗ Cannot use --config-only and --resources-only together![/]");
-                return 1;
-            }
 
             // Parse resolution strategy
             var (strategy, isValidStrategy) = ParseStrategy(settings.Strategy);
@@ -154,10 +136,9 @@ public class PullCommand : Command<PullCommandSettings>
                 return 1;
             }
 
-            // Load local config if exists
+            // Load local config if exists for validation
             ConfigurationModel? localConfig = null;
-            var localConfigPath = Path.Combine(projectDirectory, "lrm.json");
-            if (File.Exists(localConfigPath))
+            if (File.Exists(Path.Combine(projectDirectory, "lrm.json")))
             {
                 localConfig = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
             }
@@ -203,16 +184,25 @@ public class PullCommand : Command<PullCommandSettings>
                 AnsiConsole.MarkupLine("[yellow]⚠ Upgrading from file-based sync to key-level sync[/]");
             }
 
-            // Get backend for the format
+            // Get backend for the local format (client-agnostic: format is determined locally)
             var backendFactory = new Core.Backends.ResourceBackendFactory();
             Core.Abstractions.IResourceBackend backend;
             try
             {
-                backend = backendFactory.GetBackend(remoteProject!.Format, config);
+                // Use local config format or auto-detect from files
+                if (!string.IsNullOrEmpty(config.ResourceFormat))
+                {
+                    backend = backendFactory.GetBackend(config.ResourceFormat, config);
+                }
+                else
+                {
+                    backend = backendFactory.ResolveFromPath(projectDirectory, config);
+                }
             }
-            catch (NotSupportedException)
+            catch (NotSupportedException ex)
             {
-                AnsiConsole.MarkupLine($"[red]✗ Unsupported format: {remoteProject.Format}[/]");
+                AnsiConsole.MarkupLine($"[red]✗ {ex.Message}[/]");
+                AnsiConsole.MarkupLine("[dim]Set 'format' in lrm.json or ensure resource files exist.[/]");
                 return 1;
             }
 
@@ -243,36 +233,33 @@ public class PullCommand : Command<PullCommandSettings>
             AnsiConsole.MarkupLine($"[dim]Remote: {pullResponse.Total} entries[/]");
 
             // Perform three-way merge
+            // Pass default language to normalize API language codes to CLI convention
+            // (CLI uses "" for default language, API uses actual language code like "en")
+            // But XLIFF/iOS/i18next use explicit language codes, so don't normalize for those
             var merger = new KeyLevelMerger();
             MergeResult mergeResult;
+
+            // Determine if we should normalize default language to ""
+            // If we have local entries, check if they use "" for default
+            // Otherwise, use the backend's convention
+            var normalizeDefaultLang = localEntries.Any()
+                ? localEntries.Any(e => string.IsNullOrEmpty(e.Lang))
+                : KeyLevelMerger.BackendUsesEmptyForDefault(backend.Name);
 
             if (syncState == null || !syncState.Entries.Any())
             {
                 // First pull - accept all remote
-                mergeResult = merger.MergeForFirstPull(pullResponse.Entries);
+                mergeResult = merger.MergeForFirstPull(pullResponse.Entries, pullResponse.DefaultLanguage, normalizeDefaultLang);
                 AnsiConsole.MarkupLine("[dim]First pull - accepting all remote entries[/]");
             }
             else
             {
-                // Normal merge
-                mergeResult = merger.MergeForPull(localEntries, pullResponse.Entries, syncState);
-            }
-
-            // Handle config merge
-            ConfigMergeResult? configMergeResult = null;
-            if (!settings.ResourcesOnly && pullResponse.Config != null)
-            {
-                var configMerger = new ConfigMerger();
-                var localConfigJson = File.Exists(localConfigPath) ? File.ReadAllText(localConfigPath) : null;
-                var localProps = localConfigJson != null
-                    ? configMerger.ExtractConfigProperties(localConfigJson)
-                    : new Dictionary<string, (string Value, string Hash)>();
-
-                configMergeResult = configMerger.MergeForPull(localProps, pullResponse.Config, syncState);
+                // Normal merge - uses local entries to detect convention internally
+                mergeResult = merger.MergeForPull(localEntries, pullResponse.Entries, syncState, pullResponse.DefaultLanguage);
             }
 
             // Show changes summary
-            ShowMergeSummary(mergeResult, configMergeResult, settings);
+            ShowMergeSummary(mergeResult);
 
             // Handle conflicts
             if (mergeResult.HasConflicts)
@@ -327,7 +314,7 @@ public class PullCommand : Command<PullCommandSettings>
             }
 
             // Check if there's anything to do
-            if (mergeResult.ToWrite.Count == 0 && configMergeResult?.ToWrite.Count == 0)
+            if (mergeResult.ToWrite.Count == 0)
             {
                 AnsiConsole.MarkupLine("[green]✓ Already up to date![/]");
                 return 0;
@@ -364,30 +351,10 @@ public class PullCommand : Command<PullCommandSettings>
             // Apply changes
             try
             {
-                // Update config FIRST so backend uses correct settings for file regeneration
-                if (!settings.ResourcesOnly && configMergeResult?.ToWrite.Count > 0)
-                {
-                    AnsiConsole.Status()
-                        .Start("Updating configuration...", ctx =>
-                        {
-                            var configMerger = new ConfigMerger();
-                            var localConfigJson = File.Exists(localConfigPath) ? File.ReadAllText(localConfigPath) : "{}";
-                            var newConfigJson = configMerger.ApplyConfigChanges(localConfigJson, configMergeResult.ToWrite);
-                            File.WriteAllText(localConfigPath, newConfigJson);
-                        });
-
-                    // Reload config and backend after config update
-                    config = Core.Configuration.ConfigurationManager.LoadConfigurationAsync(projectDirectory, cancellationToken).GetAwaiter().GetResult();
-                    backend = backendFactory.GetBackend(remoteProject!.Format, config);
-                    // Re-discover languages with updated config
-                    languages = backend.Discovery.DiscoverLanguages(projectDirectory);
-                }
-
                 AnsiConsole.Status()
                     .Start("Applying changes...", ctx =>
                     {
-                        // Update resources (now with correct backend from updated config)
-                        if (!settings.ConfigOnly && mergeResult.ToWrite.Count > 0)
+                        if (mergeResult.ToWrite.Count > 0)
                         {
                             ctx.Status("Regenerating resource files...");
                             var regenerator = new FileRegenerator(backend, projectDirectory);
@@ -404,7 +371,7 @@ public class PullCommand : Command<PullCommandSettings>
                     });
 
                 // Update sync state
-                var newSyncState = BuildNewSyncState(mergeResult, configMergeResult, localEntries);
+                var newSyncState = BuildNewSyncState(mergeResult, localEntries);
                 SyncStateManager.SaveAsync(projectDirectory, newSyncState, cancellationToken).GetAwaiter().GetResult();
 
                 AnsiConsole.WriteLine();
@@ -417,10 +384,6 @@ public class PullCommand : Command<PullCommandSettings>
                 if (mergeResult.AutoMerged > 0)
                 {
                     AnsiConsole.MarkupLine($"  [dim]Auto-merged: {mergeResult.AutoMerged} entries[/]");
-                }
-                if (configMergeResult?.ToWrite.Count > 0)
-                {
-                    AnsiConsole.MarkupLine($"  [dim]Config properties: {configMergeResult.ToWrite.Count}[/]");
                 }
 
                 if (backupPath != null)
@@ -471,7 +434,7 @@ public class PullCommand : Command<PullCommandSettings>
         }
     }
 
-    private void ShowMergeSummary(MergeResult mergeResult, ConfigMergeResult? configMergeResult, PullCommandSettings settings)
+    private void ShowMergeSummary(MergeResult mergeResult)
     {
         AnsiConsole.MarkupLine("[blue]Merge summary:[/]");
 
@@ -486,14 +449,6 @@ public class PullCommand : Command<PullCommandSettings>
         if (mergeResult.Conflicts.Count > 0)
         {
             AnsiConsole.MarkupLine($"  [yellow]! {mergeResult.Conflicts.Count} conflict(s) need resolution[/]");
-        }
-        if (configMergeResult?.ToWrite.Count > 0)
-        {
-            AnsiConsole.MarkupLine($"  [blue]~ {configMergeResult.ToWrite.Count} config property(ies) to update[/]");
-        }
-        if (configMergeResult?.Conflicts.Count > 0)
-        {
-            AnsiConsole.MarkupLine($"  [yellow]! {configMergeResult.Conflicts.Count} config conflict(s)[/]");
         }
 
         AnsiConsole.WriteLine();
@@ -643,14 +598,13 @@ public class PullCommand : Command<PullCommandSettings>
         };
     }
 
-    private SyncState BuildNewSyncState(MergeResult mergeResult, ConfigMergeResult? configMergeResult, List<LocalEntry> localEntries)
+    private SyncState BuildNewSyncState(MergeResult mergeResult, List<LocalEntry> localEntries)
     {
         var newState = new SyncState
         {
             Version = 2,
             Timestamp = DateTime.UtcNow,
-            Entries = new Dictionary<string, Dictionary<string, string>>(),
-            ConfigProperties = new Dictionary<string, string>()
+            Entries = new Dictionary<string, Dictionary<string, string>>()
         };
 
         // Add hashes from merged entries
@@ -683,15 +637,6 @@ public class PullCommand : Command<PullCommandSettings>
             if (!newState.Entries[entry.Key].ContainsKey(entry.Lang))
             {
                 newState.Entries[entry.Key][entry.Lang] = entry.Hash;
-            }
-        }
-
-        // Add config hashes
-        if (configMergeResult != null)
-        {
-            foreach (var (path, hash) in configMergeResult.NewHashes)
-            {
-                newState.ConfigProperties[path] = hash;
             }
         }
 

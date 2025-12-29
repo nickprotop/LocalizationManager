@@ -270,21 +270,17 @@ app.Configure(config =>
             .WithExample(new[] { "cloud", "clone", "https://lrm-cloud.com/@username/project", "--no-pull" });
 
         cfg.AddCommand<PushCommand>("push")
-            .WithDescription("Push local changes (resources + lrm.json) to the cloud")
+            .WithDescription("Push local changes to the cloud")
             .WithExample(new[] { "cloud", "push" })
             .WithExample(new[] { "cloud", "push", "-m", "Update translations" })
-            .WithExample(new[] { "cloud", "push", "--dry-run" })
-            .WithExample(new[] { "cloud", "push", "--config-only" })
-            .WithExample(new[] { "cloud", "push", "--resources-only" });
+            .WithExample(new[] { "cloud", "push", "--dry-run" });
 
         cfg.AddCommand<PullCommand>("pull")
-            .WithDescription("Pull remote changes (resources + lrm.json) from the cloud")
+            .WithDescription("Pull remote changes from the cloud")
             .WithExample(new[] { "cloud", "pull" })
             .WithExample(new[] { "cloud", "pull", "--dry-run" })
             .WithExample(new[] { "cloud", "pull", "--force" })
-            .WithExample(new[] { "cloud", "pull", "--strategy", "remote" })
-            .WithExample(new[] { "cloud", "pull", "--config-only" })
-            .WithExample(new[] { "cloud", "pull", "--resources-only" });
+            .WithExample(new[] { "cloud", "pull", "--strategy", "remote" });
 
         cfg.AddCommand<StatusCommand>("status")
             .WithDescription("Show cloud sync status and recent activity")

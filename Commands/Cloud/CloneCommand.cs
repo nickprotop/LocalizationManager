@@ -483,8 +483,11 @@ public class CloneCommand : Command<CloneCommandSettings>
         AnsiConsole.MarkupLine($"[dim]Found {pullResponse.Total} entries[/]");
 
         // Convert entries to MergedEntry format for FileRegenerator
+        // Determine if we should normalize default language to ""
+        // XLIFF/iOS/i18next use explicit language codes, so don't normalize for those
+        var normalizeDefaultLang = KeyLevelMerger.BackendUsesEmptyForDefault(backend.Name);
         var merger = new KeyLevelMerger();
-        var mergeResult = merger.MergeForFirstPull(pullResponse.Entries);
+        var mergeResult = merger.MergeForFirstPull(pullResponse.Entries, pullResponse.DefaultLanguage, normalizeDefaultLang);
 
         if (mergeResult.ToWrite.Count == 0)
         {
@@ -494,12 +497,14 @@ public class CloneCommand : Command<CloneCommandSettings>
         }
 
         // Get languages from the entries
+        // Note: After normalization, default language may be "" (for resx/android) or explicit code (for xliff/ios)
         var languages = mergeResult.ToWrite.Select(e => e.Lang).Distinct()
             .Select(lang => new Core.Models.LanguageInfo
             {
                 Code = lang,
-                Name = lang,
-                IsDefault = lang == remoteProject.DefaultLanguage
+                Name = string.IsNullOrEmpty(lang) ? remoteProject.DefaultLanguage : lang,
+                IsDefault = string.IsNullOrEmpty(lang) ||
+                           string.Equals(lang, remoteProject.DefaultLanguage, StringComparison.OrdinalIgnoreCase)
             })
             .ToList();
 

@@ -96,11 +96,13 @@ public class KeyLevelMerger
     /// <param name="localEntries">Current local entries with computed hashes</param>
     /// <param name="remoteEntries">Entries from server</param>
     /// <param name="syncState">Last sync state (BASE for three-way merge)</param>
+    /// <param name="defaultLanguage">Project's default language code (to normalize to empty string)</param>
     /// <returns>Merge result with entries to write and conflicts</returns>
     public MergeResult MergeForPull(
         IEnumerable<LocalEntry> localEntries,
         IEnumerable<EntryData> remoteEntries,
-        SyncState? syncState)
+        SyncState? syncState,
+        string? defaultLanguage = null)
     {
         var result = new MergeResult();
 
@@ -109,14 +111,20 @@ public class KeyLevelMerger
             .GroupBy(e => (e.Key, e.Lang))
             .ToDictionary(g => g.Key, g => g.First());
 
+        // Determine if local files use "" for default language
+        // (e.g., Android/RESX use "", while XLIFF/iOS use explicit codes like "en")
+        var localUsesEmptyForDefault = localEntries.Any(e => string.IsNullOrEmpty(e.Lang));
+
         // Build lookup for remote entries
         // Note: We use translation.Comment (per-language) rather than entry.Comment (key-level)
+        // Only normalize if local files use "" for default language
         var remoteByKey = new Dictionary<(string Key, string Lang), (string Value, string Hash, string? Comment, bool IsPlural, Dictionary<string, string>? PluralForms)>();
         foreach (var entry in remoteEntries)
         {
             foreach (var (lang, translation) in entry.Translations)
             {
-                remoteByKey[(entry.Key, lang)] = (translation.Value, translation.Hash, translation.Comment, entry.IsPlural, translation.PluralForms);
+                var normalizedLang = NormalizeLanguageCode(lang, defaultLanguage, localUsesEmptyForDefault);
+                remoteByKey[(entry.Key, normalizedLang)] = (translation.Value, translation.Hash, translation.Comment, entry.IsPlural, translation.PluralForms);
             }
         }
 
@@ -159,6 +167,7 @@ public class KeyLevelMerger
                     // New from remote - accept
                     result.ToWrite.Add(CreateMergedEntry(key, lang, remoteEntry, MergeSource.Remote));
                     result.NewHashes.SetEntryHash(key, lang, remoteEntry.Hash);
+                    result.AutoMerged++;
                 }
                 else if (baseHash == remoteHash)
                 {
@@ -272,8 +281,10 @@ public class KeyLevelMerger
     /// Creates a merge result for first pull (no local state) - accepts all remote.
     /// </summary>
     /// <param name="remoteEntries">Entries from server</param>
+    /// <param name="defaultLanguage">Project's default language code (to normalize to empty string)</param>
+    /// <param name="normalizeDefaultLanguage">Whether to normalize default language to "" (true for RESX/Android/JSON, false for XLIFF/iOS)</param>
     /// <returns>Merge result with all remote entries to write</returns>
-    public MergeResult MergeForFirstPull(IEnumerable<EntryData> remoteEntries)
+    public MergeResult MergeForFirstPull(IEnumerable<EntryData> remoteEntries, string? defaultLanguage = null, bool normalizeDefaultLanguage = true)
     {
         var result = new MergeResult();
 
@@ -281,11 +292,15 @@ public class KeyLevelMerger
         {
             foreach (var (lang, translation) in entry.Translations)
             {
+                // Normalize default language to empty string (CLI convention) if requested
+                // XLIFF/iOS use explicit language codes, so don't normalize for those
+                var normalizedLang = NormalizeLanguageCode(lang, defaultLanguage, normalizeDefaultLanguage);
+
                 // Use translation.Comment (per-language) rather than entry.Comment (key-level)
                 result.ToWrite.Add(new MergedEntry
                 {
                     Key = entry.Key,
-                    Lang = lang,
+                    Lang = normalizedLang,
                     Value = translation.Value,
                     Comment = translation.Comment,
                     IsPlural = entry.IsPlural,
@@ -293,7 +308,7 @@ public class KeyLevelMerger
                     Hash = translation.Hash,
                     Source = MergeSource.Remote
                 });
-                result.NewHashes.SetEntryHash(entry.Key, lang, translation.Hash);
+                result.NewHashes.SetEntryHash(entry.Key, normalizedLang, translation.Hash);
             }
         }
 
@@ -413,6 +428,46 @@ public class KeyLevelMerger
             PluralForms = remote.PluralForms,
             Hash = remote.Hash,
             Source = source
+        };
+    }
+
+    /// <summary>
+    /// Normalizes a language code from the API to the CLI convention.
+    /// The CLI uses empty string "" for the default language, while the API uses the actual language code.
+    /// Only normalizes if shouldNormalize is true (i.e., local files use "" for default).
+    /// </summary>
+    /// <param name="lang">Language code from the API</param>
+    /// <param name="defaultLanguage">The project's default language code</param>
+    /// <param name="shouldNormalize">Whether normalization should be applied</param>
+    /// <returns>Normalized language code (empty string if it matches default language and shouldNormalize is true)</returns>
+    private static string NormalizeLanguageCode(string lang, string? defaultLanguage, bool shouldNormalize)
+    {
+        if (!shouldNormalize || string.IsNullOrEmpty(defaultLanguage))
+            return lang;
+
+        // If the language code matches the default language, normalize to empty string
+        if (string.Equals(lang, defaultLanguage, StringComparison.OrdinalIgnoreCase))
+            return "";
+
+        return lang;
+    }
+
+    /// <summary>
+    /// Determines whether a backend uses explicit language codes (like "en") for the default language,
+    /// or uses empty string "" as the convention.
+    /// </summary>
+    /// <param name="backendName">Backend name (e.g., "xliff", "ios", "android")</param>
+    /// <returns>True if backend uses "" for default language, false if it uses explicit codes</returns>
+    public static bool BackendUsesEmptyForDefault(string backendName)
+    {
+        // XLIFF, iOS, and i18next use explicit language codes like "en" for default
+        // RESX, Android, JSON, PO use "" for default language
+        return backendName.ToLowerInvariant() switch
+        {
+            "xliff" => false,
+            "ios" or "strings" => false,
+            "i18next" => false,
+            _ => true  // resx, json, android, po, etc. use ""
         };
     }
 }

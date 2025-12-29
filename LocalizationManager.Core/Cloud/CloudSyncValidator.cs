@@ -80,7 +80,15 @@ public class CloudSyncValidator
             return result;
         }
 
-        var remoteFormat = remoteProject.Format?.ToLowerInvariant() ?? "json";
+        var remoteFormat = remoteProject.Format?.ToLowerInvariant();
+
+        // If remote has no format, the API is client-agnostic - format is determined by client
+        // Skip format validation in this case
+        if (string.IsNullOrEmpty(remoteFormat))
+        {
+            return result;
+        }
+
         var detectedFormat = DetectLocalFormat();
 
         // Normalize formats for comparison (json and i18next are compatible - both use JSON files)
@@ -127,6 +135,13 @@ public class CloudSyncValidator
         var localFormat = localConfig.ResourceFormat?.ToLowerInvariant();
         var remoteFormat = remoteProject.Format?.ToLowerInvariant();
 
+        // If remote has no format, the API is client-agnostic - format is determined by client
+        // Skip format validation in this case
+        if (string.IsNullOrEmpty(remoteFormat))
+        {
+            return;
+        }
+
         if (string.IsNullOrEmpty(localFormat))
         {
             // Try to auto-detect from files
@@ -136,12 +151,6 @@ public class CloudSyncValidator
                 result.AddWarning("Local format not specified in lrm.json and could not be auto-detected.");
                 return;
             }
-        }
-
-        if (string.IsNullOrEmpty(remoteFormat))
-        {
-            result.AddWarning("Remote project format is not set.");
-            return;
         }
 
         // Normalize formats for comparison (json and i18next are compatible)
