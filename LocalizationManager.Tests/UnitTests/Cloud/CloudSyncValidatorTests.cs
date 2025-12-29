@@ -543,33 +543,33 @@ public class CloudSyncValidatorTests : IDisposable
     #region Edge Cases
 
     [Fact]
-    public void ValidateForPush_EmptyRemoteFormat_ReturnsWarning()
+    public void ValidateForPush_EmptyRemoteFormat_AllowsSync()
     {
-        // Arrange
+        // Arrange - API is client-agnostic, format is determined by client
         var localConfig = new ConfigurationModel { ResourceFormat = "resx", DefaultLanguageCode = "en" };
         var remoteProject = new CloudProject { Format = "", DefaultLanguage = "en" };
 
         // Act
         var result = _validator.ValidateForPush(localConfig, remoteProject);
 
-        // Assert
-        Assert.True(result.CanSync); // Empty format is a warning, not an error
-        Assert.Contains(result.Warnings, w => w.Contains("Remote project format is not set"));
+        // Assert - No warning when format is empty (client-agnostic API design)
+        Assert.True(result.CanSync);
+        Assert.Empty(result.Warnings);
     }
 
     [Fact]
-    public void ValidateForPush_NullRemoteFormat_ReturnsWarning()
+    public void ValidateForPush_NullRemoteFormat_AllowsSync()
     {
-        // Arrange
+        // Arrange - API is client-agnostic, format is determined by client
         var localConfig = new ConfigurationModel { ResourceFormat = "resx", DefaultLanguageCode = "en" };
         var remoteProject = new CloudProject { Format = null!, DefaultLanguage = "en" };
 
         // Act
         var result = _validator.ValidateForPush(localConfig, remoteProject);
 
-        // Assert
+        // Assert - No warning when format is null (client-agnostic API design)
         Assert.True(result.CanSync);
-        Assert.Contains(result.Warnings, w => w.Contains("Remote project format is not set"));
+        Assert.Empty(result.Warnings);
     }
 
     [Fact]
