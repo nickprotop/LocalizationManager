@@ -9,6 +9,8 @@
 [![GitHub Discussions](https://img.shields.io/github/discussions/nickprotop/LocalizationManager)](https://github.com/nickprotop/LocalizationManager/discussions)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?logo=buy-me-a-coffee&logoColor=white)](https://buymeacoffee.com/nickprotop)
 
+> 📝 **New:** [The $0 Localization Stack for Solo .NET Developers](https://dev.to/nikolaos_protopapas_d3bd6/the-0-localization-stack-for-solo-net-developers-3i62) - Learn how to translate your app for free with local LLMs
+
 **A powerful, cross-platform command-line tool for managing localization files with an interactive Terminal UI and Web UI. Supports .NET `.resx`, JSON, i18next, Android `strings.xml`, and iOS `.strings` formats.**
 
 ![LRM Demo](assets/lrm-demo.gif)
