@@ -110,6 +110,26 @@ lrm validate --config-file ./my-config.json --path ./Resources
 
 ---
 
+## Supported Formats
+
+LRM automatically detects and supports these localization file formats:
+
+| Format | File Patterns | Use Case |
+|--------|--------------|----------|
+| **.resx** | `*.resx`, `*.{culture}.resx` | .NET applications |
+| **JSON** | `strings.json`, `strings.{culture}.json` | Web applications, custom JSON |
+| **i18next** | `{culture}.json` in flat structure | React, Node.js with i18next |
+| **Android** | `res/values/strings.xml`, `res/values-{culture}/strings.xml` | Android apps |
+| **iOS** | `{culture}.lproj/Localizable.strings` | iOS/macOS apps |
+| **PO** | `locale/{culture}/LC_MESSAGES/*.po`, `*.po` | GNU gettext projects |
+| **XLIFF** | `*.xliff`, `*.xlf` | Translation interchange |
+
+Format detection is automatic based on file structure and naming patterns. No explicit format flag is required.
+
+See [CONFIGURATION.md](CONFIGURATION.md) for format-specific configuration options (JSON, Android, iOS, PO, XLIFF).
+
+---
+
 ## validate
 
 **Description:** Validate resource files for issues including missing translations, duplicates, empty values, and extra keys.
