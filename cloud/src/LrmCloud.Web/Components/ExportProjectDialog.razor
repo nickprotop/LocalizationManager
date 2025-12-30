@@ -1,6 +1,7 @@
 @inject NavigationManager NavigationManager
 @inject Radzen.DialogService DialogService
 @inject IJSRuntime JS
+@inject HttpClient Http
 
 <RadzenStack Gap="1rem">
     <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary">
@@ -88,9 +89,8 @@
 
         try
         {
-            // Build export URL
-            var baseUrl = NavigationManager.BaseUri.TrimEnd('/');
-            var url = $"{baseUrl}/api/projects/{ProjectId}/files/export?format={_selectedFormat}";
+            // Build export URL (relative - HttpClient handles base URL and auth)
+            var url = $"api/projects/{ProjectId}/files/export?format={_selectedFormat}";
 
             // Add selected languages if any
             if (_selectedLanguages.Any())
@@ -98,11 +98,25 @@
                 url += $"&languages={string.Join(",", _selectedLanguages)}";
             }
 
-            // Trigger download using JS interop (opens in new tab/triggers download)
-            await JS.InvokeVoidAsync("open", url, "_blank");
+            // Fetch the file with proper authentication via HttpClient
+            var response = await Http.GetAsync(url);
 
-            // Close dialog after brief delay
-            await Task.Delay(500);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _errorMessage = $"Export failed: {response.StatusCode}";
+                return;
+            }
+
+            // Get the file bytes and filename
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var fileName = response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+                ?? $"localization-{ProjectId}-{_selectedFormat}.zip";
+
+            // Convert to base64 and trigger download via JS
+            var base64 = Convert.ToBase64String(bytes);
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, base64, "application/zip");
+
             DialogService.Close(true);
         }
         catch (Exception ex)
