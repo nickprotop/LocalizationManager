@@ -11,7 +11,7 @@
 
 > 📝 **New:** [The $0 Localization Stack for Solo .NET Developers](https://dev.to/nikolaos_protopapas_d3bd6/the-0-localization-stack-for-solo-net-developers-3i62) - Learn how to translate your app for free with local LLMs
 
-**A powerful, cross-platform command-line tool for managing localization files with an interactive Terminal UI and Web UI. Supports .NET `.resx`, JSON, i18next, Android `strings.xml`, and iOS `.strings` formats.**
+**A powerful, cross-platform command-line tool for managing localization files with an interactive Terminal UI and Web UI. Supports .NET `.resx`, JSON, i18next, Android `strings.xml`, iOS `.strings`, PO (gettext), and XLIFF formats.**
 
 ![LRM Demo](assets/lrm-demo.gif)
 
@@ -82,7 +82,7 @@ Managing localization files is painful:
 - **No Linux-native tools** with interactive editing existed
 
 LRM solves this by providing:
-- **Multi-format support** - .resx, JSON, i18next, Android, iOS
+- **Multi-format support** - .resx, JSON, i18next, Android, iOS, PO, XLIFF
 - **First-class Linux support** with native binaries
 - **Interactive Terminal UI (TUI)** for visual editing
 - **Full CLI** for scripting and CI/CD automation
@@ -110,7 +110,7 @@ LRM solves this by providing:
 | **Self-contained** | ✅ Single binary | ❌ Needs .NET Runtime | ❌ Installer | ❌ Large install | ✅ |
 | **ARM64 Support** | ✅ Native | ❌ | ❌ | ❌ | ✅ Any editor |
 
-**LRM is the only Linux-native, CLI-first tool with an interactive TUI, Web UI, and REST API for multi-format localization management (.resx, JSON, i18next, Android, iOS).**
+**LRM is the only Linux-native, CLI-first tool with an interactive TUI, Web UI, and REST API for multi-format localization management (.resx, JSON, i18next, Android, iOS, PO, XLIFF).**
 
 ---
 
@@ -152,6 +152,8 @@ LRM solves this by providing:
 | **i18next** | `en.json`, `fr.json` | React, Vue, Angular |
 | **Android** | `res/values/strings.xml`, `res/values-fr/strings.xml` | Android apps |
 | **iOS** | `en.lproj/Localizable.strings`, `fr.lproj/Localizable.strings` | iOS/macOS apps |
+| **PO** | `locale/en/LC_MESSAGES/messages.po` | GNU gettext projects |
+| **XLIFF** | `en.xliff`, `translations/fr.xliff` | Translation interchange |
 
 ### Quick Start by Platform
 
@@ -201,6 +203,8 @@ lrm translate --provider google --to es,fr --path ./app/src/main/res
   - **i18next** - Full compatibility with suffix-based plurals (`_one`, `_other`)
   - **Android** - `strings.xml` with `<plurals>` and `<string-array>` support
   - **iOS** - `.strings` and `.stringsdict` with plural support
+  - **PO** - GNU gettext format with plural forms, fuzzy entries, and context support
+  - **XLIFF** - XLIFF 1.2/2.0 bilingual translation interchange format
   - Auto-detection of format from file patterns
   - Comments and metadata preservation across all formats
   - [See JSON format usage guide →](LocalizationManager.JsonLocalization/README.md)
