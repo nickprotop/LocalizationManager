@@ -1,0 +1,7 @@
+{
+  "AppName": "Mon Application",
+  "WelcomeMessage": "Bienvenue dans notre application!",
+  "ButtonSave": "Enregistrer",
+  "ButtonCancel": "Annuler",
+  "ErrorRequired": "Ce champ est obligatoire"
+}

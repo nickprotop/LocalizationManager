@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+  <file original="messages" source-language="en" datatype="plaintext" target-language="fr">
+    <header>
+      <tool tool-id="lrm" tool-name="Localization Resource Manager" tool-version="1.0" />
+    </header>
+    <body>
+      <trans-unit id="AppName">
+        <source>AppName</source>
+        <target>Mon Application</target>
+      </trans-unit>
+      <trans-unit id="WelcomeMessage">
+        <source>WelcomeMessage</source>
+        <target>Bienvenue dans notre application!</target>
+      </trans-unit>
+      <trans-unit id="ButtonSave">
+        <source>ButtonSave</source>
+        <target>Enregistrer</target>
+      </trans-unit>
+      <trans-unit id="ButtonCancel">
+        <source>ButtonCancel</source>
+        <target>Annuler</target>
+      </trans-unit>
+      <trans-unit id="ErrorRequired">
+        <source>ErrorRequired</source>
+        <target>Ce champ est obligatoire</target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>

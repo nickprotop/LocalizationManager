@@ -1,0 +1,14 @@
+/* The name of the application */
+"AppName" = "Mon Application";
+
+/* Welcome message */
+"WelcomeMessage" = "Bienvenue dans notre application!";
+
+/* Save button */
+"ButtonSave" = "Enregistrer";
+
+/* Cancel button */
+"ButtonCancel" = "Annuler";
+
+/* Required field error */
+"ErrorRequired" = "Ce champ est obligatoire";
