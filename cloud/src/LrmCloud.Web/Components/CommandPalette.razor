@@ -78,9 +78,11 @@
     private CommandItem? _selectedItem;
     private DotNetObjectReference<CommandPalette>? _dotNetRef;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        await BuildCommandItems();
+        // Only build static items on init - no API calls
+        // Projects are loaded when user opens the palette (Ctrl+K)
+        BuildStaticItems();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -101,7 +103,7 @@
         }
     }
 
-    private async Task BuildCommandItems()
+    private void BuildStaticItems()
     {
         _allItems = new List<CommandItem>
         {
@@ -127,7 +129,15 @@
             new("Help & Support", "help_outline", "support", "Help", ""),
         };
 
-        // Load recent projects
+        FilterItems();
+    }
+
+    private async Task LoadRecentProjectsAsync()
+    {
+        // Remove any existing recent projects
+        _allItems.RemoveAll(i => i.Category == "Recent Projects");
+
+        // Load recent projects from API
         try
         {
             var projects = await ProjectService.GetProjectsAsync();
@@ -184,7 +194,7 @@
     {
         _isOpen = true;
         _searchQuery = "";
-        await BuildCommandItems();
+        await LoadRecentProjectsAsync();
         await InvokeAsync(StateHasChanged);
     }
 
