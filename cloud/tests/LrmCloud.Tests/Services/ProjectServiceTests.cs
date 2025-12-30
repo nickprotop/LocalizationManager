@@ -200,7 +200,7 @@ public class ProjectServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateProjectAsync_InvalidFormat_Fails()
+    public async Task CreateProjectAsync_WithoutFormat_Succeeds()
     {
         // Arrange
         var user = await CreateTestUserAsync();
@@ -213,10 +213,10 @@ public class ProjectServiceTests : IDisposable
         // Act
         var (success, project, errorMessage) = await _projectService.CreateProjectAsync(user.Id, request);
 
-        // Assert
-        Assert.False(success);
-        Assert.Null(project);
-        Assert.Contains("Invalid format", errorMessage);
+        // Assert - Format is optional, project creation should succeed
+        Assert.True(success);
+        Assert.NotNull(project);
+        Assert.Null(errorMessage);
     }
 
     [Fact]

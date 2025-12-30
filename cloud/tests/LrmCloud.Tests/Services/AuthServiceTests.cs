@@ -319,7 +319,7 @@ public class AuthServiceTests : IDisposable
 
         // Assert
         Assert.False(success);
-        Assert.Equal("Invalid verification token", errorMessage);
+        Assert.Equal("This verification link is invalid or has already been used.", errorMessage);
 
         var verifiedUser = await _dbContext.Users.FirstAsync(u => u.Email == "test@example.com");
         Assert.False(verifiedUser.EmailVerified);
@@ -351,7 +351,7 @@ public class AuthServiceTests : IDisposable
 
         // Assert
         Assert.False(success);
-        Assert.Equal("Verification link expired", errorMessage);
+        Assert.Equal("This verification link has expired. Please register again to receive a new link.", errorMessage);
     }
 
     [Fact]
@@ -376,7 +376,7 @@ public class AuthServiceTests : IDisposable
 
         // Assert
         Assert.False(success);
-        Assert.Equal("Email already verified", errorMessage);
+        Assert.Equal("Your email address has already been verified. You can log in now.", errorMessage);
     }
 
     [Fact]
@@ -387,7 +387,7 @@ public class AuthServiceTests : IDisposable
 
         // Assert
         Assert.False(success);
-        Assert.Equal("Invalid verification link", errorMessage);
+        Assert.Equal("This verification link is invalid. Please check the link or request a new one.", errorMessage);
     }
 
     // ========================================
@@ -580,7 +580,7 @@ public class AuthServiceTests : IDisposable
 
         // Assert
         Assert.False(success);
-        Assert.Equal("Invalid password reset token", errorMessage);
+        Assert.Equal("This password reset link is invalid or has already been used.", errorMessage);
     }
 
     [Fact]
@@ -616,7 +616,7 @@ public class AuthServiceTests : IDisposable
 
         // Assert
         Assert.False(success);
-        Assert.Equal("Password reset link expired", errorMessage);
+        Assert.Equal("This password reset link has expired. Please request a new one.", errorMessage);
     }
 
     [Fact]
@@ -762,7 +762,7 @@ public class AuthServiceTests : IDisposable
         // Assert
         Assert.False(success);
         Assert.Null(response);
-        Assert.Equal("Invalid email or password", errorMessage);
+        Assert.Equal("The email or password you entered is incorrect.", errorMessage);
     }
 
     [Fact]
@@ -781,7 +781,7 @@ public class AuthServiceTests : IDisposable
         // Assert
         Assert.False(success);
         Assert.Null(response);
-        Assert.Equal("Invalid email or password", errorMessage);
+        Assert.Equal("The email or password you entered is incorrect.", errorMessage);
     }
 
     [Fact]
@@ -814,7 +814,7 @@ public class AuthServiceTests : IDisposable
         // Assert
         Assert.False(success);
         Assert.Null(response);
-        Assert.Equal("Please verify your email address before logging in", errorMessage);
+        Assert.Equal("Please verify your email address before logging in. Check your inbox for the verification link.", errorMessage);
     }
 
     [Fact]
@@ -985,7 +985,7 @@ public class AuthServiceTests : IDisposable
         // Assert
         Assert.False(success);
         Assert.Null(response);
-        Assert.Equal("Invalid email or password", errorMessage);
+        Assert.Equal("The email or password you entered is incorrect.", errorMessage);
     }
 
     // ============================================================================
