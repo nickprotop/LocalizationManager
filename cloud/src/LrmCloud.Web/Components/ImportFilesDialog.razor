@@ -1,0 +1,264 @@
+@using LrmCloud.Shared.DTOs.Files
+@using LrmCloud.Shared.DTOs.Sync
+@inject HttpClient Http
+@inject NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<RadzenStack Gap="1rem">
+    <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary">
+        Import localization files into this project. Existing keys will be updated, new keys will be added.
+    </RadzenText>
+
+    <RadzenFormField Text="Format" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+        <ChildContent>
+            <RadzenDropDown @bind-Value="_selectedFormat" Style="width: 100%;"
+                            Data="@_formatOptions" TextProperty="Text" ValueProperty="Value"
+                            Disabled="@_isImporting" />
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                Format of the files you're uploading
+            </RadzenText>
+        </Helper>
+    </RadzenFormField>
+
+    <RadzenCard Style="border: 2px dashed var(--rz-base-400); padding: 2rem; text-align: center; position: relative;">
+        <InputFile OnChange="OnFilesChanged" multiple
+                   accept=".resx,.json,.xml,.strings,.stringsdict,.po,.pot,.xlf,.xliff"
+                   disabled="@_isImporting"
+                   style="position: absolute; top: 0; left: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;" />
+        <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="cloud_upload" Style="font-size: 3rem; color: var(--rz-secondary);" />
+            <RadzenText TextStyle="TextStyle.Body1">Drop files here or click to browse</RadzenText>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                Supported: .resx, .json, .xml, .strings, .po, .xlf (max 50 files)
+            </RadzenText>
+        </RadzenStack>
+    </RadzenCard>
+
+    @if (_uploadedFiles.Any())
+    {
+        <RadzenText TextStyle="TextStyle.Subtitle2">Selected Files (@_uploadedFiles.Count)</RadzenText>
+        <div style="max-height: 200px; overflow-y: auto;">
+            <RadzenDataGrid TItem="IBrowserFile" Data="@_uploadedFiles" Density="Density.Compact" AllowSorting="false">
+                <Columns>
+                    <RadzenDataGridColumn TItem="IBrowserFile" Title="File">
+                        <Template Context="file">
+                            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                <RadzenIcon Icon="@GetFileIcon(file.Name)" />
+                                <RadzenText TextStyle="TextStyle.Body2">@file.Name</RadzenText>
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="IBrowserFile" Title="Size" Width="80px">
+                        <Template Context="file">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@FormatFileSize(file.Size)</RadzenText>
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="IBrowserFile" Width="40px">
+                        <Template Context="file">
+                            <RadzenButton Icon="close" Variant="Radzen.Variant.Text" Size="ButtonSize.Small"
+                                          Click="@(() => RemoveFile(file))" Disabled="@_isImporting" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </div>
+    }
+
+    @if (_importResult != null)
+    {
+        <RadzenAlert AlertStyle="@(_importResult.Success ? AlertStyle.Success : AlertStyle.Warning)"
+                     Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+            <RadzenStack Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.Body2">
+                    <strong>@(_importResult.Success ? "Import completed!" : "Import completed with warnings")</strong>
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption">
+                    Applied: @_importResult.Applied entries
+                </RadzenText>
+                @if (_importResult.Errors.Any())
+                {
+                    <ul style="margin: 0.5rem 0 0 0; padding-left: 1.5rem; font-size: 0.875rem;">
+                        @foreach (var error in _importResult.Errors.Take(5))
+                        {
+                            <li>@error</li>
+                        }
+                        @if (_importResult.Errors.Count > 5)
+                        {
+                            <li>...and @(_importResult.Errors.Count - 5) more</li>
+                        }
+                    </ul>
+                }
+            </RadzenStack>
+        </RadzenAlert>
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+            @_errorMessage
+        </RadzenAlert>
+    }
+
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+        <RadzenButton Variant="Radzen.Variant.Text" Text="@(_importResult != null ? "Close" : "Cancel")"
+                      Click="@Close" Disabled="@_isImporting" />
+        @if (_importResult == null)
+        {
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="@(_isImporting ? "Importing..." : "Import")"
+                          Icon="upload" Click="@HandleImport"
+                          Disabled="@(_isImporting || !_uploadedFiles.Any())" IsBusy="@_isImporting" />
+        }
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    private string _selectedFormat = "resx";
+    private List<IBrowserFile> _uploadedFiles = new();
+    private bool _isImporting;
+    private string? _errorMessage;
+    private FileImportResponse? _importResult;
+
+    private readonly List<object> _formatOptions = new()
+    {
+        new { Value = "resx", Text = ".resx (C#/.NET)" },
+        new { Value = "json", Text = "JSON Localization" },
+        new { Value = "i18next", Text = "i18next (JS/React)" },
+        new { Value = "android", Text = "Android strings.xml" },
+        new { Value = "ios", Text = "iOS .strings/.stringsdict" },
+        new { Value = "po", Text = "GNU gettext (.po/.pot)" },
+        new { Value = "xliff", Text = "XLIFF (.xliff/.xlf)" }
+    };
+
+    private void Close()
+    {
+        DialogService.Close(_importResult != null);
+    }
+
+    private void OnFilesChanged(InputFileChangeEventArgs e)
+    {
+        _uploadedFiles = e.GetMultipleFiles(50).ToList();
+        _errorMessage = null;
+        _importResult = null;
+        AutoDetectFormat();
+        StateHasChanged();
+    }
+
+    private void RemoveFile(IBrowserFile file)
+    {
+        _uploadedFiles.Remove(file);
+        if (_uploadedFiles.Any())
+            AutoDetectFormat();
+    }
+
+    private void AutoDetectFormat()
+    {
+        if (!_uploadedFiles.Any()) return;
+
+        var firstFile = _uploadedFiles.First().Name.ToLowerInvariant();
+
+        if (firstFile.EndsWith(".resx"))
+            _selectedFormat = "resx";
+        else if (firstFile.EndsWith(".json"))
+            _selectedFormat = "json";
+        else if (firstFile.EndsWith(".xml"))
+            _selectedFormat = "android";
+        else if (firstFile.EndsWith(".strings") || firstFile.EndsWith(".stringsdict"))
+            _selectedFormat = "ios";
+        else if (firstFile.EndsWith(".po") || firstFile.EndsWith(".pot"))
+            _selectedFormat = "po";
+        else if (firstFile.EndsWith(".xlf") || firstFile.EndsWith(".xliff"))
+            _selectedFormat = "xliff";
+    }
+
+    private async Task HandleImport()
+    {
+        if (!_uploadedFiles.Any()) return;
+
+        _isImporting = true;
+        _errorMessage = null;
+        _importResult = null;
+
+        try
+        {
+            // Read all files
+            var files = new List<FileDto>();
+            foreach (var file in _uploadedFiles)
+            {
+                try
+                {
+                    await using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                    using var reader = new StreamReader(stream);
+                    var content = await reader.ReadToEndAsync();
+
+                    files.Add(new FileDto
+                    {
+                        Path = file.Name,
+                        Content = content
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _errorMessage = $"Failed to read {file.Name}: {ex.Message}";
+                    return;
+                }
+            }
+
+            // Call import API
+            var request = new FileImportRequest
+            {
+                Format = _selectedFormat,
+                Files = files
+            };
+
+            var response = await Http.PostAsJsonAsync($"projects/{ProjectId}/files/import", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<LrmCloud.Shared.Api.ApiResponse<FileImportResponse>>();
+                _importResult = result?.Data;
+
+                if (_importResult?.Success == true)
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Import Complete",
+                        $"Imported {_importResult.Applied} entries");
+                }
+            }
+            else
+            {
+                _errorMessage = $"Import failed: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Import failed: {ex.Message}";
+        }
+        finally
+        {
+            _isImporting = false;
+        }
+    }
+
+    private static string GetFileIcon(string fileName)
+    {
+        var lower = fileName.ToLowerInvariant();
+        if (lower.EndsWith(".resx")) return "code";
+        if (lower.EndsWith(".json")) return "data_object";
+        if (lower.EndsWith(".xml")) return "android";
+        if (lower.EndsWith(".strings") || lower.EndsWith(".stringsdict")) return "phone_iphone";
+        if (lower.EndsWith(".po") || lower.EndsWith(".pot")) return "translate";
+        if (lower.EndsWith(".xlf") || lower.EndsWith(".xliff")) return "swap_horiz";
+        return "description";
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024):F1} MB";
+    }
+}

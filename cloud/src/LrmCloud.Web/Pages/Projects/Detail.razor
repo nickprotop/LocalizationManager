@@ -49,6 +49,8 @@ else
         </RadzenStack>
 
         <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+            <RadzenButton Variant="Radzen.Variant.Outlined" Icon="upload"
+                          Text="Import" Click="@OpenImportDialog" />
             <RadzenButton Variant="Radzen.Variant.Outlined" Icon="download"
                           Text="Export" Click="@OpenExportDialog" />
             <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Secondary" Icon="settings"
@@ -201,7 +203,8 @@ else
     private readonly List<ContextMenuItem> _actionMenuItems = new()
     {
         new ContextMenuItem { Text = "Translate Missing", Value = "translate", Icon = "translate" },
-        new ContextMenuItem { Text = "Export", Value = "export", Icon = "file_download" }
+        new ContextMenuItem { Text = "Import Files", Value = "import", Icon = "upload" },
+        new ContextMenuItem { Text = "Export Files", Value = "export", Icon = "download" }
     };
 
     private void OnActionMenuClick(MenuItemEventArgs args)
@@ -211,6 +214,9 @@ else
         {
             case "translate":
                 InvokeAsync(OpenTranslateDialog);
+                break;
+            case "import":
+                InvokeAsync(OpenImportDialog);
                 break;
             case "export":
                 InvokeAsync(ExportProject);
@@ -322,6 +328,26 @@ else
     private async Task ExportProject()
     {
         await OpenExportDialog();
+    }
+
+    // =========================================================================
+    // Import
+    // =========================================================================
+
+    private async Task OpenImportDialog()
+    {
+        var result = await DialogService.OpenAsync<ImportFilesDialog>("Import Files",
+            new Dictionary<string, object>
+            {
+                { "ProjectId", ProjectId }
+            },
+            new Radzen.DialogOptions { Width = "500px" });
+
+        // Refresh data if import was successful
+        if (result is true)
+        {
+            await LoadDataAsync();
+        }
     }
 
     private async Task OpenExportDialog()

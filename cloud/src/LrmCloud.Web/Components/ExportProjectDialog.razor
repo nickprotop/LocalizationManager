@@ -89,8 +89,8 @@
 
         try
         {
-            // Build export URL (relative - HttpClient handles base URL and auth)
-            var url = $"api/projects/{ProjectId}/files/export?format={_selectedFormat}";
+            // Build export URL (relative to HttpClient's base URL which is /api/)
+            var url = $"projects/{ProjectId}/files/export?format={_selectedFormat}";
 
             // Add selected languages if any
             if (_selectedLanguages.Any())
