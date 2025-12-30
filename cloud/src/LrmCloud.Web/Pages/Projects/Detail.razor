@@ -314,10 +314,10 @@ else
             },
             new Radzen.DialogOptions { Width = "600px" });
 
-        if (result is TranslateResponseDto translationResult && translationResult.Success)
+        // Refresh data if translation occurred (stats + validation)
+        if (result is not null)
         {
-            // Refresh stats after translation
-            _stats = await ResourceService.GetProjectStatsAsync(ProjectId);
+            await LoadDataAsync();
         }
     }
 
@@ -343,8 +343,8 @@ else
             },
             new Radzen.DialogOptions { Width = "500px" });
 
-        // Refresh data if import was successful
-        if (result is true)
+        // Refresh data if import was successful (or dialog closed after import)
+        if (result is not false)
         {
             await LoadDataAsync();
         }

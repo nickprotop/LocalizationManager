@@ -213,10 +213,12 @@ public class CloudTranslationService : ICloudTranslationService
                     }
                     else
                     {
-                        // Look up source translation using the database language code
-                        // (empty string for RESX/Android/iOS default language, actual code for JSON/i18next)
+                        // Look up source translation - check both conventions:
+                        // - CLI sync stores default language with LanguageCode = ""
+                        // - Web import stores with actual code (e.g., "en")
                         var sourceTranslation = key.Translations
-                            .FirstOrDefault(t => t.LanguageCode == sourceLanguageDbCode && t.PluralForm == pluralForm);
+                            .FirstOrDefault(t => (t.LanguageCode == sourceLanguageDbCode || t.LanguageCode == sourceLanguage)
+                                                 && t.PluralForm == pluralForm);
                         sourceText = sourceTranslation?.Value;
                     }
 
