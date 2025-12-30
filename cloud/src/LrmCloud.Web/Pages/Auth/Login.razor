@@ -86,7 +86,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (await AuthService.IsAuthenticatedAsync())
+        // Use IsTokenValidAsync instead of IsAuthenticatedAsync to check both:
+        // 1. Token exists
+        // 2. Token is not expired
+        // 3. Tokens are not being cleared (prevents redirect loop during logout)
+        if (await AuthService.IsTokenValidAsync())
         {
             Navigation.NavigateTo(ReturnUrl ?? "", forceLoad: false);
         }

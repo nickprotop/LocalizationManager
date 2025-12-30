@@ -14,6 +14,13 @@ public class TokenStorageService
     private const string RefreshExpiryKey = "lrm_refresh_expiry";
 
     private readonly ILocalStorageService _localStorage;
+    private volatile bool _isClearing;
+
+    /// <summary>
+    /// Indicates if a token clear operation is currently in progress.
+    /// Used to prevent race conditions during logout.
+    /// </summary>
+    public bool IsClearing => _isClearing;
 
     public TokenStorageService(ILocalStorageService localStorage)
     {
@@ -75,9 +82,22 @@ public class TokenStorageService
 
     public async Task ClearTokensAsync()
     {
-        await _localStorage.RemoveItemAsync(AccessTokenKey);
-        await _localStorage.RemoveItemAsync(RefreshTokenKey);
-        await _localStorage.RemoveItemAsync(TokenExpiryKey);
-        await _localStorage.RemoveItemAsync(RefreshExpiryKey);
+        _isClearing = true;
+        try
+        {
+            // Use Task.WhenAll to clear all tokens atomically
+            // This prevents race conditions where IsAuthenticatedAsync might read
+            // a partially cleared state during logout
+            await Task.WhenAll(
+                _localStorage.RemoveItemAsync(AccessTokenKey).AsTask(),
+                _localStorage.RemoveItemAsync(RefreshTokenKey).AsTask(),
+                _localStorage.RemoveItemAsync(TokenExpiryKey).AsTask(),
+                _localStorage.RemoveItemAsync(RefreshExpiryKey).AsTask()
+            );
+        }
+        finally
+        {
+            _isClearing = false;
+        }
     }
 }

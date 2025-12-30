@@ -8,6 +8,9 @@
             ? "login"
             : $"login?returnUrl={returnUrl}";
 
-        Navigation.NavigateTo(loginUrl, forceLoad: false);
+        // Use forceLoad: true to stop all pending API requests
+        // This prevents a loop where pending requests continue to fail
+        // after auth state changes to unauthenticated
+        Navigation.NavigateTo(loginUrl, forceLoad: true);
     }
 }

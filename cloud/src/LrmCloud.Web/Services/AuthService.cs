@@ -246,6 +246,26 @@ public class AuthService
         return !string.IsNullOrEmpty(token);
     }
 
+    /// <summary>
+    /// Checks if the user has a valid (non-expired) token.
+    /// Unlike IsAuthenticatedAsync, this also verifies the token hasn't expired
+    /// and handles the case where tokens are being cleared.
+    /// </summary>
+    public async Task<bool> IsTokenValidAsync()
+    {
+        // Don't report as authenticated if tokens are being cleared
+        // This prevents race conditions during logout
+        if (_tokenStorage.IsClearing)
+            return false;
+
+        var token = await _tokenStorage.GetAccessTokenAsync();
+        if (string.IsNullOrEmpty(token))
+            return false;
+
+        // Also check if token is expired
+        return !await _tokenStorage.IsTokenExpiredAsync();
+    }
+
     public async Task<ProfileResult> GetProfileAsync()
     {
         try
