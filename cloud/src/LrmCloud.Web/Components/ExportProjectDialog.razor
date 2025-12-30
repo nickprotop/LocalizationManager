@@ -1,0 +1,123 @@
+@inject NavigationManager NavigationManager
+@inject Radzen.DialogService DialogService
+@inject IJSRuntime JS
+
+<RadzenStack Gap="1rem">
+    <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary">
+        Export your project translations as files. Choose a format and select which languages to include.
+    </RadzenText>
+
+    <RadzenFormField Text="Format" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+        <ChildContent>
+            <RadzenDropDown @bind-Value="_selectedFormat" Style="width: 100%;"
+                            Data="@_formatOptions" TextProperty="Text" ValueProperty="Value"
+                            Disabled="@_isExporting" />
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Output file format</RadzenText>
+        </Helper>
+    </RadzenFormField>
+
+    <RadzenFormField Text="Languages" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+        <ChildContent>
+            @if (Languages.Any())
+            {
+                <RadzenCheckBoxList @bind-Value="_selectedLanguages" Data="@Languages"
+                                    TextProperty="Text" ValueProperty="Value"
+                                    Orientation="Radzen.Orientation.Vertical"
+                                    Disabled="@_isExporting" />
+            }
+            else
+            {
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">No languages available</RadzenText>
+            }
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                Leave all unchecked to export all languages
+            </RadzenText>
+        </Helper>
+    </RadzenFormField>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" AllowClose="false" Size="AlertSize.Small">
+            @_errorMessage
+        </RadzenAlert>
+    }
+
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+        <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@Close" Disabled="@_isExporting" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="@(_isExporting ? "Exporting..." : "Export")"
+                      Icon="download" Click="@HandleExport" Disabled="@_isExporting" IsBusy="@_isExporting" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    [Parameter]
+    public List<LanguageOption> Languages { get; set; } = new();
+
+    private string _selectedFormat = "json";
+    private IEnumerable<string> _selectedLanguages = Enumerable.Empty<string>();
+    private bool _isExporting;
+    private string? _errorMessage;
+
+    private readonly List<object> _formatOptions = new()
+    {
+        new { Value = "resx", Text = ".resx (C#/.NET)" },
+        new { Value = "json", Text = "JSON Localization" },
+        new { Value = "i18next", Text = "i18next (JS/React)" },
+        new { Value = "android", Text = "Android strings.xml" },
+        new { Value = "ios", Text = "iOS .strings/.stringsdict" },
+        new { Value = "po", Text = "GNU gettext (.po/.pot)" },
+        new { Value = "xliff", Text = "XLIFF (.xliff/.xlf)" }
+    };
+
+    private void Close()
+    {
+        DialogService.Close(null);
+    }
+
+    private async Task HandleExport()
+    {
+        _isExporting = true;
+        _errorMessage = null;
+
+        try
+        {
+            // Build export URL
+            var baseUrl = NavigationManager.BaseUri.TrimEnd('/');
+            var url = $"{baseUrl}/api/projects/{ProjectId}/files/export?format={_selectedFormat}";
+
+            // Add selected languages if any
+            if (_selectedLanguages.Any())
+            {
+                url += $"&languages={string.Join(",", _selectedLanguages)}";
+            }
+
+            // Trigger download using JS interop (opens in new tab/triggers download)
+            await JS.InvokeVoidAsync("open", url, "_blank");
+
+            // Close dialog after brief delay
+            await Task.Delay(500);
+            DialogService.Close(true);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Export failed: {ex.Message}";
+        }
+        finally
+        {
+            _isExporting = false;
+        }
+    }
+
+    public class LanguageOption
+    {
+        public string Value { get; set; } = "";
+        public string Text { get; set; } = "";
+    }
+}

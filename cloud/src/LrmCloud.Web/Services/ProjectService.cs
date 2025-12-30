@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using LrmCloud.Shared.Api;
 using LrmCloud.Shared.DTOs;
+using LrmCloud.Shared.DTOs.Files;
 using LrmCloud.Shared.DTOs.Projects;
 using LrmCloud.Shared.DTOs.Sync;
 
@@ -179,17 +180,17 @@ public class ProjectService
     {
         try
         {
-            var request = new PushRequest
+            var request = new FileImportRequest
             {
-                ModifiedFiles = files,
+                Files = files,
                 Message = "Initial import from web UI"
             };
 
-            var response = await _httpClient.PostAsJsonAsync($"projects/{projectId}/import", request);
+            var response = await _httpClient.PostAsJsonAsync($"projects/{projectId}/files/import", request);
 
             if (response.IsSuccessStatusCode)
             {
-                var result = await response.Content.ReadFromJsonAsync<ApiResponse<PushResponse>>();
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<FileImportResponse>>();
                 if (result?.Data != null)
                 {
                     // Fetch the updated project to get accurate key count
@@ -199,7 +200,7 @@ public class ProjectService
                     {
                         KeyCount = project?.KeyCount ?? 0,
                         LanguageCount = files.Count, // Number of files imported
-                        ModifiedCount = result.Data.ModifiedCount
+                        ModifiedCount = result.Data.Applied
                     });
                 }
             }

@@ -145,6 +145,7 @@ public class Program
             builder.Services.AddScoped<IGitHubFormatResolver, GitHubFormatResolver>();
             builder.Services.AddScoped<IFileExportService, FileExportService>();
             builder.Services.AddScoped<IFileImportService, FileImportService>();
+            builder.Services.AddScoped<IFileOperationsService, FileOperationsService>(); // File-level import/export for web UI
             builder.Services.AddScoped<IGitHubSyncService, GitHubSyncService>();
             builder.Services.AddScoped<IGitHubPullService, GitHubPullService>(); // Pull from GitHub with three-way merge
             builder.Services.AddScoped<IOrganizationService, OrganizationService>();

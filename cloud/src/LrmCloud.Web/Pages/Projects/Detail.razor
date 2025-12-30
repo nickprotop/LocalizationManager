@@ -48,8 +48,12 @@ else
             }
         </RadzenStack>
 
-        <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Secondary" Icon="settings"
-                      Text="Settings" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/settings"))" />
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem">
+            <RadzenButton Variant="Radzen.Variant.Outlined" Icon="download"
+                          Text="Export" Click="@OpenExportDialog" />
+            <RadzenButton Variant="Radzen.Variant.Outlined" ButtonStyle="ButtonStyle.Secondary" Icon="settings"
+                          Text="Settings" Click="@(() => Navigation.NavigateTo($"projects/{ProjectId}/settings"))" />
+        </RadzenStack>
     </RadzenStack>
 
     @if (!string.IsNullOrEmpty(_project.Description))
@@ -192,8 +196,6 @@ else
     private bool _isLoading = true;
     private string _activeTab = "overview";
 
-    // Export dialog state
-    private string _exportFormat = "json";
 
     // Actions context menu
     private readonly List<ContextMenuItem> _actionMenuItems = new()
@@ -319,45 +321,29 @@ else
 
     private async Task ExportProject()
     {
-        _exportFormat = "json";
-
-        var result = await DialogService.OpenAsync("Export Project", ds =>
-            @<RadzenStack Gap="1rem">
-                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
-                    Export your localization resources in various formats.
-                </RadzenText>
-
-                <RadzenRadioButtonList @bind-Value="_exportFormat" TValue="string" Orientation="Radzen.Orientation.Vertical">
-                    <Items>
-                        <RadzenRadioButtonListItem Text="JSON (all languages in one file)" Value="@("json")" />
-                        <RadzenRadioButtonListItem Text="CSV (spreadsheet compatible)" Value="@("csv")" />
-                        <RadzenRadioButtonListItem Text="@($"Native format ({_project?.GitHubFormat ?? "auto-detect"} files)")" Value="@("native")" />
-                    </Items>
-                </RadzenRadioButtonList>
-
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
-                    <RadzenButton Variant="Radzen.Variant.Text" Text="Cancel" Click="@(() => ds.Close(false))" />
-                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Icon="download" Text="Download"
-                                  Click="@(() => ds.Close(true))"
-                                  Disabled="@(string.IsNullOrEmpty(_exportFormat))" />
-                </RadzenStack>
-            </RadzenStack>,
-            new Radzen.DialogOptions { Width = "400px" });
-
-        if (result == true)
-        {
-            await ExecuteExport();
-        }
+        await OpenExportDialog();
     }
 
-    private async Task ExecuteExport()
+    private async Task OpenExportDialog()
     {
-        if (_project == null)
+        if (_project == null || _stats == null)
             return;
 
-        // For now, show a message about using CLI
-        // In the future, this could download files directly
-        NotificationService.Notify(NotificationSeverity.Info, "Export",
-            $"Export to {_exportFormat.ToUpper()} format - Use CLI: lrm cloud sync --project {ProjectId} --export {_exportFormat}");
+        // Build language options from stats (Dictionary<string, LanguageStats>)
+        var languages = _stats.Languages
+            .Select(kvp => new ExportProjectDialog.LanguageOption
+            {
+                Value = kvp.Key,
+                Text = $"{kvp.Key} ({kvp.Value.TranslatedCount}/{_stats.TotalKeys})"
+            })
+            .ToList();
+
+        await DialogService.OpenAsync<ExportProjectDialog>("Export Project",
+            new Dictionary<string, object>
+            {
+                { "ProjectId", ProjectId },
+                { "Languages", languages }
+            },
+            new Radzen.DialogOptions { Width = "450px" });
     }
 }
