@@ -19,6 +19,7 @@ public class GitHubAuthService : IGitHubAuthService
     private const string GitHubAuthorizeUrl = "https://github.com/login/oauth/authorize";
     private const string GitHubTokenUrl = "https://github.com/login/oauth/access_token";
     private const string GitHubUserApiUrl = "https://api.github.com/user";
+    private const string GitHubEmailsApiUrl = "https://api.github.com/user/emails";
 
     public GitHubAuthService(
         AppDbContext db,
@@ -99,6 +100,8 @@ public class GitHubAuthService : IGitHubAuthService
 
             User user;
             bool isNewUser;
+            string? authEvent = null;
+            string? relatedEmail = null;
 
             if (linkUserId.HasValue)
             {
@@ -115,7 +118,11 @@ public class GitHubAuthService : IGitHubAuthService
             else
             {
                 // Normal login/register flow
-                (user, isNewUser) = await CreateOrLinkUserAsync(githubProfile, accessToken);
+                var createResult = await CreateOrLinkUserAsync(githubProfile, accessToken);
+                user = createResult.User;
+                isNewUser = createResult.IsNewUser;
+                authEvent = createResult.AuthEvent;
+                relatedEmail = createResult.RelatedEmail;
             }
 
             // Generate JWT and refresh tokens
@@ -148,7 +155,9 @@ public class GitHubAuthService : IGitHubAuthService
                 Token = token,
                 ExpiresAt = expiresAt,
                 RefreshToken = refreshToken,
-                RefreshTokenExpiresAt = refreshTokenExpiresAt
+                RefreshTokenExpiresAt = refreshTokenExpiresAt,
+                AuthEvent = authEvent,
+                RelatedEmail = relatedEmail
             };
 
             _logger.LogInformation("GitHub OAuth successful for user {UserId} (GitHub ID: {GitHubId}). New user: {IsNew}",
@@ -309,10 +318,81 @@ public class GitHubAuthService : IGitHubAuthService
         }
 
         var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<GitHubUserProfile>(json);
+        var profile = JsonSerializer.Deserialize<GitHubUserProfile>(json);
+        if (profile == null)
+            return null;
+
+        // If /user returned email, it's public and verified by GitHub
+        if (!string.IsNullOrEmpty(profile.Email))
+        {
+            profile.EmailVerified = true;
+        }
+        else
+        {
+            // Email is private - fetch from /user/emails endpoint
+            var emailResult = await FetchGitHubPrimaryEmailAsync(client);
+            if (emailResult.HasValue)
+            {
+                profile.Email = emailResult.Value.Email;
+                profile.EmailVerified = emailResult.Value.Verified;
+                _logger.LogDebug("Fetched private email for GitHub {Id}: verified={Verified}",
+                    profile.Id, profile.EmailVerified);
+            }
+            // If fetch failed, Email stays null → placeholder will be used later
+        }
+
+        return profile;
     }
 
-    private async Task<(User User, bool IsNewUser)> CreateOrLinkUserAsync(
+    /// <summary>
+    /// Fetches the user's primary email from GitHub's /user/emails endpoint.
+    /// This is called when /user returns no email (user has email set to private).
+    /// </summary>
+    /// <returns>Tuple of (email, verified) or null if failed</returns>
+    private async Task<(string Email, bool Verified)?> FetchGitHubPrimaryEmailAsync(HttpClient client)
+    {
+        try
+        {
+            var response = await client.GetAsync(GitHubEmailsApiUrl);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("GitHub emails API failed with status {StatusCode}", response.StatusCode);
+                return null;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            var emails = JsonSerializer.Deserialize<List<GitHubEmail>>(json);
+            if (emails == null || emails.Count == 0)
+            {
+                _logger.LogWarning("GitHub emails API returned empty list");
+                return null;
+            }
+
+            // Priority: primary+verified > any verified > primary > first
+            var selected = emails.FirstOrDefault(e => e.Primary && e.Verified)
+                        ?? emails.FirstOrDefault(e => e.Verified)
+                        ?? emails.FirstOrDefault(e => e.Primary)
+                        ?? emails[0];
+
+            return (selected.Email, selected.Verified);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching GitHub emails");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Creates a new user or links GitHub to an existing user.
+    /// Returns auth event info for UI notifications.
+    /// </summary>
+    /// <returns>
+    /// (User, IsNewUser, AuthEvent, RelatedEmail) where:
+    /// - AuthEvent: "autolinked" if linked to existing, "new_account_email_exists" if email conflict, null otherwise
+    /// - RelatedEmail: The email address involved in the event (for UI display)
+    /// </returns>
+    private async Task<(User User, bool IsNewUser, string? AuthEvent, string? RelatedEmail)> CreateOrLinkUserAsync(
         GitHubUserProfile githubProfile,
         string accessToken)
     {
@@ -327,10 +407,10 @@ public class GitHubAuthService : IGitHubAuthService
             existingUser.UpdatedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
-            return (existingUser, false);
+            return (existingUser, false, null, null);
         }
 
-        // Check if user exists with same email (account linking)
+        // Check if user exists with same email (potential account linking)
         if (!string.IsNullOrEmpty(githubProfile.Email))
         {
             var githubEmail = githubProfile.Email.ToLower();
@@ -339,24 +419,49 @@ public class GitHubAuthService : IGitHubAuthService
 
             if (userByEmail != null)
             {
-                // Link GitHub to existing email account
-                userByEmail.GitHubId = githubProfile.Id;
-                userByEmail.GitHubAccessTokenEncrypted = EncryptToken(accessToken);
-                userByEmail.GitHubTokenExpiresAt = null;
-                userByEmail.AvatarUrl = githubProfile.AvatarUrl ?? userByEmail.AvatarUrl;
-                userByEmail.EmailVerified = true; // GitHub email is verified
-                userByEmail.UpdatedAt = DateTime.UtcNow;
+                // Security: Only auto-link if BOTH emails are verified
+                // This prevents account hijacking via unverified email claims
+                if (githubProfile.EmailVerified && userByEmail.EmailVerified)
+                {
+                    // Safe to link - both parties verified ownership of email
+                    userByEmail.GitHubId = githubProfile.Id;
+                    userByEmail.GitHubAccessTokenEncrypted = EncryptToken(accessToken);
+                    userByEmail.GitHubTokenExpiresAt = null;
+                    userByEmail.AvatarUrl = githubProfile.AvatarUrl ?? userByEmail.AvatarUrl;
+                    userByEmail.UpdatedAt = DateTime.UtcNow;
 
-                await _db.SaveChangesAsync();
+                    await _db.SaveChangesAsync();
 
-                _logger.LogInformation("Linked GitHub ID {GitHubId} to existing user {UserId}",
-                    githubProfile.Id, userByEmail.Id);
+                    _logger.LogInformation("Auto-linked GitHub {GitHubId} to user {UserId} (both emails verified)",
+                        githubProfile.Id, userByEmail.Id);
 
-                return (userByEmail, false);
+                    return (userByEmail, false, "autolinked", userByEmail.Email);
+                }
+                else
+                {
+                    // Not safe to auto-link - create separate account
+                    _logger.LogInformation(
+                        "Skipping auto-link for email {Email}: GitHub verified={GitHubVerified}, existing user verified={UserVerified}",
+                        githubEmail, githubProfile.EmailVerified, userByEmail.EmailVerified);
+
+                    // Fall through to create new user, but track the conflict for UI notification
+                    var conflictEmail = userByEmail.Email;
+                    var newUserWithConflict = await CreateNewGitHubUserAsync(githubProfile, accessToken);
+                    return (newUserWithConflict, true, "new_account_email_exists", conflictEmail);
+                }
             }
         }
 
-        // Create new user
+        // Create new user (no email conflict)
+        var newUser = await CreateNewGitHubUserAsync(githubProfile, accessToken);
+        return (newUser, true, null, null);
+    }
+
+    /// <summary>
+    /// Creates a new user from GitHub profile.
+    /// </summary>
+    private async Task<User> CreateNewGitHubUserAsync(GitHubUserProfile githubProfile, string accessToken)
+    {
         var email = githubProfile.Email ?? $"github_{githubProfile.Id}@lrm-cloud.com";
         var username = await GenerateUniqueUsernameAsync(githubProfile.Login);
 
@@ -367,7 +472,8 @@ public class GitHubAuthService : IGitHubAuthService
             Username = username,
             DisplayName = githubProfile.Name,
             AvatarUrl = githubProfile.AvatarUrl,
-            EmailVerified = !string.IsNullOrEmpty(githubProfile.Email), // Verified if GitHub provided email
+            // Only mark verified if GitHub confirmed the email
+            EmailVerified = githubProfile.EmailVerified,
             GitHubId = githubProfile.Id,
             GitHubAccessTokenEncrypted = EncryptToken(accessToken),
             GitHubTokenExpiresAt = null,
@@ -384,7 +490,7 @@ public class GitHubAuthService : IGitHubAuthService
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("Created new user {UserId} from GitHub ID {GitHubId}", newUser.Id, githubProfile.Id);
-        return (newUser, true);
+        return newUser;
     }
 
     private async Task<string> GenerateUniqueUsernameAsync(string preferredUsername)

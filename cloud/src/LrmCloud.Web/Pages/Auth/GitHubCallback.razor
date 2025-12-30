@@ -81,6 +81,25 @@
 
             if (result.IsSuccess)
             {
+                // Store auth event in localStorage if present (for UI notification banners)
+                if (parameters.TryGetValue("authEvent", out var authEvent) &&
+                    !string.IsNullOrEmpty(authEvent))
+                {
+                    var relatedEmail = parameters.TryGetValue("relatedEmail", out var email)
+                        ? Uri.UnescapeDataString(email)
+                        : null;
+
+                    var eventData = new
+                    {
+                        Event = Uri.UnescapeDataString(authEvent),
+                        RelatedEmail = relatedEmail,
+                        Timestamp = DateTime.UtcNow.ToString("O")
+                    };
+
+                    await JS.InvokeVoidAsync("localStorage.setItem", "github_auth_event",
+                        System.Text.Json.JsonSerializer.Serialize(eventData));
+                }
+
                 // Clear the fragment from URL before redirecting (security)
                 await JS.InvokeVoidAsync("clearUrlFragment");
                 // Navigate to home - forceLoad: false lets Blazor handle auth state

@@ -1,0 +1,84 @@
+@* GitHub auth event banner - shows notifications after GitHub OAuth login *@
+@inject IJSRuntime JS
+
+@if (_showBanner)
+{
+    @if (_authEvent == "autolinked")
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Success" Shade="Shade.Lighter" AllowClose="true" Close="@DismissBanner">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="link" />
+                <span>Your GitHub account was automatically linked to your existing account <strong>(@_relatedEmail)</strong>.</span>
+            </RadzenStack>
+        </RadzenAlert>
+    }
+    else if (_authEvent == "new_account_email_exists")
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="true" Close="@DismissBanner">
+            <RadzenStack Orientation="Radzen.Orientation.Vertical" Gap="0.25rem">
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="warning" />
+                    <span>An account with email <strong>@_relatedEmail</strong> already exists but couldn't be linked automatically.</span>
+                </RadzenStack>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" Style="margin-left: 1.75rem;">
+                    To merge accounts, verify your email on both accounts, then link GitHub from Settings.
+                </RadzenText>
+            </RadzenStack>
+        </RadzenAlert>
+    }
+}
+
+@code {
+    private bool _showBanner;
+    private string? _authEvent;
+    private string? _relatedEmail;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CheckForAuthEvent();
+        }
+    }
+
+    private async Task CheckForAuthEvent()
+    {
+        try
+        {
+            var eventJson = await JS.InvokeAsync<string?>("localStorage.getItem", "github_auth_event");
+            if (!string.IsNullOrEmpty(eventJson))
+            {
+                var eventData = System.Text.Json.JsonDocument.Parse(eventJson);
+                _authEvent = eventData.RootElement.GetProperty("Event").GetString();
+
+                if (eventData.RootElement.TryGetProperty("RelatedEmail", out var emailProp))
+                {
+                    _relatedEmail = emailProp.GetString();
+                }
+
+                // Check if event is recent (within last 5 minutes)
+                if (eventData.RootElement.TryGetProperty("Timestamp", out var timestampProp))
+                {
+                    var timestamp = DateTime.Parse(timestampProp.GetString() ?? "", null, System.Globalization.DateTimeStyles.RoundtripKind);
+                    if (DateTime.UtcNow - timestamp < TimeSpan.FromMinutes(5))
+                    {
+                        _showBanner = true;
+                        await InvokeAsync(StateHasChanged);
+                    }
+                }
+
+                // Clear the event from storage (it's been read)
+                await JS.InvokeVoidAsync("localStorage.removeItem", "github_auth_event");
+            }
+        }
+        catch
+        {
+            // Ignore errors reading localStorage
+        }
+    }
+
+    private void DismissBanner()
+    {
+        _showBanner = false;
+    }
+}

@@ -426,6 +426,16 @@ public class AuthController : ApiControllerBase
                 $"&refreshToken={Uri.EscapeDataString(response.RefreshToken)}" +
                 $"&refreshTokenExpiresAt={Uri.EscapeDataString(response.RefreshTokenExpiresAt.ToString("O"))}";
 
+            // Add auth event info if present (for UI notifications)
+            if (!string.IsNullOrEmpty(response.AuthEvent))
+            {
+                redirectUrl += $"&authEvent={Uri.EscapeDataString(response.AuthEvent)}";
+                if (!string.IsNullOrEmpty(response.RelatedEmail))
+                {
+                    redirectUrl += $"&relatedEmail={Uri.EscapeDataString(response.RelatedEmail)}";
+                }
+            }
+
             return Redirect(redirectUrl);
         }
         catch (Exception ex)
