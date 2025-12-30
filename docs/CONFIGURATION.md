@@ -323,6 +323,117 @@ fr.lproj/
 
 ---
 
+### Po
+
+**Type:** `object`
+**Purpose:** Configure PO (GNU gettext) resource file format (only applies when `ResourceFormat` is `"po"`)
+
+```json
+{
+  "Po": {
+    "Domain": "messages",
+    "FolderStructure": "gnu",
+    "GeneratePot": true,
+    "PreserveFuzzy": true,
+    "KeyStrategy": "auto"
+  }
+}
+```
+
+#### Po Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `Domain` | string | `"messages"` | Message domain name (produces `{domain}.po` and `{domain}.pot`) |
+| `FolderStructure` | string | `"gnu"` | Folder structure: `"gnu"` (standard gettext) or `"flat"` |
+| `GeneratePot` | bool | `true` | Generate/update POT template files when writing |
+| `PreserveFuzzy` | bool | `true` | Preserve fuzzy flags on entries during operations |
+| `KeyStrategy` | string | `"auto"` | Key generation strategy: `"auto"`, `"msgid"`, `"context"`, `"hash"` |
+
+**GNU Folder Structure:**
+```
+locale/
+├── en/
+│   └── LC_MESSAGES/
+│       ├── messages.po
+│       └── messages.pot
+├── fr/
+│   └── LC_MESSAGES/
+│       └── messages.po
+└── de/
+    └── LC_MESSAGES/
+        └── messages.po
+```
+
+**Flat Folder Structure:**
+```
+po/
+├── messages.pot        # Template
+├── en.po               # English
+├── fr.po               # French
+└── de.po               # German
+```
+
+**Key Strategy Options:**
+- `"auto"` - Use `msgctxt|msgid` if context exists, otherwise `msgid`
+- `"msgid"` - Always use msgid as key
+- `"context"` - Always use msgctxt (fallback to msgid if none)
+- `"hash"` - SHA256 hash for very long keys
+
+**Features:**
+- Plural forms with language-specific rules (40+ languages supported)
+- Context support (msgctxt) for disambiguating identical source strings
+- Fuzzy entry handling with previous msgid preservation
+- Printf-style format specifier validation (%d, %s, %f, etc.)
+- Encoding support: UTF-8, UTF-16, ISO-8859-1, Windows-1252
+
+---
+
+### Xliff
+
+**Type:** `object`
+**Purpose:** Configure XLIFF resource file format (only applies when `ResourceFormat` is `"xliff"`)
+
+```json
+{
+  "Xliff": {
+    "Version": "2.0",
+    "Bilingual": false,
+    "FileExtension": ".xliff"
+  }
+}
+```
+
+#### Xliff Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `Version` | string | `"2.0"` | XLIFF version to use when writing: `"1.2"` or `"2.0"` |
+| `Bilingual` | bool | `false` | Create bilingual files (include source text in target files) |
+| `FileExtension` | string | `".xliff"` | File extension to use: `".xliff"` or `".xlf"` |
+
+**Folder Structure:**
+```
+translations/
+├── en.xliff            # Source/default language
+├── fr.xliff            # French translations
+├── de.xliff            # German translations
+└── es.xliff            # Spanish translations
+```
+
+**Version Differences:**
+- **XLIFF 1.2**: Uses `trans-unit` elements, `source-language`/`target-language` attributes
+- **XLIFF 2.0**: Uses `unit`/`segment` elements, `srcLang`/`trgLang` attributes
+
+**Features:**
+- XLIFF 1.2 and 2.0 standard support (auto-detected when reading)
+- Bilingual file structure preserves source text alongside translations
+- Plural handling via groups with `restype="x-gettext-plurals"`
+- Note/comment preservation
+- XXE attack prevention (safe XML parsing)
+
+---
+
 ### Translation
 
 **Type:** `object`
