@@ -37,11 +37,15 @@ public class AuthenticatedHttpHandler : DelegatingHandler
             var coordinator = _serviceProvider.GetService<TokenRefreshCoordinator>();
             if (coordinator?.IsRefreshInProgress == true)
             {
-                await coordinator.WaitForRefreshAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                await coordinator.WaitForRefreshAsync(TokenRefreshCoordinator.MaxRefreshWaitTime, cancellationToken);
             }
 
             // Proactive refresh: if token is expired or about to expire, refresh before sending
-            if (await _tokenStorage.IsTokenExpiredAsync() && await _tokenStorage.CanRefreshAsync())
+            // Check coordinator state first to avoid unnecessary attempts
+            var authService = _serviceProvider.GetService<AuthService>();
+            if (await _tokenStorage.IsTokenExpiredAsync() &&
+                await _tokenStorage.CanRefreshAsync() &&
+                authService?.ShouldAttemptRefresh() == true)
             {
                 await TryRefreshTokenAsync();
             }
@@ -51,10 +55,11 @@ public class AuthenticatedHttpHandler : DelegatingHandler
 
         var response = await base.SendAsync(request, cancellationToken);
 
-        // Handle 401 Unauthorized - try to refresh token
+        // Handle 401 Unauthorized - try to refresh token (if not permanently failed)
         if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized && !isAuthEndpoint)
         {
-            if (await TryRefreshTokenAsync())
+            var authSvc = _serviceProvider.GetService<AuthService>();
+            if (authSvc?.ShouldAttemptRefresh() == true && await TryRefreshTokenAsync())
             {
                 // Retry the request with new token
                 request = await CloneRequestAsync(request);

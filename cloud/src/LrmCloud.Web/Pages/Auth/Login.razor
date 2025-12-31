@@ -2,6 +2,7 @@
 @layout AuthLayout
 @inject AuthService AuthService
 @inject NavigationManager Navigation
+@inject TokenRefreshCoordinator RefreshCoordinator
 
 <PageTitle>Login - LRM Cloud</PageTitle>
 
@@ -11,6 +12,13 @@
         <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">LRM Cloud</RadzenText>
         <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Sign in to your account</RadzenText>
     </div>
+
+    @if (!string.IsNullOrEmpty(_sessionExpiredMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="true" Close="@(() => _sessionExpiredMessage = null)">
+            <RadzenIcon Icon="schedule" class="rz-me-2" />@_sessionExpiredMessage
+        </RadzenAlert>
+    }
 
     @if (!string.IsNullOrEmpty(_errorMessage))
     {
@@ -79,6 +87,7 @@
     private readonly LoginRequest _model = new();
     private bool _isLoading;
     private string? _errorMessage;
+    private string? _sessionExpiredMessage;
 
     [Parameter]
     [SupplyParameterFromQuery(Name = "returnUrl")]
@@ -86,6 +95,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Check if we were redirected here due to session expiry
+        if (RefreshCoordinator.IsRefreshPermanentlyFailed && !string.IsNullOrEmpty(RefreshCoordinator.FailureReason))
+        {
+            _sessionExpiredMessage = RefreshCoordinator.FailureReason;
+            // Reset so the message only shows once
+            RefreshCoordinator.ResetFailureState();
+        }
+
         // Use IsTokenValidAsync instead of IsAuthenticatedAsync to check both:
         // 1. Token exists
         // 2. Token is not expired

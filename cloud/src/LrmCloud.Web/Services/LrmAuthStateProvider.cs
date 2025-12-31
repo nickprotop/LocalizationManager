@@ -16,6 +16,12 @@ public class LrmAuthStateProvider : AuthenticationStateProvider
     private UserDto? _cachedUser;
     private bool _isInitialized;
 
+    // Cache auth state to prevent multiple simultaneous evaluations
+    private AuthenticationState? _cachedAuthState;
+    private DateTime _cacheExpiry = DateTime.MinValue;
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMilliseconds(500);
+    private readonly SemaphoreSlim _cacheLock = new(1, 1);
+
     public LrmAuthStateProvider(TokenStorageService tokenStorage, HttpClient httpClient, IServiceProvider serviceProvider)
     {
         _tokenStorage = tokenStorage;
@@ -25,6 +31,35 @@ public class LrmAuthStateProvider : AuthenticationStateProvider
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
+        // Return cached state if still valid (prevents multiple simultaneous evaluations)
+        if (_cachedAuthState != null && DateTime.UtcNow < _cacheExpiry)
+        {
+            return _cachedAuthState;
+        }
+
+        // Use lock to prevent concurrent cache population
+        await _cacheLock.WaitAsync();
+        try
+        {
+            // Double-check after acquiring lock
+            if (_cachedAuthState != null && DateTime.UtcNow < _cacheExpiry)
+            {
+                return _cachedAuthState;
+            }
+
+            var authState = await GetAuthenticationStateCoreAsync();
+            _cachedAuthState = authState;
+            _cacheExpiry = DateTime.UtcNow.Add(CacheDuration);
+            return authState;
+        }
+        finally
+        {
+            _cacheLock.Release();
+        }
+    }
+
+    private async Task<AuthenticationState> GetAuthenticationStateCoreAsync()
+    {
         var token = await _tokenStorage.GetAccessTokenAsync();
 
         if (string.IsNullOrEmpty(token))
@@ -33,39 +68,13 @@ public class LrmAuthStateProvider : AuthenticationStateProvider
         }
 
         // Check if token is expired
+        // NOTE: We do NOT trigger refresh here - that's handled by AuthenticatedHttpHandler
+        // This prevents multiple refresh attempts from different components
         if (await _tokenStorage.IsTokenExpiredAsync())
         {
-            // Token expired, try to refresh if possible
-            if (await _tokenStorage.CanRefreshAsync())
-            {
-                try
-                {
-                    // Attempt to refresh the token using AuthService
-                    // AuthService uses TokenRefreshCoordinator internally to prevent concurrent refreshes
-                    var authService = _serviceProvider.GetService<AuthService>();
-                    if (authService != null && await authService.RefreshTokenAsync())
-                    {
-                        // Refresh succeeded - the AuthService already notified us
-                        // and updated the cached user, so we can proceed
-                        token = await _tokenStorage.GetAccessTokenAsync();
-                    }
-                    else
-                    {
-                        // Refresh failed - return unauthenticated
-                        return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
-                    }
-                }
-                catch
-                {
-                    // Error during refresh - return unauthenticated
-                    return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
-                }
-            }
-            else
-            {
-                // Can't refresh - return unauthenticated
-                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
-            }
+            // Token expired - return unauthenticated
+            // The next API call via AuthenticatedHttpHandler will trigger refresh
+            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
         }
 
         // Try to get user info from cache or fetch from API
@@ -87,6 +96,8 @@ public class LrmAuthStateProvider : AuthenticationStateProvider
     public void NotifyUserAuthentication(UserDto user)
     {
         _cachedUser = user;
+        _cachedAuthState = null; // Invalidate cache
+        _cacheExpiry = DateTime.MinValue;
         var authenticatedUser = CreateClaimsPrincipal(user);
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(authenticatedUser)));
     }
@@ -95,6 +106,8 @@ public class LrmAuthStateProvider : AuthenticationStateProvider
     {
         _cachedUser = null;
         _isInitialized = false;
+        _cachedAuthState = null; // Invalidate cache
+        _cacheExpiry = DateTime.MinValue;
         var anonymousUser = new ClaimsPrincipal(new ClaimsIdentity());
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(anonymousUser)));
     }

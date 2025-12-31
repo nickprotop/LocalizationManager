@@ -35,6 +35,9 @@ public class AuthService
                 var result = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>();
                 if (result?.Data != null)
                 {
+                    // Reset any previous auth failure state
+                    _refreshCoordinator.ResetFailureState();
+
                     await _tokenStorage.StoreTokensAsync(
                         result.Data.Token,
                         result.Data.RefreshToken,
@@ -145,7 +148,7 @@ public class AuthService
         {
             // Another refresh is in progress or was recently attempted
             // Wait for it to complete and check if tokens are now valid
-            await _refreshCoordinator.WaitForRefreshAsync(TimeSpan.FromSeconds(5));
+            await _refreshCoordinator.WaitForRefreshAsync(TokenRefreshCoordinator.MaxRefreshWaitTime);
 
             // Check if we now have valid tokens (from the other refresh)
             var token = await _tokenStorage.GetAccessTokenAsync();
@@ -182,6 +185,10 @@ public class AuthService
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
                 response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
+                // Mark as permanently failed to prevent retry loops
+                _refreshCoordinator.MarkRefreshPermanentlyFailed(
+                    "Your session has expired. Please log in again.");
+
                 await _tokenStorage.ClearTokensAsync();
                 _authStateProvider.NotifyUserLogout();
             }
@@ -247,15 +254,37 @@ public class AuthService
     }
 
     /// <summary>
+    /// Checks if a refresh attempt should be made.
+    /// Returns false if refresh has permanently failed or is already in progress.
+    /// </summary>
+    public bool ShouldAttemptRefresh()
+    {
+        // Don't attempt if permanently failed (e.g., token was revoked)
+        if (_refreshCoordinator.IsRefreshPermanentlyFailed)
+            return false;
+
+        // Don't attempt if already in progress
+        if (_refreshCoordinator.IsRefreshInProgress)
+            return false;
+
+        return true;
+    }
+
+    /// <summary>
     /// Checks if the user has a valid (non-expired) token.
     /// Unlike IsAuthenticatedAsync, this also verifies the token hasn't expired
-    /// and handles the case where tokens are being cleared.
+    /// and handles the case where tokens are being cleared or auth has permanently failed.
     /// </summary>
     public async Task<bool> IsTokenValidAsync()
     {
         // Don't report as authenticated if tokens are being cleared
         // This prevents race conditions during logout
         if (_tokenStorage.IsClearing)
+            return false;
+
+        // Don't report as authenticated if refresh has permanently failed
+        // This means the session is invalid and user needs to login again
+        if (_refreshCoordinator.IsRefreshPermanentlyFailed)
             return false;
 
         var token = await _tokenStorage.GetAccessTokenAsync();
