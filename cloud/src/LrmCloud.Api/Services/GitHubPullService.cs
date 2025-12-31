@@ -104,7 +104,14 @@ public class GitHubPullService : IGitHubPullService
                 return CreateErrorResult("No translation files found in the repository");
 
             // 2. Parse files into entries
-            var githubEntries = _importService.ParseFiles(format, githubFiles, project.DefaultLanguage);
+            var parseResult = _importService.ParseFiles(format, githubFiles, project.DefaultLanguage);
+            var githubEntries = parseResult.Entries;
+
+            // Log any parse errors but continue (GitHub pull is best-effort)
+            foreach (var error in parseResult.ParseErrors)
+            {
+                _logger.LogWarning("GitHub pull: Failed to parse file {FilePath}: {Error}", error.Path, error.Error);
+            }
 
             // 3. Load DB entries
             var dbEntries = await LoadDbEntriesAsync(projectId);

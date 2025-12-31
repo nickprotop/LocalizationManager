@@ -49,6 +49,41 @@ public class FilesController : ApiControllerBase
     {
         var userId = GetUserId();
 
+        // Input validation
+        const int MaxFileCount = 100;
+        const int MaxFileSizeBytes = 5 * 1024 * 1024; // 5MB per file
+        const int MaxTotalSizeBytes = 50 * 1024 * 1024; // 50MB total
+
+        if (request.Files.Count > MaxFileCount)
+        {
+            return BadRequest("FILES_TOO_MANY", $"Maximum {MaxFileCount} files per import");
+        }
+
+        var totalSize = request.Files.Sum(f => f.Content?.Length ?? 0);
+        if (totalSize > MaxTotalSizeBytes)
+        {
+            return BadRequest("FILES_TOO_LARGE", "Total file size exceeds 50MB limit");
+        }
+
+        foreach (var file in request.Files)
+        {
+            if ((file.Content?.Length ?? 0) > MaxFileSizeBytes)
+            {
+                return BadRequest("FILE_TOO_LARGE", $"File '{file.Path}' exceeds 5MB limit");
+            }
+
+            // Path traversal validation
+            if (string.IsNullOrWhiteSpace(file.Path))
+            {
+                return BadRequest("FILES_INVALID_PATH", "File path cannot be empty");
+            }
+
+            if (file.Path.Contains("..") || Path.IsPathRooted(file.Path))
+            {
+                return BadRequest("FILES_INVALID_PATH", $"Invalid file path: {file.Path}");
+            }
+        }
+
         try
         {
             var result = await _fileOperationsService.ImportFilesAsync(projectId, userId, request, ct);
@@ -65,6 +100,80 @@ public class FilesController : ApiControllerBase
                     "User {UserId} import to project {ProjectId} had errors: {Errors}",
                     userId, projectId, string.Join(", ", result.Errors));
             }
+
+            return Success(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Forbidden("FILES_FORBIDDEN", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Preview what an import would change before applying.
+    /// Shows which keys would be added, modified, or remain unchanged.
+    /// </summary>
+    /// <param name="projectId">Project ID</param>
+    /// <param name="request">Import preview request with files and optional format</param>
+    /// <returns>Preview showing what would change</returns>
+    /// <response code="200">Preview generated successfully</response>
+    /// <response code="400">Invalid request</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="403">User doesn't have permission to import to this project</response>
+    [HttpPost("import/preview")]
+    [ProducesResponseType(typeof(ApiResponse<FileImportPreviewResponse>), 200)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(ProblemDetails), 401)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    public async Task<ActionResult<ApiResponse<FileImportPreviewResponse>>> ImportPreview(
+        int projectId,
+        [FromBody] FileImportPreviewRequest request,
+        CancellationToken ct)
+    {
+        var userId = GetUserId();
+
+        // Same validation as import
+        const int MaxFileCount = 100;
+        const int MaxFileSizeBytes = 5 * 1024 * 1024; // 5MB per file
+        const int MaxTotalSizeBytes = 50 * 1024 * 1024; // 50MB total
+
+        if (request.Files.Count > MaxFileCount)
+        {
+            return BadRequest("FILES_TOO_MANY", $"Maximum {MaxFileCount} files per import");
+        }
+
+        var totalSize = request.Files.Sum(f => f.Content?.Length ?? 0);
+        if (totalSize > MaxTotalSizeBytes)
+        {
+            return BadRequest("FILES_TOO_LARGE", "Total file size exceeds 50MB limit");
+        }
+
+        foreach (var file in request.Files)
+        {
+            if ((file.Content?.Length ?? 0) > MaxFileSizeBytes)
+            {
+                return BadRequest("FILE_TOO_LARGE", $"File '{file.Path}' exceeds 5MB limit");
+            }
+
+            // Path traversal validation
+            if (string.IsNullOrWhiteSpace(file.Path))
+            {
+                return BadRequest("FILES_INVALID_PATH", "File path cannot be empty");
+            }
+
+            if (file.Path.Contains("..") || Path.IsPathRooted(file.Path))
+            {
+                return BadRequest("FILES_INVALID_PATH", $"Invalid file path: {file.Path}");
+            }
+        }
+
+        try
+        {
+            var result = await _fileOperationsService.PreviewImportAsync(projectId, userId, request, ct);
+
+            _logger.LogInformation(
+                "User {UserId} previewed import for project {ProjectId}: {ToAdd} to add, {ToModify} to modify",
+                userId, projectId, result.Summary.ToAdd, result.Summary.ToModify);
 
             return Success(result);
         }

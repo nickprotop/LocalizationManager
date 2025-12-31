@@ -107,17 +107,18 @@ public class FileImportService : IFileImportService
     }
 
     /// <inheritdoc />
-    public Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry> ParseFiles(
+    public ParseFilesResult ParseFiles(
         string format,
         Dictionary<string, string> files,
         string defaultLanguage)
     {
-        var result = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>();
+        var entries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>();
+        var parseErrors = new List<FileParseErrorInfo>();
 
         // For iOS, handle .stringsdict files specially to parse plurals
         if (format.Equals("ios", StringComparison.OrdinalIgnoreCase))
         {
-            ParseIosFilesWithPlurals(files, defaultLanguage, result);
+            ParseIosFilesWithPlurals(files, defaultLanguage, entries, parseErrors);
         }
         else
         {
@@ -130,21 +131,30 @@ public class FileImportService : IFileImportService
                     foreach (var entry in parsed.Entries)
                     {
                         var key = (entry.Key, entry.LanguageCode, entry.PluralForm);
-                        result[key] = entry;
+                        entries[key] = entry;
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Failed to parse file {FilePath}, skipping", filePath);
+                    parseErrors.Add(new FileParseErrorInfo
+                    {
+                        Path = filePath,
+                        Error = ex.Message
+                    });
                 }
             }
         }
 
         _logger.LogInformation(
-            "Parsed {TotalEntries} entries from {FileCount} files",
-            result.Count, files.Count);
+            "Parsed {TotalEntries} entries from {FileCount} files ({ErrorCount} failed)",
+            entries.Count, files.Count, parseErrors.Count);
 
-        return result;
+        return new ParseFilesResult
+        {
+            Entries = entries,
+            ParseErrors = parseErrors
+        };
     }
 
     /// <summary>
@@ -153,7 +163,8 @@ public class FileImportService : IFileImportService
     private void ParseIosFilesWithPlurals(
         Dictionary<string, string> files,
         string defaultLanguage,
-        Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry> result)
+        Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry> result,
+        List<FileParseErrorInfo> parseErrors)
     {
         var stringsdictParser = new StringsdictParser();
 
@@ -175,6 +186,11 @@ public class FileImportService : IFileImportService
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to parse iOS .strings file {FilePath}, skipping", filePath);
+                parseErrors.Add(new FileParseErrorInfo
+                {
+                    Path = filePath,
+                    Error = ex.Message
+                });
             }
         }
 
@@ -234,6 +250,11 @@ public class FileImportService : IFileImportService
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to parse iOS .stringsdict file {FilePath}, skipping", filePath);
+                parseErrors.Add(new FileParseErrorInfo
+                {
+                    Path = filePath,
+                    Error = ex.Message
+                });
             }
         }
     }

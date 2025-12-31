@@ -194,12 +194,13 @@ public class FileOperationsServiceTests : IDisposable
             It.IsAny<string>(),
             It.IsAny<Dictionary<string, string>>(),
             It.IsAny<string>()))
-            .Returns(parsedEntries);
+            .Returns(new ParseFilesResult { Entries = parsedEntries });
 
         _mockKeySyncService.Setup(x => x.PushAsync(
             project.Id,
             user.Id,
             It.IsAny<KeySyncPushRequest>(),
+            It.IsAny<string>(),
             It.IsAny<CancellationToken>()))
             .ReturnsAsync(new KeySyncPushResponse { Applied = 2 });
 
@@ -223,6 +224,160 @@ public class FileOperationsServiceTests : IDisposable
             project.Id,
             user.Id,
             It.Is<KeySyncPushRequest>(r => r.Entries.Count == 2),
+            "import",
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ImportFilesAsync_ReturnsHistoryId()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+
+        _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        {
+            { ("test", "en", ""), new GitHubEntry { Key = "test", LanguageCode = "en", Value = "Test", Hash = "abc" } }
+        };
+
+        _mockFileImportService.Setup(x => x.ParseFiles(
+            It.IsAny<string>(),
+            It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<string>()))
+            .Returns(new ParseFilesResult { Entries = parsedEntries });
+
+        _mockKeySyncService.Setup(x => x.PushAsync(
+            It.IsAny<int>(),
+            It.IsAny<int>(),
+            It.IsAny<KeySyncPushRequest>(),
+            It.IsAny<string>(),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new KeySyncPushResponse { Applied = 1, HistoryId = "hist_12345" });
+
+        var request = new FileImportRequest
+        {
+            Files = new List<FileDto>
+            {
+                new() { Path = "strings.json", Content = "{\"test\": \"Test\"}" }
+            },
+            Format = "json"
+        };
+
+        // Act
+        var result = await _service.ImportFilesAsync(project.Id, user.Id, request);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Equal("hist_12345", result.HistoryId);
+    }
+
+    [Fact]
+    public async Task ImportFilesAsync_ReportsParseErrors()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+
+        _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        {
+            { ("valid_key", "en", ""), new GitHubEntry { Key = "valid_key", LanguageCode = "en", Value = "Valid", Hash = "abc" } }
+        };
+
+        var parseErrors = new List<FileParseErrorInfo>
+        {
+            new() { Path = "invalid.json", Error = "Invalid JSON syntax" },
+            new() { Path = "corrupt.json", Error = "Unexpected token" }
+        };
+
+        _mockFileImportService.Setup(x => x.ParseFiles(
+            It.IsAny<string>(),
+            It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<string>()))
+            .Returns(new ParseFilesResult { Entries = parsedEntries, ParseErrors = parseErrors });
+
+        _mockKeySyncService.Setup(x => x.PushAsync(
+            It.IsAny<int>(),
+            It.IsAny<int>(),
+            It.IsAny<KeySyncPushRequest>(),
+            It.IsAny<string>(),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new KeySyncPushResponse { Applied = 1 });
+
+        var request = new FileImportRequest
+        {
+            Files = new List<FileDto>
+            {
+                new() { Path = "valid.json", Content = "{\"valid_key\": \"Valid\"}" },
+                new() { Path = "invalid.json", Content = "not json" },
+                new() { Path = "corrupt.json", Content = "{broken" }
+            },
+            Format = "json"
+        };
+
+        // Act
+        var result = await _service.ImportFilesAsync(project.Id, user.Id, request);
+
+        // Assert
+        Assert.True(result.Success); // Import continues despite parse errors
+        Assert.Equal(1, result.Applied);
+        Assert.Equal(2, result.ParseErrors.Count);
+        Assert.Contains(result.ParseErrors, e => e.Path == "invalid.json");
+        Assert.Contains(result.ParseErrors, e => e.Path == "corrupt.json");
+    }
+
+    [Fact]
+    public async Task ImportFilesAsync_UsesImportSource()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+
+        _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        {
+            { ("test", "en", ""), new GitHubEntry { Key = "test", LanguageCode = "en", Value = "Test", Hash = "abc" } }
+        };
+
+        _mockFileImportService.Setup(x => x.ParseFiles(
+            It.IsAny<string>(),
+            It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<string>()))
+            .Returns(new ParseFilesResult { Entries = parsedEntries });
+
+        _mockKeySyncService.Setup(x => x.PushAsync(
+            It.IsAny<int>(),
+            It.IsAny<int>(),
+            It.IsAny<KeySyncPushRequest>(),
+            "import", // Expect "import" source
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new KeySyncPushResponse { Applied = 1 });
+
+        var request = new FileImportRequest
+        {
+            Files = new List<FileDto>
+            {
+                new() { Path = "strings.json", Content = "{\"test\": \"Test\"}" }
+            },
+            Format = "json"
+        };
+
+        // Act
+        await _service.ImportFilesAsync(project.Id, user.Id, request);
+
+        // Assert - verify source was "import"
+        _mockKeySyncService.Verify(x => x.PushAsync(
+            project.Id,
+            user.Id,
+            It.IsAny<KeySyncPushRequest>(),
+            "import",
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -245,12 +400,13 @@ public class FileOperationsServiceTests : IDisposable
             "json", // Should auto-detect json
             It.IsAny<Dictionary<string, string>>(),
             It.IsAny<string>()))
-            .Returns(parsedEntries);
+            .Returns(new ParseFilesResult { Entries = parsedEntries });
 
         _mockKeySyncService.Setup(x => x.PushAsync(
             It.IsAny<int>(),
             It.IsAny<int>(),
             It.IsAny<KeySyncPushRequest>(),
+            It.IsAny<string>(),
             It.IsAny<CancellationToken>()))
             .ReturnsAsync(new KeySyncPushResponse { Applied = 1 });
 
@@ -422,5 +578,348 @@ public class FileOperationsServiceTests : IDisposable
         // Assert
         Assert.Contains(result.Files, f => f.Language == "en" && f.IsDefault);
         Assert.Contains(result.Files, f => f.Language == "fr");
+    }
+
+    // ============================================================
+    // Import Preview Tests
+    // ============================================================
+
+    [Fact]
+    public async Task PreviewImportAsync_NoPermission_ReturnsError()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+
+        _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(false);
+
+        var request = new FileImportPreviewRequest
+        {
+            Files = new List<FileDto>
+            {
+                new() { Path = "strings.json", Content = "{\"greeting\": \"Hello\"}" }
+            },
+            Format = "json"
+        };
+
+        // Act
+        var result = await _service.PreviewImportAsync(project.Id, user.Id, request);
+
+        // Assert
+        Assert.Contains(result.Errors, e => e.Contains("permission"));
+    }
+
+    [Fact]
+    public async Task PreviewImportAsync_EmptyFiles_ReturnsError()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+
+        _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var request = new FileImportPreviewRequest
+        {
+            Files = new List<FileDto>(),
+            Format = "json"
+        };
+
+        // Act
+        var result = await _service.PreviewImportAsync(project.Id, user.Id, request);
+
+        // Assert
+        Assert.Contains(result.Errors, e => e.Contains("No files"));
+    }
+
+    [Fact]
+    public async Task PreviewImportAsync_NewKeys_ShowsToAdd()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+
+        _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        {
+            { ("new_key", "en", ""), new GitHubEntry { Key = "new_key", LanguageCode = "en", Value = "New Value", Hash = "abc" } }
+        };
+
+        _mockFileImportService.Setup(x => x.ParseFiles(
+            It.IsAny<string>(),
+            It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<string>()))
+            .Returns(new ParseFilesResult { Entries = parsedEntries });
+
+        var request = new FileImportPreviewRequest
+        {
+            Files = new List<FileDto>
+            {
+                new() { Path = "strings.json", Content = "{\"new_key\": \"New Value\"}" }
+            },
+            Format = "json"
+        };
+
+        // Act
+        var result = await _service.PreviewImportAsync(project.Id, user.Id, request);
+
+        // Assert
+        Assert.Empty(result.Errors);
+        Assert.Equal(1, result.Summary.ToAdd);
+        Assert.Equal(0, result.Summary.ToModify);
+        Assert.Equal(0, result.Summary.Unchanged);
+        Assert.Equal(1, result.Summary.Total);
+        Assert.Single(result.Changes);
+        Assert.Equal("add", result.Changes[0].ChangeType);
+        Assert.Equal("New Value", result.Changes[0].NewValue);
+    }
+
+    [Fact]
+    public async Task PreviewImportAsync_ExistingKeySameValue_ShowsUnchanged()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await CreateTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        // Import same value that already exists
+        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        {
+            { ("greeting", "en", ""), new GitHubEntry { Key = "greeting", LanguageCode = "en", Value = "Hello", Hash = "abc" } }
+        };
+
+        _mockFileImportService.Setup(x => x.ParseFiles(
+            It.IsAny<string>(),
+            It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<string>()))
+            .Returns(new ParseFilesResult { Entries = parsedEntries });
+
+        var request = new FileImportPreviewRequest
+        {
+            Files = new List<FileDto>
+            {
+                new() { Path = "strings.json", Content = "{\"greeting\": \"Hello\"}" }
+            },
+            Format = "json"
+        };
+
+        // Act
+        var result = await _service.PreviewImportAsync(project.Id, user.Id, request);
+
+        // Assert
+        Assert.Empty(result.Errors);
+        Assert.Equal(0, result.Summary.ToAdd);
+        Assert.Equal(0, result.Summary.ToModify);
+        Assert.Equal(1, result.Summary.Unchanged);
+        Assert.Single(result.Changes);
+        Assert.Equal("unchanged", result.Changes[0].ChangeType);
+        Assert.Equal("Hello", result.Changes[0].CurrentValue);
+        Assert.Equal("Hello", result.Changes[0].NewValue);
+    }
+
+    [Fact]
+    public async Task PreviewImportAsync_ExistingKeyDifferentValue_ShowsToModify()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await CreateTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        // Import different value for existing key
+        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        {
+            { ("greeting", "en", ""), new GitHubEntry { Key = "greeting", LanguageCode = "en", Value = "Hi there!", Hash = "abc" } }
+        };
+
+        _mockFileImportService.Setup(x => x.ParseFiles(
+            It.IsAny<string>(),
+            It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<string>()))
+            .Returns(new ParseFilesResult { Entries = parsedEntries });
+
+        var request = new FileImportPreviewRequest
+        {
+            Files = new List<FileDto>
+            {
+                new() { Path = "strings.json", Content = "{\"greeting\": \"Hi there!\"}" }
+            },
+            Format = "json"
+        };
+
+        // Act
+        var result = await _service.PreviewImportAsync(project.Id, user.Id, request);
+
+        // Assert
+        Assert.Empty(result.Errors);
+        Assert.Equal(0, result.Summary.ToAdd);
+        Assert.Equal(1, result.Summary.ToModify);
+        Assert.Equal(0, result.Summary.Unchanged);
+        Assert.Single(result.Changes);
+        Assert.Equal("modify", result.Changes[0].ChangeType);
+        Assert.Equal("Hello", result.Changes[0].CurrentValue);
+        Assert.Equal("Hi there!", result.Changes[0].NewValue);
+    }
+
+    [Fact]
+    public async Task PreviewImportAsync_MixedChanges_ShowsCorrectCounts()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await CreateTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        {
+            // Same value - unchanged
+            { ("greeting", "en", ""), new GitHubEntry { Key = "greeting", LanguageCode = "en", Value = "Hello", Hash = "a" } },
+            // Different value - modify
+            { ("farewell", "en", ""), new GitHubEntry { Key = "farewell", LanguageCode = "en", Value = "See ya!", Hash = "b" } },
+            // New key - add
+            { ("welcome", "en", ""), new GitHubEntry { Key = "welcome", LanguageCode = "en", Value = "Welcome!", Hash = "c" } }
+        };
+
+        _mockFileImportService.Setup(x => x.ParseFiles(
+            It.IsAny<string>(),
+            It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<string>()))
+            .Returns(new ParseFilesResult { Entries = parsedEntries });
+
+        var request = new FileImportPreviewRequest
+        {
+            Files = new List<FileDto>
+            {
+                new() { Path = "strings.json", Content = "{}" }
+            },
+            Format = "json"
+        };
+
+        // Act
+        var result = await _service.PreviewImportAsync(project.Id, user.Id, request);
+
+        // Assert
+        Assert.Empty(result.Errors);
+        Assert.Equal(1, result.Summary.ToAdd);
+        Assert.Equal(1, result.Summary.ToModify);
+        Assert.Equal(1, result.Summary.Unchanged);
+        Assert.Equal(3, result.Summary.Total);
+        Assert.Equal(3, result.Changes.Count);
+    }
+
+    [Fact]
+    public async Task PreviewImportAsync_ReportsParseErrors()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+
+        _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        {
+            { ("valid_key", "en", ""), new GitHubEntry { Key = "valid_key", LanguageCode = "en", Value = "Valid", Hash = "abc" } }
+        };
+
+        var parseErrors = new List<FileParseErrorInfo>
+        {
+            new() { Path = "invalid.json", Error = "Invalid JSON syntax" }
+        };
+
+        _mockFileImportService.Setup(x => x.ParseFiles(
+            It.IsAny<string>(),
+            It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<string>()))
+            .Returns(new ParseFilesResult { Entries = parsedEntries, ParseErrors = parseErrors });
+
+        var request = new FileImportPreviewRequest
+        {
+            Files = new List<FileDto>
+            {
+                new() { Path = "valid.json", Content = "{}" },
+                new() { Path = "invalid.json", Content = "not json" }
+            },
+            Format = "json"
+        };
+
+        // Act
+        var result = await _service.PreviewImportAsync(project.Id, user.Id, request);
+
+        // Assert
+        Assert.Single(result.ParseErrors);
+        Assert.Contains(result.ParseErrors, e => e.Path == "invalid.json");
+    }
+
+    // ============================================================
+    // Import Added/Modified/Unchanged Tests
+    // ============================================================
+
+    [Fact]
+    public async Task ImportFilesAsync_PopulatesAddedModifiedUnchanged()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+
+        _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        {
+            { ("key1", "en", ""), new GitHubEntry { Key = "key1", LanguageCode = "en", Value = "Value1", Hash = "a" } },
+            { ("key2", "en", ""), new GitHubEntry { Key = "key2", LanguageCode = "en", Value = "Value2", Hash = "b" } },
+            { ("key3", "en", ""), new GitHubEntry { Key = "key3", LanguageCode = "en", Value = "Value3", Hash = "c" } }
+        };
+
+        _mockFileImportService.Setup(x => x.ParseFiles(
+            It.IsAny<string>(),
+            It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<string>()))
+            .Returns(new ParseFilesResult { Entries = parsedEntries });
+
+        // Simulate push response with mixed results
+        _mockKeySyncService.Setup(x => x.PushAsync(
+            It.IsAny<int>(),
+            It.IsAny<int>(),
+            It.IsAny<KeySyncPushRequest>(),
+            It.IsAny<string>(),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new KeySyncPushResponse
+            {
+                Applied = 2,
+                Added = 1,
+                Modified = 1,
+                Unchanged = 1
+            });
+
+        var request = new FileImportRequest
+        {
+            Files = new List<FileDto>
+            {
+                new() { Path = "strings.json", Content = "{}" }
+            },
+            Format = "json"
+        };
+
+        // Act
+        var result = await _service.ImportFilesAsync(project.Id, user.Id, request);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Equal(2, result.Applied);
+        Assert.Equal(1, result.Added);
+        Assert.Equal(1, result.Modified);
+        Assert.Equal(1, result.Unchanged);
     }
 }

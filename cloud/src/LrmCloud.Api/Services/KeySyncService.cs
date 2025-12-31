@@ -43,6 +43,7 @@ public class KeySyncService : IKeySyncService
         int projectId,
         int userId,
         KeySyncPushRequest request,
+        string source = "cli",
         CancellationToken ct = default)
     {
         var response = new KeySyncPushResponse();
@@ -68,9 +69,20 @@ public class KeySyncService : IKeySyncService
                 {
                     response.Conflicts.Add(result.Conflict!);
                 }
+                else if (result.IsUnchanged)
+                {
+                    // Value already exists with same content
+                    response.Unchanged++;
+                }
                 else if (result.Applied)
                 {
                     response.Applied++;
+
+                    // Track Added vs Modified
+                    if (result.WasNew)
+                        response.Added++;
+                    else
+                        response.Modified++;
 
                     if (!response.NewEntryHashes.ContainsKey(entry.Key))
                     {
@@ -137,7 +149,8 @@ public class KeySyncService : IKeySyncService
             // Record push in history (only if there were changes)
             if (historyChanges.Count > 0)
             {
-                await _historyService.RecordPushAsync(projectId, userId, request.Message, historyChanges, operationType: "push", source: "cli", ct: ct);
+                var history = await _historyService.RecordPushAsync(projectId, userId, request.Message, historyChanges, operationType: "push", source: source, ct: ct);
+                response.HistoryId = history.HistoryId;
             }
 
             await transaction.CommitAsync(ct);
@@ -376,10 +389,12 @@ public class KeySyncService : IKeySyncService
                 SourcePluralText = entry.IsPlural ? entry.SourcePluralText : null,
                 Version = 1,
                 CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                UpdatedAt = DateTime.UtcNow,
+                // Initialize Translations collection for new keys
+                Translations = new List<Entities.Translation>()
             };
             _db.ResourceKeys.Add(resourceKey);
-            await _db.SaveChangesAsync(ct);
+            // Note: Don't SaveChanges here - batch with final save for performance
         }
         else
         {
@@ -414,7 +429,7 @@ public class KeySyncService : IKeySyncService
             // New translation - no conflict possible
             translation = new Entities.Translation
             {
-                ResourceKeyId = resourceKey.Id,
+                ResourceKey = resourceKey, // Use navigation property for EF Core to handle FK
                 LanguageCode = entry.Lang,
                 Value = entry.Value,
                 Comment = entry.Comment,
@@ -451,6 +466,17 @@ public class KeySyncService : IKeySyncService
                     RemoteHash = translation.Hash,
                     RemoteUpdatedAt = translation.UpdatedAt
                 }
+            };
+        }
+
+        // Check if value is unchanged
+        if (translation.Hash == newHash)
+        {
+            return new EntryChangeResult
+            {
+                Applied = false,
+                IsUnchanged = true,
+                NewHash = newHash
             };
         }
 
@@ -566,7 +592,7 @@ public class KeySyncService : IKeySyncService
                 // Create new plural form translation
                 var translation = new Entities.Translation
                 {
-                    ResourceKeyId = resourceKey.Id,
+                    ResourceKey = resourceKey, // Use navigation property for EF Core to handle FK
                     LanguageCode = entry.Lang,
                     Value = value,
                     Comment = entry.Comment,
@@ -592,6 +618,7 @@ public class KeySyncService : IKeySyncService
     {
         public bool Applied { get; set; }
         public bool IsConflict { get; set; }
+        public bool IsUnchanged { get; set; }
         public bool WasNew { get; set; }
         public EntryConflictDto? Conflict { get; set; }
         public string? NewHash { get; set; }
@@ -808,7 +835,7 @@ public class KeySyncService : IKeySyncService
 /// </summary>
 public interface IKeySyncService
 {
-    Task<KeySyncPushResponse> PushAsync(int projectId, int userId, KeySyncPushRequest request, CancellationToken ct = default);
+    Task<KeySyncPushResponse> PushAsync(int projectId, int userId, KeySyncPushRequest request, string source = "cli", CancellationToken ct = default);
     Task<KeySyncPullResponse> PullAsync(int projectId, int userId, DateTime? since = null, int? limit = null, int? offset = null, CancellationToken ct = default);
     Task<ConflictResolutionResponse> ResolveConflictsAsync(int projectId, int userId, ConflictResolutionRequest request, CancellationToken ct = default);
 }

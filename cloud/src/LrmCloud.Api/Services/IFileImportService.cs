@@ -31,6 +31,24 @@ public class ParsedResourceFile
 }
 
 /// <summary>
+/// Result of parsing multiple files.
+/// </summary>
+public class ParseFilesResult
+{
+    public Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry> Entries { get; init; } = new();
+    public List<FileParseErrorInfo> ParseErrors { get; init; } = new();
+}
+
+/// <summary>
+/// Information about a file that failed to parse.
+/// </summary>
+public class FileParseErrorInfo
+{
+    public required string Path { get; init; }
+    public required string Error { get; init; }
+}
+
+/// <summary>
 /// Service for importing/parsing translation files from GitHub.
 /// Inverse of FileExportService - parses file content into entries.
 /// </summary>
@@ -56,8 +74,8 @@ public interface IFileImportService
     /// <param name="format">File format</param>
     /// <param name="files">Dictionary of filePath -> content</param>
     /// <param name="defaultLanguage">Project default language</param>
-    /// <returns>Dictionary keyed by (keyName, languageCode, pluralForm) containing all entries</returns>
-    Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry> ParseFiles(
+    /// <returns>Result containing entries and any parse errors</returns>
+    ParseFilesResult ParseFiles(
         string format,
         Dictionary<string, string> files,
         string defaultLanguage);

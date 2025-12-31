@@ -784,20 +784,69 @@ public class ResourceService : IResourceService
                 }
 
                 // Placeholder validation (only for non-default languages)
-                if (!isDefaultLang && !string.IsNullOrEmpty(defaultValue))
+                if (!isDefaultLang)
                 {
-                    var placeholderResult = PlaceholderValidator.Validate(defaultValue, translation.Value);
-                    if (!placeholderResult.IsValid)
+                    if (key.IsPlural)
                     {
-                        result.Issues.Add(new ValidationIssue
+                        // For plural keys, validate each plural form separately
+                        // Get all plural forms for default language
+                        var defaultPluralForms = key.Translations
+                            .Where(t => t.LanguageCode == project.DefaultLanguage || string.IsNullOrEmpty(t.LanguageCode))
+                            .ToDictionary(t => t.PluralForm, t => t.Value);
+
+                        // Get all plural forms for target language
+                        var targetPluralForms = key.Translations
+                            .Where(t => t.LanguageCode == language)
+                            .ToList();
+
+                        foreach (var targetTranslation in targetPluralForms)
                         {
-                            Severity = "warning",
-                            Message = $"Placeholder mismatch in '{language}'",
-                            Category = ValidationCategory.Placeholder,
-                            KeyName = key.KeyName,
-                            LanguageCode = language,
-                            Details = placeholderResult.GetSummary()
-                        });
+                            if (string.IsNullOrWhiteSpace(targetTranslation.Value))
+                                continue; // Skip empty - already reported as "Empty value"
+
+                            // Only validate if source has the same plural form
+                            // Skip validation for forms that don't exist in source (e.g., Russian "few"/"many" when English only has "one"/"other")
+                            if (!defaultPluralForms.TryGetValue(targetTranslation.PluralForm, out var sourceValue))
+                                continue;
+
+                            if (!string.IsNullOrEmpty(sourceValue))
+                            {
+                                var placeholderResult = PlaceholderValidator.Validate(sourceValue, targetTranslation.Value);
+                                if (!placeholderResult.IsValid)
+                                {
+                                    var formSuffix = string.IsNullOrEmpty(targetTranslation.PluralForm)
+                                        ? ""
+                                        : $" (plural: {targetTranslation.PluralForm})";
+
+                                    result.Issues.Add(new ValidationIssue
+                                    {
+                                        Severity = "warning",
+                                        Message = $"Placeholder mismatch in '{language}'{formSuffix}",
+                                        Category = ValidationCategory.Placeholder,
+                                        KeyName = key.KeyName,
+                                        LanguageCode = language,
+                                        Details = placeholderResult.GetSummary()
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(defaultValue))
+                    {
+                        // Non-plural key: use existing logic
+                        var placeholderResult = PlaceholderValidator.Validate(defaultValue, translation.Value);
+                        if (!placeholderResult.IsValid)
+                        {
+                            result.Issues.Add(new ValidationIssue
+                            {
+                                Severity = "warning",
+                                Message = $"Placeholder mismatch in '{language}'",
+                                Category = ValidationCategory.Placeholder,
+                                KeyName = key.KeyName,
+                                LanguageCode = language,
+                                Details = placeholderResult.GetSummary()
+                            });
+                        }
                     }
                 }
 

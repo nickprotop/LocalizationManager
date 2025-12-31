@@ -45,6 +45,7 @@ public class FileExportService : IFileExportService
         var keysQuery = _db.ResourceKeys
             .Where(k => k.ProjectId == projectId)
             .Include(k => k.Translations)
+            .OrderBy(k => k.KeyName) // Deterministic ordering for consistent exports
             .AsNoTracking();
 
         var keys = await keysQuery.ToListAsync();
@@ -66,7 +67,7 @@ public class FileExportService : IFileExportService
         var targetLanguages = languages?.ToList() ?? allLanguages;
 
         // Always include default language
-        if (!targetLanguages.Contains(project.DefaultLanguage))
+        if (!targetLanguages.Any(l => l.Equals(project.DefaultLanguage, StringComparison.OrdinalIgnoreCase)))
         {
             targetLanguages.Insert(0, project.DefaultLanguage);
         }
@@ -76,7 +77,7 @@ public class FileExportService : IFileExportService
 
         foreach (var languageCode in targetLanguages)
         {
-            var isDefault = languageCode == project.DefaultLanguage;
+            var isDefault = languageCode.Equals(project.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
             var resourceFile = BuildResourceFile(keys, languageCode, isDefault, format);
 
             if (!resourceFile.Entries.Any())

@@ -18,6 +18,11 @@ public interface IFileOperationsService
     Task<FileImportResponse> ImportFilesAsync(int projectId, int userId, FileImportRequest request, CancellationToken ct = default);
 
     /// <summary>
+    /// Preview what import would change (dry-run).
+    /// </summary>
+    Task<FileImportPreviewResponse> PreviewImportAsync(int projectId, int userId, FileImportPreviewRequest request, CancellationToken ct = default);
+
+    /// <summary>
     /// Export project to files as ZIP.
     /// </summary>
     Task<byte[]> ExportFilesAsync(int projectId, int userId, string format, string[]? languages, CancellationToken ct = default);
@@ -103,11 +108,11 @@ public class FileOperationsService : IFileOperationsService
 
             // 4. Parse files → GitHubEntry[]
             var fileDict = request.Files.ToDictionary(f => f.Path, f => f.Content);
-            Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry> entries;
+            ParseFilesResult parseResult;
 
             try
             {
-                entries = _fileImportService.ParseFiles(format, fileDict, project.DefaultLanguage);
+                parseResult = _fileImportService.ParseFiles(format, fileDict, project.DefaultLanguage);
             }
             catch (Exception ex)
             {
@@ -116,6 +121,17 @@ public class FileOperationsService : IFileOperationsService
                 return response;
             }
 
+            // Add parse errors to response (non-fatal - import continues with remaining files)
+            foreach (var error in parseResult.ParseErrors)
+            {
+                response.ParseErrors.Add(new FileParseError
+                {
+                    Path = error.Path,
+                    Error = error.Error
+                });
+            }
+
+            var entries = parseResult.Entries;
             if (!entries.Any())
             {
                 response.Errors.Add("No entries found in files");
@@ -176,11 +192,15 @@ public class FileOperationsService : IFileOperationsService
                 Message = request.Message ?? "Import from web UI"
             };
 
-            var pushResult = await _keySyncService.PushAsync(projectId, userId, pushRequest, ct);
+            var pushResult = await _keySyncService.PushAsync(projectId, userId, pushRequest, source: "import", ct: ct);
 
             // 7. Build response
             response.Success = pushResult.Conflicts.Count == 0;
             response.Applied = pushResult.Applied;
+            response.Added = pushResult.Added;
+            response.Modified = pushResult.Modified;
+            response.Unchanged = pushResult.Unchanged;
+            response.HistoryId = pushResult.HistoryId;
 
             if (pushResult.Conflicts.Count > 0)
             {
@@ -191,8 +211,8 @@ public class FileOperationsService : IFileOperationsService
             }
 
             _logger.LogInformation(
-                "Imported {Applied} entries to project {ProjectId}",
-                response.Applied, projectId);
+                "Imported {Applied} entries ({Added} added, {Modified} modified, {Unchanged} unchanged) to project {ProjectId}",
+                response.Applied, response.Added, response.Modified, response.Unchanged, projectId);
 
             return response;
         }
@@ -200,6 +220,172 @@ public class FileOperationsService : IFileOperationsService
         {
             _logger.LogError(ex, "Failed to import files to project {ProjectId}", projectId);
             response.Errors.Add($"Import failed: {ex.Message}");
+            return response;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<FileImportPreviewResponse> PreviewImportAsync(
+        int projectId,
+        int userId,
+        FileImportPreviewRequest request,
+        CancellationToken ct = default)
+    {
+        var response = new FileImportPreviewResponse();
+
+        try
+        {
+            // 1. Validate access
+            if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+            {
+                response.Errors.Add("You don't have permission to import to this project");
+                return response;
+            }
+
+            // 2. Get project for default language
+            var project = await _db.Projects.FindAsync(new object[] { projectId }, ct);
+            if (project == null)
+            {
+                response.Errors.Add("Project not found");
+                return response;
+            }
+
+            if (!request.Files.Any())
+            {
+                response.Errors.Add("No files to preview");
+                return response;
+            }
+
+            // 3. Detect format if not specified
+            var format = request.Format ?? DetectFormat(request.Files);
+            if (string.IsNullOrEmpty(format))
+            {
+                response.Errors.Add("Could not detect file format. Please specify format explicitly.");
+                return response;
+            }
+
+            // 4. Parse files
+            var fileDict = request.Files.ToDictionary(f => f.Path, f => f.Content);
+            ParseFilesResult parseResult;
+
+            try
+            {
+                parseResult = _fileImportService.ParseFiles(format, fileDict, project.DefaultLanguage);
+            }
+            catch (Exception ex)
+            {
+                response.Errors.Add($"Failed to parse files: {ex.Message}");
+                _logger.LogWarning(ex, "Failed to parse files for project {ProjectId} preview", projectId);
+                return response;
+            }
+
+            // Add parse errors to response
+            foreach (var error in parseResult.ParseErrors)
+            {
+                response.ParseErrors.Add(new FileParseError
+                {
+                    Path = error.Path,
+                    Error = error.Error
+                });
+            }
+
+            var entries = parseResult.Entries;
+            if (!entries.Any())
+            {
+                response.Errors.Add("No entries found in files");
+                return response;
+            }
+
+            // 5. Get existing keys and translations for comparison
+            var existingKeys = await _db.ResourceKeys
+                .Where(k => k.ProjectId == projectId)
+                .Include(k => k.Translations)
+                .ToDictionaryAsync(k => k.KeyName, ct);
+
+            // 6. Compare each entry to determine change type
+            var processedKeys = new HashSet<(string Key, string Lang)>();
+
+            foreach (var entry in entries.Values)
+            {
+                var keyLang = (entry.Key, entry.LanguageCode);
+
+                // Skip if we've already processed this key+lang
+                if (processedKeys.Contains(keyLang))
+                    continue;
+
+                processedKeys.Add(keyLang);
+
+                var changePreview = new ImportChangePreview
+                {
+                    Key = entry.Key,
+                    Language = entry.LanguageCode,
+                    IsPlural = entry.IsPlural
+                };
+
+                // Get new value
+                string newValue;
+                if (entry.IsPlural && entry.PluralForms != null && entry.PluralForms.Count > 0)
+                {
+                    newValue = entry.PluralForms.GetValueOrDefault("other", "");
+                }
+                else
+                {
+                    newValue = entry.Value ?? "";
+                }
+                changePreview.NewValue = newValue;
+
+                // Check if key exists
+                if (existingKeys.TryGetValue(entry.Key, out var existingKey))
+                {
+                    // Key exists - check for translation in this language
+                    var existingTranslation = existingKey.Translations
+                        .FirstOrDefault(t => t.LanguageCode == entry.LanguageCode);
+
+                    if (existingTranslation != null)
+                    {
+                        changePreview.CurrentValue = existingTranslation.Value;
+
+                        // Compare values (for plural, compare other form)
+                        if (existingTranslation.Value == newValue)
+                        {
+                            changePreview.ChangeType = "unchanged";
+                            response.Summary.Unchanged++;
+                        }
+                        else
+                        {
+                            changePreview.ChangeType = "modify";
+                            response.Summary.ToModify++;
+                        }
+                    }
+                    else
+                    {
+                        // Key exists but no translation for this language
+                        changePreview.ChangeType = "add";
+                        response.Summary.ToAdd++;
+                    }
+                }
+                else
+                {
+                    // Key doesn't exist - will be added
+                    changePreview.ChangeType = "add";
+                    response.Summary.ToAdd++;
+                }
+
+                response.Changes.Add(changePreview);
+            }
+
+            response.Summary.Total = response.Changes.Count;
+
+            _logger.LogInformation(
+                "Preview import for project {ProjectId}: {ToAdd} to add, {ToModify} to modify, {Unchanged} unchanged",
+                projectId, response.Summary.ToAdd, response.Summary.ToModify, response.Summary.Unchanged);
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to preview import for project {ProjectId}", projectId);
+            response.Errors.Add($"Preview failed: {ex.Message}");
             return response;
         }
     }

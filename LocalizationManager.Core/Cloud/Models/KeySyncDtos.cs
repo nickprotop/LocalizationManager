@@ -163,9 +163,24 @@ public class ConfigPropertyChange
 public class KeySyncPushResponse
 {
     /// <summary>
-    /// Number of entries successfully applied.
+    /// Number of entries successfully applied (Added + Modified).
     /// </summary>
     public int Applied { get; set; }
+
+    /// <summary>
+    /// Number of new entries added.
+    /// </summary>
+    public int Added { get; set; }
+
+    /// <summary>
+    /// Number of existing entries modified.
+    /// </summary>
+    public int Modified { get; set; }
+
+    /// <summary>
+    /// Number of entries unchanged (same value already exists).
+    /// </summary>
+    public int Unchanged { get; set; }
 
     /// <summary>
     /// Number of entries deleted.
@@ -193,6 +208,11 @@ public class KeySyncPushResponse
     /// Key: property path, Value: hash
     /// </summary>
     public Dictionary<string, string> NewConfigHashes { get; set; } = new();
+
+    /// <summary>
+    /// History ID for this push operation (if changes were recorded).
+    /// </summary>
+    public string? HistoryId { get; set; }
 }
 
 #endregion

@@ -54,7 +54,7 @@ public class SyncController : ApiControllerBase
 
         try
         {
-            var result = await _syncService.PushAsync(projectId, userId, request, ct);
+            var result = await _syncService.PushAsync(projectId, userId, request, source: "cli", ct: ct);
 
             if (result.Conflicts.Count > 0)
             {
