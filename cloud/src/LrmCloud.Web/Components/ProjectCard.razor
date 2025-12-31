@@ -9,6 +9,13 @@
             <div class="project-card-org">@(Project.OrganizationName ?? "Personal")</div>
         </div>
         <div class="project-card-badges">
+            @if (Project.IsSampleProject)
+            {
+                <RadzenBadge BadgeStyle="BadgeStyle.Info"
+                             Title="This is a sample project for demonstration">
+                    Demo
+                </RadzenBadge>
+            }
             @if (!string.IsNullOrEmpty(Project.GitHubRepo))
             {
                 <span @onclick="NavigateToGitHub" @onclick:stopPropagation="true">

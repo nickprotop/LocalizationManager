@@ -58,6 +58,18 @@ else
         </RadzenStack>
     </RadzenStack>
 
+    @if (_project.IsSampleProject)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false" class="rz-mb-4">
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="Radzen.AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.5rem">
+                <span>
+                    <strong>Demo Project</strong> — This is a sample project to help you explore LRM Cloud. Feel free to experiment!
+                </span>
+                <RadzenButton Variant="Radzen.Variant.Text" ButtonStyle="ButtonStyle.Primary" Text="Create Your Own Project" Icon="add" Click="@OpenCreateDialog" Size="ButtonSize.Small" />
+            </RadzenStack>
+        </RadzenAlert>
+    }
+
     @if (!string.IsNullOrEmpty(_project.Description))
     {
         <RadzenText TextStyle="TextStyle.Body1" class="rz-color-secondary rz-mb-4">@_project.Description</RadzenText>
@@ -371,5 +383,17 @@ else
                 { "Languages", languages }
             },
             new Radzen.DialogOptions { Width = "450px" });
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var result = await DialogService.OpenAsync<CreateProjectDialog>("Create Project",
+            null,
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result is ProjectDto newProject)
+        {
+            Navigation.NavigateTo($"projects/{newProject.Id}");
+        }
     }
 }

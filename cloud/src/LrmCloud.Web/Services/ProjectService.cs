@@ -174,6 +174,46 @@ public class ProjectService
     }
 
     /// <summary>
+    /// Gets the sample project status for the current user.
+    /// </summary>
+    public async Task<SampleProjectStatusDto?> GetSampleProjectStatusAsync()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("projects/sample/status");
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<SampleProjectStatusDto>>();
+            return result?.Data;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Creates a sample project for onboarding.
+    /// </summary>
+    public async Task<ProjectDto?> CreateSampleProjectAsync()
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync("projects/sample", null);
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<ProjectDto>>();
+            return result?.Data;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Imports resource files into a project
     /// </summary>
     public async Task<ServiceResult<ImportResult>> ImportFilesAsync(int projectId, List<FileDto> files)
