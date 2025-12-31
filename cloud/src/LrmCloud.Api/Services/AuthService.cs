@@ -432,16 +432,23 @@ public class AuthService : IAuthService
 
     private async Task<(string RefreshToken, DateTime ExpiresAt)> GenerateRefreshTokenAsync(int userId, string? ipAddress)
     {
-        // Generate cryptographically secure refresh token
-        var refreshToken = TokenGenerator.GenerateSecureToken(32);
-        var tokenHash = BCrypt.Net.BCrypt.HashPassword(refreshToken, 12);
+        // Generate token with selector.verifier pattern for O(1) lookup
+        // Selector: 16 chars for fast indexed lookup
+        // Verifier: 32 chars, hashed with BCrypt for security
+        var selector = TokenGenerator.GenerateSecureToken(16);
+        var verifier = TokenGenerator.GenerateSecureToken(32);
+        var refreshToken = $"{selector}.{verifier}";
+
+        // Only hash the verifier, not the selector
+        var verifierHash = BCrypt.Net.BCrypt.HashPassword(verifier, 12);
         var expiresAt = DateTime.UtcNow.AddDays(_config.Auth.RefreshTokenExpiryDays);
 
-        // Store in database
+        // Store in database with selector for O(1) lookup
         var refreshTokenEntity = new Shared.Entities.RefreshToken
         {
             UserId = userId,
-            TokenHash = tokenHash,
+            TokenSelector = selector,
+            TokenHash = verifierHash,
             ExpiresAt = expiresAt,
             CreatedAt = DateTime.UtcNow,
             CreatedByIp = ipAddress
@@ -457,25 +464,48 @@ public class AuthService : IAuthService
 
     public async Task<(bool Success, LoginResponse? Response, string? ErrorMessage)> RefreshTokenAsync(string refreshToken, string? ipAddress = null)
     {
-        // Find the refresh token in database
-        var storedTokens = await _db.RefreshTokens
-            .Include(rt => rt.User)
-            .Where(rt => rt.User.DeletedAt == null)
-            .ToListAsync();
-
+        // Parse token: new format is "selector.verifier", legacy format is just the token
         Shared.Entities.RefreshToken? validToken = null;
-        foreach (var storedToken in storedTokens)
+        var dotIndex = refreshToken.IndexOf('.');
+
+        if (dotIndex > 0)
         {
-            if (BCrypt.Net.BCrypt.Verify(refreshToken, storedToken.TokenHash))
+            // New format: selector.verifier - O(1) lookup via indexed selector
+            var selector = refreshToken[..dotIndex];
+            var verifier = refreshToken[(dotIndex + 1)..];
+
+            var storedToken = await _db.RefreshTokens
+                .Include(rt => rt.User)
+                .Where(rt => rt.TokenSelector == selector && rt.User.DeletedAt == null)
+                .FirstOrDefaultAsync();
+
+            if (storedToken != null && BCrypt.Net.BCrypt.Verify(verifier, storedToken.TokenHash))
             {
                 validToken = storedToken;
-                break;
+            }
+        }
+        else
+        {
+            // Legacy format: scan all tokens (backward compatibility)
+            // This path will be removed once all legacy tokens expire
+            var storedTokens = await _db.RefreshTokens
+                .Include(rt => rt.User)
+                .Where(rt => rt.TokenSelector == null && rt.User.DeletedAt == null)
+                .ToListAsync();
+
+            foreach (var storedToken in storedTokens)
+            {
+                if (BCrypt.Net.BCrypt.Verify(refreshToken, storedToken.TokenHash))
+                {
+                    validToken = storedToken;
+                    break;
+                }
             }
         }
 
         if (validToken == null)
         {
-            _logger.LogWarning("Refresh token not found");
+            _logger.LogWarning("Refresh token not found or invalid");
             return (false, null, "Invalid refresh token");
         }
 
@@ -527,7 +557,9 @@ public class AuthService : IAuthService
         var (newRefreshToken, newRefreshTokenExpiresAt) = await GenerateRefreshTokenAsync(user.Id, ipAddress);
 
         // Store reference to new token in old token (for audit trail)
-        validToken.ReplacedByTokenHash = BCrypt.Net.BCrypt.HashPassword(newRefreshToken, 12);
+        // Just store the selector part as the reference (before the dot)
+        var newSelector = newRefreshToken[..newRefreshToken.IndexOf('.')];
+        validToken.ReplacedByTokenHash = newSelector;
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("Tokens refreshed for user: {Email}", user.Email);
@@ -558,18 +590,39 @@ public class AuthService : IAuthService
 
     public async Task<bool> RevokeRefreshTokenAsync(string refreshToken, string? ipAddress = null)
     {
-        // Find the refresh token in database
-        var storedTokens = await _db.RefreshTokens
-            .Where(rt => rt.RevokedAt == null)
-            .ToListAsync();
-
+        // Parse token: new format is "selector.verifier", legacy format is just the token
         Shared.Entities.RefreshToken? validToken = null;
-        foreach (var storedToken in storedTokens)
+        var dotIndex = refreshToken.IndexOf('.');
+
+        if (dotIndex > 0)
         {
-            if (BCrypt.Net.BCrypt.Verify(refreshToken, storedToken.TokenHash))
+            // New format: selector.verifier - O(1) lookup
+            var selector = refreshToken[..dotIndex];
+            var verifier = refreshToken[(dotIndex + 1)..];
+
+            var storedToken = await _db.RefreshTokens
+                .Where(rt => rt.TokenSelector == selector && rt.RevokedAt == null)
+                .FirstOrDefaultAsync();
+
+            if (storedToken != null && BCrypt.Net.BCrypt.Verify(verifier, storedToken.TokenHash))
             {
                 validToken = storedToken;
-                break;
+            }
+        }
+        else
+        {
+            // Legacy format: scan tokens without selector
+            var storedTokens = await _db.RefreshTokens
+                .Where(rt => rt.TokenSelector == null && rt.RevokedAt == null)
+                .ToListAsync();
+
+            foreach (var storedToken in storedTokens)
+            {
+                if (BCrypt.Net.BCrypt.Verify(refreshToken, storedToken.TokenHash))
+                {
+                    validToken = storedToken;
+                    break;
+                }
             }
         }
 
@@ -1020,15 +1073,31 @@ public class AuthService : IAuthService
             .ToListAsync();
 
         // Determine which session is current (if refresh token provided)
-        string? currentTokenHash = null;
+        int? currentSessionId = null;
         if (!string.IsNullOrEmpty(currentRefreshToken))
         {
-            foreach (var session in activeSessions)
+            var dotIndex = currentRefreshToken.IndexOf('.');
+            if (dotIndex > 0)
             {
-                if (BCrypt.Net.BCrypt.Verify(currentRefreshToken, session.TokenHash))
+                // New format: selector.verifier - O(1) lookup
+                var selector = currentRefreshToken[..dotIndex];
+                var verifier = currentRefreshToken[(dotIndex + 1)..];
+                var session = activeSessions.FirstOrDefault(s => s.TokenSelector == selector);
+                if (session != null && BCrypt.Net.BCrypt.Verify(verifier, session.TokenHash))
                 {
-                    currentTokenHash = session.TokenHash;
-                    break;
+                    currentSessionId = session.Id;
+                }
+            }
+            else
+            {
+                // Legacy format
+                foreach (var session in activeSessions.Where(s => s.TokenSelector == null))
+                {
+                    if (BCrypt.Net.BCrypt.Verify(currentRefreshToken, session.TokenHash))
+                    {
+                        currentSessionId = session.Id;
+                        break;
+                    }
                 }
             }
         }
@@ -1041,7 +1110,7 @@ public class AuthService : IAuthService
             ExpiresAt = rt.ExpiresAt,
             LastUsedAt = rt.LastUsedAt,
             CreatedByIp = rt.CreatedByIp,
-            IsCurrent = rt.TokenHash == currentTokenHash
+            IsCurrent = rt.Id == currentSessionId
         }).ToList();
 
         return sessions;
@@ -1081,14 +1150,31 @@ public class AuthService : IAuthService
             .Where(rt => rt.UserId == userId && rt.RevokedAt == null)
             .ToListAsync();
 
-        // Find current session to exclude
+        // Find current session to exclude using selector pattern
         Shared.Entities.RefreshToken? currentSession = null;
-        foreach (var session in activeSessions)
+        var dotIndex = currentRefreshToken.IndexOf('.');
+
+        if (dotIndex > 0)
         {
-            if (BCrypt.Net.BCrypt.Verify(currentRefreshToken, session.TokenHash))
+            // New format: selector.verifier
+            var selector = currentRefreshToken[..dotIndex];
+            var verifier = currentRefreshToken[(dotIndex + 1)..];
+            var session = activeSessions.FirstOrDefault(s => s.TokenSelector == selector);
+            if (session != null && BCrypt.Net.BCrypt.Verify(verifier, session.TokenHash))
             {
                 currentSession = session;
-                break;
+            }
+        }
+        else
+        {
+            // Legacy format
+            foreach (var session in activeSessions.Where(s => s.TokenSelector == null))
+            {
+                if (BCrypt.Net.BCrypt.Verify(currentRefreshToken, session.TokenHash))
+                {
+                    currentSession = session;
+                    break;
+                }
             }
         }
 

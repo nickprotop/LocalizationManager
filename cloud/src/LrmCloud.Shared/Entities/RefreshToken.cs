@@ -19,7 +19,17 @@ public class RefreshToken
     public int UserId { get; set; }
 
     /// <summary>
-    /// Hashed refresh token (stored securely, never plain text).
+    /// Token selector for O(1) lookup. First part of the token (before the dot).
+    /// This is stored in plain text and used for fast database lookup via index.
+    /// </summary>
+    [MaxLength(32)]
+    [Column("token_selector")]
+    public string? TokenSelector { get; set; }
+
+    /// <summary>
+    /// Hashed token verifier (second part of the token, after the dot).
+    /// This is hashed with BCrypt and verified after lookup by selector.
+    /// For legacy tokens without selector, this contains the full token hash.
     /// </summary>
     [Required]
     [MaxLength(255)]

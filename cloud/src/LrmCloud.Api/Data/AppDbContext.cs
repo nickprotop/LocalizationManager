@@ -85,6 +85,8 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.ExpiresAt);
             entity.HasIndex(e => e.TokenHash);
+            // Token selector for O(1) lookup (unique, allows null for legacy tokens)
+            entity.HasIndex(e => e.TokenSelector).IsUnique().HasFilter("token_selector IS NOT NULL");
 
             entity.HasOne(e => e.User)
                 .WithMany()
