@@ -158,6 +158,7 @@ public class Program
             builder.Services.AddScoped<TranslationMemoryService>(); // Translation Memory for reuse
             builder.Services.AddScoped<GlossaryService>(); // Glossary management for consistent terminology
             builder.Services.AddScoped<ReviewWorkflowService>(); // Review/approval workflow for translations
+            builder.Services.AddScoped<SampleProjectService>(); // Sample project for onboarding
             builder.Services.AddScoped<IStorageService, MinioStorageService>();
 
             // Translation Services

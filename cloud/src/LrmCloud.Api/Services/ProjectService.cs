@@ -728,7 +728,8 @@ public class ProjectService : IProjectService
             CreatedAt = project.CreatedAt,
             UpdatedAt = project.UpdatedAt,
             ValidationErrors = validationErrors,
-            ValidationWarnings = validationWarnings
+            ValidationWarnings = validationWarnings,
+            IsSampleProject = project.IsSampleProject
         };
     }
 

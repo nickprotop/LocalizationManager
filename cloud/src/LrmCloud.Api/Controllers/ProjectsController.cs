@@ -15,13 +15,16 @@ namespace LrmCloud.Api.Controllers;
 public class ProjectsController : ApiControllerBase
 {
     private readonly IProjectService _projectService;
+    private readonly SampleProjectService _sampleProjectService;
     private readonly ILogger<ProjectsController> _logger;
 
     public ProjectsController(
         IProjectService projectService,
+        SampleProjectService sampleProjectService,
         ILogger<ProjectsController> logger)
     {
         _projectService = projectService;
+        _sampleProjectService = sampleProjectService;
         _logger = logger;
     }
 
@@ -107,6 +110,44 @@ public class ProjectsController : ApiControllerBase
 
         _logger.LogInformation("User {UserId} created project {ProjectId}", userId, project!.Id);
         return Created(nameof(GetProject), new { id = project.Id }, project);
+    }
+
+    /// <summary>
+    /// Creates or returns a sample project for onboarding.
+    /// </summary>
+    /// <returns>Sample project</returns>
+    [HttpPost("sample")]
+    [ProducesResponseType(typeof(ApiResponse<ProjectDto>), 200)]
+    [ProducesResponseType(typeof(ApiResponse<ProjectDto>), 201)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    public async Task<ActionResult<ApiResponse<ProjectDto>>> CreateSampleProject()
+    {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var project = await _sampleProjectService.CreateSampleProjectAsync(userId);
+
+        if (project == null)
+            return BadRequest("PRJ_SAMPLE_FAILED", "Failed to create sample project");
+
+        _logger.LogInformation("User {UserId} created/retrieved sample project {ProjectId}", userId, project.Id);
+        return Success(project);
+    }
+
+    /// <summary>
+    /// Gets the sample project creation status for the current user.
+    /// </summary>
+    /// <returns>Status indicating whether auto-create or manual create is available</returns>
+    [HttpGet("sample/status")]
+    [ProducesResponseType(typeof(ApiResponse<SampleProjectStatusDto>), 200)]
+    public async Task<ActionResult<ApiResponse<SampleProjectStatusDto>>> GetSampleProjectStatus()
+    {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var (shouldAutoCreate, canCreateSample) = await _sampleProjectService.GetSampleProjectStatusAsync(userId);
+
+        return Success(new SampleProjectStatusDto
+        {
+            ShouldAutoCreate = shouldAutoCreate,
+            CanCreateSample = canCreateSample
+        });
     }
 
     /// <summary>
