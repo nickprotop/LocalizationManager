@@ -63,7 +63,21 @@ else
                             <RadzenTextBox Value="@_profile.Email" ReadOnly="true" Style="width: 100%;" />
                         </ChildContent>
                         <End>
-                            @if (_profile.EmailVerified)
+                            @if (_profile.AuthType == "github")
+                            {
+                                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="GitHub Verified" />
+                                    @if (IsPlaceholderEmail(_profile.Email))
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="No email" />
+                                    }
+                                    else if (!_profile.EmailVerified)
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Email unverified" />
+                                    }
+                                </RadzenStack>
+                            }
+                            else if (_profile.EmailVerified)
                             {
                                 <RadzenIcon Icon="verified" Style="color: var(--rz-success);" />
                             }
@@ -459,6 +473,9 @@ else
         "team" => BadgeStyle.Secondary,
         _ => BadgeStyle.Light
     };
+
+    private static bool IsPlaceholderEmail(string? email) =>
+        !string.IsNullOrEmpty(email) && email.StartsWith("github_") && email.EndsWith("@lrm-cloud.com");
 
     // GitHub methods
     private async Task LoadGitHubStatusAsync()

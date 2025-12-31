@@ -417,6 +417,7 @@ public class AuthService : IAuthService
                 DisplayName = user.DisplayName,
                 AvatarUrl = user.AvatarUrl,
                 EmailVerified = user.EmailVerified,
+                AuthType = user.AuthType,
                 Plan = user.Plan,
                 IsSuperAdmin = user.IsSuperAdmin,
                 CreatedAt = user.CreatedAt
@@ -575,6 +576,7 @@ public class AuthService : IAuthService
                 DisplayName = user.DisplayName,
                 AvatarUrl = user.AvatarUrl,
                 EmailVerified = user.EmailVerified,
+                AuthType = user.AuthType,
                 Plan = user.Plan,
                 IsSuperAdmin = user.IsSuperAdmin,
                 CreatedAt = user.CreatedAt

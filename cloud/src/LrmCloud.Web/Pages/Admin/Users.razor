@@ -116,9 +116,23 @@ else
                     <RadzenBadge BadgeStyle="@GetPlanBadgeStyle(user.Plan)" Text="@user.Plan.ToUpper()" />
                 </Template>
             </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="AdminUserDto" Title="Status" Width="100px">
+            <RadzenDataGridColumn TItem="AdminUserDto" Title="Status" Width="140px">
                 <Template Context="user">
-                    @if (user.EmailVerified)
+                    @if (user.AuthType == "github")
+                    {
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem" Wrap="FlexWrap.Wrap">
+                            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="GitHub" />
+                            @if (IsPlaceholderEmail(user.Email))
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="No email" />
+                            }
+                            else if (!user.EmailVerified)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Unverified" />
+                            }
+                        </RadzenStack>
+                    }
+                    else if (user.EmailVerified)
                     {
                         <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Verified" />
                     }
@@ -265,6 +279,9 @@ else
         "team" => BadgeStyle.Primary,
         _ => BadgeStyle.Light
     };
+
+    private static bool IsPlaceholderEmail(string? email) =>
+        !string.IsNullOrEmpty(email) && email.StartsWith("github_") && email.EndsWith("@lrm-cloud.com");
 
     private void SelectAllUsers(bool selectAll)
     {

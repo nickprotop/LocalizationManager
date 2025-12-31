@@ -49,9 +49,25 @@ else
                         {
                             <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Superadmin" />
                         }
-                        @if (_user.EmailVerified)
+                        @if (_user.AuthType == "github")
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="GitHub Verified" />
+                            @if (IsPlaceholderEmail(_user.Email))
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="No email" />
+                            }
+                            else if (!_user.EmailVerified)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Email unverified" />
+                            }
+                        }
+                        else if (_user.EmailVerified)
                         {
                             <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Verified" />
+                        }
+                        else
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Unverified" />
                         }
                     </RadzenStack>
                 </RadzenStack>
@@ -396,6 +412,9 @@ else
         "github" => "code",
         _ => "email"
     };
+
+    private static bool IsPlaceholderEmail(string? email) =>
+        !string.IsNullOrEmpty(email) && email.StartsWith("github_") && email.EndsWith("@lrm-cloud.com");
 
     private static double GetUsagePercent(long used, long limit) =>
         limit > 0 ? Math.Min(100, used * 100.0 / limit) : 0;
