@@ -162,6 +162,14 @@ public class User
     [Column("locked_until")]
     public DateTime? LockedUntil { get; set; }
 
+    // Onboarding
+    /// <summary>
+    /// Whether this user has received the auto-created sample project.
+    /// Used to show "Create Sample Project" button for returning users who deleted all projects.
+    /// </summary>
+    [Column("has_received_sample_project")]
+    public bool HasReceivedSampleProject { get; set; }
+
     // Admin
     /// <summary>
     /// Whether this user is a superadmin with full system access.

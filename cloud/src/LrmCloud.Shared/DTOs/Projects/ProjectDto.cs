@@ -71,4 +71,9 @@ public class ProjectDto
     /// Number of validation warnings (from cached validation).
     /// </summary>
     public int ValidationWarnings { get; set; }
+
+    /// <summary>
+    /// Whether this is an auto-generated sample project for onboarding.
+    /// </summary>
+    public bool IsSampleProject { get; set; }
 }

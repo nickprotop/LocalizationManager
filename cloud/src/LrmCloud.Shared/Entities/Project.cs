@@ -188,6 +188,14 @@ public class Project
     [Column("max_snapshots")]
     public int? MaxSnapshots { get; set; }
 
+    // Sample project indicator
+    /// <summary>
+    /// Whether this is an auto-generated sample project for onboarding.
+    /// Sample projects have a "Demo" badge and can be deleted.
+    /// </summary>
+    [Column("is_sample_project")]
+    public bool IsSampleProject { get; set; }
+
     // Validation cache
     /// <summary>
     /// Cached validation result as JSON.
