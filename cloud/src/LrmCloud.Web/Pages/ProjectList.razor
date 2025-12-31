@@ -47,22 +47,72 @@
 }
 else if (!FilteredProjects.Any())
 {
-    <div class="empty-state lrm-animate-fade-in-up">
-        @if (_projects.Count == 0)
-        {
-            <RadzenIcon Icon="folder_open" Style="font-size: 4rem; color: var(--lrm-text-muted);" />
-            <h3 style="margin: 1rem 0 0.5rem; color: var(--lrm-text-primary);">No projects yet</h3>
-            <p style="color: var(--lrm-text-secondary); margin-bottom: 1.5rem;">Create your first project to start managing translations</p>
-            <RadzenButton Variant="Radzen.Variant.Filled" Icon="add" Text="Create Your First Project" Click="@OpenCreateDialog" Disabled="@(!_canCreateProject)" title="@_limitMessage" />
-        }
-        else
-        {
+    @if (_projects.Count == 0)
+    {
+        <div class="welcome-card lrm-animate-fade-in-up">
+            <div class="welcome-header">
+                <RadzenIcon Icon="language" Style="font-size: 3rem; color: var(--lrm-primary-500);" />
+                <h2 style="margin: 0.5rem 0 0.25rem; color: var(--lrm-text-primary);">Welcome to LRM Cloud!</h2>
+                <p style="color: var(--lrm-text-secondary); margin: 0;">Start managing your app's translations in minutes.</p>
+            </div>
+
+            <div class="welcome-steps">
+                <h4 style="margin: 0 0 0.75rem; color: var(--lrm-text-primary);">How it works:</h4>
+                <div class="steps-list">
+                    <div class="step-item">
+                        <span class="step-icon">📁</span>
+                        <span>Import your localization files</span>
+                    </div>
+                    <div class="step-item">
+                        <span class="step-icon">✏️</span>
+                        <span>Edit translations in the web editor</span>
+                    </div>
+                    <div class="step-item">
+                        <span class="step-icon">🤖</span>
+                        <span>Auto-translate missing with AI</span>
+                    </div>
+                    <div class="step-item">
+                        <span class="step-icon">📤</span>
+                        <span>Export or sync back to your project</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="welcome-actions">
+                <div class="action-card" @onclick="OpenImportDialog">
+                    <RadzenIcon Icon="upload_file" Style="font-size: 2rem; color: var(--lrm-primary-500);" />
+                    <h4>Import Files</h4>
+                    <p>Upload .resx, .json, .xml, .strings</p>
+                </div>
+                <div class="action-card" @onclick="OpenCreateWithGitHub">
+                    <RadzenIcon Icon="link" Style="font-size: 2rem; color: var(--lrm-success-500);" />
+                    <h4>Connect GitHub</h4>
+                    <p>Sync from your repository</p>
+                </div>
+                <div class="action-card" @onclick="OpenCreateDialog">
+                    <RadzenIcon Icon="add_circle" Style="font-size: 2rem; color: var(--lrm-info-500);" />
+                    <h4>Create Blank</h4>
+                    <p>Start from scratch</p>
+                </div>
+            </div>
+
+            <div class="welcome-footer">
+                <RadzenLink Path="https://github.com/nickprotop/LocalizationManager/blob/main/docs/CLOUD.md" Target="_blank" Style="color: var(--lrm-text-secondary);">
+                    <RadzenIcon Icon="menu_book" Style="font-size: 1rem; margin-right: 0.25rem;" />
+                    Read the documentation
+                </RadzenLink>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="empty-state lrm-animate-fade-in-up">
             <RadzenIcon Icon="search_off" Style="font-size: 4rem; color: var(--lrm-text-muted);" />
             <h3 style="margin: 1rem 0 0.5rem; color: var(--lrm-text-primary);">No projects match your search</h3>
             <p style="color: var(--lrm-text-secondary); margin-bottom: 1.5rem;">Try adjusting your filters</p>
             <RadzenButton Variant="Radzen.Variant.Text" Text="Clear Filters" Click="ClearFilters" />
-        }
-    </div>
+        </div>
+    }
 }
 else
 {
@@ -139,6 +189,34 @@ else
         var result = await DialogService.OpenAsync<CreateProjectDialog>("Create Project",
             null,
             new Radzen.DialogOptions { Width = "500px" });
+
+        if (result is ProjectDto project)
+        {
+            await OnProjectCreated(project);
+        }
+    }
+
+    private async Task OpenCreateWithGitHub()
+    {
+        var parameters = new Dictionary<string, object>
+        {
+            { "ShowGitHubSection", true }
+        };
+        var result = await DialogService.OpenAsync<CreateProjectDialog>("Create Project",
+            parameters,
+            new Radzen.DialogOptions { Width = "500px" });
+
+        if (result is ProjectDto project)
+        {
+            await OnProjectCreated(project);
+        }
+    }
+
+    private async Task OpenImportDialog()
+    {
+        var result = await DialogService.OpenAsync<ImportProjectDialog>("Import Project",
+            null,
+            new Radzen.DialogOptions { Width = "600px" });
 
         if (result is ProjectDto project)
         {

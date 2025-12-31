@@ -1138,6 +1138,87 @@ ul.rz-profile-menu > li > ul.rz-navigation-menu {
     text-align: center;
 }
 
+/* Welcome Card (Onboarding) */
+.welcome-card {
+    background: var(--lrm-surface-base);
+    border-radius: var(--lrm-radius-lg);
+    border: 1px solid var(--lrm-border-color);
+    padding: var(--lrm-space-8);
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.welcome-header {
+    text-align: center;
+    margin-bottom: var(--lrm-space-6);
+}
+
+.welcome-steps {
+    background: var(--lrm-surface-elevated);
+    border-radius: var(--lrm-radius-md);
+    padding: var(--lrm-space-4);
+    margin-bottom: var(--lrm-space-6);
+}
+
+.steps-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--lrm-space-3);
+}
+
+.step-item {
+    display: flex;
+    align-items: center;
+    gap: var(--lrm-space-2);
+    color: var(--lrm-text-secondary);
+    font-size: var(--lrm-text-sm);
+}
+
+.step-icon {
+    font-size: 1.25rem;
+}
+
+.welcome-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--lrm-space-4);
+    margin-bottom: var(--lrm-space-6);
+}
+
+.action-card {
+    background: var(--lrm-surface-elevated);
+    border: 1px solid var(--lrm-border-color);
+    border-radius: var(--lrm-radius-md);
+    padding: var(--lrm-space-5);
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--lrm-transition-fast);
+}
+
+.action-card:hover {
+    border-color: var(--lrm-primary-500);
+    transform: translateY(-2px);
+    box-shadow: var(--lrm-shadow-md);
+}
+
+.action-card h4 {
+    margin: var(--lrm-space-2) 0 var(--lrm-space-1);
+    color: var(--lrm-text-primary);
+    font-size: var(--lrm-text-base);
+}
+
+.action-card p {
+    margin: 0;
+    color: var(--lrm-text-muted);
+    font-size: var(--lrm-text-sm);
+}
+
+.welcome-footer {
+    text-align: center;
+    padding-top: var(--lrm-space-4);
+    border-top: 1px solid var(--lrm-border-color);
+}
+
 /* =============================================================================
    Search Trigger Button (Header)
    ============================================================================= */
