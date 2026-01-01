@@ -50,10 +50,42 @@
         </div>
     </div>
 
-    <div id="blazor-error-ui">
-        An unhandled error has occurred.
-        <a href="." class="reload">Reload</a>
-        <span class="dismiss">&#10006;</span>
+    <div id="blazor-error-ui" class="blazor-error-overlay">
+        <div class="blazor-error-card">
+            <button class="blazor-error-dismiss" onclick="dismissBlazorError()">&times;</button>
+
+            <div class="blazor-error-icon">⚠️</div>
+
+            <h2>Something Went Wrong</h2>
+
+            <p class="blazor-error-message">
+                The application encountered an error. This can happen after
+                updates or due to temporary issues.
+            </p>
+
+            <div class="blazor-error-actions">
+                <button onclick="location.reload()" class="blazor-error-btn primary">
+                    🔄 Reload Page
+                </button>
+                <button onclick="clearCacheAndReload()" class="blazor-error-btn secondary">
+                    🧹 Clear Cache & Reload
+                </button>
+            </div>
+
+            <button onclick="goToDashboard()" class="blazor-error-btn tertiary">
+                🏠 Go to Dashboard
+            </button>
+
+            <div class="blazor-error-tip">
+                💡 <strong>Tip:</strong> If buttons don't work, press
+                <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> to force a hard refresh
+            </div>
+
+            <details class="blazor-error-details">
+                <summary>Show technical details</summary>
+                <pre id="blazor-error-message">An unhandled error has occurred.</pre>
+            </details>
+        </div>
     </div>
 
     <!-- Radzen JS -->

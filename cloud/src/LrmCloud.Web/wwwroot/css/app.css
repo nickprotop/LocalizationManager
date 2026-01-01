@@ -677,25 +677,153 @@ div.rz-sidebar {
    Error UI
    ============================================================================= */
 
+/* Modern Blazor Error Overlay - Light Theme */
 #blazor-error-ui {
-    color-scheme: light only;
-    background: lightyellow;
-    bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
-    box-sizing: border-box;
-    display: none;
-    left: 0;
-    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
-    position: fixed;
-    width: 100%;
-    z-index: 1000;
+    display: none; /* Blazor shows this automatically on error */
 }
 
-#blazor-error-ui .dismiss {
-    cursor: pointer;
+.blazor-error-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+}
+
+.blazor-error-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 480px;
+    width: 90%;
+    text-align: center;
+    color: #1f2937;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    position: relative;
+}
+
+.blazor-error-dismiss {
     position: absolute;
-    right: 0.75rem;
-    top: 0.5rem;
+    top: 12px;
+    right: 12px;
+    background: transparent;
+    border: none;
+    color: #6b7280;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.blazor-error-dismiss:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #1f2937;
+}
+
+.blazor-error-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.blazor-error-card h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.blazor-error-message {
+    color: #6b7280;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+}
+
+.blazor-error-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.blazor-error-btn {
+    padding: 0.75rem 1.25rem;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.blazor-error-btn.primary {
+    background: var(--rz-primary, #3b82f6);
+    color: white;
+}
+
+.blazor-error-btn.primary:hover {
+    background: var(--rz-primary-dark, #2563eb);
+}
+
+.blazor-error-btn.secondary {
+    background: #6b7280;
+    color: white;
+}
+
+.blazor-error-btn.secondary:hover {
+    background: #4b5563;
+}
+
+.blazor-error-btn.tertiary {
+    background: transparent;
+    border: 1px solid #e5e7eb;
+    color: #374151;
+    width: 100%;
+}
+
+.blazor-error-btn.tertiary:hover {
+    background: #f9fafb;
+}
+
+.blazor-error-tip {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.blazor-error-tip kbd {
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.8rem;
+    border: 1px solid #d1d5db;
+    color: #374151;
+}
+
+.blazor-error-details {
+    margin-top: 1rem;
+    text-align: left;
+}
+
+.blazor-error-details summary {
+    cursor: pointer;
+    color: #6b7280;
+    font-size: 0.85rem;
+}
+
+.blazor-error-details pre {
+    background: #f9fafb;
+    padding: 0.75rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    overflow-x: auto;
+    margin-top: 0.5rem;
+    color: #dc2626;
+    border: 1px solid #e5e7eb;
 }
 
 .blazor-error-boundary {

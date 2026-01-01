@@ -373,3 +373,41 @@ window.downloadFileFromBase64 = function(fileName, base64Data, mimeType) {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 };
+
+// =============================================================================
+// Blazor Error UI Helpers
+// =============================================================================
+window.clearCacheAndReload = async function() {
+    try {
+        if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(key => caches.delete(key)));
+        }
+        if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map(r => r.unregister()));
+        }
+    } catch (e) {
+        console.error('Failed to clear cache:', e);
+    }
+    window.location.reload(true);
+};
+
+window.goToDashboard = async function() {
+    try {
+        if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(key => caches.delete(key)));
+        }
+    } catch (e) {
+        console.error('Failed to clear cache:', e);
+    }
+    window.location.href = '/?t=' + Date.now();
+};
+
+window.dismissBlazorError = function() {
+    const errorUI = document.getElementById('blazor-error-ui');
+    if (errorUI) {
+        errorUI.style.display = 'none';
+    }
+};
