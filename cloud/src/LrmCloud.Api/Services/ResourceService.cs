@@ -160,6 +160,12 @@ public class ResourceService : IResourceService
                 return (false, null, "You don't have permission to manage resources in this project");
             }
 
+            // Validate key name
+            if (string.IsNullOrWhiteSpace(request.KeyName))
+            {
+                return (false, null, "Key name cannot be empty");
+            }
+
             // Check if key already exists
             var exists = await _db.ResourceKeys
                 .AnyAsync(k => k.ProjectId == projectId && k.KeyName == request.KeyName);

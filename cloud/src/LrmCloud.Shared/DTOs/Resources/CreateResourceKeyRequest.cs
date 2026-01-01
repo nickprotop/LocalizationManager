@@ -8,6 +8,7 @@ namespace LrmCloud.Shared.DTOs.Resources;
 public class CreateResourceKeyRequest
 {
     [Required(ErrorMessage = "Key name is required")]
+    [MinLength(1, ErrorMessage = "Key name cannot be empty")]
     [MaxLength(500, ErrorMessage = "Key name must not exceed 500 characters")]
     public required string KeyName { get; set; }
 

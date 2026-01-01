@@ -65,6 +65,13 @@ public class KeySyncService : IKeySyncService
             {
                 var result = await ApplyEntryChangeAsync(projectId, entry, ct);
 
+                if (result.Error != null)
+                {
+                    // Skip invalid entries (e.g., empty key names)
+                    _logger.LogWarning("Skipping entry due to validation error: {Error}", result.Error);
+                    continue;
+                }
+
                 if (result.IsConflict)
                 {
                     response.Conflicts.Add(result.Conflict!);
@@ -371,6 +378,12 @@ public class KeySyncService : IKeySyncService
         EntryChangeDto entry,
         CancellationToken ct)
     {
+        // Validate key name
+        if (string.IsNullOrWhiteSpace(entry.Key))
+        {
+            return new EntryChangeResult { Error = "Key name cannot be empty" };
+        }
+
         // Find or create the resource key
         var resourceKey = await _db.ResourceKeys
             .Include(k => k.Translations)
@@ -625,6 +638,7 @@ public class KeySyncService : IKeySyncService
         public string? BeforeValue { get; set; }
         public string? BeforeHash { get; set; }
         public string? BeforeComment { get; set; }
+        public string? Error { get; set; }
     }
 
     private async Task<EntryDeletionResult> ApplyEntryDeletionAsync(
