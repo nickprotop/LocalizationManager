@@ -61,23 +61,15 @@ public class SetApiKeyCommand : Command<SetApiKeyCommand.Settings>
             AnsiConsole.MarkupLine($"Stored in: [dim]{AppDataPaths.GetCredentialsFilePath()}[/]");
             AnsiConsole.WriteLine();
 
-            // Show usage instructions
-            AnsiConsole.MarkupLine("[yellow]To use the secure credential store:[/]");
-            AnsiConsole.MarkupLine("Add this to your [cyan]lrm.json[/]:");
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("  {");
-            AnsiConsole.MarkupLine("    \"Translation\": {");
-            AnsiConsole.MarkupLine("      [green]\"UseSecureCredentialStore\": true[/]");
-            AnsiConsole.MarkupLine("    }");
-            AnsiConsole.MarkupLine("  }");
+            // Show usage info
+            AnsiConsole.MarkupLine("[green]The API key is now ready to use.[/] No additional configuration needed.");
             AnsiConsole.WriteLine();
 
             // Show alternative with environment variables
-            AnsiConsole.MarkupLine("[dim]Alternatively, use environment variables (recommended for CI/CD):[/]");
+            AnsiConsole.MarkupLine("[dim]For CI/CD, use environment variables instead:[/]");
             if (OperatingSystem.IsWindows())
             {
                 AnsiConsole.MarkupLine($"  [dim]PowerShell:[/] $env:LRM_{settings.Provider.ToUpperInvariant()}_API_KEY=\"your-key\"");
-                AnsiConsole.MarkupLine($"  [dim]CMD:[/] set LRM_{settings.Provider.ToUpperInvariant()}_API_KEY=your-key");
             }
             else
             {

@@ -313,8 +313,9 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
         CancellationToken cancellationToken)
     {
         var batchSize = settings.BatchSize ?? settings.LoadedConfiguration?.Translation?.BatchSize ?? 10;
-        var totalTranslations = keysToTranslate.Count * targetLanguages.Count;
-        var completed = 0;
+        var totalKeys = keysToTranslate.Count * targetLanguages.Count;
+        var translated = 0;
+        var skipped = 0;
 
         // Create a table to show results
         var table = new Table();
@@ -345,7 +346,7 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
                     targetDict.TryGetValue(key.Key, out var existing) &&
                     !string.IsNullOrWhiteSpace(existing.Value))
                 {
-                    completed++;
+                    skipped++;
                     continue;
                 }
 
@@ -544,6 +545,8 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
                             response.TranslatedText.Length > 40 ? response.TranslatedText.Substring(0, 37) + "..." : response.TranslatedText,
                             status);
                     }
+
+                    translated++;
                 }
                 catch (TranslationException ex)
                 {
@@ -553,8 +556,6 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
                         "[dim]N/A[/]",
                         $"[red]Error: {ex.ErrorCode}[/]");
                 }
-
-                completed++;
             }
 
             // Create backup before saving
@@ -576,7 +577,15 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
         AnsiConsole.WriteLine();
         AnsiConsole.Write(table);
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"Translated [cyan]{completed}[/] of [cyan]{totalTranslations}[/] items.");
+
+        if (skipped > 0)
+        {
+            AnsiConsole.MarkupLine($"Translated [cyan]{translated}[/] of [cyan]{totalKeys}[/] keys ([dim]{skipped} already had translations[/]).");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"Translated [cyan]{translated}[/] of [cyan]{totalKeys}[/] keys.");
+        }
     }
 
     private void ShowProviderNotConfiguredError(string provider)
