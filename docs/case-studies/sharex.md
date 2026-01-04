@@ -660,14 +660,14 @@ Translate multiple keys at once with the built-in translation feature:
 6. **Snapshot & rollback** - Save project state and restore if needed
 7. **GitHub integration** - Sync translations directly with your repository
 
-**Try LRM Cloud**: [lrmcloud.com](https://lrmcloud.com)
+**Try LRM Cloud**: [lrm-cloud.com](https://lrm-cloud.com)
 
 ---
 
 ## Want This for Your Project?
 
 - **CLI**: Free, open-source - [github.com/nickprotop/LocalizationManager](https://github.com/nickprotop/LocalizationManager)
-- **LRM Cloud**: Team collaboration, GitHub sync, web editor - [lrmcloud.com](https://lrmcloud.com)
+- **LRM Cloud**: Team collaboration, GitHub sync, web editor - [lrm-cloud.com](https://lrm-cloud.com)
 
 ### Quick Start
 
