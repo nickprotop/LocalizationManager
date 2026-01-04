@@ -97,6 +97,7 @@ CURRENT_POSTGRES_PORT=$(env_get 'POSTGRES_PORT' '5432')
 CURRENT_REDIS_PORT=$(env_get 'REDIS_PORT' '6379')
 CURRENT_MINIO_PORT=$(env_get 'MINIO_PORT' '9000')
 CURRENT_MINIO_CONSOLE=$(env_get 'MINIO_CONSOLE' '9001')
+CURRENT_UMAMI_PORT=$(env_get 'UMAMI_PORT' '')
 CURRENT_MINIO_USER=$(env_get 'MINIO_USER' 'lrmcloud')
 CURRENT_MINIO_PASSWORD=$(env_get 'MINIO_PASSWORD' '')
 
@@ -120,6 +121,8 @@ OLD_MINIO_PASSWORD="$CURRENT_MINIO_PASSWORD"
 CURRENT_JWT=$(config_get '.auth.jwtSecret' '')
 CURRENT_ENCRYPTION=$(config_get '.encryption.tokenKey' '')
 CURRENT_API_KEY_SECRET=$(config_get '.apiKeyMasterSecret' '')
+CURRENT_UMAMI_SECRET=$(config_get '.analytics.umamiSecret' '')
+CURRENT_WEBSITE_ID=$(config_get '.analytics.websiteId' '')
 
 CURRENT_MAIL_BACKEND=$(config_get '.mail.backend' 'smtp')
 CURRENT_MAIL_HOST=$(config_get '.mail.host' 'localhost')
@@ -209,6 +212,26 @@ MINIO_PORT=${MINIO_PORT:-$CURRENT_MINIO_PORT}
 
 read -p "MinIO Console Port (0=internal only) [$CURRENT_MINIO_CONSOLE]: " MINIO_CONSOLE
 MINIO_CONSOLE=${MINIO_CONSOLE:-$CURRENT_MINIO_CONSOLE}
+
+# Umami Analytics Dashboard Port
+if [ -n "$CURRENT_UMAMI_PORT" ]; then
+    CURRENT_UMAMI_ENABLED="y"
+    UMAMI_DEFAULT="Y/n"
+else
+    CURRENT_UMAMI_ENABLED="n"
+    UMAMI_DEFAULT="y/N"
+fi
+print_info "Umami dashboard requires direct port access (tracking works via main site)"
+read -p "Expose Umami dashboard port? [$UMAMI_DEFAULT]: " ENABLE_UMAMI
+ENABLE_UMAMI=${ENABLE_UMAMI:-$CURRENT_UMAMI_ENABLED}
+
+if [ "$ENABLE_UMAMI" = "y" ] || [ "$ENABLE_UMAMI" = "Y" ]; then
+    DEFAULT_UMAMI_PORT=${CURRENT_UMAMI_PORT:-3006}
+    read -p "Umami Direct Port [$DEFAULT_UMAMI_PORT]: " UMAMI_PORT
+    UMAMI_PORT=${UMAMI_PORT:-$DEFAULT_UMAMI_PORT}
+else
+    UMAMI_PORT=""
+fi
 
 read -p "Environment [$CURRENT_ENV]: " ENVIRONMENT
 ENVIRONMENT=${ENVIRONMENT:-$CURRENT_ENV}
@@ -420,6 +443,7 @@ DEFAULT_JWT_SECRET=${CURRENT_JWT:-$(generate_password)$(generate_password)}
 DEFAULT_ENCRYPTION_KEY=${CURRENT_ENCRYPTION:-$(generate_key)}
 DEFAULT_API_KEY_SECRET=${CURRENT_API_KEY_SECRET:-$(generate_password)$(generate_password)}
 DEFAULT_MINIO_PASSWORD=${CURRENT_MINIO_PASSWORD:-$(generate_password)}
+DEFAULT_UMAMI_SECRET=${CURRENT_UMAMI_SECRET:-$(generate_password)}
 
 # Prompt for PostgreSQL password
 if [ -n "$CURRENT_DB_PASSWORD" ]; then
@@ -474,6 +498,20 @@ else
     read -p "API Key Master Secret [$DEFAULT_API_KEY_SECRET]: " INPUT_API_KEY_SECRET
 fi
 API_KEY_SECRET=${INPUT_API_KEY_SECRET:-$DEFAULT_API_KEY_SECRET}
+
+# Prompt for Umami analytics secret
+if [ -n "$CURRENT_UMAMI_SECRET" ]; then
+    print_info "Umami secret exists (hidden)"
+    read -p "Umami Secret [keep existing]: " INPUT_UMAMI_SECRET
+else
+    read -p "Umami Secret [$DEFAULT_UMAMI_SECRET]: " INPUT_UMAMI_SECRET
+fi
+UMAMI_SECRET=${INPUT_UMAMI_SECRET:-$DEFAULT_UMAMI_SECRET}
+
+# Prompt for Analytics Website ID
+print_info "Website ID is obtained from Umami dashboard after creating a website"
+read -p "Analytics Website ID [${CURRENT_WEBSITE_ID:-skip for now}]: " INPUT_WEBSITE_ID
+WEBSITE_ID=${INPUT_WEBSITE_ID:-$CURRENT_WEBSITE_ID}
 
 # ============================================================================
 # GitHub OAuth Configuration (optional)
@@ -626,6 +664,10 @@ NEW_CONFIG=$(cat <<EOF
     "enterpriseTranslationChars": ${CURRENT_ENTERPRISE_TRANSLATION_CHARS},
     "enterpriseOtherChars": ${CURRENT_ENTERPRISE_OTHER_CHARS},
     "maxKeysPerProject": ${CURRENT_MAX_KEYS}
+  },
+  "analytics": {
+    "umamiSecret": "${UMAMI_SECRET}",
+    "websiteId": "${WEBSITE_ID}"
   }
 }
 EOF
@@ -677,6 +719,11 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 REDIS_PASSWORD=${REDIS_PASSWORD}
 MINIO_USER=lrmcloud
 MINIO_PASSWORD=${MINIO_PASSWORD}
+
+# Analytics
+UMAMI_SECRET=${UMAMI_SECRET}
+WEBSITE_ID=${WEBSITE_ID}
+UMAMI_PORT=${UMAMI_PORT}
 
 # Environment
 ENVIRONMENT=${ENVIRONMENT}
@@ -814,6 +861,16 @@ elif [ -n "$MINIO_CONSOLE" ] && [ "$MINIO_CONSOLE" != "0" ]; then
 EOF
 fi
 
+# Add Umami port if direct access enabled
+if [ -n "$UMAMI_PORT" ] && [ "$UMAMI_PORT" != "0" ]; then
+    cat >> "$OVERRIDE_FILE" <<EOF
+
+  umami:
+    ports:
+      - "${UMAMI_PORT}:3000"
+EOF
+fi
+
 print_success "Created docker-compose.override.yml"
 
 # ============================================================================
@@ -924,6 +981,14 @@ until docker exec lrmcloud-postgres pg_isready -U lrm -d lrmcloud &> /dev/null; 
 done
 print_success "PostgreSQL is ready"
 
+# Ensure umami database exists (for analytics)
+if docker exec lrmcloud-postgres psql -U lrm -d postgres -lqt | cut -d \| -f 1 | grep -qw umami; then
+    print_info "Umami database already exists"
+else
+    docker exec lrmcloud-postgres psql -U lrm -d postgres -c "CREATE DATABASE umami;"
+    print_success "Created umami database"
+fi
+
 # Update PostgreSQL password if changed
 if [ -n "$OLD_POSTGRES_PASSWORD" ] && [ "$POSTGRES_PASSWORD" != "$OLD_POSTGRES_PASSWORD" ]; then
     print_step "Updating PostgreSQL password..."
@@ -1003,6 +1068,11 @@ if [ -n "$MINIO_CONSOLE" ] && [ "$MINIO_CONSOLE" != "0" ]; then
     echo "  • MinIO Console: http://localhost:${MINIO_CONSOLE}"
 else
     echo "  • MinIO Console: (internal only)"
+fi
+if [ -n "$UMAMI_PORT" ] && [ "$UMAMI_PORT" != "0" ]; then
+    echo "  • Analytics:     http://localhost:${UMAMI_PORT}"
+else
+    echo "  • Analytics:     (internal only)"
 fi
 echo ""
 echo "Configuration: $CONFIG_FILE"

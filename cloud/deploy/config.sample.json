@@ -174,5 +174,9 @@
   },
   "superAdmin": {
     "emails": ["admin@example.com"]
+  },
+  "analytics": {
+    "umamiSecret": "YOUR_UMAMI_APP_SECRET_32_PLUS_CHARS",
+    "websiteId": "YOUR_UMAMI_WEBSITE_ID"
   }
 }

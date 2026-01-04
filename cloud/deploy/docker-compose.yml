@@ -18,6 +18,7 @@ services:
       - api
       - web
       - www
+      - umami
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
       interval: 30s
@@ -56,6 +57,8 @@ services:
     # No ports exposed - proxied by nginx
     volumes:
       - ./data/logs/web:/var/log/nginx
+    environment:
+      - WEBSITE_ID=${WEBSITE_ID:-}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:80/health"]
       interval: 30s
@@ -75,6 +78,8 @@ services:
     # No ports exposed - proxied by nginx
     volumes:
       - ./data/logs/www:/var/log/nginx
+    environment:
+      - WEBSITE_ID=${WEBSITE_ID:-}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:80/health"]
       interval: 30s
@@ -129,4 +134,24 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
+
+  # ==========================================================================
+  # Umami Analytics
+  # ==========================================================================
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    container_name: lrmcloud-umami
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-lrm}:${POSTGRES_PASSWORD}@lrmcloud-postgres:5432/umami
+      - DATABASE_TYPE=postgresql
+      - APP_SECRET=${UMAMI_SECRET}
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 

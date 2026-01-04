@@ -175,6 +175,16 @@ else
 fi
 
 # ============================================================================
+# Step 1.6: Show analytics config status
+# ============================================================================
+WEBSITE_ID=$(grep -oP '^WEBSITE_ID=\K.*' "$SCRIPT_DIR/.env" 2>/dev/null || echo "")
+if [ -n "$WEBSITE_ID" ]; then
+    print_info "Analytics Website ID: ${WEBSITE_ID:0:8}..."
+else
+    print_info "Analytics Website ID: not configured (run setup.sh to set)"
+fi
+
+# ============================================================================
 
 # Step 2: Pull base images
 print_step "Pulling base Docker images..."
@@ -206,6 +216,15 @@ docker compose stop api web www nginx
 # Step 5: Start new containers
 print_step "Starting containers..."
 docker compose up -d
+
+# Step 5.1: Ensure umami database exists (for analytics)
+print_step "Ensuring umami database exists..."
+if docker exec lrmcloud-postgres psql -U "${POSTGRES_USER:-lrm}" -d postgres -lqt | cut -d \| -f 1 | grep -qw umami; then
+    print_info "Umami database already exists"
+else
+    docker exec lrmcloud-postgres psql -U "${POSTGRES_USER:-lrm}" -d postgres -c "CREATE DATABASE umami;"
+    print_success "Created umami database"
+fi
 
 # Step 5.5: Restart nginx to ensure it picks up config changes + refresh DNS
 print_step "Restarting nginx..."

@@ -65,5 +65,14 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -sf http://localhost:80/ || exit 1
 
-# nginx runs as non-root by default in this config
-CMD ["nginx", "-g", "daemon off;"]
+# Create entrypoint script to inject WEBSITE_ID at runtime
+RUN printf '#!/bin/sh\n\
+set -e\n\
+if [ -n "$WEBSITE_ID" ]; then\n\
+  sed -i "s/data-website-id=\"[^\"]*\"/data-website-id=\"$WEBSITE_ID\"/g" \\\n\
+    /usr/share/nginx/html/index.html\n\
+fi\n\
+exec nginx -g "daemon off;"\n\
+' > /entrypoint.sh && chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

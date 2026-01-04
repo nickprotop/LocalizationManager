@@ -6,3 +6,6 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Grant privileges (database and user created by POSTGRES_DB/POSTGRES_USER env vars)
 -- Additional setup can be added here as needed
+
+-- Umami analytics database
+CREATE DATABASE umami;

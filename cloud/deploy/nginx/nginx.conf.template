@@ -52,6 +52,7 @@ http {
     # Rate limiting zones
     limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
     limit_req_zone $binary_remote_addr zone=api:10m rate=100r/s;
+    limit_req_zone $binary_remote_addr zone=analytics:10m rate=10r/s;
 
     # Upstream servers
     upstream api {
@@ -66,6 +67,11 @@ http {
 
     upstream www {
         server lrmcloud-www:80;
+        keepalive 8;
+    }
+
+    upstream umami {
+        server lrmcloud-umami:3000;
         keepalive 8;
     }
 
@@ -191,6 +197,33 @@ http {
 
         location /app/ {
             proxy_pass http://web/;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # =====================================================
+        # Analytics Tracking (Umami) - /analytics/*
+        # Dashboard accessible via direct port (see setup.sh)
+        # =====================================================
+
+        # Tracking script
+        location = /analytics/script.js {
+            proxy_pass http://umami/script.js;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            expires 1d;
+            add_header Cache-Control "public";
+        }
+
+        # Tracking API endpoint
+        location = /analytics/api/send {
+            limit_req zone=analytics burst=20 nodelay;
+            limit_req_status 429;
+
+            proxy_pass http://umami/api/send;
             proxy_http_version 1.1;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
@@ -333,6 +366,33 @@ http {
 
         location /app/ {
             proxy_pass http://web/;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # =====================================================
+        # Analytics Tracking (Umami) - /analytics/*
+        # Dashboard accessible via direct port (see setup.sh)
+        # =====================================================
+
+        # Tracking script
+        location = /analytics/script.js {
+            proxy_pass http://umami/script.js;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            expires 1d;
+            add_header Cache-Control "public";
+        }
+
+        # Tracking API endpoint
+        location = /analytics/api/send {
+            limit_req zone=analytics burst=20 nodelay;
+            limit_req_status 429;
+
+            proxy_pass http://umami/api/send;
             proxy_http_version 1.1;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
