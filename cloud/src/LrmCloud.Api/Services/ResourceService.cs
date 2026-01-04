@@ -1081,7 +1081,7 @@ public class ResourceService : IResourceService
                 IsDefault = resolvedLangCode == project.DefaultLanguage,
                 TranslatedCount = l.TranslatedCount,
                 TotalKeys = totalKeys,
-                CompletionPercentage = l.TotalCount > 0 ? Math.Round((double)l.TranslatedCount / l.TotalCount * 100, 1) : 0,
+                CompletionPercentage = totalKeys > 0 ? Math.Round((double)l.TranslatedCount / totalKeys * 100, 1) : 0,
                 LastUpdated = l.LastUpdated
             };
         }).OrderBy(l => !l.IsDefault).ThenBy(l => l.LanguageCode).ToList();
