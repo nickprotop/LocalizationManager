@@ -552,8 +552,10 @@ public class TranslationController : ApiControllerBase
                     });
             }
 
+            // Pass false for useLocalCredentialStore to ensure we only test the provided key,
+            // not fall back to local credential storage
             var provider = LocalizationManager.Core.Translation.TranslationProviderFactory.Create(
-                request.ProviderName, config);
+                request.ProviderName, config, useLocalCredentialStore: false);
 
             // Test with a simple translation
             var testRequest = new LocalizationManager.Core.Translation.TranslationRequest

@@ -1027,7 +1027,9 @@ public class CloudTranslationService : ICloudTranslationService
             // Set the API key and apply provider-specific configuration
             ApplyProviderConfig(config, providerName, apiKey, resolved.Config);
 
-            return TranslationProviderFactory.Create(providerName, config);
+            // Pass false for useLocalCredentialStore - cloud should only use explicitly configured keys,
+            // not fall back to local credential storage which might exist on dev machines
+            return TranslationProviderFactory.Create(providerName, config, useLocalCredentialStore: false);
         }
         catch (Exception ex)
         {
