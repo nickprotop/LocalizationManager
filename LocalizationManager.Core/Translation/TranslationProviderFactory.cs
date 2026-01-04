@@ -43,16 +43,21 @@ public static class TranslationProviderFactory
     /// </summary>
     /// <param name="providerName">The provider name (e.g., "deepl", "libretranslate", "openai", "claude", "ollama", "azureopenai", "azuretranslator").</param>
     /// <param name="config">The configuration model containing API keys and settings.</param>
+    /// <param name="useLocalCredentialStore">
+    /// Whether to check the local secure credential store for API keys.
+    /// Set to false for server-side usage where local credentials shouldn't be used.
+    /// Default: true for CLI compatibility.
+    /// </param>
     /// <returns>An instance of the requested provider.</returns>
     /// <exception cref="ArgumentException">If the provider name is unknown.</exception>
-    public static ITranslationProvider Create(string providerName, ConfigurationModel? config)
+    public static ITranslationProvider Create(string providerName, ConfigurationModel? config, bool useLocalCredentialStore = true)
     {
         if (string.IsNullOrWhiteSpace(providerName))
         {
             throw new ArgumentException("Provider name cannot be null or empty.", nameof(providerName));
         }
 
-        var apiKey = ApiKeyResolver.GetApiKey(providerName, config);
+        var apiKey = ApiKeyResolver.GetApiKey(providerName, config, useLocalCredentialStore);
         var aiConfig = config?.Translation?.AIProviders;
 
         return providerName.ToLowerInvariant() switch

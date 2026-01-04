@@ -16,14 +16,19 @@ public static class ApiKeyResolver
     /// </summary>
     /// <param name="provider">The provider name (e.g., "google", "deepl", "libretranslate").</param>
     /// <param name="config">The configuration model, or null.</param>
+    /// <param name="useLocalCredentialStore">
+    /// Whether to check the local secure credential store.
+    /// Set to false when using server-side configs that shouldn't fall back to local storage.
+    /// Default: true for CLI compatibility.
+    /// </param>
     /// <returns>The API key if found, otherwise null.</returns>
     /// <remarks>
     /// Priority order:
     /// 1. Environment variable (LRM_GOOGLE_API_KEY, LRM_DEEPL_API_KEY, etc.)
-    /// 2. Secure credential store (if UseSecureCredentialStore is enabled)
+    /// 2. Secure credential store (if useLocalCredentialStore is true)
     /// 3. Plain configuration file (lrm.json)
     /// </remarks>
-    public static string? GetApiKey(string provider, ConfigurationModel? config)
+    public static string? GetApiKey(string provider, ConfigurationModel? config, bool useLocalCredentialStore = true)
     {
         if (string.IsNullOrWhiteSpace(provider))
         {
@@ -39,7 +44,7 @@ public static class ApiKeyResolver
         }
 
         // 2. Try secure credential store (if enabled)
-        if (config?.Translation?.UseSecureCredentialStore == true)
+        if (useLocalCredentialStore)
         {
             try
             {
@@ -65,8 +70,9 @@ public static class ApiKeyResolver
     /// </summary>
     /// <param name="provider">The provider name.</param>
     /// <param name="config">The configuration model, or null.</param>
+    /// <param name="useLocalCredentialStore">Whether to check the local secure credential store.</param>
     /// <returns>A description of where the API key was found, or null if not found.</returns>
-    public static string? GetApiKeySource(string provider, ConfigurationModel? config)
+    public static string? GetApiKeySource(string provider, ConfigurationModel? config, bool useLocalCredentialStore = true)
     {
         if (string.IsNullOrWhiteSpace(provider))
         {
@@ -81,8 +87,8 @@ public static class ApiKeyResolver
             return $"Environment variable ({envVar})";
         }
 
-        // Check secure store
-        if (config?.Translation?.UseSecureCredentialStore == true)
+        // Check secure store (if enabled)
+        if (useLocalCredentialStore)
         {
             try
             {
@@ -113,9 +119,10 @@ public static class ApiKeyResolver
     /// </summary>
     /// <param name="provider">The provider name.</param>
     /// <param name="config">The configuration model, or null.</param>
+    /// <param name="useLocalCredentialStore">Whether to check the local secure credential store.</param>
     /// <returns>True if an API key is found, otherwise false.</returns>
-    public static bool HasApiKey(string provider, ConfigurationModel? config)
+    public static bool HasApiKey(string provider, ConfigurationModel? config, bool useLocalCredentialStore = true)
     {
-        return !string.IsNullOrWhiteSpace(GetApiKey(provider, config));
+        return !string.IsNullOrWhiteSpace(GetApiKey(provider, config, useLocalCredentialStore));
     }
 }
