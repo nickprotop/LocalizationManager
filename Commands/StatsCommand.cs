@@ -146,13 +146,18 @@ public class StatsCommand : Command<BaseFormattableCommandSettings>
     {
         DisplayConfigNotice(settings);
 
+        // Get default language key count for coverage calculation
+        var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
+        var defaultKeyCount = defaultFile?.Count ?? 0;
+
         // Create statistics table
         var table = new Table();
         table.Title = new TableTitle("[bold]Localization Statistics[/]");
         table.AddColumn("Language");
-        table.AddColumn("Total Keys");
-        table.AddColumn("Completed");
+        table.AddColumn("Keys");
+        table.AddColumn("Translated");
         table.AddColumn("Empty");
+        table.AddColumn("Missing");
         table.AddColumn("Coverage");
         table.AddColumn("File Size");
 
@@ -160,12 +165,25 @@ public class StatsCommand : Command<BaseFormattableCommandSettings>
         {
             var fileInfo = new FileInfo(rf.Language.FilePath);
             var fileSizeKb = (fileInfo.Length / 1024.0).ToString("F1");
+
+            // Empty = keys in file with empty values
             var emptyCount = rf.Count - rf.CompletedCount;
 
+            // Missing = keys in default but not in this file
+            var missingVsDefault = rf.Language.IsDefault ? 0 : Math.Max(0, defaultKeyCount - rf.Count);
+
+            // Coverage = keys in file / keys in default
+            var coverageVsDefault = rf.Language.IsDefault ? 100.0 :
+                (defaultKeyCount > 0 ? (rf.Count * 100.0 / defaultKeyCount) : 100.0);
+
             // Color code coverage
-            var coverageColor = rf.CompletionPercentage >= 100 ? "green" :
-                               rf.CompletionPercentage >= 80 ? "yellow" :
+            var coverageColor = coverageVsDefault >= 100 ? "green" :
+                               coverageVsDefault >= 80 ? "yellow" :
                                "red";
+
+            // Color empty/missing if non-zero
+            var emptyDisplay = emptyCount > 0 ? $"[yellow]{emptyCount}[/]" : "0";
+            var missingDisplay = missingVsDefault > 0 ? $"[red]{missingVsDefault}[/]" : "0";
 
             var languageDisplay = rf.Language.IsDefault
                 ? $"[yellow]{rf.Language.Name.EscapeMarkup()}[/]"
@@ -175,8 +193,9 @@ public class StatsCommand : Command<BaseFormattableCommandSettings>
                 languageDisplay,
                 rf.Count.ToString(),
                 rf.CompletedCount.ToString(),
-                emptyCount.ToString(),
-                $"[{coverageColor}]{rf.CompletionPercentage:F1}%[/]",
+                emptyDisplay,
+                missingDisplay,
+                $"[{coverageColor}]{coverageVsDefault:F1}%[/]",
                 $"{fileSizeKb} KB"
             );
         }
@@ -203,21 +222,34 @@ public class StatsCommand : Command<BaseFormattableCommandSettings>
 
     private void DisplayJson(List<LocalizationManager.Core.Models.ResourceFile> resourceFiles)
     {
-        var stats = resourceFiles.Select(rf => new
+        var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
+        var defaultKeyCount = defaultFile?.Count ?? 0;
+
+        var stats = resourceFiles.Select(rf =>
         {
-            language = rf.Language.Name,
-            isDefault = rf.Language.IsDefault,
-            totalKeys = rf.Count,
-            completedKeys = rf.CompletedCount,
-            emptyKeys = rf.Count - rf.CompletedCount,
-            coveragePercentage = rf.CompletionPercentage,
-            filePath = rf.Language.FilePath,
-            fileSizeBytes = new FileInfo(rf.Language.FilePath).Length
+            var missingVsDefault = rf.Language.IsDefault ? 0 : Math.Max(0, defaultKeyCount - rf.Count);
+            var coverageVsDefault = rf.Language.IsDefault ? 100.0 :
+                (defaultKeyCount > 0 ? (rf.Count * 100.0 / defaultKeyCount) : 100.0);
+
+            return new
+            {
+                language = rf.Language.Name,
+                languageCode = rf.Language.Code,
+                isDefault = rf.Language.IsDefault,
+                totalKeys = rf.Count,
+                translatedKeys = rf.CompletedCount,
+                emptyKeys = rf.Count - rf.CompletedCount,
+                missingKeys = missingVsDefault,
+                coveragePercentage = Math.Round(coverageVsDefault, 1),
+                filePath = rf.Language.FilePath,
+                fileSizeBytes = new FileInfo(rf.Language.FilePath).Length
+            };
         }).ToList();
 
         var output = new
         {
             totalLanguages = resourceFiles.Count,
+            defaultKeyCount = defaultKeyCount,
             statistics = stats
         };
 
@@ -226,6 +258,9 @@ public class StatsCommand : Command<BaseFormattableCommandSettings>
 
     private void DisplaySimple(List<LocalizationManager.Core.Models.ResourceFile> resourceFiles, BaseFormattableCommandSettings settings)
     {
+        var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
+        var defaultKeyCount = defaultFile?.Count ?? 0;
+
         Console.WriteLine("Localization Statistics");
         Console.WriteLine("======================");
         Console.WriteLine();
@@ -235,15 +270,20 @@ public class StatsCommand : Command<BaseFormattableCommandSettings>
             var fileInfo = new FileInfo(rf.Language.FilePath);
             var fileSizeKb = (fileInfo.Length / 1024.0).ToString("F1");
             var emptyCount = rf.Count - rf.CompletedCount;
+            var missingVsDefault = rf.Language.IsDefault ? 0 : Math.Max(0, defaultKeyCount - rf.Count);
+            var coverageVsDefault = rf.Language.IsDefault ? 100.0 :
+                (defaultKeyCount > 0 ? (rf.Count * 100.0 / defaultKeyCount) : 100.0);
+
             var defaultCode = settings.LoadedConfiguration?.DefaultLanguageCode ?? "default";
             var defaultMarker = rf.Language.IsDefault ? $" ({defaultCode})" : "";
 
             Console.WriteLine($"{rf.Language.Name}{defaultMarker}");
-            Console.WriteLine($"  Total Keys:    {rf.Count}");
-            Console.WriteLine($"  Completed:     {rf.CompletedCount}");
-            Console.WriteLine($"  Empty:         {emptyCount}");
-            Console.WriteLine($"  Coverage:      {rf.CompletionPercentage:F1}%");
-            Console.WriteLine($"  File Size:     {fileSizeKb} KB");
+            Console.WriteLine($"  Keys:        {rf.Count}");
+            Console.WriteLine($"  Translated:  {rf.CompletedCount}");
+            Console.WriteLine($"  Empty:       {emptyCount}");
+            Console.WriteLine($"  Missing:     {missingVsDefault}");
+            Console.WriteLine($"  Coverage:    {coverageVsDefault:F1}%");
+            Console.WriteLine($"  File Size:   {fileSizeKb} KB");
             Console.WriteLine();
         }
     }
