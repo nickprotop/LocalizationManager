@@ -60,10 +60,17 @@ public class KeySyncService : IKeySyncService
 
         try
         {
+            // Pre-load all existing keys for this project to avoid duplicate lookups
+            // and track newly created keys within this batch
+            var existingKeys = await _db.ResourceKeys
+                .Include(k => k.Translations)
+                .Where(k => k.ProjectId == projectId)
+                .ToDictionaryAsync(k => k.KeyName, ct);
+
             // Process entry changes
             foreach (var entry in request.Entries)
             {
-                var result = await ApplyEntryChangeAsync(projectId, entry, ct);
+                var result = await ApplyEntryChangeAsync(projectId, entry, existingKeys, ct);
 
                 if (result.Error != null)
                 {
@@ -376,6 +383,7 @@ public class KeySyncService : IKeySyncService
     private async Task<EntryChangeResult> ApplyEntryChangeAsync(
         int projectId,
         EntryChangeDto entry,
+        Dictionary<string, Entities.ResourceKey> existingKeys,
         CancellationToken ct)
     {
         // Validate key name
@@ -384,10 +392,8 @@ public class KeySyncService : IKeySyncService
             return new EntryChangeResult { Error = "Key name cannot be empty" };
         }
 
-        // Find or create the resource key
-        var resourceKey = await _db.ResourceKeys
-            .Include(k => k.Translations)
-            .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == entry.Key, ct);
+        // Find or create the resource key (using in-memory dictionary to avoid duplicates in batch)
+        existingKeys.TryGetValue(entry.Key, out var resourceKey);
 
         if (resourceKey == null)
         {
@@ -407,6 +413,8 @@ public class KeySyncService : IKeySyncService
                 Translations = new List<Entities.Translation>()
             };
             _db.ResourceKeys.Add(resourceKey);
+            // Add to dictionary so subsequent entries for the same key use this instance
+            existingKeys[entry.Key] = resourceKey;
             // Note: Don't SaveChanges here - batch with final save for performance
         }
         else
