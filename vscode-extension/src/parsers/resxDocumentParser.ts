@@ -24,6 +24,12 @@ export class ResxDocumentParser implements IResourceDocumentParser {
 
         let match;
         while ((match = this.dataBlockRegex.exec(text)) !== null) {
+            // Skip file/binary references (icons, images, sounds, etc.)
+            // These have type="System.Resources.ResXFileRef" and should not be translated
+            if (match[0].includes('type="System.Resources.ResXFileRef')) {
+                continue;
+            }
+
             const keyName = match[1];
             const blockContent = match[2];
             const startIndex = match.index;

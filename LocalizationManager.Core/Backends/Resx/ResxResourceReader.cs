@@ -108,6 +108,14 @@ public class ResxResourceReader : IResourceReader
 
         foreach (var dataElement in dataElements)
         {
+            // Skip file/binary references (icons, images, sounds, etc.)
+            // These have type="System.Resources.ResXFileRef, ..." and should not be translated
+            var typeAttr = dataElement.Attribute("type");
+            if (typeAttr != null && typeAttr.Value.Contains("ResXFileRef"))
+            {
+                continue;
+            }
+
             var key = dataElement.Attribute("name")?.Value;
             if (string.IsNullOrEmpty(key))
             {
