@@ -97,6 +97,49 @@ public class ResxResourceReader : IResourceReader
         => Task.FromResult(Read(reader, metadata));
 
     /// <summary>
+    /// Gets the keys of all file/binary references (icons, images, sounds, etc.) in a .resx file.
+    /// These entries have type="System.Resources.ResXFileRef, ..." and are not translatable strings.
+    /// </summary>
+    /// <param name="language">The language info containing the file path.</param>
+    /// <returns>A set of keys that are file references.</returns>
+    public HashSet<string> GetFileReferenceKeys(LanguageInfo language)
+    {
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (string.IsNullOrEmpty(language.FilePath) || !File.Exists(language.FilePath))
+        {
+            return keys;
+        }
+
+        try
+        {
+            using var xmlReader = XmlReader.Create(language.FilePath, CreateSecureXmlSettings());
+            var xdoc = XDocument.Load(xmlReader);
+
+            var dataElements = xdoc.Root?.Elements("data") ?? Enumerable.Empty<XElement>();
+
+            foreach (var dataElement in dataElements)
+            {
+                var typeAttr = dataElement.Attribute("type");
+                if (typeAttr != null && typeAttr.Value.Contains("ResXFileRef"))
+                {
+                    var key = dataElement.Attribute("name")?.Value;
+                    if (!string.IsNullOrEmpty(key))
+                    {
+                        keys.Add(key);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // If we can't read the file, return empty set
+        }
+
+        return keys;
+    }
+
+    /// <summary>
     /// Internal method to parse an XDocument into a ResourceFile.
     /// </summary>
     private static ResourceFile ParseXDocument(XDocument xdoc, LanguageInfo language)

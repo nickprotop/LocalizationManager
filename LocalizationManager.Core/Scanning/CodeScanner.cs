@@ -26,13 +26,21 @@ public class CodeScanner
     /// <summary>
     /// Scan source code for localization key references and compare with resource files
     /// </summary>
+    /// <param name="sourcePath">Path to source code directory</param>
+    /// <param name="resourceFiles">Resource files to compare against</param>
+    /// <param name="strictMode">If true, only include high-confidence matches</param>
+    /// <param name="excludePatterns">Glob patterns to exclude from scanning</param>
+    /// <param name="resourceClassNames">Custom resource class names to detect</param>
+    /// <param name="localizationMethods">Custom localization method names to detect</param>
+    /// <param name="excludeFromMissing">Keys to exclude from "missing keys" report (e.g., file references)</param>
     public ScanResult Scan(
         string sourcePath,
         List<ResourceFile> resourceFiles,
         bool strictMode = false,
         IEnumerable<string>? excludePatterns = null,
         List<string>? resourceClassNames = null,
-        List<string>? localizationMethods = null)
+        List<string>? localizationMethods = null,
+        HashSet<string>? excludeFromMissing = null)
     {
         var result = new ScanResult
         {
@@ -82,9 +90,14 @@ public class CodeScanner
             result.AllKeyUsages.Add(usage);
 
             // Track missing keys (in code, not in resources)
+            // Skip keys that are in the exclude list (e.g., file references)
             if (!usage.ExistsInResources)
             {
-                result.MissingKeys.Add(usage);
+                var isExcluded = excludeFromMissing?.Contains(key) ?? false;
+                if (!isExcluded)
+                {
+                    result.MissingKeys.Add(usage);
+                }
             }
         }
 
@@ -122,13 +135,15 @@ public class CodeScanner
     /// <param name="strictMode">If true, only include high-confidence matches</param>
     /// <param name="resourceClassNames">Custom resource class names to detect</param>
     /// <param name="localizationMethods">Custom localization method names to detect</param>
+    /// <param name="excludeFromMissing">Keys to exclude from "missing keys" report (e.g., file references)</param>
     /// <returns>Scan result (same format as full scan, but for single file)</returns>
     public ScanResult ScanSingleFile(
         string filePath,
         List<ResourceFile> resourceFiles,
         bool strictMode = false,
         List<string>? resourceClassNames = null,
-        List<string>? localizationMethods = null)
+        List<string>? localizationMethods = null,
+        HashSet<string>? excludeFromMissing = null)
     {
         var result = new ScanResult
         {
@@ -185,9 +200,14 @@ public class CodeScanner
                 result.AllKeyUsages.Add(usage);
 
                 // Track missing keys (in code, not in resources)
+                // Skip keys that are in the exclude list (e.g., file references)
                 if (!usage.ExistsInResources)
                 {
-                    result.MissingKeys.Add(usage);
+                    var isExcluded = excludeFromMissing?.Contains(key) ?? false;
+                    if (!isExcluded)
+                    {
+                        result.MissingKeys.Add(usage);
+                    }
                 }
             }
 
@@ -229,6 +249,7 @@ public class CodeScanner
     /// <param name="strictMode">If true, only include high-confidence matches</param>
     /// <param name="resourceClassNames">Custom resource class names to detect</param>
     /// <param name="localizationMethods">Custom localization method names to detect</param>
+    /// <param name="excludeFromMissing">Keys to exclude from "missing keys" report (e.g., file references)</param>
     /// <returns>Scan result (same format as full scan, but for single file)</returns>
     public ScanResult ScanSingleFileContent(
         string filePath,
@@ -236,7 +257,8 @@ public class CodeScanner
         List<ResourceFile> resourceFiles,
         bool strictMode = false,
         List<string>? resourceClassNames = null,
-        List<string>? localizationMethods = null)
+        List<string>? localizationMethods = null,
+        HashSet<string>? excludeFromMissing = null)
     {
         var result = new ScanResult
         {
@@ -293,9 +315,14 @@ public class CodeScanner
                 result.AllKeyUsages.Add(usage);
 
                 // Track missing keys (in code, not in resources)
+                // Skip keys that are in the exclude list (e.g., file references)
                 if (!usage.ExistsInResources)
                 {
-                    result.MissingKeys.Add(usage);
+                    var isExcluded = excludeFromMissing?.Contains(key) ?? false;
+                    if (!isExcluded)
+                    {
+                        result.MissingKeys.Add(usage);
+                    }
                 }
             }
 

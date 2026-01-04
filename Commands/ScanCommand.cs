@@ -3,6 +3,7 @@
 
 using System.ComponentModel;
 using LocalizationManager.Core;
+using LocalizationManager.Core.Backends.Resx;
 using LocalizationManager.Core.Enums;
 using LocalizationManager.Core.Models;
 using LocalizationManager.Core.Output;
@@ -55,6 +56,10 @@ public class ScanCommand : Command<ScanCommand.Settings>
         [CommandOption("--file <PATH>")]
         [Description("Scan a single file instead of the entire codebase")]
         public string? FilePath { get; set; }
+
+        [CommandOption("--include-file-refs")]
+        [Description("Include file references (icons, images, sounds) in missing keys report. By default, .resx file references are excluded.")]
+        public bool IncludeFileRefs { get; set; }
     }
 
     public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken = default)
@@ -159,10 +164,26 @@ public class ScanCommand : Command<ScanCommand.Settings>
             // Scan code
             var scanner = new CodeScanner();
 
+            // Get file reference keys to exclude from "missing keys" (resx only, unless --include-file-refs)
+            HashSet<string>? excludeFromMissing = null;
+            if (!settings.IncludeFileRefs && backendName == "resx")
+            {
+                var defaultLanguage = languages.FirstOrDefault(l => l.IsDefault);
+                if (defaultLanguage != null)
+                {
+                    var resxReader = new ResxResourceReader();
+                    excludeFromMissing = resxReader.GetFileReferenceKeys(defaultLanguage);
+                    if (excludeFromMissing.Count > 0 && isTableFormat)
+                    {
+                        AnsiConsole.MarkupLine($"[dim]Excluding {excludeFromMissing.Count} file references from missing keys report[/]");
+                    }
+                }
+            }
+
             // Check if scanning a single file
             if (settings.FilePath != null)
             {
-                return ExecuteSingleFileScan(scanner, settings, resourceFiles, resourceClassNames, localizationMethods, format, isTableFormat);
+                return ExecuteSingleFileScan(scanner, settings, resourceFiles, resourceClassNames, localizationMethods, format, isTableFormat, excludeFromMissing);
             }
 
             // Full codebase scan
@@ -175,13 +196,13 @@ public class ScanCommand : Command<ScanCommand.Settings>
                     {
                         ctx.Spinner(Spinner.Known.Dots);
                         return scanner.Scan(sourcePath, resourceFiles, settings.StrictMode, excludePatterns,
-                            resourceClassNames, localizationMethods);
+                            resourceClassNames, localizationMethods, excludeFromMissing);
                     });
             }
             else
             {
                 result = scanner.Scan(sourcePath, resourceFiles, settings.StrictMode, excludePatterns,
-                    resourceClassNames, localizationMethods);
+                    resourceClassNames, localizationMethods, excludeFromMissing);
             }
 
             // Display results based on format
@@ -223,7 +244,8 @@ public class ScanCommand : Command<ScanCommand.Settings>
         List<string>? resourceClassNames,
         List<string>? localizationMethods,
         OutputFormat format,
-        bool isTableFormat)
+        bool isTableFormat,
+        HashSet<string>? excludeFromMissing)
     {
         var filePath = Path.GetFullPath(settings.FilePath!);
 
@@ -256,13 +278,13 @@ public class ScanCommand : Command<ScanCommand.Settings>
                 {
                     ctx.Spinner(Spinner.Known.Dots);
                     return scanner.ScanSingleFile(filePath, resourceFiles, settings.StrictMode,
-                        resourceClassNames, localizationMethods);
+                        resourceClassNames, localizationMethods, excludeFromMissing);
                 });
         }
         else
         {
             result = scanner.ScanSingleFile(filePath, resourceFiles, settings.StrictMode,
-                resourceClassNames, localizationMethods);
+                resourceClassNames, localizationMethods, excludeFromMissing);
         }
 
         // Display results using existing display methods
