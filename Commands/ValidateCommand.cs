@@ -698,7 +698,7 @@ public class ValidateCommand : Command<ValidateCommandSettings>
             // Find all case variants in resource files
             var variants = resourceFiles
                 .SelectMany(rf => rf.Entries)
-                .Where(e => e.Key.Equals(normalizedKey, StringComparison.OrdinalIgnoreCase))
+                .Where(e => e.Key == normalizedKey)
                 .Select(e => e.Key)
                 .Distinct()
                 .ToList();

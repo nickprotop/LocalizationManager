@@ -344,7 +344,7 @@ public class ImportCommand : Command<ImportCommandSettings>
                 }
 
                 var newValue = values[langName];
-                var existingEntry = resourceFile.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+                var existingEntry = resourceFile.Entries.FirstOrDefault(e => e.Key == key);
 
                 if (existingEntry != null)
                 {

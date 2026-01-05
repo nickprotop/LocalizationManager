@@ -230,7 +230,7 @@ public class ExportCommand : Command<ExportCommandSettings>
             // Add values for each language
             foreach (var resourceFile in resourceFiles)
             {
-                var entry = resourceFile.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+                var entry = resourceFile.Entries.FirstOrDefault(e => e.Key == key);
                 row.Add(entry?.Value ?? string.Empty);
             }
 
@@ -242,7 +242,7 @@ public class ExportCommand : Command<ExportCommandSettings>
             }
 
             // Add comment (from default language)
-            var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+            var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == key);
             row.Add(defaultEntry?.Comment ?? string.Empty);
 
             sb.AppendLine(EscapeCsvRow(row));
@@ -317,11 +317,11 @@ public class ExportCommand : Command<ExportCommandSettings>
             var translations = new Dictionary<string, string?>();
             foreach (var resourceFile in resourceFiles)
             {
-                var entry = resourceFile.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+                var entry = resourceFile.Entries.FirstOrDefault(e => e.Key == key);
                 translations[resourceFile.Language.Name] = entry?.Value;
             }
 
-            var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+            var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == key);
 
             var item = new Dictionary<string, object?>
             {
@@ -375,13 +375,13 @@ public class ExportCommand : Command<ExportCommandSettings>
             // Add translations for each language
             foreach (var resourceFile in resourceFiles)
             {
-                var entry = resourceFile.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+                var entry = resourceFile.Entries.FirstOrDefault(e => e.Key == key);
                 var value = entry?.Value ?? "(empty)";
                 sb.AppendLine($"  {resourceFile.Language.Name}: {value}");
             }
 
             // Add comment
-            var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+            var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == key);
             if (!string.IsNullOrEmpty(defaultEntry?.Comment))
             {
                 sb.AppendLine($"  Comment: {defaultEntry.Comment}");
