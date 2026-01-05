@@ -34,8 +34,10 @@
         }
 
         <RadzenSplitButton Text="Columns" Icon="view_column" Variant="Radzen.Variant.Outlined" Size="ButtonSize.Small"
-                           Click="@(args => { })" Style="margin-top: auto;">
+                           Click="@OnColumnMenuClick" Style="margin-top: auto;">
             <ChildContent>
+                <RadzenSplitButtonItem Text="Select All" Value="__SELECT_ALL__" Icon="check_box" />
+                <RadzenSplitButtonItem Text="Select None" Value="__SELECT_NONE__" Icon="check_box_outline_blank" />
                 @foreach (var lang in Languages)
                 {
                     var langCode = lang;
@@ -84,6 +86,7 @@
                 AllowFiltering="false"
                 AllowSorting="true"
                 AllowPaging="true"
+                AllowColumnResize="true"
                 PageSize="50"
                 PageSizeOptions="@(new int[] { 25, 50, 100, 200 })"
                 PagerHorizontalAlign="HorizontalAlign.Right"
@@ -93,6 +96,7 @@
                 AllowRowSelectOnRowClick="false"
                 RowClick="@OnRowClick"
                 EditMode="Radzen.DataGridEditMode.Single"
+                class="translation-grid"
                 Style="height: calc(100vh - 320px);"
                 RowStyle="cursor: pointer;">
 
@@ -148,7 +152,7 @@
         </RadzenDataGridColumn>
 
         @* Key name *@
-        <RadzenDataGridColumn TItem="TranslationGridRow" Property="KeyName" Title="Key" Width="250px" Frozen="true">
+        <RadzenDataGridColumn TItem="TranslationGridRow" Property="KeyName" Title="Key" Width="250px" Frozen="true" Resizable="true">
             <Template Context="row">
                 @{
                     var keyIssues = GetKeyValidationIssues(row.KeyName);
@@ -196,7 +200,7 @@
         @foreach (var lang in VisibleLanguages)
         {
             var langCode = lang;
-            <RadzenDataGridColumn TItem="TranslationGridRow" Title="@GetLanguageTitle(lang)" MinWidth="200px" Sortable="false">
+            <RadzenDataGridColumn TItem="TranslationGridRow" Title="@GetLanguageTitle(lang)" Width="300px" MinWidth="250px" Sortable="false" Resizable="true">
                 <Template Context="row">
                     @{
                         var cell = row.IsPlural
@@ -394,8 +398,7 @@
 
     private static string GetCellStyle(string value)
     {
-        if (value.Length > 50)
-            return "overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px; display: block;";
+        // Text wrapping is now handled by CSS, no need for inline styles
         return "";
     }
 
@@ -471,6 +474,28 @@
         else
             _hiddenLanguages.Add(langCode);
         StateHasChanged();
+    }
+
+    private void OnColumnMenuClick(RadzenSplitButtonItem item)
+    {
+        if (item?.Value != null)
+        {
+            var value = item.Value.ToString();
+            if (value == "__SELECT_ALL__")
+            {
+                _hiddenLanguages.Clear();
+                StateHasChanged();
+            }
+            else if (value == "__SELECT_NONE__")
+            {
+                _hiddenLanguages = new HashSet<string>(Languages);
+                StateHasChanged();
+            }
+            else
+            {
+                ToggleLanguageVisibility(value!);
+            }
+        }
     }
 
     private void OnSelectAllChanged(bool value)

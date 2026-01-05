@@ -956,6 +956,9 @@ div.rz-sidebar {
 
 .translation-grid .rz-cell {
     vertical-align: top;
+    white-space: normal !important;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .translation-cell-missing {
