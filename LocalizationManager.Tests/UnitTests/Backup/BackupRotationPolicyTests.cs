@@ -175,9 +175,10 @@ public class BackupRotationPolicyTests
         var backups = new List<BackupMetadata>();
 
         // Create backups for 4 weeks (one per week)
+        // Start from 1 day ago to ensure all backups are clearly in the past
         for (int i = 0; i < 4; i++)
         {
-            backups.Add(CreateBackup(i + 1, now.AddDays(-i * 7)));
+            backups.Add(CreateBackup(i + 1, now.AddDays(-1 - i * 7)));
         }
 
         var manifest = new BackupManifest
