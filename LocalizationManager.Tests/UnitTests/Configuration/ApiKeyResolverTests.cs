@@ -33,7 +33,7 @@ public class ApiKeyResolverTests
     public void GetApiKey_NoConfiguration_ReturnsNull()
     {
         // Act
-        var apiKey = ApiKeyResolver.GetApiKey("deepl", null);
+        var apiKey = ApiKeyResolver.GetApiKey("deepl", null, useLocalCredentialStore: false);
 
         // Assert
         Assert.Null(apiKey);
@@ -156,7 +156,7 @@ public class ApiKeyResolverTests
         };
 
         // Act
-        var hasKey = ApiKeyResolver.HasApiKey("deepl", config);
+        var hasKey = ApiKeyResolver.HasApiKey("deepl", config, useLocalCredentialStore: false);
 
         // Assert
         Assert.False(hasKey);
@@ -201,7 +201,7 @@ public class ApiKeyResolverTests
         };
 
         // Act
-        var source = ApiKeyResolver.GetApiKeySource("deepl", config);
+        var source = ApiKeyResolver.GetApiKeySource("deepl", config, useLocalCredentialStore: false);
 
         // Assert
         Assert.NotNull(source);
@@ -212,7 +212,7 @@ public class ApiKeyResolverTests
     public void GetApiKeySource_NoKey_ReturnsNull()
     {
         // Act
-        var source = ApiKeyResolver.GetApiKeySource("deepl", null);
+        var source = ApiKeyResolver.GetApiKeySource("deepl", null, useLocalCredentialStore: false);
 
         // Assert
         Assert.Null(source);
