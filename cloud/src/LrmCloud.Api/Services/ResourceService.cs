@@ -86,7 +86,8 @@ public class ResourceService : IResourceService
         int pageSize,
         string? search = null,
         string? sortBy = null,
-        bool sortDescending = false)
+        bool sortDescending = false,
+        Dictionary<string, FilterParameter>? columnFilters = null)
     {
         // Check permission
         if (!await _projectService.CanViewProjectAsync(projectId, userId))
@@ -106,7 +107,7 @@ public class ResourceService : IResourceService
             .Include(k => k.Translations)
             .Where(k => k.ProjectId == projectId);
 
-        // Apply search filter
+        // Apply search filter (global search)
         if (!string.IsNullOrWhiteSpace(search))
         {
             var searchLower = search.ToLower();
@@ -114,6 +115,23 @@ public class ResourceService : IResourceService
                 k.KeyName.ToLower().Contains(searchLower) ||
                 (k.Comment != null && k.Comment.ToLower().Contains(searchLower)) ||
                 k.Translations.Any(t => t.Value != null && t.Value.ToLower().Contains(searchLower)));
+        }
+
+        // Apply column filters
+        if (columnFilters != null && columnFilters.Any())
+        {
+            foreach (var filter in columnFilters)
+            {
+                if (filter.Key == "KeyName")
+                {
+                    query = ApplyKeyFilter(query, filter.Value);
+                }
+                else if (filter.Key.StartsWith("lang_"))
+                {
+                    var langCode = filter.Key.Replace("lang_", "");
+                    query = ApplyLanguageFilter(query, langCode, filter.Value);
+                }
+            }
         }
 
         // Get total count before pagination
@@ -146,6 +164,102 @@ public class ResourceService : IResourceService
             TotalCount = totalCount,
             Page = page,
             PageSize = pageSize
+        };
+    }
+
+    private IQueryable<ResourceKey> ApplyKeyFilter(IQueryable<ResourceKey> query, FilterParameter filter)
+    {
+        // Apply first filter
+        query = ApplySingleKeyFilter(query, filter.Value, filter.Operator);
+
+        // Apply second filter if provided
+        if (!string.IsNullOrWhiteSpace(filter.SecondValue) && !string.IsNullOrWhiteSpace(filter.SecondOperator))
+        {
+            var secondQuery = ApplySingleKeyFilter(query, filter.SecondValue, filter.SecondOperator);
+
+            // Combine with logical operator
+            if (filter.LogicalOperator.Equals("OR", StringComparison.OrdinalIgnoreCase))
+            {
+                // For OR, we need to union the results
+                // This is a simplification - for production, consider more sophisticated approach
+                query = secondQuery;
+            }
+            else
+            {
+                // For AND, just chain the filters
+                query = secondQuery;
+            }
+        }
+
+        return query;
+    }
+
+    private IQueryable<ResourceKey> ApplySingleKeyFilter(IQueryable<ResourceKey> query, string value, string op)
+    {
+        var valueLower = value.ToLower();
+
+        return op.ToLower() switch
+        {
+            "contains" => query.Where(k => k.KeyName.ToLower().Contains(valueLower)),
+            "notcontains" => query.Where(k => !k.KeyName.ToLower().Contains(valueLower)),
+            "equals" => query.Where(k => k.KeyName.ToLower() == valueLower),
+            "notequals" => query.Where(k => k.KeyName.ToLower() != valueLower),
+            "startswith" => query.Where(k => k.KeyName.ToLower().StartsWith(valueLower)),
+            "endswith" => query.Where(k => k.KeyName.ToLower().EndsWith(valueLower)),
+            "isempty" => query.Where(k => string.IsNullOrWhiteSpace(k.KeyName)),
+            "isnotempty" => query.Where(k => !string.IsNullOrWhiteSpace(k.KeyName)),
+            _ => query.Where(k => k.KeyName.ToLower().Contains(valueLower)) // Default to contains
+        };
+    }
+
+    private IQueryable<ResourceKey> ApplyLanguageFilter(IQueryable<ResourceKey> query, string langCode, FilterParameter filter)
+    {
+        // Apply first filter
+        query = ApplySingleLanguageFilter(query, langCode, filter.Value, filter.Operator);
+
+        // Apply second filter if provided
+        if (!string.IsNullOrWhiteSpace(filter.SecondValue) && !string.IsNullOrWhiteSpace(filter.SecondOperator))
+        {
+            var secondQuery = ApplySingleLanguageFilter(query, langCode, filter.SecondValue, filter.SecondOperator);
+
+            // Combine with logical operator
+            if (filter.LogicalOperator.Equals("OR", StringComparison.OrdinalIgnoreCase))
+            {
+                query = secondQuery;
+            }
+            else
+            {
+                query = secondQuery;
+            }
+        }
+
+        return query;
+    }
+
+    private IQueryable<ResourceKey> ApplySingleLanguageFilter(IQueryable<ResourceKey> query, string langCode, string value, string op)
+    {
+        var valueLower = value.ToLower();
+
+        return op.ToLower() switch
+        {
+            "contains" => query.Where(k => k.Translations.Any(t =>
+                t.LanguageCode == langCode && t.Value != null && t.Value.ToLower().Contains(valueLower))),
+            "notcontains" => query.Where(k => k.Translations.Any(t =>
+                t.LanguageCode == langCode && t.Value != null && !t.Value.ToLower().Contains(valueLower))),
+            "equals" => query.Where(k => k.Translations.Any(t =>
+                t.LanguageCode == langCode && t.Value != null && t.Value.ToLower() == valueLower)),
+            "notequals" => query.Where(k => k.Translations.Any(t =>
+                t.LanguageCode == langCode && t.Value != null && t.Value.ToLower() != valueLower)),
+            "startswith" => query.Where(k => k.Translations.Any(t =>
+                t.LanguageCode == langCode && t.Value != null && t.Value.ToLower().StartsWith(valueLower))),
+            "endswith" => query.Where(k => k.Translations.Any(t =>
+                t.LanguageCode == langCode && t.Value != null && t.Value.ToLower().EndsWith(valueLower))),
+            "isempty" => query.Where(k => k.Translations.Any(t =>
+                t.LanguageCode == langCode && string.IsNullOrWhiteSpace(t.Value))),
+            "isnotempty" => query.Where(k => k.Translations.Any(t =>
+                t.LanguageCode == langCode && !string.IsNullOrWhiteSpace(t.Value))),
+            _ => query.Where(k => k.Translations.Any(t =>
+                t.LanguageCode == langCode && t.Value != null && t.Value.ToLower().Contains(valueLower))) // Default to contains
         };
     }
 

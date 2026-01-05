@@ -928,4 +928,433 @@ public class ResourceServiceTests : IDisposable
             .CountAsync();
         Assert.Equal(0, remainingTranslations);
     }
+
+    // ============================================================
+    // Filter Tests
+    // ============================================================
+
+    private async Task SetupFilterTestDataAsync(int projectId)
+    {
+        // Create resource keys with different patterns
+        var keys = new[]
+        {
+            new ResourceKey { ProjectId = projectId, KeyName = "app.title", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ResourceKey { ProjectId = projectId, KeyName = "app.welcome", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ResourceKey { ProjectId = projectId, KeyName = "app.description", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ResourceKey { ProjectId = projectId, KeyName = "settings.theme", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ResourceKey { ProjectId = projectId, KeyName = "settings.language", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ResourceKey { ProjectId = projectId, KeyName = "error.404", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ResourceKey { ProjectId = projectId, KeyName = "error.500", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
+        };
+
+        _db.ResourceKeys.AddRange(keys);
+        await _db.SaveChangesAsync();
+
+        // Add translations for each key
+        var translations = new List<LrmCloud.Shared.Entities.Translation>
+        {
+            // app.title
+            new() { ResourceKeyId = keys[0].Id, LanguageCode = "en", Value = "Application Title", UpdatedAt = DateTime.UtcNow },
+            new() { ResourceKeyId = keys[0].Id, LanguageCode = "es", Value = "Título de la Aplicación", UpdatedAt = DateTime.UtcNow },
+
+            // app.welcome
+            new() { ResourceKeyId = keys[1].Id, LanguageCode = "en", Value = "Welcome", UpdatedAt = DateTime.UtcNow },
+            new() { ResourceKeyId = keys[1].Id, LanguageCode = "es", Value = "Bienvenido", UpdatedAt = DateTime.UtcNow },
+
+            // app.description
+            new() { ResourceKeyId = keys[2].Id, LanguageCode = "en", Value = "Application Description", UpdatedAt = DateTime.UtcNow },
+            new() { ResourceKeyId = keys[2].Id, LanguageCode = "es", Value = "Descripción de la Aplicación", UpdatedAt = DateTime.UtcNow },
+
+            // settings.theme
+            new() { ResourceKeyId = keys[3].Id, LanguageCode = "en", Value = "Theme Settings", UpdatedAt = DateTime.UtcNow },
+            new() { ResourceKeyId = keys[3].Id, LanguageCode = "es", Value = "Configuración de Tema", UpdatedAt = DateTime.UtcNow },
+
+            // settings.language
+            new() { ResourceKeyId = keys[4].Id, LanguageCode = "en", Value = "Language Settings", UpdatedAt = DateTime.UtcNow },
+            new() { ResourceKeyId = keys[4].Id, LanguageCode = "es", Value = "Configuración de Idioma", UpdatedAt = DateTime.UtcNow },
+
+            // error.404
+            new() { ResourceKeyId = keys[5].Id, LanguageCode = "en", Value = "Page Not Found", UpdatedAt = DateTime.UtcNow },
+            new() { ResourceKeyId = keys[5].Id, LanguageCode = "es", Value = "Página No Encontrada", UpdatedAt = DateTime.UtcNow },
+
+            // error.500
+            new() { ResourceKeyId = keys[6].Id, LanguageCode = "en", Value = "Server Error", UpdatedAt = DateTime.UtcNow },
+            new() { ResourceKeyId = keys[6].Id, LanguageCode = "es", Value = "Error del Servidor", UpdatedAt = DateTime.UtcNow }
+        };
+
+        _db.Translations.AddRange(translations);
+        await _db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_KeyFilter_Contains_ReturnsMatchingKeys()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>
+        {
+            ["KeyName"] = new FilterParameter { Operator = "contains", Value = "app." }
+        };
+
+        // Act
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, null, null, false, filters);
+
+        // Assert
+        Assert.Equal(3, result.TotalCount);
+        Assert.All(result.Items, item => Assert.Contains("app.", item.KeyName));
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_KeyFilter_StartsWith_ReturnsMatchingKeys()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>
+        {
+            ["KeyName"] = new FilterParameter { Operator = "startswith", Value = "settings" }
+        };
+
+        // Act
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, null, null, false, filters);
+
+        // Assert
+        Assert.Equal(2, result.TotalCount);
+        Assert.All(result.Items, item => Assert.StartsWith("settings", item.KeyName));
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_KeyFilter_EndsWith_ReturnsMatchingKeys()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>
+        {
+            ["KeyName"] = new FilterParameter { Operator = "endswith", Value = "title" }
+        };
+
+        // Act
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, null, null, false, filters);
+
+        // Assert
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("app.title", result.Items.First().KeyName);
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_KeyFilter_Equals_ReturnsExactMatch()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>
+        {
+            ["KeyName"] = new FilterParameter { Operator = "equals", Value = "error.404" }
+        };
+
+        // Act
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, null, null, false, filters);
+
+        // Assert
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("error.404", result.Items.First().KeyName);
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_KeyFilter_NotContains_ReturnsNonMatchingKeys()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>
+        {
+            ["KeyName"] = new FilterParameter { Operator = "notcontains", Value = "app." }
+        };
+
+        // Act
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, null, null, false, filters);
+
+        // Assert
+        Assert.Equal(4, result.TotalCount);
+        Assert.All(result.Items, item => Assert.DoesNotContain("app.", item.KeyName));
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_LanguageFilter_Contains_ReturnsMatchingKeys()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>
+        {
+            ["lang_en"] = new FilterParameter { Operator = "contains", Value = "Welcome" }
+        };
+
+        // Act
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, null, null, false, filters);
+
+        // Assert
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("app.welcome", result.Items.First().KeyName);
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_LanguageFilter_StartsWith_ReturnsMatchingKeys()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>
+        {
+            ["lang_en"] = new FilterParameter { Operator = "startswith", Value = "Application" }
+        };
+
+        // Act
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, null, null, false, filters);
+
+        // Assert
+        Assert.Equal(2, result.TotalCount);
+        Assert.Contains(result.Items, item => item.KeyName == "app.title");
+        Assert.Contains(result.Items, item => item.KeyName == "app.description");
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_LanguageFilter_Equals_ReturnsExactMatch()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>
+        {
+            ["lang_es"] = new FilterParameter { Operator = "equals", Value = "Bienvenido" }
+        };
+
+        // Act
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, null, null, false, filters);
+
+        // Assert
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("app.welcome", result.Items.First().KeyName);
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_MultipleFilters_KeyAndLanguage_ReturnsMatchingKeys()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>
+        {
+            ["KeyName"] = new FilterParameter { Operator = "contains", Value = "error" },
+            ["lang_en"] = new FilterParameter { Operator = "contains", Value = "Server" }
+        };
+
+        // Act
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, null, null, false, filters);
+
+        // Assert
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("error.500", result.Items.First().KeyName);
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_FiltersWithPagination_ReturnsPaginatedResults()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>
+        {
+            ["KeyName"] = new FilterParameter { Operator = "contains", Value = "app." }
+        };
+
+        // Act - Get first page with 2 items
+        var resultPage1 = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 2, null, null, false, filters);
+
+        // Act - Get second page with 2 items
+        var resultPage2 = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 2, 2, null, null, false, filters);
+
+        // Assert
+        Assert.Equal(3, resultPage1.TotalCount);
+        Assert.Equal(2, resultPage1.Items.Count());
+        Assert.Equal(3, resultPage2.TotalCount);
+        Assert.Single(resultPage2.Items);
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_FiltersWithSearch_CombinesBothFilters()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>
+        {
+            ["KeyName"] = new FilterParameter { Operator = "startswith", Value = "app" }
+        };
+
+        // Act - Search for "title" within keys starting with "app"
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, "title", null, false, filters);
+
+        // Assert - Should find only "app.title"
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("app.title", result.Items.First().KeyName);
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_NoFilters_ReturnsAllKeys()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, null, null, false, null);
+
+        // Assert
+        Assert.Equal(7, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_EmptyFilterDictionary_ReturnsAllKeys()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>();
+
+        // Act
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, null, null, false, filters);
+
+        // Assert
+        Assert.Equal(7, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_CaseInsensitiveFilter_ReturnsMatchingKeys()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>
+        {
+            ["KeyName"] = new FilterParameter { Operator = "contains", Value = "APP." } // Uppercase
+        };
+
+        // Act
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, null, null, false, filters);
+
+        // Assert - Should match case-insensitively
+        Assert.Equal(3, result.TotalCount);
+        Assert.All(result.Items, item => Assert.Contains("app.", item.KeyName.ToLower()));
+    }
+
+    [Fact]
+    public async Task GetResourceKeysPagedAsync_LanguageFilterNotExists_ReturnsEmpty()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync();
+        var project = await CreateTestProjectAsync(user.Id);
+        await SetupFilterTestDataAsync(project.Id);
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        var filters = new Dictionary<string, FilterParameter>
+        {
+            ["lang_fr"] = new FilterParameter { Operator = "contains", Value = "Bonjour" }
+        };
+
+        // Act
+        var result = await _resourceService.GetResourceKeysPagedAsync(
+            project.Id, user.Id, 1, 50, null, null, false, filters);
+
+        // Assert
+        Assert.Equal(0, result.TotalCount);
+    }
 }

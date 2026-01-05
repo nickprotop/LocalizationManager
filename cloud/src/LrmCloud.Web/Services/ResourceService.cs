@@ -53,7 +53,8 @@ public class ResourceService
         int pageSize = 50,
         string? search = null,
         string? sortBy = null,
-        bool sortDesc = false)
+        bool sortDesc = false,
+        Dictionary<string, object>? filters = null)
     {
         var queryParams = new List<string>
         {
@@ -69,6 +70,19 @@ public class ResourceService
 
         if (sortDesc)
             queryParams.Add("sortDesc=true");
+
+        // Add filter parameters
+        if (filters != null)
+        {
+            foreach (var filter in filters)
+            {
+                var value = filter.Value?.ToString();
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    queryParams.Add($"{filter.Key}={Uri.EscapeDataString(value)}");
+                }
+            }
+        }
 
         var queryString = string.Join("&", queryParams);
         var response = await _httpClient.GetAsync($"projects/{projectId}/resources?{queryString}");

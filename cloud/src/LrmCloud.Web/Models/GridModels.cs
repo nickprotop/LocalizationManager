@@ -8,6 +8,8 @@ public class GridState<T>
     public int Page { get; set; }
     public int PageSize { get; set; } = 50;
     public ICollection<SortDefinition<T>> SortDefinitions { get; set; } = new List<SortDefinition<T>>();
+    public List<FilterDefinition>? Filters { get; set; }
+    public string? SearchText { get; set; }
 }
 
 /// <summary>
@@ -26,4 +28,17 @@ public class SortDefinition<T>
 {
     public string? SortBy { get; set; }
     public bool Descending { get; set; }
+}
+
+/// <summary>
+/// Filter definition for grid columns.
+/// </summary>
+public class FilterDefinition
+{
+    public string Property { get; set; } = string.Empty;
+    public string Operator { get; set; } = "contains"; // contains, equals, startswith, etc.
+    public object? Value { get; set; }
+    public string LogicalOperator { get; set; } = "AND"; // AND, OR
+    public object? SecondValue { get; set; }
+    public string? SecondOperator { get; set; }
 }

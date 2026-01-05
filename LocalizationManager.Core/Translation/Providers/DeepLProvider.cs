@@ -64,11 +64,17 @@ public class DeepLProvider : ITranslationProvider
             // Apply rate limiting
             await _rateLimiter.WaitAsync(cancellationToken);
 
+            // Normalize language codes for DeepL API
+            // DeepL expects uppercase 2-letter codes (e.g., "EL" not "el_GR")
+            // Special cases: EN-US, EN-GB, PT-BR, PT-PT, etc. use hyphens
+            var sourceLanguage = NormalizeLanguageCode(request.SourceLanguage);
+            var targetLanguage = NormalizeLanguageCode(request.TargetLanguage);
+
             // Translate
             var result = await _translator.TranslateTextAsync(
                 request.SourceText,
-                request.SourceLanguage,
-                request.TargetLanguage,
+                sourceLanguage,
+                targetLanguage,
                 cancellationToken: cancellationToken);
 
             return new TranslationResponse
@@ -194,5 +200,45 @@ public class DeepLProvider : ITranslationProvider
             // If fetching languages fails, return null (unknown)
             return null;
         }
+    }
+
+    /// <summary>
+    /// Normalizes language codes for DeepL API.
+    /// DeepL expects uppercase 2-letter ISO 639-1 codes (e.g., "EL", "FR").
+    /// For regional variants, it uses hyphens (e.g., "EN-US", "PT-BR").
+    /// </summary>
+    /// <param name="languageCode">Language code in any format (e.g., "el_GR", "en-US", "fr").</param>
+    /// <returns>Normalized language code for DeepL API, or null for auto-detection.</returns>
+    private static string? NormalizeLanguageCode(string? languageCode)
+    {
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            return null; // Auto-detect
+        }
+
+        // Replace underscores with hyphens (e.g., "el_GR" → "el-GR")
+        languageCode = languageCode.Replace('_', '-');
+
+        // DeepL supports these regional variants with hyphens
+        var supportedRegionalVariants = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "EN-US", "EN-GB",
+            "PT-BR", "PT-PT",
+            "ES-ES", "ES-MX"
+        };
+
+        // Check if it's a supported regional variant
+        if (supportedRegionalVariants.Contains(languageCode))
+        {
+            return languageCode.ToUpperInvariant();
+        }
+
+        // For all other cases, take only the base language code (first 2 chars)
+        // and convert to uppercase (e.g., "el-GR" → "EL", "fr" → "FR")
+        var baseCode = languageCode.Length >= 2
+            ? languageCode.Substring(0, 2).ToUpperInvariant()
+            : languageCode.ToUpperInvariant();
+
+        return baseCode;
     }
 }

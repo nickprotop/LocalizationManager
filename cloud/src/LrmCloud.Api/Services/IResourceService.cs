@@ -33,7 +33,8 @@ public interface IResourceService
         int pageSize,
         string? search = null,
         string? sortBy = null,
-        bool sortDescending = false);
+        bool sortDescending = false,
+        Dictionary<string, FilterParameter>? columnFilters = null);
 
     /// <summary>
     /// Creates a new resource key.
@@ -136,4 +137,35 @@ public interface IResourceService
     Task<BatchSaveResponse> BatchSaveWithHistoryAsync(
         int projectId, int userId, BatchSaveRequest request);
 
+}
+
+/// <summary>
+/// Represents a filter parameter for column filtering.
+/// </summary>
+public class FilterParameter
+{
+    /// <summary>
+    /// Filter operator (contains, equals, startswith, endswith, etc.)
+    /// </summary>
+    public string Operator { get; set; } = "contains";
+
+    /// <summary>
+    /// Filter value
+    /// </summary>
+    public string Value { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Second filter value for complex conditions (AND/OR)
+    /// </summary>
+    public string? SecondValue { get; set; }
+
+    /// <summary>
+    /// Second filter operator
+    /// </summary>
+    public string? SecondOperator { get; set; }
+
+    /// <summary>
+    /// Logical operator between filters (AND, OR)
+    /// </summary>
+    public string LogicalOperator { get; set; } = "AND";
 }

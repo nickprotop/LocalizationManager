@@ -74,6 +74,11 @@ public class ResourcesController : ApiControllerBase
     /// <param name="search">Search term for key name, comment, or translation value</param>
     /// <param name="sortBy">Sort field: keyName, updatedAt, createdAt</param>
     /// <param name="sortDesc">Sort descending</param>
+    /// <param name="keyFilter">Filter value for KeyName column</param>
+    /// <param name="keyFilterOp">Filter operator for KeyName (contains, equals, startswith, endswith)</param>
+    /// <param name="keyFilter2">Second filter value for KeyName (for AND/OR conditions)</param>
+    /// <param name="keyFilterOp2">Second filter operator for KeyName</param>
+    /// <param name="keyFilterLogic">Logical operator between key filters (AND, OR)</param>
     /// <returns>Paginated list of resource keys with translations</returns>
     [HttpGet("resources")]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<ResourceKeyDetailDto>>), 200)]
@@ -83,11 +88,60 @@ public class ResourcesController : ApiControllerBase
         [FromQuery] int pageSize = 50,
         [FromQuery] string? search = null,
         [FromQuery] string? sortBy = null,
-        [FromQuery] bool sortDesc = false)
+        [FromQuery] bool sortDesc = false,
+        [FromQuery] string? keyFilter = null,
+        [FromQuery] string? keyFilterOp = null,
+        [FromQuery] string? keyFilter2 = null,
+        [FromQuery] string? keyFilterOp2 = null,
+        [FromQuery] string? keyFilterLogic = null)
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+        // Build column filters dictionary from query parameters
+        var columnFilters = new Dictionary<string, Services.FilterParameter>();
+
+        // Add key filter if provided
+        if (!string.IsNullOrWhiteSpace(keyFilter))
+        {
+            columnFilters["KeyName"] = new Services.FilterParameter
+            {
+                Operator = keyFilterOp ?? "contains",
+                Value = keyFilter,
+                SecondValue = keyFilter2,
+                SecondOperator = keyFilterOp2,
+                LogicalOperator = keyFilterLogic ?? "AND"
+            };
+        }
+
+        // Add language filters from query string (format: lang_{code}, lang_{code}_op)
+        var queryDict = HttpContext.Request.Query
+            .Where(q => q.Key.StartsWith("lang_") && !q.Key.EndsWith("_op") && !q.Key.EndsWith("_op2") && !q.Key.EndsWith("_2") && !q.Key.EndsWith("_logic"))
+            .ToDictionary(q => q.Key, q => q.Value.ToString());
+
+        foreach (var langFilter in queryDict)
+        {
+            var langCode = langFilter.Key.Replace("lang_", "");
+            var langValue = langFilter.Value;
+            var langOp = HttpContext.Request.Query[$"lang_{langCode}_op"].ToString();
+            var langValue2 = HttpContext.Request.Query[$"lang_{langCode}_2"].ToString();
+            var langOp2 = HttpContext.Request.Query[$"lang_{langCode}_op2"].ToString();
+            var langLogic = HttpContext.Request.Query[$"lang_{langCode}_logic"].ToString();
+
+            if (!string.IsNullOrWhiteSpace(langValue))
+            {
+                columnFilters[$"lang_{langCode}"] = new Services.FilterParameter
+                {
+                    Operator = string.IsNullOrWhiteSpace(langOp) ? "contains" : langOp,
+                    Value = langValue,
+                    SecondValue = string.IsNullOrWhiteSpace(langValue2) ? null : langValue2,
+                    SecondOperator = string.IsNullOrWhiteSpace(langOp2) ? null : langOp2,
+                    LogicalOperator = string.IsNullOrWhiteSpace(langLogic) ? "AND" : langLogic
+                };
+            }
+        }
+
         var result = await _resourceService.GetResourceKeysPagedAsync(
-            projectId, userId, page, pageSize, search, sortBy, sortDesc);
+            projectId, userId, page, pageSize, search, sortBy, sortDesc, columnFilters);
         return Success(result);
     }
 

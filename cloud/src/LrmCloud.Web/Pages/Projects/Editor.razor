@@ -233,13 +233,17 @@ else
             var sortBy = sortDef?.SortBy;
             var sortDesc = sortDef?.Descending ?? false;
 
+            // Build filter query parameters from state.Filters
+            var filterParams = BuildFilterQueryParams(state.Filters);
+
             var result = await ResourceService.GetResourceKeysPagedAsync(
                 ProjectId,
                 state.Page + 1,
                 state.PageSize,
-                _searchText,
+                state.SearchText ?? _searchText,
                 sortBy,
-                sortDesc);
+                sortDesc,
+                filterParams);
 
             var rows = new List<TranslationGridRow>();
             foreach (var detail in result.Items)
@@ -331,6 +335,53 @@ else
             NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error loading data: {ex.Message}");
             return new Models.GridData<TranslationGridRow> { Items = new List<TranslationGridRow>(), TotalItems = 0 };
         }
+    }
+
+    private Dictionary<string, object> BuildFilterQueryParams(List<Models.FilterDefinition>? filters)
+    {
+        var result = new Dictionary<string, object>();
+
+        if (filters == null || !filters.Any())
+            return result;
+
+        foreach (var filter in filters)
+        {
+            // Skip null or empty filter values
+            if (filter.Value == null || string.IsNullOrWhiteSpace(filter.Value.ToString()))
+                continue;
+
+            // Key column filter
+            if (filter.Property == "KeyName")
+            {
+                result["keyFilter"] = filter.Value.ToString() ?? "";
+                result["keyFilterOp"] = filter.Operator;
+
+                // Handle second filter value for complex conditions (AND/OR)
+                if (filter.SecondValue != null && !string.IsNullOrWhiteSpace(filter.SecondValue.ToString()))
+                {
+                    result["keyFilter2"] = filter.SecondValue.ToString() ?? "";
+                    result["keyFilterOp2"] = filter.SecondOperator ?? "contains";
+                    result["keyFilterLogic"] = filter.LogicalOperator;
+                }
+            }
+            // Language column filters (format: lang_{languageCode})
+            else if (filter.Property.StartsWith("lang_"))
+            {
+                var langCode = filter.Property.Replace("lang_", "");
+                result[$"lang_{langCode}"] = filter.Value.ToString() ?? "";
+                result[$"lang_{langCode}_op"] = filter.Operator;
+
+                // Handle second filter value for language columns
+                if (filter.SecondValue != null && !string.IsNullOrWhiteSpace(filter.SecondValue.ToString()))
+                {
+                    result[$"lang_{langCode}_2"] = filter.SecondValue.ToString() ?? "";
+                    result[$"lang_{langCode}_op2"] = filter.SecondOperator ?? "contains";
+                    result[$"lang_{langCode}_logic"] = filter.LogicalOperator;
+                }
+            }
+        }
+
+        return result;
     }
 
     private void OnSearchTextChanged(string search)

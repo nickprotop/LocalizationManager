@@ -83,7 +83,10 @@
                 Count="@_count"
                 LoadData="@LoadData"
                 IsLoading="@_isLoading"
-                AllowFiltering="false"
+                AllowFiltering="true"
+                FilterMode="FilterMode.Advanced"
+                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                LogicalFilterOperator="LogicalFilterOperator.And"
                 AllowSorting="true"
                 AllowPaging="true"
                 AllowColumnResize="true"
@@ -152,7 +155,7 @@
         </RadzenDataGridColumn>
 
         @* Key name *@
-        <RadzenDataGridColumn TItem="TranslationGridRow" Property="KeyName" Title="Key" Width="250px" Frozen="true" Resizable="true">
+        <RadzenDataGridColumn TItem="TranslationGridRow" Property="KeyName" Title="Key" Width="250px" Frozen="true" Resizable="true" Filterable="true">
             <Template Context="row">
                 @{
                     var keyIssues = GetKeyValidationIssues(row.KeyName);
@@ -200,7 +203,7 @@
         @foreach (var lang in VisibleLanguages)
         {
             var langCode = lang;
-            <RadzenDataGridColumn TItem="TranslationGridRow" Title="@GetLanguageTitle(lang)" Width="300px" MinWidth="250px" Sortable="false" Resizable="true">
+            <RadzenDataGridColumn TItem="TranslationGridRow" Title="@GetLanguageTitle(lang)" Property="@GetLanguageProperty(lang)" Width="300px" MinWidth="250px" Sortable="false" Resizable="true" Filterable="true">
                 <Template Context="row">
                     @{
                         var cell = row.IsPlural
@@ -396,6 +399,13 @@
         return label;
     }
 
+    private string GetLanguageProperty(string langCode)
+    {
+        // Returns a property identifier for filtering
+        // Format: "lang_{languageCode}"
+        return $"lang_{langCode}";
+    }
+
     private static string GetCellStyle(string value)
     {
         // Text wrapping is now handled by CSS, no need for inline styles
@@ -416,11 +426,17 @@
 
         try
         {
-            // Convert Radzen LoadDataArgs to GridState for compatibility
+            // Build GridState with filters
             var state = new Models.GridState<TranslationGridRow>
             {
                 Page = (args.Skip ?? 0) / (args.Top ?? 50),
-                PageSize = args.Top ?? 50
+                PageSize = args.Top ?? 50,
+
+                // Convert Radzen filters to GridState format
+                Filters = ConvertRadzenFilters(args.Filters),
+
+                // Preserve search text filter
+                SearchText = _searchText
             };
 
             var result = await ServerDataFunc(state);
@@ -438,6 +454,48 @@
             _isLoading = false;
             StateHasChanged();
         }
+    }
+
+    private List<Models.FilterDefinition> ConvertRadzenFilters(IEnumerable<FilterDescriptor>? filters)
+    {
+        if (filters == null) return new List<Models.FilterDefinition>();
+
+        var result = new List<Models.FilterDefinition>();
+
+        foreach (var filter in filters)
+        {
+            result.Add(new Models.FilterDefinition
+            {
+                Property = filter.Property,
+                Operator = ConvertFilterOperator(filter.FilterOperator),
+                Value = filter.FilterValue,
+                LogicalOperator = filter.LogicalFilterOperator == LogicalFilterOperator.Or ? "OR" : "AND",
+                SecondValue = filter.SecondFilterValue,
+                SecondOperator = filter.SecondFilterValue != null
+                    ? ConvertFilterOperator(filter.SecondFilterOperator)
+                    : null
+            });
+        }
+
+        return result;
+    }
+
+    private string ConvertFilterOperator(FilterOperator op)
+    {
+        return op switch
+        {
+            FilterOperator.Contains => "contains",
+            FilterOperator.DoesNotContain => "notcontains",
+            FilterOperator.Equals => "equals",
+            FilterOperator.NotEquals => "notequals",
+            FilterOperator.StartsWith => "startswith",
+            FilterOperator.EndsWith => "endswith",
+            FilterOperator.IsNull => "isnull",
+            FilterOperator.IsNotNull => "isnotnull",
+            FilterOperator.IsEmpty => "isempty",
+            FilterOperator.IsNotEmpty => "isnotempty",
+            _ => "contains"
+        };
     }
 
     private async Task OnSearchChanged(string value)
