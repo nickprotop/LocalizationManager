@@ -68,20 +68,19 @@ public class PoResourceReader : IResourceReader
     {
         var entries = new List<ResourceEntry>();
         PoHeader? header = null;
+        string? originalHeader = null;
         var poEntries = await ParseEntriesAsync(reader, ct);
 
         foreach (var poEntry in poEntries)
         {
             ct.ThrowIfCancellationRequested();
 
-            // Skip obsolete entries
-            if (poEntry.IsObsolete)
-                continue;
-
             // Parse header entry
             if (poEntry.IsHeader)
             {
                 header = PoHeader.Parse(poEntry.MsgStr ?? "");
+                // Capture original header for preservation
+                originalHeader = BuildOriginalHeader(poEntry);
                 continue;
             }
 
@@ -93,7 +92,8 @@ public class PoResourceReader : IResourceReader
         return new ResourceFile
         {
             Language = metadata,
-            Entries = entries
+            Entries = entries,
+            OriginalHeader = originalHeader
         };
     }
 
@@ -174,6 +174,9 @@ public class PoResourceReader : IResourceReader
             {
                 currentEntry.MsgStr = UnescapeString(match.Groups[1].Value);
                 currentField = PoField.MsgStr;
+
+                // Capture original formatting
+                currentEntry.OriginalMsgStrLines = new List<string> { line.Trim() };
                 continue;
             }
 
@@ -185,6 +188,10 @@ public class PoResourceReader : IResourceReader
                 currentEntry.MsgStrPlural ??= new Dictionary<int, string>();
                 currentEntry.MsgStrPlural[index] = UnescapeString(match.Groups[2].Value);
                 currentField = PoField.MsgStrPlural;
+
+                // Capture original formatting (for plural forms, append to existing list)
+                currentEntry.OriginalMsgStrLines ??= new List<string>();
+                currentEntry.OriginalMsgStrLines.Add(line.Trim());
                 continue;
             }
 
@@ -194,6 +201,12 @@ public class PoResourceReader : IResourceReader
             {
                 var value = UnescapeString(match.Groups[1].Value);
                 AppendToCurrent(currentEntry, currentField, value);
+
+                // Capture original formatting for continuation lines
+                if (currentField is PoField.MsgStr or PoField.MsgStrPlural)
+                {
+                    currentEntry.OriginalMsgStrLines?.Add(line.Trim());
+                }
                 continue;
             }
         }
@@ -306,7 +319,14 @@ public class PoResourceReader : IResourceReader
                 IsPlural = true,
                 PluralForms = pluralForms,
                 // Store msgid_plural for translation (source plural text)
-                SourcePluralText = poEntry.MsgIdPlural
+                SourcePluralText = poEntry.MsgIdPlural,
+                References = poEntry.References,  // Transfer references
+                // Preserve original formatting for plural forms
+                OriginalFormatting = poEntry.OriginalMsgStrLines != null && poEntry.OriginalMsgStrLines.Any()
+                    ? string.Join("\n", poEntry.OriginalMsgStrLines)
+                    : null,
+                Flags = poEntry.Flags,  // Transfer flags (fuzzy, etc.)
+                IsObsolete = poEntry.IsObsolete  // Transfer obsolete status
             };
         }
 
@@ -314,8 +334,59 @@ public class PoResourceReader : IResourceReader
         {
             Key = key,
             Value = poEntry.MsgStr,
-            Comment = poEntry.GetCombinedComment()
+            Comment = poEntry.GetCombinedComment(),
+            References = poEntry.References,  // Transfer references
+            // Preserve original formatting
+            OriginalFormatting = poEntry.OriginalMsgStrLines != null && poEntry.OriginalMsgStrLines.Any()
+                ? string.Join("\n", poEntry.OriginalMsgStrLines)
+                : null,
+            Flags = poEntry.Flags,  // Transfer flags (fuzzy, etc.)
+            IsObsolete = poEntry.IsObsolete  // Transfer obsolete status
         };
+    }
+
+    /// <summary>
+    /// Builds the original header text from a header PoEntry for preservation.
+    /// This maintains the exact original header format including comments and metadata.
+    /// </summary>
+    private string BuildOriginalHeader(PoEntry headerEntry)
+    {
+        var sb = new StringBuilder();
+
+        // Add translator comments
+        if (!string.IsNullOrEmpty(headerEntry.TranslatorComment))
+        {
+            foreach (var line in headerEntry.TranslatorComment.Split('\n'))
+            {
+                sb.AppendLine(string.IsNullOrEmpty(line) ? "#" : $"# {line}");
+            }
+        }
+
+        // Add extracted comments
+        if (!string.IsNullOrEmpty(headerEntry.ExtractedComment))
+        {
+            foreach (var line in headerEntry.ExtractedComment.Split('\n'))
+            {
+                sb.AppendLine($"#. {line}");
+            }
+        }
+
+        // Add the header msgid and msgstr
+        sb.AppendLine("msgid \"\"");
+        sb.AppendLine("msgstr \"\"");
+
+        // Add header fields (these are already escaped in MsgStr)
+        if (!string.IsNullOrEmpty(headerEntry.MsgStr))
+        {
+            // Trim trailing newlines to avoid adding empty "\n" lines
+            var headerContent = headerEntry.MsgStr.TrimEnd('\n', '\r');
+            foreach (var line in headerContent.Split('\n'))
+            {
+                sb.AppendLine($"\"{line}\\n\"");
+            }
+        }
+
+        return sb.ToString();
     }
 
     private static bool HasContent(PoEntry entry)

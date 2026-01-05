@@ -364,6 +364,7 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
                         }
                         // Update Value to match 'other' form
                         entry.Value = entry.PluralForms.GetValueOrDefault("other") ?? entry.PluralForms.Values.FirstOrDefault();
+                        rf.IsModified = true;  // Mark file as modified
                         updatedCount++;
                     }
                 }
@@ -380,6 +381,7 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
                         if (entry != null)
                         {
                             entry.Value = kvp.Value;
+                            rf.IsModified = true;  // Mark file as modified
                             updatedCount++;
                         }
                     }
@@ -395,12 +397,13 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
                     if (entry != null)
                     {
                         entry.Comment = settings.Comment;
+                        rf.IsModified = true;  // Mark file as modified
                     }
                 }
             }
 
-            // Save changes
-            foreach (var rf in resourceFiles)
+            // Save changes (only modified files)
+            foreach (var rf in resourceFiles.Where(f => f.IsModified))
             {
                 settings.WriteResourceFile(rf);
             }

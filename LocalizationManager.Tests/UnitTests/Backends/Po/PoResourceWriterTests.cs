@@ -309,4 +309,192 @@ public class PoResourceWriterTests
     }
 
     #endregion
+
+    #region Formatting Preservation Tests
+
+    [Fact]
+    public void Write_UnchangedValue_PreservesOriginalFormatting()
+    {
+        // Arrange
+        var writer = new PoResourceWriter();
+        var languageInfo = new LanguageInfo { Code = "en", BaseName = "test", Name = "English" };
+        var entries = new List<ResourceEntry>
+        {
+            new ResourceEntry
+            {
+                Key = "test.key",
+                Value = "Line one\nLine two",
+                OriginalFormatting = "msgstr \"\"\n\"Line one\\n\"\n\"Line two\""
+            }
+        };
+        var file = new ResourceFile { Language = languageInfo, Entries = entries };
+
+        // Act
+        var output = writer.SerializeToString(file);
+
+        // Assert
+        Assert.Contains("msgstr \"\"", output);
+        Assert.Contains("\"Line one\\n\"", output);
+        Assert.Contains("\"Line two\"", output);
+    }
+
+    [Fact]
+    public void Write_ChangedValue_RegeneratesFormatting()
+    {
+        // Arrange
+        var writer = new PoResourceWriter();
+        var languageInfo = new LanguageInfo { Code = "en", BaseName = "test", Name = "English" };
+        var entries = new List<ResourceEntry>
+        {
+            new ResourceEntry
+            {
+                Key = "test.key",
+                Value = "New translation value",
+                OriginalFormatting = "msgstr \"\"\n\"Old translation value\""
+            }
+        };
+        var file = new ResourceFile { Language = languageInfo, Entries = entries };
+
+        // Act
+        var output = writer.SerializeToString(file);
+
+        // Assert
+        Assert.DoesNotContain("Old translation value", output);
+        Assert.Contains("New translation value", output);
+    }
+
+    [Fact]
+    public void Write_NoOriginalFormatting_GeneratesFormatting()
+    {
+        // Arrange
+        var writer = new PoResourceWriter();
+        var languageInfo = new LanguageInfo { Code = "en", BaseName = "test", Name = "English" };
+        var entries = new List<ResourceEntry>
+        {
+            new ResourceEntry
+            {
+                Key = "test.key",
+                Value = "Translation value",
+                OriginalFormatting = null
+            }
+        };
+        var file = new ResourceFile { Language = languageInfo, Entries = entries };
+
+        // Act
+        var output = writer.SerializeToString(file);
+
+        // Assert
+        Assert.Contains("msgstr", output);
+        Assert.Contains("Translation value", output);
+    }
+
+    [Fact]
+    public void Write_LongUnchangedValue_PreservesOriginalWrapping()
+    {
+        // Arrange
+        var writer = new PoResourceWriter();
+        var languageInfo = new LanguageInfo { Code = "en", BaseName = "test", Name = "English" };
+        var longValue = "This is a very long translation that was wrapped at specific points";
+        var entries = new List<ResourceEntry>
+        {
+            new ResourceEntry
+            {
+                Key = "test.key",
+                Value = longValue,
+                OriginalFormatting = "msgstr \"\"\n\"This is a very long translation that was wrapped \"\n\"at specific points\""
+            }
+        };
+        var file = new ResourceFile { Language = languageInfo, Entries = entries };
+
+        // Act
+        var output = writer.SerializeToString(file);
+
+        // Assert
+        Assert.Contains("\"This is a very long translation that was wrapped \"", output);
+        Assert.Contains("\"at specific points\"", output);
+    }
+
+    [Fact]
+    public void ReadWriteCycle_UnchangedFile_PreservesFormatting()
+    {
+        // Arrange - original PO content with specific formatting
+        var originalPoContent = @"
+msgid ""app.title""
+msgstr ""Application Title""
+
+msgid ""app.description""
+msgstr """"
+""Long description wrapped""
+""at specific point""
+
+msgid ""test.key""
+msgstr ""Simple value""
+";
+        var reader = new PoResourceReader();
+        var writer = new PoResourceWriter();
+        var languageInfo = new LanguageInfo { Code = "en", BaseName = "test", Name = "English" };
+
+        // Act - Read and write back without changes
+        var entries = reader.Read(new StringReader(originalPoContent), languageInfo);
+        var outputPoContent = writer.SerializeToString(entries);
+
+        // Assert - msgstr lines should match (allowing for header differences)
+        var originalMsgStrLines = originalPoContent.Split('\n')
+            .Where(l => l.Trim().StartsWith("msgstr") || l.Trim().StartsWith("\""))
+            .Select(l => l.Trim())
+            .Where(l => !string.IsNullOrEmpty(l))
+            .ToList();
+
+        var outputMsgStrLines = outputPoContent.Split('\n')
+            .Where(l => l.Trim().StartsWith("msgstr") || l.Trim().StartsWith("\""))
+            .Select(l => l.Trim())
+            .Where(l => !string.IsNullOrEmpty(l))
+            .Skip(2) // Skip header msgstr lines
+            .ToList();
+
+        // Check that the non-header msgstr formatting is preserved
+        Assert.Contains("msgstr \"Application Title\"", outputMsgStrLines);
+        Assert.Contains("msgstr \"\"", outputMsgStrLines);
+        Assert.Contains("\"Long description wrapped\"", outputMsgStrLines);
+        Assert.Contains("\"at specific point\"", outputMsgStrLines);
+    }
+
+    [Fact]
+    public void ReadWriteCycle_OneValueChanged_PreservesOtherFormatting()
+    {
+        // Arrange
+        var originalPoContent = @"
+msgid ""key1""
+msgstr """"
+""Original multi-line""
+""formatting preserved""
+
+msgid ""key2""
+msgstr ""This value will change""
+
+msgid ""key3""
+msgstr ""Another preserved value""
+";
+        var reader = new PoResourceReader();
+        var writer = new PoResourceWriter();
+        var languageInfo = new LanguageInfo { Code = "en", BaseName = "test", Name = "English" };
+
+        // Act - Read, change key2, write back
+        var file = reader.Read(new StringReader(originalPoContent), languageInfo);
+        var key2Entry = file.Entries.First(e => e.Key == "key2");
+        key2Entry.Value = "New changed value";
+        var outputPoContent = writer.SerializeToString(file);
+
+        // Assert
+        // key1 and key3 should preserve original formatting
+        Assert.Contains("\"Original multi-line\"", outputPoContent);
+        Assert.Contains("\"formatting preserved\"", outputPoContent);
+        Assert.Contains("\"Another preserved value\"", outputPoContent);
+
+        // key2 should have new value with regenerated formatting
+        Assert.Contains("New changed value", outputPoContent);
+        Assert.DoesNotContain("This value will change", outputPoContent);
+    }
+
+    #endregion
 }

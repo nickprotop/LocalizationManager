@@ -289,4 +289,102 @@ public class PoResourceReaderTests
     }
 
     #endregion
+
+    #region Formatting Preservation Tests
+
+    [Fact]
+    public void Read_CapturesOriginalMsgStrFormatting()
+    {
+        // Arrange
+        var poContent = @"
+msgid ""test.key""
+msgstr """"
+""Line one of translation""
+""Line two of translation""
+";
+        var reader = new PoResourceReader();
+        var languageInfo = new LanguageInfo { Code = "en", BaseName = "test", Name = "English" };
+
+        // Act
+        var result = reader.Read(new StringReader(poContent), languageInfo);
+
+        // Assert
+        var entry = result.Entries.FirstOrDefault();
+        Assert.NotNull(entry);
+        Assert.NotNull(entry.OriginalFormatting);
+        Assert.Contains("msgstr \"\"", entry.OriginalFormatting);
+        Assert.Contains("\"Line one of translation\"", entry.OriginalFormatting);
+        Assert.Contains("\"Line two of translation\"", entry.OriginalFormatting);
+    }
+
+    [Fact]
+    public void Read_SingleLineMsgStr_CapturesFormatting()
+    {
+        // Arrange
+        var poContent = @"
+msgid ""test.key""
+msgstr ""Single line translation""
+";
+        var reader = new PoResourceReader();
+        var languageInfo = new LanguageInfo { Code = "en", BaseName = "test", Name = "English" };
+
+        // Act
+        var result = reader.Read(new StringReader(poContent), languageInfo);
+
+        // Assert
+        var entry = result.Entries.FirstOrDefault();
+        Assert.NotNull(entry);
+        Assert.NotNull(entry.OriginalFormatting);
+        Assert.Equal("msgstr \"Single line translation\"", entry.OriginalFormatting.Trim());
+    }
+
+    [Fact]
+    public void Read_WithEscapeSequences_PreservesOriginalStyle()
+    {
+        // Arrange
+        var poContent = @"
+msgid ""test.key""
+msgstr ""Line one\nLine two\tTab""
+";
+        var reader = new PoResourceReader();
+        var languageInfo = new LanguageInfo { Code = "en", BaseName = "test", Name = "English" };
+
+        // Act
+        var result = reader.Read(new StringReader(poContent), languageInfo);
+
+        // Assert
+        var entry = result.Entries.FirstOrDefault();
+        Assert.NotNull(entry);
+        Assert.NotNull(entry.OriginalFormatting);
+        Assert.Contains(@"\n", entry.OriginalFormatting);
+        Assert.Contains(@"\t", entry.OriginalFormatting);
+    }
+
+    [Fact]
+    public void Read_PluralForms_CapturesAllFormatting()
+    {
+        // Arrange
+        var poContent = @"
+msgid ""test.plural""
+msgid_plural ""test.plurals""
+msgstr[0] ""One item""
+msgstr[1] """"
+""Multiple items""
+";
+        var reader = new PoResourceReader();
+        var languageInfo = new LanguageInfo { Code = "en", BaseName = "test", Name = "English" };
+
+        // Act
+        var result = reader.Read(new StringReader(poContent), languageInfo);
+
+        // Assert
+        var entry = result.Entries.FirstOrDefault();
+        Assert.NotNull(entry);
+        Assert.NotNull(entry.OriginalFormatting);
+        Assert.Contains("msgstr[0]", entry.OriginalFormatting);
+        Assert.Contains("msgstr[1]", entry.OriginalFormatting);
+        Assert.Contains("\"Multiple items\"", entry.OriginalFormatting);
+    }
+
+    #endregion
 }

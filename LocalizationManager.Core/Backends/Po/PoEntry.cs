@@ -36,6 +36,12 @@ internal class PoEntry
     public Dictionary<int, string>? MsgStrPlural { get; set; }
 
     /// <summary>
+    /// Original raw msgstr lines as they appeared in the PO file.
+    /// Used to preserve formatting when writing back unchanged translations.
+    /// </summary>
+    public List<string>? OriginalMsgStrLines { get; set; }
+
+    /// <summary>
     /// Translator comment (# comment).
     /// </summary>
     public string? TranslatorComment { get; set; }

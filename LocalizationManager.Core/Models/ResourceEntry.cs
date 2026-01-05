@@ -76,4 +76,28 @@ public class ResourceEntry
     public string? DisplayValue => IsPlural
         ? PluralForms?.GetValueOrDefault("other") ?? PluralForms?.Values.FirstOrDefault() ?? Value
         : Value;
+
+    /// <summary>
+    /// Source file references (Po format: #: file.cs:line comments).
+    /// Preserves location information from source code.
+    /// </summary>
+    public List<string>? References { get; set; }
+
+    /// <summary>
+    /// Stores the original raw formatting of the entry from the file.
+    /// Used to preserve exact line breaks and wrapping when entry is unchanged.
+    /// </summary>
+    public string? OriginalFormatting { get; set; }
+
+    /// <summary>
+    /// Flags associated with this entry (PO format: #, flags).
+    /// Common flags: fuzzy, c-format, no-c-format, etc.
+    /// </summary>
+    public HashSet<string>? Flags { get; set; }
+
+    /// <summary>
+    /// Indicates if this entry is obsolete (PO format: marked with #~).
+    /// Obsolete entries are kept for reference but not actively used.
+    /// </summary>
+    public bool IsObsolete { get; set; }
 }

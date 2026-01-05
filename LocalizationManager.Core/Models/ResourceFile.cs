@@ -50,4 +50,16 @@ public class ResourceFile
     /// Gets the translation completion percentage.
     /// </summary>
     public double CompletionPercentage => Count > 0 ? (double)CompletedCount / Count * 100 : 0;
+
+    /// <summary>
+    /// Tracks whether this file has been modified and needs to be written.
+    /// Used to prevent unnecessary file writes.
+    /// </summary>
+    public bool IsModified { get; set; } = false;
+
+    /// <summary>
+    /// Stores the original header from the resource file for preservation.
+    /// Used by Po backend to maintain original copyright, translator info, etc.
+    /// </summary>
+    public string? OriginalHeader { get; set; }
 }

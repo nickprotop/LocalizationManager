@@ -547,6 +547,7 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
                     }
 
                     translated++;
+                    targetFile.IsModified = true;  // Mark file as modified
                 }
                 catch (TranslationException ex)
                 {
@@ -558,16 +559,16 @@ public class TranslateCommand : AsyncCommand<TranslateCommand.Settings>
                 }
             }
 
-            // Create backup before saving
-            if (!settings.DryRun && !settings.NoBackup)
+            // Create backup before saving (only if file was modified)
+            if (!settings.DryRun && !settings.NoBackup && targetFile.IsModified)
             {
                 var backupManager = new BackupVersionManager(10);
                 var basePath = System.IO.Path.GetDirectoryName(targetLanguageInfo.FilePath) ?? Environment.CurrentDirectory;
                 await backupManager.CreateBackupAsync(targetLanguageInfo.FilePath, "translate", basePath);
             }
 
-            // Save the updated resource file
-            if (!settings.DryRun)
+            // Save the updated resource file (only if modified)
+            if (!settings.DryRun && targetFile.IsModified)
             {
                 settings.WriteResourceFile(targetFile);
             }
