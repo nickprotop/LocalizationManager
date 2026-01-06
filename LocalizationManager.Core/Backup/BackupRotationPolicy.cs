@@ -164,18 +164,9 @@ public class BackupRotationPolicy
     /// </summary>
     private string GetIsoWeekKey(DateTime date)
     {
-        // ISO 8601 week number
-        var dayOfWeek = (int)date.DayOfWeek;
-        var dayOfYear = date.DayOfYear;
-
-        // Adjust for ISO 8601: Monday = 1, Sunday = 7
-        var isoWeekDay = dayOfWeek == 0 ? 7 : dayOfWeek;
-
-        // Find the ISO week number
-        var thursday = date.AddDays(4 - isoWeekDay);
-        var isoYear = thursday.Year;
-        var jan4 = new DateTime(isoYear, 1, 4);
-        var isoWeek = (thursday.DayOfYear - jan4.DayOfYear) / 7 + 1;
+        // Use built-in ISO 8601 week calculation
+        var isoYear = System.Globalization.ISOWeek.GetYear(date);
+        var isoWeek = System.Globalization.ISOWeek.GetWeekOfYear(date);
 
         return $"{isoYear}-W{isoWeek:D2}";
     }
