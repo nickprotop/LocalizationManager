@@ -115,6 +115,11 @@ public class SyncChangeEntry
     public required string Lang { get; set; }
 
     /// <summary>
+    /// Plural form category (empty for non-plural, "one", "other", etc. for plural keys).
+    /// </summary>
+    public string PluralForm { get; set; } = "";
+
+    /// <summary>
     /// Type of change: "added", "modified", "deleted"
     /// </summary>
     public required string ChangeType { get; set; }

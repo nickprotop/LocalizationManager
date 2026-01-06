@@ -213,6 +213,13 @@ public class SyncHistoryService : ISyncHistoryService
             throw new InvalidOperationException($"History entry '{historyId}' has already been reverted");
         }
 
+        // Get project for default language check
+        var project = await _db.Projects.FindAsync(projectId, ct);
+        if (project == null)
+        {
+            throw new InvalidOperationException($"Project {projectId} not found");
+        }
+
         // Parse the changes that were made
         if (string.IsNullOrEmpty(historyToRevert.ChangesJson))
         {
@@ -244,15 +251,34 @@ public class SyncHistoryService : ISyncHistoryService
                         // Revert addition = delete
                         if (resourceKey != null)
                         {
+                            var pluralForm = change.PluralForm ?? "";
                             var translation = resourceKey.Translations
-                                .FirstOrDefault(t => t.LanguageCode == change.Lang && t.PluralForm == "");
+                                .FirstOrDefault(t => t.LanguageCode == change.Lang && t.PluralForm == pluralForm);
                             if (translation != null)
                             {
                                 _db.Translations.Remove(translation);
+
+                                // Clear SourceText if reverting default language addition
+                                var isDefaultLang = string.IsNullOrEmpty(change.Lang) || change.Lang == project.DefaultLanguage;
+                                if (isDefaultLang)
+                                {
+                                    if (string.IsNullOrEmpty(pluralForm))
+                                    {
+                                        resourceKey.SourceText = null;
+                                        resourceKey.UpdatedAt = DateTime.UtcNow;
+                                    }
+                                    else if (pluralForm == "other")
+                                    {
+                                        resourceKey.SourcePluralText = null;
+                                        resourceKey.UpdatedAt = DateTime.UtcNow;
+                                    }
+                                }
+
                                 revertChanges.Add(new SyncChangeEntry
                                 {
                                     Key = change.Key,
                                     Lang = change.Lang,
+                                    PluralForm = pluralForm,
                                     ChangeType = "deleted",
                                     BeforeValue = change.AfterValue,
                                     BeforeHash = change.AfterHash,
@@ -267,14 +293,16 @@ public class SyncHistoryService : ISyncHistoryService
                         // Revert modification = restore previous value
                         if (resourceKey != null && change.BeforeValue != null)
                         {
+                            var pluralForm = change.PluralForm ?? "";
                             var translation = resourceKey.Translations
-                                .FirstOrDefault(t => t.LanguageCode == change.Lang && t.PluralForm == "");
+                                .FirstOrDefault(t => t.LanguageCode == change.Lang && t.PluralForm == pluralForm);
                             if (translation != null)
                             {
                                 revertChanges.Add(new SyncChangeEntry
                                 {
                                     Key = change.Key,
                                     Lang = change.Lang,
+                                    PluralForm = pluralForm,
                                     ChangeType = "modified",
                                     BeforeValue = translation.Value,
                                     BeforeHash = translation.Hash,
@@ -287,6 +315,22 @@ public class SyncHistoryService : ISyncHistoryService
                                 translation.Hash = change.BeforeHash;
                                 translation.Version++;
                                 translation.UpdatedAt = DateTime.UtcNow;
+
+                                // Restore SourceText if reverting default language modification
+                                var isDefaultLang = string.IsNullOrEmpty(change.Lang) || change.Lang == project.DefaultLanguage;
+                                if (isDefaultLang)
+                                {
+                                    if (string.IsNullOrEmpty(pluralForm))
+                                    {
+                                        resourceKey.SourceText = change.BeforeValue;
+                                        resourceKey.UpdatedAt = DateTime.UtcNow;
+                                    }
+                                    else if (pluralForm == "other")
+                                    {
+                                        resourceKey.SourcePluralText = change.BeforeValue;
+                                        resourceKey.UpdatedAt = DateTime.UtcNow;
+                                    }
+                                }
                             }
                         }
                         break;
@@ -295,6 +339,8 @@ public class SyncHistoryService : ISyncHistoryService
                         // Revert deletion = re-add
                         if (change.BeforeValue != null)
                         {
+                            var pluralForm = change.PluralForm ?? "";
+
                             if (resourceKey == null)
                             {
                                 resourceKey = new ResourceKey
@@ -317,17 +363,34 @@ public class SyncHistoryService : ISyncHistoryService
                                 Comment = change.BeforeComment,
                                 Hash = change.BeforeHash,
                                 Status = "translated",
-                                PluralForm = "",
+                                PluralForm = pluralForm,
                                 Version = 1,
                                 CreatedAt = DateTime.UtcNow,
                                 UpdatedAt = DateTime.UtcNow
                             };
                             _db.Translations.Add(translation);
 
+                            // Restore SourceText if reverting default language deletion
+                            var isDefaultLang = string.IsNullOrEmpty(change.Lang) || change.Lang == project.DefaultLanguage;
+                            if (isDefaultLang)
+                            {
+                                if (string.IsNullOrEmpty(pluralForm))
+                                {
+                                    resourceKey.SourceText = change.BeforeValue;
+                                    resourceKey.UpdatedAt = DateTime.UtcNow;
+                                }
+                                else if (pluralForm == "other")
+                                {
+                                    resourceKey.SourcePluralText = change.BeforeValue;
+                                    resourceKey.UpdatedAt = DateTime.UtcNow;
+                                }
+                            }
+
                             revertChanges.Add(new SyncChangeEntry
                             {
                                 Key = change.Key,
                                 Lang = change.Lang,
+                                PluralForm = pluralForm,
                                 ChangeType = "added",
                                 BeforeValue = null,
                                 BeforeHash = null,

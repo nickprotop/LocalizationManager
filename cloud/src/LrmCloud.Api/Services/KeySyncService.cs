@@ -104,11 +104,12 @@ public class KeySyncService : IKeySyncService
                     }
                     response.NewEntryHashes[entry.Key][entry.Lang] = result.NewHash!;
 
-                    // Track change for history
+                    // Track change for history (PluralForm = "" for non-plural entries)
                     historyChanges.Add(new Entities.SyncChangeEntry
                     {
                         Key = entry.Key,
                         Lang = entry.Lang,
+                        PluralForm = "",
                         ChangeType = result.WasNew ? "added" : "modified",
                         BeforeValue = result.BeforeValue,
                         BeforeHash = result.BeforeHash,
@@ -133,11 +134,12 @@ public class KeySyncService : IKeySyncService
                 {
                     response.Deleted++;
 
-                    // Track deletion for history
+                    // Track deletion for history (PluralForm = "" for non-plural entries)
                     historyChanges.Add(new Entities.SyncChangeEntry
                     {
                         Key = deletion.Key,
                         Lang = deletion.Lang ?? result.DeletedLang ?? "all",
+                        PluralForm = "",
                         ChangeType = "deleted",
                         BeforeValue = result.DeletedValue,
                         BeforeHash = result.DeletedHash,
@@ -256,6 +258,7 @@ public class KeySyncService : IKeySyncService
                 Key = key.KeyName,
                 Comment = key.Comment,
                 IsPlural = key.IsPlural,
+                SourceText = key.SourceText,
                 SourcePluralText = key.SourcePluralText
             };
 
@@ -404,6 +407,8 @@ public class KeySyncService : IKeySyncService
                 KeyName = entry.Key,
                 IsPlural = entry.IsPlural,
                 Comment = entry.Comment,
+                // Store source text (from default language file, msgid for PO format)
+                SourceText = entry.SourceText,
                 // For plural keys, store source plural text (PO msgid_plural or "other" form)
                 SourcePluralText = entry.IsPlural ? entry.SourcePluralText : null,
                 Version = 1,
@@ -425,8 +430,14 @@ public class KeySyncService : IKeySyncService
                 resourceKey.IsPlural = entry.IsPlural;
                 resourceKey.UpdatedAt = DateTime.UtcNow;
             }
-            // Update SourcePluralText if not set yet
-            if (entry.IsPlural && resourceKey.SourcePluralText == null && entry.SourcePluralText != null)
+            // Update SourceText if provided (from source/default language push)
+            if (!string.IsNullOrEmpty(entry.SourceText) && resourceKey.SourceText != entry.SourceText)
+            {
+                resourceKey.SourceText = entry.SourceText;
+                resourceKey.UpdatedAt = DateTime.UtcNow;
+            }
+            // Update SourcePluralText if provided
+            if (entry.IsPlural && !string.IsNullOrEmpty(entry.SourcePluralText) && resourceKey.SourcePluralText != entry.SourcePluralText)
             {
                 resourceKey.SourcePluralText = entry.SourcePluralText;
                 resourceKey.UpdatedAt = DateTime.UtcNow;
@@ -771,6 +782,7 @@ public class KeySyncService : IKeySyncService
     {
         var resourceKey = await _db.ResourceKeys
             .Include(k => k.Translations)
+            .Include(k => k.Project)
             .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == resolution.Key, ct);
 
         if (resourceKey == null)
@@ -780,6 +792,9 @@ public class KeySyncService : IKeySyncService
 
         var translation = resourceKey.Translations
             .FirstOrDefault(t => t.LanguageCode == resolution.Lang && t.PluralForm == "");
+
+        // Check if this is the default language for SourceText updates
+        var isDefaultLanguage = resourceKey.Project?.DefaultLanguage == resolution.Lang;
 
         switch (resolution.Resolution)
         {
@@ -792,6 +807,13 @@ public class KeySyncService : IKeySyncService
                     translation.Version++;
                     translation.UpdatedAt = DateTime.UtcNow;
                     response.Applied++;
+
+                    // Update SourceText if this is the default language
+                    if (isDefaultLanguage)
+                    {
+                        resourceKey.SourceText = resolution.EditedValue;
+                        resourceKey.UpdatedAt = DateTime.UtcNow;
+                    }
 
                     AddToHashes(response.NewHashes, resolution.Key, resolution.Lang!, translation.Hash);
                 }
@@ -833,6 +855,14 @@ public class KeySyncService : IKeySyncService
                         translation.Version++;
                         translation.UpdatedAt = DateTime.UtcNow;
                     }
+
+                    // Update SourceText if this is the default language
+                    if (isDefaultLanguage)
+                    {
+                        resourceKey.SourceText = resolution.EditedValue;
+                        resourceKey.UpdatedAt = DateTime.UtcNow;
+                    }
+
                     response.Applied++;
                     AddToHashes(response.NewHashes, resolution.Key, resolution.Lang!, translation.Hash!);
                 }

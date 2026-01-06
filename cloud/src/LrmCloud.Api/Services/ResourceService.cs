@@ -297,6 +297,8 @@ public class ResourceService : IResourceService
                 KeyPath = request.KeyPath,
                 IsPlural = request.IsPlural,
                 Comment = request.Comment,
+                // Store the default language value as SourceText for translation reference
+                SourceText = request.DefaultLanguageValue,
                 Version = 1,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -467,6 +469,10 @@ public class ResourceService : IResourceService
             var translation = resourceKey.Translations
                 .FirstOrDefault(t => t.LanguageCode == languageCode && t.PluralForm == request.PluralForm);
 
+            // Get project to check if we're updating the default language
+            var project = await _db.Projects.FindAsync(projectId);
+            var isDefaultLanguage = project != null && languageCode == project.DefaultLanguage;
+
             if (translation == null)
             {
                 // Create new translation
@@ -483,6 +489,18 @@ public class ResourceService : IResourceService
                 };
 
                 _db.Translations.Add(translation);
+
+                // If creating translation for default language, also update SourceText
+                if (isDefaultLanguage && string.IsNullOrEmpty(request.PluralForm))
+                {
+                    resourceKey.SourceText = request.Value;
+                    resourceKey.UpdatedAt = DateTime.UtcNow;
+                }
+                else if (isDefaultLanguage && request.PluralForm == "other")
+                {
+                    resourceKey.SourcePluralText = request.Value;
+                    resourceKey.UpdatedAt = DateTime.UtcNow;
+                }
             }
             else
             {
@@ -498,6 +516,18 @@ public class ResourceService : IResourceService
                 translation.Comment = request.Comment;
                 translation.UpdatedAt = DateTime.UtcNow;
                 translation.Version++;
+
+                // If updating the default language, also update SourceText
+                if (isDefaultLanguage && string.IsNullOrEmpty(request.PluralForm))
+                {
+                    resourceKey.SourceText = request.Value;
+                    resourceKey.UpdatedAt = DateTime.UtcNow;
+                }
+                else if (isDefaultLanguage && request.PluralForm == "other")
+                {
+                    resourceKey.SourcePluralText = request.Value;
+                    resourceKey.UpdatedAt = DateTime.UtcNow;
+                }
             }
 
             await _db.SaveChangesAsync();
@@ -528,6 +558,10 @@ public class ResourceService : IResourceService
             {
                 return (false, 0, "You don't have permission to manage resources in this project");
             }
+
+            // Get project to check if we're updating the default language
+            var project = await _db.Projects.FindAsync(projectId);
+            var isDefaultLanguage = project != null && languageCode == project.DefaultLanguage;
 
             var updatedCount = 0;
 
@@ -576,6 +610,18 @@ public class ResourceService : IResourceService
                     translation.Status = update.Status;
                     translation.UpdatedAt = DateTime.UtcNow;
                     translation.Version++;
+                }
+
+                // If updating the default language, also update SourceText
+                if (isDefaultLanguage && string.IsNullOrEmpty(update.PluralForm))
+                {
+                    resourceKey.SourceText = update.Value;
+                    resourceKey.UpdatedAt = DateTime.UtcNow;
+                }
+                else if (isDefaultLanguage && update.PluralForm == "other")
+                {
+                    resourceKey.SourcePluralText = update.Value;
+                    resourceKey.UpdatedAt = DateTime.UtcNow;
                 }
 
                 updatedCount++;
@@ -1023,6 +1069,7 @@ public class ResourceService : IResourceService
             KeyName = key.KeyName,
             KeyPath = key.KeyPath,
             IsPlural = key.IsPlural,
+            SourceText = key.SourceText,
             SourcePluralText = key.SourcePluralText,
             Comment = key.Comment,
             Version = key.Version,
@@ -1039,19 +1086,47 @@ public class ResourceService : IResourceService
 
     private ResourceKeyDetailDto MapToResourceKeyDetailDto(ResourceKey key, string? defaultLanguage)
     {
+        var translations = key.Translations.Select(t => MapToTranslationDto(t, defaultLanguage)).ToList();
+
+        // Add virtual translation for source language display if SourceText exists
+        // but no translation exists for the default language (or empty LanguageCode)
+        if (!string.IsNullOrEmpty(defaultLanguage) && !string.IsNullOrEmpty(key.SourceText) && !key.IsPlural)
+        {
+            var hasDefaultLangTranslation = key.Translations.Any(t =>
+                (t.LanguageCode == defaultLanguage || string.IsNullOrEmpty(t.LanguageCode))
+                && string.IsNullOrEmpty(t.PluralForm));
+
+            if (!hasDefaultLangTranslation)
+            {
+                // Insert virtual source translation for grid display
+                translations.Insert(0, new TranslationDto
+                {
+                    Id = 0,
+                    LanguageCode = defaultLanguage,
+                    Value = key.SourceText,
+                    PluralForm = "",
+                    Status = "source",
+                    Version = 0,
+                    UpdatedAt = key.UpdatedAt,
+                    IsVirtual = true
+                });
+            }
+        }
+
         return new ResourceKeyDetailDto
         {
             Id = key.Id,
             KeyName = key.KeyName,
             KeyPath = key.KeyPath,
             IsPlural = key.IsPlural,
+            SourceText = key.SourceText,
             SourcePluralText = key.SourcePluralText,
             Comment = key.Comment,
             Version = key.Version,
             TranslationCount = key.Translations.Count,
             CreatedAt = key.CreatedAt,
             UpdatedAt = key.UpdatedAt,
-            Translations = key.Translations.Select(t => MapToTranslationDto(t, defaultLanguage)).ToList()
+            Translations = translations
         };
     }
 
@@ -1371,6 +1446,9 @@ public class ResourceService : IResourceService
         var response = new BatchSaveResponse();
         var changes = new List<SyncChangeEntry>();
 
+        // Get project to check default language for SourceText updates
+        var project = await _db.Projects.FindAsync(projectId);
+
         await using var transaction = await _db.Database.BeginTransactionAsync();
 
         try
@@ -1402,6 +1480,7 @@ public class ResourceService : IResourceService
                     {
                         Key = keyChange.KeyName,
                         Lang = "",
+                        PluralForm = "",
                         ChangeType = "modified",
                         BeforeComment = beforeComment,
                         AfterComment = keyChange.Comment
@@ -1483,6 +1562,21 @@ public class ResourceService : IResourceService
                     translation.Version++;
                 }
 
+                // If updating the default language, also update SourceText on ResourceKey
+                if (project != null && translationChange.LanguageCode == project.DefaultLanguage)
+                {
+                    if (string.IsNullOrEmpty(pluralForm))
+                    {
+                        resourceKey.SourceText = translation.Value;
+                        resourceKey.UpdatedAt = DateTime.UtcNow;
+                    }
+                    else if (pluralForm == "other")
+                    {
+                        resourceKey.SourcePluralText = translation.Value;
+                        resourceKey.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+
                 response.TranslationsModified++;
 
                 // Record the change
@@ -1490,6 +1584,7 @@ public class ResourceService : IResourceService
                 {
                     Key = translationChange.KeyName,
                     Lang = translationChange.LanguageCode,
+                    PluralForm = pluralForm,
                     ChangeType = changeType,
                     BeforeValue = beforeValue,
                     AfterValue = translation.Value,
