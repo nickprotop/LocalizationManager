@@ -54,8 +54,21 @@ public partial class AndroidResourceWriter : IResourceWriter
             OmitXmlDeclaration = false
         };
 
-        using var writer = XmlWriter.Create(file.Language.FilePath, settings);
-        doc.Save(writer);
+        // Use atomic write to prevent file corruption
+        var tempPath = file.Language.FilePath + $".tmp.{Guid.NewGuid()}";
+        try
+        {
+            using (var writer = XmlWriter.Create(tempPath, settings))
+            {
+                doc.Save(writer);
+            }
+            File.Move(tempPath, file.Language.FilePath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+                File.Delete(tempPath);
+        }
     }
 
     /// <summary>
@@ -295,7 +308,7 @@ public partial class AndroidResourceWriter : IResourceWriter
         var match = ArrayKeyPattern().Match(key);
         if (match.Success && int.TryParse(match.Groups[2].Value, out var index))
             return index;
-        return 0;
+        return int.MaxValue;  // Sort malformed entries last
     }
 
     /// <summary>
