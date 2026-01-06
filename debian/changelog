@@ -1,6 +1,5 @@
-lrm (0.7.10-1) noble; urgency=medium
+lrm (0.7.11-1) noble; urgency=medium
 
-  * Fixed: Fix low priority maintenance and consistency issues\n- Fix medium priority logic bugs across all backends\n- Fix critical data loss bugs in iOS, Android, Po, and Json backends\n
-  * Added: Add security hardening and atomic writes to backend writers\n- Add XLIFF 2.0 plural support using group elements\n
+  * Fixed: Fix ISO week calculation in backup rotation policy\n
 
- -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Tue, 06 Jan 2026 11:55:51 +0200
+ -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Tue, 06 Jan 2026 12:48:00 +0200
