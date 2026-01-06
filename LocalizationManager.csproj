@@ -87,4 +87,9 @@
     <RazorGenerate Remove="**\*.razor" />
   </ItemGroup>
 
+  <!-- Embed static files (wwwroot) into single executable -->
+  <ItemGroup>
+    <EmbeddedResource Include="wwwroot\**\*" />
+  </ItemGroup>
+
 </Project>

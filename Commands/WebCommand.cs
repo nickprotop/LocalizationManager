@@ -20,6 +20,7 @@
 // SOFTWARE.
 
 using System.ComponentModel;
+using Microsoft.Extensions.FileProviders;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using LocalizationManager.Core.Backends.Json;
@@ -253,8 +254,41 @@ public class WebCommand : Command<WebCommand.Settings>
 
         app.MapControllers();
 
-        // Serve static files (CSS, JS, images)
-        app.UseStaticFiles();
+        // Serve static files from embedded resources (for single-file executable)
+        var assembly = typeof(Program).Assembly;
+
+        // Debug: List embedded resources
+        var resourceNames = assembly.GetManifestResourceNames();
+        AnsiConsole.MarkupLine($"[dim]Embedded resources: {string.Join(", ", resourceNames.Take(5))}...[/]");
+
+        var embeddedProvider = new EmbeddedFileProvider(assembly, "LocalizationManager.wwwroot");
+
+        var staticFileOptions = new Microsoft.AspNetCore.Builder.StaticFileOptions
+        {
+            FileProvider = embeddedProvider,
+            OnPrepareResponse = ctx =>
+            {
+                // Ensure correct MIME types are set
+                var path = ctx.File.Name.ToLowerInvariant();
+                if (path.EndsWith(".css"))
+                {
+                    ctx.Context.Response.ContentType = "text/css; charset=utf-8";
+                }
+                else if (path.EndsWith(".js"))
+                {
+                    ctx.Context.Response.ContentType = "application/javascript; charset=utf-8";
+                }
+                else if (path.EndsWith(".json"))
+                {
+                    ctx.Context.Response.ContentType = "application/json; charset=utf-8";
+                }
+                else if (path.EndsWith(".ico"))
+                {
+                    ctx.Context.Response.ContentType = "image/x-icon";
+                }
+            }
+        };
+        app.UseStaticFiles(staticFileOptions);
 
         // Blazor Server routing
         app.UseRouting();
