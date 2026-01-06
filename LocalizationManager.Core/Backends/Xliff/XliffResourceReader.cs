@@ -57,9 +57,18 @@ public class XliffResourceReader : IResourceReader
     {
         var content = reader.ReadToEnd();
 
-        // Parse the document - use XDocument.Parse for string content
-        // This handles encoding properly for strings (avoids UTF-8/UTF-16 BOM issues)
-        var doc = XDocument.Parse(content, LoadOptions.PreserveWhitespace);
+        // Use secure XML settings to prevent XXE attacks
+        var settings = new XmlReaderSettings
+        {
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null
+        };
+
+        XDocument doc;
+        using (var xmlReader = XmlReader.Create(new StringReader(content), settings))
+        {
+            doc = XDocument.Load(xmlReader, LoadOptions.PreserveWhitespace);
+        }
 
         // Detect version from the parsed document (more reliable than stream-based detection)
         var version = DetectVersionFromDocument(doc);
@@ -86,9 +95,9 @@ public class XliffResourceReader : IResourceReader
 
         // Check namespace
         var ns = root.GetDefaultNamespace().NamespaceName;
-        if (ns.Contains("2.0"))
+        if (ns == XliffVersionDetector.Xliff20Namespace)
             return "2.0";
-        if (ns.Contains("1.2"))
+        if (ns == XliffVersionDetector.Xliff12Namespace)
             return "1.2";
 
         // Check version attribute
@@ -105,7 +114,7 @@ public class XliffResourceReader : IResourceReader
         if (root.Attribute("srcLang") != null)
             return "2.0";
 
-        return "1.2"; // Default to 1.2
+        return "unknown";  // Let caller decide how to handle
     }
 
     /// <summary>
@@ -223,7 +232,7 @@ public class XliffResourceReader : IResourceReader
             // Always prefer target value (which contains the localized text)
             var pluralValue = target ?? source;
 
-            if (!string.IsNullOrEmpty(pluralId) && pluralValue != null)
+            if (!string.IsNullOrEmpty(pluralId) && !string.IsNullOrEmpty(pluralValue))
             {
                 // Extract plural category from id (e.g., "key[one]", "key[other]")
                 var category = ExtractPluralCategory(pluralId);
@@ -244,7 +253,10 @@ public class XliffResourceReader : IResourceReader
         return new ResourceEntry
         {
             Key = id,
-            Value = pluralForms.GetValueOrDefault("other") ?? pluralForms.Values.FirstOrDefault(),
+            Value = pluralForms.GetValueOrDefault("other")
+                ?? pluralForms.GetValueOrDefault("one")
+                ?? pluralForms.Values.FirstOrDefault()
+                ?? "",
             Comment = string.IsNullOrEmpty(comment) ? null : comment,
             IsPlural = true,
             PluralForms = pluralForms
@@ -282,12 +294,24 @@ public class XliffResourceReader : IResourceReader
             var groups = fileElement.Elements(ns + "group");
             foreach (var group in groups)
             {
-                var nestedUnits = group.Descendants(ns + "unit");
-                foreach (var unit in nestedUnits)
+                // Check if this is a plural group (has multiple units with same base key)
+                var groupUnits = group.Elements(ns + "unit").ToList();
+                if (groupUnits.Count > 1 && IsPluralGroup(groupUnits))
                 {
-                    var entry = ParseUnit20(unit, ns, metadata);
-                    if (entry != null)
-                        entries.Add(entry);
+                    var pluralEntry = ParsePluralGroup20(group, ns, metadata);
+                    if (pluralEntry != null)
+                        entries.Add(pluralEntry);
+                }
+                else
+                {
+                    // Regular group - parse nested units
+                    var nestedUnits = group.Descendants(ns + "unit");
+                    foreach (var unit in nestedUnits)
+                    {
+                        var entry = ParseUnit20(unit, ns, metadata);
+                        if (entry != null)
+                            entries.Add(entry);
+                    }
                 }
             }
         }
@@ -357,25 +381,116 @@ public class XliffResourceReader : IResourceReader
     /// </summary>
     private static string? ExtractPluralCategory(string id)
     {
+        return ExtractPluralCategoryWithBase(id).category;
+    }
+
+    /// <summary>
+    /// Extracts both the base name and plural category from an ID like "key[one]" or "key_plural_one".
+    /// Returns (baseName, category) or (id, null) if not a plural suffix key.
+    /// </summary>
+    private static (string baseName, string? category) ExtractPluralCategoryWithBase(string id)
+    {
         // Pattern 1: key[category]
         var bracketStart = id.LastIndexOf('[');
         var bracketEnd = id.LastIndexOf(']');
-        if (bracketStart >= 0 && bracketEnd > bracketStart)
+        // Validate: brackets must be in correct order and have content between them
+        if (bracketStart >= 0 && bracketEnd > bracketStart + 1)
         {
-            return id.Substring(bracketStart + 1, bracketEnd - bracketStart - 1);
+            var baseName = id.Substring(0, bracketStart);
+            var category = id.Substring(bracketStart + 1, bracketEnd - bracketStart - 1);
+            return (baseName, category);
         }
 
         // Pattern 2: key_plural_category
         var categories = new[] { "zero", "one", "two", "few", "many", "other" };
         foreach (var cat in categories)
         {
-            if (id.EndsWith($"_{cat}", StringComparison.OrdinalIgnoreCase) ||
-                id.EndsWith($"_plural_{cat}", StringComparison.OrdinalIgnoreCase))
+            if (id.EndsWith($"_{cat}", StringComparison.OrdinalIgnoreCase))
             {
-                return cat;
+                return (id.Substring(0, id.Length - cat.Length - 1), cat);
+            }
+            if (id.EndsWith($"_plural_{cat}", StringComparison.OrdinalIgnoreCase))
+            {
+                return (id.Substring(0, id.Length - cat.Length - 8), cat);
             }
         }
 
-        return null;
+        return (id, null);
+    }
+
+    /// <summary>
+    /// Checks if a group's units represent a plural entry.
+    /// Returns true if all units share the same base key and there are multiple units.
+    /// </summary>
+    private bool IsPluralGroup(List<XElement> units)
+    {
+        if (units.Count <= 1)
+            return false;
+
+        // Extract base keys (remove [category] suffix)
+        var baseKeys = units
+            .Select(u => u.Attribute("id")?.Value)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Select(id => ExtractPluralCategoryWithBase(id!).baseName)
+            .Distinct()
+            .ToList();
+
+        // If all units share the same base key and there are multiple units, it's a plural group
+        return baseKeys.Count == 1 && units.Count > 1;
+    }
+
+    /// <summary>
+    /// Parses a plural group in XLIFF 2.0.
+    /// </summary>
+    private ResourceEntry? ParsePluralGroup20(XElement group, XNamespace ns, LanguageInfo metadata)
+    {
+        var id = group.Attribute("id")?.Value ?? group.Attribute("name")?.Value;
+        if (string.IsNullOrEmpty(id))
+            return null;
+
+        var pluralForms = new Dictionary<string, string>();
+        var units = group.Elements(ns + "unit").ToList();
+
+        foreach (var unit in units)
+        {
+            var unitId = unit.Attribute("id")?.Value;
+            if (string.IsNullOrEmpty(unitId))
+                continue;
+
+            // Extract category from ID like "key[one]" or "key[other]"
+            var (baseName, category) = ExtractPluralCategoryWithBase(unitId);
+            if (string.IsNullOrEmpty(category))
+                continue;
+
+            // Get target value from segment
+            var segment = unit.Element(ns + "segment");
+            var target = segment?.Element(ns + "target")?.Value;
+            var source = segment?.Element(ns + "source")?.Value;
+
+            pluralForms[category] = target ?? source ?? "";
+        }
+
+        if (pluralForms.Count == 0)
+            return null;
+
+        // Get notes from group
+        var notesElement = group.Element(ns + "notes");
+        var notes = notesElement?.Elements(ns + "note")
+            .Select(n => n.Value)
+            .Where(n => !string.IsNullOrEmpty(n))
+            ?? Enumerable.Empty<string>();
+        var comment = string.Join("\n", notes);
+
+        return new ResourceEntry
+        {
+            Key = id,
+            Value = pluralForms.GetValueOrDefault("other")
+                ?? pluralForms.GetValueOrDefault("one")
+                ?? pluralForms.Values.FirstOrDefault()
+                ?? "",
+            Comment = string.IsNullOrEmpty(comment) ? null : comment,
+            IsPlural = true,
+            PluralForms = pluralForms
+        };
     }
 }

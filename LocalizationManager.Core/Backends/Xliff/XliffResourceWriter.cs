@@ -40,10 +40,19 @@ public class XliffResourceWriter : IResourceWriter
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             Directory.CreateDirectory(directory);
 
-        // Atomic write
-        var tempPath = file.Language.FilePath + ".tmp";
-        await File.WriteAllTextAsync(tempPath, content, Encoding.UTF8, ct);
-        File.Move(tempPath, file.Language.FilePath, overwrite: true);
+        // Atomic write with unique temp file name to prevent race conditions
+        var tempPath = file.Language.FilePath + $".tmp.{Guid.NewGuid()}";
+        try
+        {
+            // Use UTF-8 without BOM for consistency with SerializeToString
+            await File.WriteAllTextAsync(tempPath, content, new UTF8Encoding(false), ct);
+            File.Move(tempPath, file.Language.FilePath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+                File.Delete(tempPath);
+        }
     }
 
     /// <inheritdoc />
@@ -233,7 +242,7 @@ public class XliffResourceWriter : IResourceWriter
             {
                 var unit = new XElement(Ns12 + "trans-unit",
                     new XAttribute("id", $"{entry.Key}[{category}]"),
-                    new XElement(Ns12 + "source", entry.Key),
+                    new XElement(Ns12 + "source", entry.SourcePluralText ?? entry.Key),
                     new XElement(Ns12 + "target", value ?? ""));
                 group.Add(unit);
             }
@@ -261,7 +270,14 @@ public class XliffResourceWriter : IResourceWriter
 
         foreach (var entry in file.Entries)
         {
-            fileElement.Add(CreateUnit20(entry, file.Language.IsDefault));
+            if (entry.IsPlural && entry.PluralForms != null && entry.PluralForms.Count > 0)
+            {
+                fileElement.Add(CreatePluralUnit20(entry, file.Language.IsDefault));
+            }
+            else
+            {
+                fileElement.Add(CreateUnit20(entry, file.Language.IsDefault));
+            }
         }
 
         root.Add(fileElement);
@@ -272,8 +288,46 @@ public class XliffResourceWriter : IResourceWriter
     }
 
     /// <summary>
-    /// Creates a unit element for XLIFF 2.0.
+    /// Creates a group element for plural entries in XLIFF 2.0.
+    /// Uses groups to preserve plural structure similar to XLIFF 1.2.
+    /// </summary>
+    private XElement CreatePluralUnit20(ResourceEntry entry, bool isDefault)
+    {
+        var group = new XElement(Ns20 + "group",
+            new XAttribute("id", entry.Key),
+            new XAttribute("name", entry.Key));
+
+        if (!string.IsNullOrEmpty(entry.Comment))
+        {
+            var notes = new XElement(Ns20 + "notes",
+                new XElement(Ns20 + "note", entry.Comment));
+            group.Add(notes);
+        }
+
+        // Create a unit for each plural form
+        if (entry.PluralForms != null)
+        {
+            foreach (var (category, value) in entry.PluralForms)
+            {
+                var unit = new XElement(Ns20 + "unit",
+                    new XAttribute("id", $"{entry.Key}[{category}]"));
+
+                var segment = new XElement(Ns20 + "segment",
+                    new XElement(Ns20 + "source", entry.Key),
+                    new XElement(Ns20 + "target", value ?? ""));
+
+                unit.Add(segment);
+                group.Add(unit);
+            }
+        }
+
+        return group;
+    }
+
+    /// <summary>
+    /// Creates a unit element for XLIFF 2.0 (non-plural entries only).
     /// Always creates both source and target elements to preserve bilingual structure.
+    /// For plural entries, use CreatePluralUnit20 instead.
     /// </summary>
     private XElement CreateUnit20(ResourceEntry entry, bool isDefault)
     {
@@ -287,26 +341,11 @@ public class XliffResourceWriter : IResourceWriter
             unit.Add(notes);
         }
 
-        if (entry.IsPlural && entry.PluralForms != null)
-        {
-            // Create multiple segments for plurals
-            foreach (var (category, value) in entry.PluralForms)
-            {
-                var segment = new XElement(Ns20 + "segment",
-                    new XAttribute("id", category),
-                    new XElement(Ns20 + "source", entry.Key),
-                    new XElement(Ns20 + "target", value ?? ""));
-                unit.Add(segment);
-            }
-        }
-        else
-        {
-            // Always write both source (key) and target (value) for proper bilingual structure
-            var segment = new XElement(Ns20 + "segment",
-                new XElement(Ns20 + "source", entry.Key),
-                new XElement(Ns20 + "target", entry.Value ?? ""));
-            unit.Add(segment);
-        }
+        // Always write both source (key) and target (value) for proper bilingual structure
+        var segment = new XElement(Ns20 + "segment",
+            new XElement(Ns20 + "source", entry.Key),
+            new XElement(Ns20 + "target", entry.Value ?? ""));
+        unit.Add(segment);
 
         return unit;
     }
