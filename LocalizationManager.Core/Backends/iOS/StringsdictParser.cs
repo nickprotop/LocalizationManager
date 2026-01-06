@@ -2,6 +2,7 @@
 // Licensed under the MIT License
 
 using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace LocalizationManager.Core.Backends.iOS;
@@ -34,7 +35,21 @@ public class StringsdictParser
 
         try
         {
-            var doc = XDocument.Parse(content);
+            // Use secure XML settings to prevent XXE attacks
+            // Note: Use Ignore instead of Prohibit to handle Apple's DOCTYPE declarations
+            // Ignore still prevents external entity resolution via XmlResolver = null
+            var settings = new XmlReaderSettings
+            {
+                DtdProcessing = DtdProcessing.Ignore,
+                XmlResolver = null
+            };
+
+            XDocument doc;
+            using (var reader = XmlReader.Create(new StringReader(content), settings))
+            {
+                doc = XDocument.Load(reader);
+            }
+
             var plist = doc.Element("plist");
             var rootDict = plist?.Element("dict");
 
@@ -88,15 +103,7 @@ public class StringsdictParser
                 case "NSStringLocalizedFormatKey":
                     formatKey = propValue.Value;
                     // Extract variable name from format like "%#@count@"
-                    if (formatKey.Contains("@"))
-                    {
-                        var start = formatKey.IndexOf('@') + 1;
-                        var end = formatKey.LastIndexOf('@');
-                        if (end > start)
-                        {
-                            variableName = formatKey.Substring(start, end - start);
-                        }
-                    }
+                    variableName = ExtractVariableName(formatKey);
                     break;
 
                 default:
