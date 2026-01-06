@@ -184,7 +184,12 @@ public class PoResourceReader : IResourceReader
             match = MsgStrPluralPattern.Match(line);
             if (match.Success)
             {
-                var index = int.Parse(match.Groups[1].Value);
+                // Validate plural index is within reasonable bounds (0-10) to prevent integer overflow
+                if (!int.TryParse(match.Groups[1].Value, out var index) || index < 0 || index > 10)
+                {
+                    // Skip invalid plural index
+                    continue;
+                }
                 currentEntry.MsgStrPlural ??= new Dictionary<int, string>();
                 currentEntry.MsgStrPlural[index] = UnescapeString(match.Groups[2].Value);
                 currentField = PoField.MsgStrPlural;
@@ -223,13 +228,13 @@ public class PoResourceReader : IResourceReader
 
     private void ParseComment(string line, PoEntry entry)
     {
-        if (line.StartsWith("#:"))
+        if (line.StartsWith("#:") && line.Length > 2)
         {
             // Reference comment
             entry.References ??= new List<string>();
             entry.References.Add(line.Substring(2).Trim());
         }
-        else if (line.StartsWith("#."))
+        else if (line.StartsWith("#.") && line.Length > 2)
         {
             // Extracted comment
             var comment = line.Substring(2).Trim();
@@ -237,7 +242,7 @@ public class PoResourceReader : IResourceReader
                 ? comment
                 : entry.ExtractedComment + "\n" + comment;
         }
-        else if (line.StartsWith("#,"))
+        else if (line.StartsWith("#,") && line.Length > 2)
         {
             // Flags
             entry.Flags ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -314,7 +319,10 @@ public class PoResourceReader : IResourceReader
             return new ResourceEntry
             {
                 Key = key,
-                Value = pluralForms.GetValueOrDefault("other") ?? pluralForms.Values.FirstOrDefault(),
+                Value = pluralForms.GetValueOrDefault("other")
+                    ?? pluralForms.GetValueOrDefault("one")
+                    ?? pluralForms.Values.FirstOrDefault()
+                    ?? "",
                 Comment = poEntry.GetCombinedComment(),
                 IsPlural = true,
                 PluralForms = pluralForms,

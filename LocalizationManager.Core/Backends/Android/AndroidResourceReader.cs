@@ -170,8 +170,13 @@ public class AndroidResourceReader : IResourceReader
             }
         }
 
+        // Return null if no valid plural forms found
+        if (pluralForms.Count == 0)
+            return null;
+
         // Get the "other" form as the default value, or the first available
         var defaultValue = pluralForms.GetValueOrDefault("other") ??
+                          pluralForms.GetValueOrDefault("one") ??
                           pluralForms.Values.FirstOrDefault() ?? "";
 
         return new ResourceEntry
@@ -198,7 +203,9 @@ public class AndroidResourceReader : IResourceReader
 
         for (int i = 0; i < items.Count; i++)
         {
-            var itemComment = i == 0 ? $"{pendingComment} | {marker}".TrimStart(' ', '|') : marker;
+            var itemComment = i == 0
+                ? (string.IsNullOrEmpty(pendingComment) ? marker : $"{pendingComment} | {marker}")
+                : marker;
 
             yield return new ResourceEntry
             {
@@ -238,12 +245,14 @@ public class AndroidResourceReader : IResourceReader
         if (string.IsNullOrEmpty(value))
             return value;
 
+        // CRITICAL: Backslash must be unescaped FIRST to avoid double-unescaping
         return value
-            .Replace("\\'", "'")
-            .Replace("\\\"", "\"")
+            .Replace("\\\\", "\\")
             .Replace("\\n", "\n")
             .Replace("\\r", "\r")
             .Replace("\\t", "\t")
+            .Replace("\\\"", "\"")
+            .Replace("\\'", "'")
             .Replace("\\@", "@")
             .Replace("\\?", "?");
     }

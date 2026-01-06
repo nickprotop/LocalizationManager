@@ -60,21 +60,21 @@ public class IosResourceReader : IResourceReader
                     e.Key.Equals(entry.Key, StringComparison.Ordinal));
 
                 var defaultValue = entry.PluralForms.GetValueOrDefault("other") ??
+                                  entry.PluralForms.GetValueOrDefault("one") ??
                                   entry.PluralForms.Values.FirstOrDefault() ?? "";
 
                 var pluralEntry = new ResourceEntry
                 {
                     Key = entry.Key,
                     Value = defaultValue,
-                    Comment = null,
+                    Comment = existingIndex >= 0 ? entries[existingIndex].Comment : null,
                     IsPlural = true,
                     PluralForms = entry.PluralForms
                 };
 
                 if (existingIndex >= 0)
                 {
-                    // Replace with plural version, preserving comment
-                    pluralEntry.Comment = entries[existingIndex].Comment;
+                    // Replace with plural version (comment already preserved above)
                     entries[existingIndex] = pluralEntry;
                 }
                 else

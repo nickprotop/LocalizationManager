@@ -244,7 +244,7 @@ internal class PoHeader
         foreach (var line in lines)
         {
             var colonIndex = line.IndexOf(':');
-            if (colonIndex <= 0) continue;
+            if (colonIndex < 0) continue;
 
             var key = line.Substring(0, colonIndex).Trim();
             var value = line.Substring(colonIndex + 1).Trim().TrimEnd('\\', 'n');

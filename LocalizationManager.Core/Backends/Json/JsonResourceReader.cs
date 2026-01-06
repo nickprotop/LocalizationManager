@@ -254,7 +254,10 @@ public class JsonResourceReader : IResourceReader
             entries.Add(new ResourceEntry
             {
                 Key = key,
-                Value = pluralForms.GetValueOrDefault("other") ?? pluralForms.Values.FirstOrDefault(),
+                Value = pluralForms.GetValueOrDefault("other")
+                    ?? pluralForms.GetValueOrDefault("one")
+                    ?? pluralForms.Values.FirstOrDefault()
+                    ?? "",
                 IsPlural = true,
                 PluralForms = pluralForms
             });
@@ -342,7 +345,10 @@ public class JsonResourceReader : IResourceReader
                 var pluralEntry = new ResourceEntry
                 {
                     Key = baseName,
-                    Value = forms.GetValueOrDefault("other")?.Value ?? forms.Values.First().Value,
+                    Value = forms.GetValueOrDefault("other")?.Value
+                        ?? forms.GetValueOrDefault("one")?.Value
+                        ?? forms.Values.First().Value
+                        ?? "",
                     IsPlural = true,
                     PluralForms = forms.ToDictionary(kv => kv.Key, kv => kv.Value.Value ?? "")
                 };
@@ -364,6 +370,8 @@ public class JsonResourceReader : IResourceReader
     private Dictionary<string, string> ExtractPluralForms(JsonElement element, bool isLrmStyle)
     {
         var pluralForms = new Dictionary<string, string>();
+        var validCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "zero", "one", "two", "few", "many", "other" };
 
         foreach (var prop in element.EnumerateObject())
         {
@@ -375,14 +383,19 @@ public class JsonResourceReader : IResourceReader
             // For i18next style, get values directly
             if (prop.Value.ValueKind == JsonValueKind.String)
             {
-                pluralForms[prop.Name] = prop.Value.GetString() ?? "";
+                // Validate CLDR plural category
+                if (validCategories.Contains(prop.Name))
+                {
+                    pluralForms[prop.Name] = prop.Value.GetString() ?? "";
+                }
             }
             else if (isLrmStyle && prop.Name == "_plural" && prop.Value.ValueKind == JsonValueKind.Object)
             {
                 // LRM style: {"_plural": {"one": "...", "other": "..."}}
                 foreach (var pluralProp in prop.Value.EnumerateObject())
                 {
-                    if (pluralProp.Value.ValueKind == JsonValueKind.String)
+                    if (pluralProp.Value.ValueKind == JsonValueKind.String &&
+                        validCategories.Contains(pluralProp.Name))
                     {
                         pluralForms[pluralProp.Name] = pluralProp.Value.GetString() ?? "";
                     }
