@@ -199,6 +199,27 @@
             </Template>
         </RadzenDataGridColumn>
 
+        @* Source text column *@
+        <RadzenDataGridColumn TItem="TranslationGridRow" Title="Source" Width="300px" MinWidth="200px" Sortable="false" Resizable="true" Filterable="false">
+            <Template Context="row">
+                @{
+                    var sourceValue = row.IsPlural
+                        ? (row.SourcePluralText ?? row.SourceText ?? "")
+                        : (row.SourceText ?? "");
+                }
+                @if (string.IsNullOrEmpty(sourceValue))
+                {
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="font-style: italic;">
+                        (no source)
+                    </RadzenText>
+                }
+                else
+                {
+                    <RadzenText TextStyle="TextStyle.Body2">@sourceValue</RadzenText>
+                }
+            </Template>
+        </RadzenDataGridColumn>
+
         @* Language columns *@
         @foreach (var lang in VisibleLanguages)
         {

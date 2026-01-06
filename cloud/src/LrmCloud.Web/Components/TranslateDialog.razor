@@ -188,21 +188,70 @@
                     </ChildContent>
                 </RadzenFormField>
 
+                @* Source Text Preview *@
+                @if (SourceTexts?.Count > 0)
+                {
+                    <details style="margin-bottom: 0.5rem;">
+                        <summary style="cursor: pointer; margin-bottom: 0.5rem;">
+                            <RadzenText TextStyle="TextStyle.Subtitle2" TagName="TagName.Span">
+                                Source texts (@SourceTexts.Count)
+                            </RadzenText>
+                        </summary>
+                        <RadzenCard Style="max-height: 200px; overflow-y: auto; padding: 0.5rem;">
+                            <RadzenStack Gap="0.5rem">
+                                @foreach (var (key, text) in SourceTexts.Take(20))
+                                {
+                                    <RadzenStack Gap="0.125rem">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@key</RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body2">@TruncateText(text, 100)</RadzenText>
+                                    </RadzenStack>
+                                }
+                                @if (SourceTexts.Count > 20)
+                                {
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        ... and @(SourceTexts.Count - 20) more
+                                    </RadzenText>
+                                }
+                            </RadzenStack>
+                        </RadzenCard>
+                    </details>
+                }
+
                 <RadzenText TextStyle="TextStyle.Subtitle2">Target Languages</RadzenText>
                 <RadzenStack Gap="0.5rem">
-                    @foreach (var lang in AvailableLanguages.Where(l => l != SourceLanguage))
-                    {
-                        var langCode = lang;
-                        var isSelected = _selectedLanguages.Contains(langCode);
-                        var displayName = GetLanguageDisplayName(langCode);
-                        var labelText = displayName != langCode.ToUpperInvariant()
-                            ? $"{displayName} ({langCode.ToUpperInvariant()})"
-                            : langCode.ToUpperInvariant();
-                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="Radzen.AlignItems.Center" Gap="0.5rem">
-                            <RadzenCheckBox TValue="bool" Value="@isSelected" Change="@(v => ToggleLanguage(langCode))" />
-                            <RadzenText TextStyle="TextStyle.Body2">@labelText</RadzenText>
-                        </RadzenStack>
-                    }
+                    @* Quick actions *@
+                    <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                        <RadzenButton Text="Select All"
+                                      Size="ButtonSize.ExtraSmall"
+                                      Variant="Radzen.Variant.Outlined"
+                                      Click="@SelectAllLanguages" />
+                        <RadzenButton Text="Clear All"
+                                      Size="ButtonSize.ExtraSmall"
+                                      Variant="Radzen.Variant.Outlined"
+                                      Click="@ClearAllLanguages" />
+                    </RadzenStack>
+
+                    @* Multi-select dropdown with chips *@
+                    <RadzenDropDown @bind-Value="@_selectedLanguagesList"
+                                    Data="@_availableTargetLanguages"
+                                    Multiple="true"
+                                    AllowClear="true"
+                                    AllowFiltering="true"
+                                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                    Placeholder="Select target languages..."
+                                    Style="width: 100%;"
+                                    Chips="true"
+                                    MaxSelectedLabels="5">
+                        <Template Context="lang">
+                            @{
+                                var displayName = GetLanguageDisplayName(lang);
+                                var labelText = displayName != lang.ToUpperInvariant()
+                                    ? $"{displayName} ({lang.ToUpperInvariant()})"
+                                    : lang.ToUpperInvariant();
+                            }
+                            @labelText
+                        </Template>
+                    </RadzenDropDown>
                 </RadzenStack>
 
                 @if (!_selectedLanguages.Any())
@@ -379,7 +428,8 @@
     protected override async Task OnInitializedAsync()
     {
         _keysToTranslate = KeysToTranslate;
-        _selectedLanguages = AvailableLanguages.Where(l => l != SourceLanguage).ToHashSet();
+        // Default to no languages selected - user must explicitly choose
+        _selectedLanguages = new HashSet<string>();
         await Task.WhenAll(LoadProvidersAsync(), CheckUsageLimitsAsync(), LoadGlossaryAsync());
     }
 
@@ -435,10 +485,28 @@
         }
     }
 
-    private void ToggleLanguage(string lang)
+    private IEnumerable<string> _availableTargetLanguages => AvailableLanguages.Where(l => l != SourceLanguage);
+
+    private IEnumerable<string> _selectedLanguagesList
     {
-        if (_selectedLanguages.Contains(lang)) _selectedLanguages.Remove(lang);
-        else _selectedLanguages.Add(lang);
+        get => _selectedLanguages;
+        set => _selectedLanguages = new HashSet<string>(value ?? Enumerable.Empty<string>());
+    }
+
+    private void SelectAllLanguages()
+    {
+        _selectedLanguages = new HashSet<string>(_availableTargetLanguages);
+    }
+
+    private void ClearAllLanguages()
+    {
+        _selectedLanguages.Clear();
+    }
+
+    private static string TruncateText(string? text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        return text.Length > maxLength ? text.Substring(0, maxLength) + "..." : text;
     }
 
     private async Task CheckTmFirst()

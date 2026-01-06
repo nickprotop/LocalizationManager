@@ -260,6 +260,7 @@ else
                     KeyName = detail.KeyName,
                     KeyPath = detail.KeyPath,
                     IsPlural = detail.IsPlural,
+                    SourceText = detail.SourceText,
                     SourcePluralText = detail.SourcePluralText,
                     Comment = detail.Comment,
                     Version = detail.Version,
@@ -841,21 +842,47 @@ else
         {
             if (row.IsPlural)
             {
+                // For plural keys, use SourcePluralText for "other" form, then fall back to cells
                 foreach (var pluralForm in PluralForms.All)
                 {
-                    var cell = row.GetCell(defaultLanguage, pluralForm);
-                    if (cell != null && !string.IsNullOrEmpty(cell.Value))
+                    string? sourceValue = null;
+
+                    // Priority 1: Use SourcePluralText for "other" form (format-agnostic source)
+                    if (pluralForm == "other" && !string.IsNullOrEmpty(row.SourcePluralText))
                     {
-                        sourceTexts[$"{row.KeyName}:{pluralForm}"] = cell.Value;
+                        sourceValue = row.SourcePluralText;
+                    }
+                    // Priority 2: Fall back to default language cell
+                    else
+                    {
+                        var cell = row.GetCell(defaultLanguage, pluralForm);
+                        if (cell != null && !string.IsNullOrEmpty(cell.Value))
+                        {
+                            sourceValue = cell.Value;
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(sourceValue))
+                    {
+                        sourceTexts[$"{row.KeyName}:{pluralForm}"] = sourceValue;
                     }
                 }
             }
             else
             {
-                var cell = row.Translations.GetValueOrDefault(defaultLanguage);
-                if (cell != null && !string.IsNullOrEmpty(cell.Value))
+                // Priority 1: Use SourceText if available (format-agnostic source)
+                if (!string.IsNullOrEmpty(row.SourceText))
                 {
-                    sourceTexts[row.KeyName] = cell.Value;
+                    sourceTexts[row.KeyName] = row.SourceText;
+                }
+                // Priority 2: Fall back to default language cell
+                else
+                {
+                    var cell = row.Translations.GetValueOrDefault(defaultLanguage);
+                    if (cell != null && !string.IsNullOrEmpty(cell.Value))
+                    {
+                        sourceTexts[row.KeyName] = cell.Value;
+                    }
                 }
             }
         }
