@@ -19,4 +19,10 @@ public class TranslationDto
     /// Translation-specific comment (per-language note).
     /// </summary>
     public string? Comment { get; set; }
+
+    /// <summary>
+    /// True if this translation was synthesized (e.g., from SourceText for display),
+    /// not stored in the database.
+    /// </summary>
+    public bool IsVirtual { get; set; }
 }

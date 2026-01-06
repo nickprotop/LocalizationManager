@@ -10,6 +10,10 @@ public class ResourceKeyDto
     public string? KeyPath { get; set; }
     public bool IsPlural { get; set; }
     /// <summary>
+    /// Source text for this key (value from default language file, msgid for PO format).
+    /// </summary>
+    public string? SourceText { get; set; }
+    /// <summary>
     /// For plural keys, the source plural text pattern (PO msgid_plural or "other" form).
     /// </summary>
     public string? SourcePluralText { get; set; }

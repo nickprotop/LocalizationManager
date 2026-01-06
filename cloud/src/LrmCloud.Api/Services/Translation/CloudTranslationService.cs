@@ -213,13 +213,27 @@ public class CloudTranslationService : ICloudTranslationService
                     }
                     else
                     {
-                        // Look up source translation - check both conventions:
-                        // - CLI sync stores default language with LanguageCode = ""
-                        // - Web import stores with actual code (e.g., "en")
-                        var sourceTranslation = key.Translations
-                            .FirstOrDefault(t => (t.LanguageCode == sourceLanguageDbCode || t.LanguageCode == sourceLanguage)
-                                                 && t.PluralForm == pluralForm);
-                        sourceText = sourceTranslation?.Value;
+                        // Priority 1: Use ResourceKey.SourceText (format-agnostic source)
+                        if (string.IsNullOrEmpty(pluralForm) && !string.IsNullOrEmpty(key.SourceText))
+                        {
+                            sourceText = key.SourceText;
+                        }
+                        // Priority 2: Use ResourceKey.SourcePluralText for plural "other" form
+                        else if (pluralForm == "other" && !string.IsNullOrEmpty(key.SourcePluralText))
+                        {
+                            sourceText = key.SourcePluralText;
+                        }
+                        // Priority 3: Fall back to translation lookup (backward compatibility)
+                        else
+                        {
+                            // Look up source translation - check both conventions:
+                            // - CLI sync stores default language with LanguageCode = ""
+                            // - Web import stores with actual code (e.g., "en")
+                            var sourceTranslation = key.Translations
+                                .FirstOrDefault(t => (t.LanguageCode == sourceLanguageDbCode || t.LanguageCode == sourceLanguage)
+                                                     && t.PluralForm == pluralForm);
+                            sourceText = sourceTranslation?.Value;
+                        }
                     }
 
                     // Skip empty source texts (but don't skip the whole key for plurals)
