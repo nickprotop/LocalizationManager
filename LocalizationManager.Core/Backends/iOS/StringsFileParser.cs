@@ -241,6 +241,7 @@ public partial class StringsFileParser
     }
 
     // Pattern: "key" = "value"; with optional whitespace and semicolon
-    [GeneratedRegex(@"^\s*""(.+?)""\s*=\s*""(.*)""\s*;?\s*$", RegexOptions.Singleline)]
+    // Using timeout to prevent ReDoS attacks
+    [GeneratedRegex(@"^\s*""(.+?)""\s*=\s*""(.*)""\s*;?\s*$", RegexOptions.Singleline, 1000)]
     private static partial Regex KeyValuePattern();
 }

@@ -47,7 +47,19 @@ public class JsonResourceWriter : IResourceWriter
     public void Write(ResourceFile file)
     {
         var json = BuildJsonString(file);
-        File.WriteAllText(file.Language.FilePath, json);
+
+        // Use atomic write to prevent file corruption
+        var tempPath = file.Language.FilePath + $".tmp.{Guid.NewGuid()}";
+        try
+        {
+            File.WriteAllText(tempPath, json, new System.Text.UTF8Encoding(false));
+            File.Move(tempPath, file.Language.FilePath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+                File.Delete(tempPath);
+        }
     }
 
     /// <summary>
@@ -108,7 +120,7 @@ public class JsonResourceWriter : IResourceWriter
         return JsonSerializer.Serialize(root, new JsonSerializerOptions
         {
             WriteIndented = true,
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            Encoder = JavaScriptEncoder.Default  // Use safe encoder to prevent XSS
         });
     }
 

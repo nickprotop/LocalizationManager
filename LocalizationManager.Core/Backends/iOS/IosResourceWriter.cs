@@ -51,7 +51,19 @@ public class IosResourceWriter : IResourceWriter
                 new StringsFileParser.StringsEntry(e.Key, e.Value ?? "", e.Comment));
 
             var content = _stringsParser.Serialize(stringsEntries);
-            File.WriteAllText(stringsPath, content);
+
+            // Use atomic write to prevent file corruption
+            var tempPath = stringsPath + $".tmp.{Guid.NewGuid()}";
+            try
+            {
+                File.WriteAllText(tempPath, content, new System.Text.UTF8Encoding(false));
+                File.Move(tempPath, stringsPath, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
         }
         else if (!pluralStrings.Any())
         {
@@ -75,7 +87,19 @@ public class IosResourceWriter : IResourceWriter
                     e.PluralForms!));
 
             var content = _stringsdictParser.Serialize(stringsdictEntries);
-            File.WriteAllText(stringsdictPath, content);
+
+            // Use atomic write to prevent file corruption
+            var tempPath = stringsdictPath + $".tmp.{Guid.NewGuid()}";
+            try
+            {
+                File.WriteAllText(tempPath, content, new System.Text.UTF8Encoding(false));
+                File.Move(tempPath, stringsdictPath, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
         }
         else if (File.Exists(stringsdictPath))
         {

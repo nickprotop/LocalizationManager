@@ -37,10 +37,20 @@ public class PoResourceWriter : IResourceWriter
             Directory.CreateDirectory(directory);
 
         // Atomic write: write to temp file then rename
-        var tempPath = file.Language.FilePath + ".tmp";
-        // Use UTF-8 without BOM (PO file standard)
-        await File.WriteAllTextAsync(tempPath, content, new UTF8Encoding(false), ct);
-        File.Move(tempPath, file.Language.FilePath, overwrite: true);
+        // Use unique temp file name to prevent race conditions with concurrent writes
+        var tempPath = file.Language.FilePath + $".tmp.{Guid.NewGuid()}";
+        try
+        {
+            // Use UTF-8 without BOM (PO file standard)
+            await File.WriteAllTextAsync(tempPath, content, new UTF8Encoding(false), ct);
+            File.Move(tempPath, file.Language.FilePath, overwrite: true);
+        }
+        finally
+        {
+            // Clean up temp file if it still exists
+            if (File.Exists(tempPath))
+                File.Delete(tempPath);
+        }
     }
 
     /// <inheritdoc />
@@ -214,7 +224,8 @@ public class PoResourceWriter : IResourceWriter
         var msgId = entry.Key;
 
         var pipeIndex = entry.Key.IndexOf('|');
-        if (pipeIndex > 0)
+        // Validate: pipe must not be first or last character
+        if (pipeIndex > 0 && pipeIndex < entry.Key.Length - 1)
         {
             context = entry.Key.Substring(0, pipeIndex);
             msgId = entry.Key.Substring(pipeIndex + 1);

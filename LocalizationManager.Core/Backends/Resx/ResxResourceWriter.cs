@@ -80,8 +80,18 @@ public class ResxResourceWriter : IResourceWriter
                 WriteWithUniqueKeys(root, file.Entries);
             }
 
-            // Save with proper formatting
-            xdoc.Save(file.Language.FilePath);
+            // Save with proper formatting using atomic write to prevent file corruption
+            var tempPath = file.Language.FilePath + $".tmp.{Guid.NewGuid()}";
+            try
+            {
+                xdoc.Save(tempPath);
+                File.Move(tempPath, file.Language.FilePath, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
         }
         catch (Exception ex)
         {
