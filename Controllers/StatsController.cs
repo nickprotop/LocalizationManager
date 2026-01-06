@@ -38,15 +38,13 @@ public class StatsController : ControllerBase
                 return StatusCode(500, new { error = "No default language file found" });
             }
 
-            var totalKeys = defaultFile.Entries.Select(e => e.Key).Distinct().Count();
+            // Use ResourceFile.Count for total keys (handles plurals correctly)
+            var totalKeys = defaultFile.Count;
 
             var languageStats = resourceFiles.Select(file =>
             {
-                var translatedCount = file.Entries
-                    .Where(e => !string.IsNullOrWhiteSpace(e.Value))
-                    .Select(e => e.Key)
-                    .Distinct()
-                    .Count();
+                // Use ResourceFile.CompletedCount (handles plurals correctly via IsEmpty property)
+                var translatedCount = file.CompletedCount;
 
                 var coverage = totalKeys > 0 ? (double)translatedCount / totalKeys * 100 : 0;
 
