@@ -7,6 +7,13 @@ public class ResourceKeyDto
 {
     public int Id { get; set; }
     public required string KeyName { get; set; }
+
+    /// <summary>
+    /// Base name of the resource group this key belongs to.
+    /// Empty string for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
+
     public string? KeyPath { get; set; }
     public bool IsPlural { get; set; }
     /// <summary>

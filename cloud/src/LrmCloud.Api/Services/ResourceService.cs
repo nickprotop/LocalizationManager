@@ -52,7 +52,7 @@ public class ResourceService : IResourceService
         return keys.Select(MapToResourceKeyDto).ToList();
     }
 
-    public async Task<ResourceKeyDetailDto?> GetResourceKeyAsync(int projectId, string keyName, int userId)
+    public async Task<ResourceKeyDetailDto?> GetResourceKeyAsync(int projectId, string keyName, int userId, string baseName = "")
     {
         // Check permission
         if (!await _projectService.CanViewProjectAsync(projectId, userId))
@@ -69,7 +69,9 @@ public class ResourceService : IResourceService
 
         var key = await _db.ResourceKeys
             .Include(k => k.Translations)
-            .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == keyName);
+            .FirstOrDefaultAsync(k => k.ProjectId == projectId
+                                   && k.BaseName == baseName
+                                   && k.KeyName == keyName);
 
         if (key == null)
         {
@@ -280,19 +282,24 @@ public class ResourceService : IResourceService
                 return (false, null, "Key name cannot be empty");
             }
 
-            // Check if key already exists
+            var requestBaseName = request.BaseName ?? string.Empty;
+
+            // Check if key already exists in this group.
             var exists = await _db.ResourceKeys
-                .AnyAsync(k => k.ProjectId == projectId && k.KeyName == request.KeyName);
+                .AnyAsync(k => k.ProjectId == projectId
+                            && k.BaseName == requestBaseName
+                            && k.KeyName == request.KeyName);
 
             if (exists)
             {
-                return (false, null, $"Resource key '{request.KeyName}' already exists");
+                return (false, null, $"Resource key '{request.KeyName}' already exists in resource group '{requestBaseName}'");
             }
 
             // Create resource key
             var resourceKey = new ResourceKey
             {
                 ProjectId = projectId,
+                BaseName = requestBaseName,
                 KeyName = request.KeyName,
                 KeyPath = request.KeyPath,
                 IsPlural = request.IsPlural,
@@ -346,7 +353,7 @@ public class ResourceService : IResourceService
     }
 
     public async Task<(bool Success, ResourceKeyDto? Key, string? ErrorMessage)> UpdateResourceKeyAsync(
-        int projectId, string keyName, int userId, UpdateResourceKeyRequest request)
+        int projectId, string keyName, int userId, UpdateResourceKeyRequest request, string baseName = "")
     {
         try
         {
@@ -358,7 +365,9 @@ public class ResourceService : IResourceService
 
             var resourceKey = await _db.ResourceKeys
                 .Include(k => k.Translations)
-                .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == keyName);
+                .FirstOrDefaultAsync(k => k.ProjectId == projectId
+                                       && k.BaseName == baseName
+                                       && k.KeyName == keyName);
 
             if (resourceKey == null)
             {
@@ -400,7 +409,7 @@ public class ResourceService : IResourceService
     }
 
     public async Task<(bool Success, string? ErrorMessage)> DeleteResourceKeyAsync(
-        int projectId, string keyName, int userId)
+        int projectId, string keyName, int userId, string baseName = "")
     {
         try
         {
@@ -411,7 +420,9 @@ public class ResourceService : IResourceService
             }
 
             var resourceKey = await _db.ResourceKeys
-                .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == keyName);
+                .FirstOrDefaultAsync(k => k.ProjectId == projectId
+                                       && k.BaseName == baseName
+                                       && k.KeyName == keyName);
 
             if (resourceKey == null)
             {
@@ -1067,6 +1078,7 @@ public class ResourceService : IResourceService
         {
             Id = key.Id,
             KeyName = key.KeyName,
+            BaseName = key.BaseName,
             KeyPath = key.KeyPath,
             IsPlural = key.IsPlural,
             SourceText = key.SourceText,

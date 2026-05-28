@@ -295,6 +295,11 @@ app.Configure(config =>
             .WithExample(new[] { "cloud", "log", "abc12345" })
             .WithExample(new[] { "cloud", "log", "--format", "json" });
 
+        cfg.AddCommand<MigrateGroupsCommand>("migrate-groups")
+            .WithDescription("Bulk-rekey resource keys from one BaseName to another (use after upgrading a single-group project to multi-group)")
+            .WithExample(new[] { "cloud", "migrate-groups", "--to", "SharedResources" })
+            .WithExample(new[] { "cloud", "migrate-groups", "--from", "OldName", "--to", "NewName", "-y" });
+
         cfg.AddCommand<RevertCommand>("revert")
             .WithDescription("Revert a previous push (undo changes)")
             .WithExample(new[] { "cloud", "revert", "abc12345" })

@@ -61,13 +61,21 @@ public static class SyncStateManager
                 return new SyncStateLoadResult { State = null, WasCorrupted = true, NeedsMigration = false };
             }
 
-            var needsMigration = state.NeedsMigration;
+            // Transparently migrate v2 (Entries → LegacyEntries on load) into v3 (EntriesV3).
+            // v1 (Files dict, no Entries) still needs explicit migration from the caller.
+            var isV1 = state.Files != null && state.Files.Count > 0
+                       && (state.LegacyEntries == null || state.LegacyEntries.Count == 0)
+                       && state.EntriesV3.Count == 0;
+            if (!isV1 && state.NeedsMigration)
+            {
+                state = SyncState.MigrateToV3(state);
+            }
 
             return new SyncStateLoadResult
             {
                 State = state,
                 WasCorrupted = false,
-                NeedsMigration = needsMigration
+                NeedsMigration = state.NeedsMigration
             };
         }
         catch (JsonException)
@@ -114,10 +122,10 @@ public static class SyncStateManager
             Directory.CreateDirectory(directory);
         }
 
-        // Ensure version is set
+        // Ensure version is set to the current schema version on save.
         if (syncState.Version == 0)
         {
-            syncState.Version = 2;
+            syncState.Version = 3;
         }
 
         var options = new JsonSerializerOptions

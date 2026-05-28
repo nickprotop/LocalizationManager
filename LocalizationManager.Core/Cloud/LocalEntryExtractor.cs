@@ -51,6 +51,7 @@ public class LocalEntryExtractor
                 entries.Add(new LocalEntry
                 {
                     Key = entry.Key,
+                    BaseName = lang.BaseName ?? string.Empty,
                     Lang = lang.Code,
                     Value = entry.Value ?? string.Empty,
                     Comment = entry.Comment,
@@ -65,17 +66,19 @@ public class LocalEntryExtractor
     }
 
     /// <summary>
-    /// Extracts entries as a dictionary for quick lookup.
+    /// Extracts entries as a dictionary for quick lookup, keyed by
+    /// (BaseName, Key, Lang) so multi-group projects with shared key names
+    /// don't collide.
     /// </summary>
     /// <param name="languages">Language files to process</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Dictionary keyed by (Key, Lang)</returns>
-    public async Task<Dictionary<(string Key, string Lang), LocalEntry>> ExtractEntriesAsDictionaryAsync(
+    /// <returns>Dictionary keyed by (BaseName, Key, Lang)</returns>
+    public async Task<Dictionary<(string BaseName, string Key, string Lang), LocalEntry>> ExtractEntriesAsDictionaryAsync(
         IEnumerable<LanguageInfo> languages,
         CancellationToken cancellationToken = default)
     {
         var entries = await ExtractEntriesAsync(languages, cancellationToken);
-        return entries.ToDictionary(e => (e.Key, e.Lang), e => e);
+        return entries.ToDictionary(e => (e.BaseName, e.Key, e.Lang), e => e);
     }
 
     /// <summary>

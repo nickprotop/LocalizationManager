@@ -33,6 +33,45 @@ public class SyncController : ApiControllerBase
     }
 
     /// <summary>
+    /// Bulk-rekeys all resource keys in this project from one BaseName to another.
+    /// Used when a previously single-group project grows a second resource group:
+    /// existing rows (typically under <c>BaseName=""</c>) need to move to the
+    /// actual group name (e.g. <c>"SharedResources"</c>) so the new client can
+    /// match them.
+    /// </summary>
+    /// <response code="200">Migration complete (RowsUpdated may be 0 if no source rows)</response>
+    /// <response code="409">Migration would conflict with rows already in the target group; the ConflictingKeys list identifies them</response>
+    [HttpPost("migrate-groups")]
+    [ProducesResponseType(typeof(ApiResponse<MigrateGroupsResponse>), 200)]
+    [ProducesResponseType(typeof(ApiResponse<MigrateGroupsResponse>), 409)]
+    [ProducesResponseType(typeof(ProblemDetails), 401)]
+    [ProducesResponseType(typeof(ProblemDetails), 403)]
+    public async Task<ActionResult<ApiResponse<MigrateGroupsResponse>>> MigrateGroups(
+        int projectId,
+        [FromBody] MigrateGroupsRequest request,
+        CancellationToken ct)
+    {
+        var userId = GetUserId();
+        try
+        {
+            var result = await _syncService.MigrateGroupsAsync(projectId, userId, request, ct);
+            if (result.ConflictingKeys.Count > 0)
+            {
+                return StatusCode(409, new ApiResponse<MigrateGroupsResponse> { Data = result });
+            }
+            return Success(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Forbidden("SYNC_FORBIDDEN", ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest("INVALID_REQUEST", ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Pushes local changes to the server with conflict detection.
     /// </summary>
     /// <param name="projectId">Project ID</param>

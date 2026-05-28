@@ -245,8 +245,11 @@ public class GitHubPullService : IGitHubPullService
             {
                 foreach (var resolution in request.Resolutions)
                 {
+                    var resolutionBaseName = resolution.BaseName ?? string.Empty;
                     var key = await _db.ResourceKeys
-                        .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == resolution.Key);
+                        .FirstOrDefaultAsync(k => k.ProjectId == projectId
+                                               && k.BaseName == resolutionBaseName
+                                               && k.KeyName == resolution.Key);
 
                     if (key == null && resolution.Resolution != "skip")
                     {
@@ -254,6 +257,7 @@ public class GitHubPullService : IGitHubPullService
                         key = new ResourceKey
                         {
                             ProjectId = projectId,
+                            BaseName = resolutionBaseName,
                             KeyName = resolution.Key,
                             IsPlural = !string.IsNullOrEmpty(resolution.PluralForm)
                         };
@@ -267,6 +271,7 @@ public class GitHubPullService : IGitHubPullService
                             // Get value from sync state (stored during preview)
                             var syncState = await _db.GitHubSyncStates.FirstOrDefaultAsync(s =>
                                 s.ProjectId == projectId &&
+                                s.BaseName == resolutionBaseName &&
                                 s.KeyName == resolution.Key &&
                                 s.LanguageCode == resolution.LanguageCode &&
                                 s.PluralForm == resolution.PluralForm);
@@ -362,7 +367,8 @@ public class GitHubPullService : IGitHubPullService
             CloudValue: pc.CloudValue,
             BaseValue: pc.BaseValue,
             CloudModifiedAt: pc.CloudModifiedAt,
-            CloudModifiedBy: pc.CloudModifiedBy
+            CloudModifiedBy: pc.CloudModifiedBy,
+            BaseName: pc.BaseName
         )).ToList();
 
         return new GitHubPullConflictSummary(
@@ -402,6 +408,7 @@ public class GitHubPullService : IGitHubPullService
             _db.PendingConflicts.Add(new PendingConflict
             {
                 ProjectId = projectId,
+                BaseName = conflict.BaseName,
                 KeyName = conflict.Key,
                 LanguageCode = conflict.LanguageCode,
                 PluralForm = conflict.PluralForm,
@@ -431,7 +438,7 @@ public class GitHubPullService : IGitHubPullService
         List<GitHubPullConflictResolution> resolutions)
     {
         var keysToDelete = resolutions
-            .Select(r => (r.Key, r.LanguageCode, r.PluralForm))
+            .Select(r => (r.BaseName ?? string.Empty, r.Key, r.LanguageCode, r.PluralForm))
             .ToHashSet();
 
         var conflictsToDelete = await _db.PendingConflicts
@@ -439,7 +446,7 @@ public class GitHubPullService : IGitHubPullService
             .ToListAsync();
 
         conflictsToDelete = conflictsToDelete
-            .Where(pc => keysToDelete.Contains((pc.KeyName, pc.LanguageCode, pc.PluralForm)))
+            .Where(pc => keysToDelete.Contains((pc.BaseName, pc.KeyName, pc.LanguageCode, pc.PluralForm)))
             .ToList();
 
         if (conflictsToDelete.Any())
@@ -542,9 +549,9 @@ public class GitHubPullService : IGitHubPullService
     /// <summary>
     /// Loads database entries with their hashes for comparison.
     /// </summary>
-    private async Task<Dictionary<(string Key, string LanguageCode, string PluralForm), DbEntry>> LoadDbEntriesAsync(int projectId)
+    private async Task<Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), DbEntry>> LoadDbEntriesAsync(int projectId)
     {
-        var result = new Dictionary<(string Key, string LanguageCode, string PluralForm), DbEntry>();
+        var result = new Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), DbEntry>();
 
         var keys = await _db.ResourceKeys
             .Where(k => k.ProjectId == projectId)
@@ -556,9 +563,10 @@ public class GitHubPullService : IGitHubPullService
         {
             foreach (var translation in key.Translations)
             {
-                result[(key.KeyName, translation.LanguageCode, translation.PluralForm)] = new DbEntry
+                result[(key.BaseName, key.KeyName, translation.LanguageCode, translation.PluralForm)] = new DbEntry
                 {
                     KeyId = key.Id,
+                    BaseName = key.BaseName,
                     KeyName = key.KeyName,
                     LanguageCode = translation.LanguageCode,
                     PluralForm = translation.PluralForm,
@@ -577,7 +585,7 @@ public class GitHubPullService : IGitHubPullService
     /// <summary>
     /// Loads the GitHub sync state (base hashes for three-way merge).
     /// </summary>
-    private async Task<Dictionary<(string Key, string LanguageCode, string PluralForm), string>> LoadGitHubSyncStateAsync(int projectId)
+    private async Task<Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), string>> LoadGitHubSyncStateAsync(int projectId)
     {
         var states = await _db.GitHubSyncStates
             .Where(s => s.ProjectId == projectId)
@@ -585,7 +593,7 @@ public class GitHubPullService : IGitHubPullService
             .ToListAsync();
 
         return states.ToDictionary(
-            s => (s.KeyName, s.LanguageCode, s.PluralForm),
+            s => (s.BaseName, s.KeyName, s.LanguageCode, s.PluralForm),
             s => s.GitHubHash);
     }
 
@@ -594,9 +602,9 @@ public class GitHubPullService : IGitHubPullService
     /// Adapted from CLI KeyLevelMerger.MergeForPull logic.
     /// </summary>
     private MergeResult PerformThreeWayMerge(
-        Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry> github,
-        Dictionary<(string Key, string LanguageCode, string PluralForm), DbEntry> db,
-        Dictionary<(string Key, string LanguageCode, string PluralForm), string> baseHashes,
+        Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry> github,
+        Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), DbEntry> db,
+        Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), string> baseHashes,
         string defaultLanguage)
     {
         var result = new MergeResult();
@@ -683,7 +691,7 @@ public class GitHubPullService : IGitHubPullService
     }
 
     private static GitHubPullConflict CreateConflict(
-        (string Key, string LanguageCode, string PluralForm) key,
+        (string BaseName, string Key, string LanguageCode, string PluralForm) key,
         string conflictType,
         GitHubEntry? githubEntry,
         DbEntry? dbEntry,
@@ -698,27 +706,33 @@ public class GitHubPullService : IGitHubPullService
             CloudValue: dbEntry?.Value,
             BaseValue: null, // Could be populated if we stored base values
             CloudModifiedAt: dbEntry?.UpdatedAt,
-            CloudModifiedBy: null // Would need to track who modified
+            CloudModifiedBy: null, // Would need to track who modified
+            BaseName: key.BaseName
         );
     }
 
     /// <summary>
-    /// Applies merge changes to the database.
+    /// Applies merge changes to the database. Each entry's <c>BaseName</c> (derived
+    /// from the source file path during parsing) routes the row to the correct
+    /// resource group.
     /// </summary>
     private async Task ApplyChangesAsync(int projectId, MergeResult result, int userId, string defaultLanguage)
     {
         // Apply updates and additions
         foreach (var entry in result.ToApply.Concat(result.ToAdd))
         {
-            // Find or create key
+            // Find or create key (scoped to this entry's resource group).
             var key = await _db.ResourceKeys
-                .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == entry.Key);
+                .FirstOrDefaultAsync(k => k.ProjectId == projectId
+                                       && k.BaseName == entry.BaseName
+                                       && k.KeyName == entry.Key);
 
             if (key == null)
             {
                 key = new ResourceKey
                 {
                     ProjectId = projectId,
+                    BaseName = entry.BaseName,
                     KeyName = entry.Key,
                     IsPlural = entry.IsPlural,
                     Comment = entry.Comment,
@@ -745,11 +759,13 @@ public class GitHubPullService : IGitHubPullService
                 userId);
         }
 
-        // Apply deletions
+        // Apply deletions (scoped to each entry's resource group).
         foreach (var key in result.ToDelete)
         {
             var resourceKey = await _db.ResourceKeys
-                .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == key.Key);
+                .FirstOrDefaultAsync(k => k.ProjectId == projectId
+                                       && k.BaseName == key.BaseName
+                                       && k.KeyName == key.Key);
 
             if (resourceKey != null)
             {
@@ -816,21 +832,22 @@ public class GitHubPullService : IGitHubPullService
     }
 
     /// <summary>
-    /// Updates the GitHub sync state after a successful pull.
+    /// Updates the GitHub sync state after a successful pull. Bulk-loaded
+    /// state is keyed by (BaseName, KeyName, LanguageCode, PluralForm) so
+    /// multi-group repos route correctly.
     /// </summary>
     private async Task UpdateGitHubSyncStateAsync(
         int projectId,
-        Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry> githubEntries,
+        Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry> githubEntries,
         string? commitSha)
     {
-        // Bulk load existing sync states to avoid N+1 queries
         var existingStates = await _db.GitHubSyncStates
             .Where(s => s.ProjectId == projectId)
-            .ToDictionaryAsync(s => (s.KeyName, s.LanguageCode, s.PluralForm));
+            .ToDictionaryAsync(s => (s.BaseName, s.KeyName, s.LanguageCode, s.PluralForm));
 
         foreach (var (key, entry) in githubEntries)
         {
-            var stateKey = (key.Key, key.LanguageCode, key.PluralForm);
+            var stateKey = (key.BaseName, key.Key, key.LanguageCode, key.PluralForm);
 
             if (existingStates.TryGetValue(stateKey, out var syncState))
             {
@@ -848,6 +865,7 @@ public class GitHubPullService : IGitHubPullService
                 syncState = new GitHubSyncState
                 {
                     ProjectId = projectId,
+                    BaseName = key.BaseName,
                     KeyName = key.Key,
                     LanguageCode = key.LanguageCode,
                     PluralForm = key.PluralForm,
@@ -873,6 +891,7 @@ public class GitHubPullService : IGitHubPullService
     private class DbEntry
     {
         public int KeyId { get; init; }
+        public string BaseName { get; init; } = "";
         public required string KeyName { get; init; }
         public required string LanguageCode { get; init; }
         public string PluralForm { get; init; } = "";
@@ -887,8 +906,8 @@ public class GitHubPullService : IGitHubPullService
     {
         public List<GitHubEntry> ToApply { get; } = new();
         public List<GitHubEntry> ToAdd { get; } = new();
-        public List<(string Key, string LanguageCode, string PluralForm)> ToDelete { get; } = new();
-        public Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubPullConflict> Conflicts { get; } = new();
+        public List<(string BaseName, string Key, string LanguageCode, string PluralForm)> ToDelete { get; } = new();
+        public Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubPullConflict> Conflicts { get; } = new();
         public List<GitHubPullConflict> NeedsReview { get; } = new();
         public int Unchanged { get; set; }
     }

@@ -80,17 +80,17 @@ export class ResourceEditorPanel {
                         // Support both inline edit (single language) and modal edit (all languages)
                         if (message.values && typeof message.values === 'object' && !message.language) {
                             // Modal edit - multiple languages in values object
-                            await this.handleUpdateKeyMultiple(message.key, message.values);
+                            await this.handleUpdateKeyMultiple(message.key, message.values, message.resourceGroup);
                         } else {
                             // Inline edit - single language
-                            await this.handleUpdateKey(message.key, message.language, message.value, message.comment);
+                            await this.handleUpdateKey(message.key, message.language, message.value, message.comment, message.resourceGroup);
                         }
                         return;
                     case 'addKey':
-                        await this.handleAddKey(message.key, message.values);
+                        await this.handleAddKey(message.key, message.values, message.resourceGroup);
                         return;
                     case 'deleteKey':
-                        await this.handleDeleteKey(message.key);
+                        await this.handleDeleteKey(message.key, message.resourceGroup);
                         return;
                     case 'getKeyDetails':
                         await this.handleGetKeyDetails(message.key);
@@ -169,12 +169,13 @@ export class ResourceEditorPanel {
         }
     }
 
-    private async handleUpdateKey(key: string, language: string, value: string, comment?: string) {
+    private async handleUpdateKey(key: string, language: string, value: string, comment?: string, resourceGroup?: string) {
         try {
             // Normalize empty string to "default" for the default language
             const langCode = language || 'default';
-            console.log(`Updating key "${key}" for language "${langCode}" with value "${value}"`);
+            console.log(`Updating key "${key}" (group: ${resourceGroup || 'auto'}) for language "${langCode}" with value "${value}"`);
             await this.apiClient.updateKey(key, {
+                resourceGroup,
                 values: {
                     [langCode]: { value, comment: comment ?? undefined }
                 }
@@ -199,9 +200,9 @@ export class ResourceEditorPanel {
         }
     }
 
-    private async handleUpdateKeyMultiple(key: string, values: { [language: string]: { value: string; comment?: string | null } }) {
+    private async handleUpdateKeyMultiple(key: string, values: { [language: string]: { value: string; comment?: string | null } }, resourceGroup?: string) {
         try {
-            console.log(`Updating key "${key}" for multiple languages:`, Object.keys(values));
+            console.log(`Updating key "${key}" (group: ${resourceGroup || 'auto'}) for multiple languages:`, Object.keys(values));
             // Convert to ResourceValueUpdate format for backend API
             // Normalize empty string to "default" for the default language
             const resourceValues: { [language: string]: { value: string; comment?: string } } = {};
@@ -212,7 +213,7 @@ export class ResourceEditorPanel {
                     comment: data.comment ?? undefined
                 };
             }
-            await this.apiClient.updateKey(key, { values: resourceValues });
+            await this.apiClient.updateKey(key, { resourceGroup, values: resourceValues });
 
             // Invalidate cache for this key
             this.cacheService.invalidateKey(key);
@@ -233,9 +234,9 @@ export class ResourceEditorPanel {
         }
     }
 
-    private async handleAddKey(key: string, values: { [language: string]: string }) {
+    private async handleAddKey(key: string, values: { [language: string]: string }, resourceGroup?: string) {
         try {
-            await this.apiClient.addKey({ key, values });
+            await this.apiClient.addKey({ key, resourceGroup, values });
 
             // Invalidate entire cache since new key affects key list
             this.cacheService.invalidate();
@@ -254,9 +255,9 @@ export class ResourceEditorPanel {
         }
     }
 
-    private async handleDeleteKey(key: string) {
+    private async handleDeleteKey(key: string, resourceGroup?: string) {
         try {
-            await this.apiClient.deleteKey(key);
+            await this.apiClient.deleteKey(key, undefined, undefined, resourceGroup);
 
             // Invalidate entire cache since deleted key affects key list
             this.cacheService.invalidate();
@@ -1124,7 +1125,13 @@ export class ResourceEditorPanel {
 
             // Render header
             const header = document.getElementById('tableHeader');
-            header.innerHTML = '<th>Key</th><th style="text-align: center; width: 60px;" title="Code References">Refs</th><th style="text-align: center; width: 80px;">Status</th>';
+            const distinctGroups = new Set(resources.map(r => r.resourceGroup || ''));
+            const showGroupColumn = distinctGroups.size > 1;
+            header.innerHTML = '<th>Key</th>';
+            if (showGroupColumn) {
+                header.innerHTML += '<th title="Resource group / base name">Group</th>';
+            }
+            header.innerHTML += '<th style="text-align: center; width: 60px;" title="Code References">Refs</th><th style="text-align: center; width: 80px;">Status</th>';
             languages.forEach(lang => {
                 header.innerHTML += '<th>' + lang.code + '</th>';
             });
@@ -1136,12 +1143,24 @@ export class ResourceEditorPanel {
 
             resources.forEach(resource => {
                 const row = document.createElement('tr');
+                if (resource.resourceGroup) {
+                    row.dataset.group = resource.resourceGroup;
+                }
 
                 // Key column
                 const keyCell = document.createElement('td');
                 keyCell.className = 'key-column';
                 keyCell.textContent = resource.key;
                 row.appendChild(keyCell);
+
+                // Group column (only when multiple groups exist)
+                if (showGroupColumn) {
+                    const groupCell = document.createElement('td');
+                    groupCell.style.color = 'var(--vscode-descriptionForeground)';
+                    groupCell.style.whiteSpace = 'nowrap';
+                    groupCell.textContent = resource.resourceGroup || '';
+                    row.appendChild(groupCell);
+                }
 
                 // Refs column
                 const refsCell = document.createElement('td');
@@ -1206,6 +1225,9 @@ export class ResourceEditorPanel {
                     cell.dataset.key = resource.key;
                     cell.dataset.language = lang.code;
                     cell.dataset.originalValue = value;
+                    if (resource.resourceGroup) {
+                        cell.dataset.group = resource.resourceGroup;
+                    }
 
                     // Clear "(empty)" placeholder on focus
                     cell.addEventListener('focus', (e) => {
@@ -1266,6 +1288,7 @@ export class ResourceEditorPanel {
             const cell = e.target;
             const key = cell.dataset.key;
             const language = cell.dataset.language;
+            const resourceGroup = cell.dataset.group;
             const originalValue = cell.dataset.originalValue || '';
             let newValue = cell.textContent.trim();
 
@@ -1283,10 +1306,11 @@ export class ResourceEditorPanel {
 
             if (newValue !== originalValue) {
                 setStatus('Saving...');
-                console.log('Inline edit - saving key:', key, 'lang:', language, 'value:', newValue);
+                console.log('Inline edit - saving key:', key, 'group:', resourceGroup || 'auto', 'lang:', language, 'value:', newValue);
                 vscode.postMessage({
                     command: 'updateKey',
                     key: key,
+                    resourceGroup: resourceGroup,
                     language: language,
                     value: newValue
                 });

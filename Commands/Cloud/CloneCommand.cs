@@ -496,15 +496,19 @@ public class CloneCommand : Command<CloneCommandSettings>
             return 0;
         }
 
-        // Get languages from the entries
+        // Get (BaseName, Lang) pairs from the entries so multi-group projects
+        // create one stub LanguageInfo per group + culture.
         // Note: After normalization, default language may be "" (for resx/android) or explicit code (for xliff/ios)
-        var languages = mergeResult.ToWrite.Select(e => e.Lang).Distinct()
-            .Select(lang => new Core.Models.LanguageInfo
+        var languages = mergeResult.ToWrite
+            .Select(e => (e.BaseName, e.Lang))
+            .Distinct()
+            .Select(pair => new Core.Models.LanguageInfo
             {
-                Code = lang,
-                Name = string.IsNullOrEmpty(lang) ? remoteProject.DefaultLanguage : lang,
-                IsDefault = string.IsNullOrEmpty(lang) ||
-                           string.Equals(lang, remoteProject.DefaultLanguage, StringComparison.OrdinalIgnoreCase)
+                Code = pair.Lang,
+                Name = string.IsNullOrEmpty(pair.Lang) ? remoteProject.DefaultLanguage : pair.Lang,
+                BaseName = pair.BaseName,
+                IsDefault = string.IsNullOrEmpty(pair.Lang) ||
+                           string.Equals(pair.Lang, remoteProject.DefaultLanguage, StringComparison.OrdinalIgnoreCase)
             })
             .ToList();
 
@@ -554,20 +558,12 @@ public class CloneCommand : Command<CloneCommandSettings>
         // Update sync state with entry-level hashes
         try
         {
-            var syncState = new SyncState
-            {
-                Version = 2,
-                Timestamp = DateTime.UtcNow,
-                Entries = new Dictionary<string, Dictionary<string, string>>()
-            };
+            var syncState = SyncState.CreateNew();
+            syncState.Timestamp = DateTime.UtcNow;
 
             foreach (var entry in mergeResult.ToWrite)
             {
-                if (!syncState.Entries.ContainsKey(entry.Key))
-                {
-                    syncState.Entries[entry.Key] = new Dictionary<string, string>();
-                }
-                syncState.Entries[entry.Key][entry.Lang] = entry.Hash;
+                syncState.SetEntryHash(entry.BaseName, entry.Key, entry.Lang, entry.Hash);
             }
 
             SyncStateManager.SaveAsync(targetDirectory, syncState, ct).GetAwaiter().GetResult();

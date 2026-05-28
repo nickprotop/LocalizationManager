@@ -20,6 +20,16 @@ public class ResourceKey
     [ForeignKey(nameof(ProjectId))]
     public Project? Project { get; set; }
 
+    /// <summary>
+    /// Base name of the resource group this key belongs to (e.g. "CustomerResources"
+    /// for files like CustomerResources.resx). Empty string means "no group" /
+    /// "default group" — single-group projects always use "".
+    /// </summary>
+    [Required]
+    [MaxLength(500)]
+    [Column("base_name")]
+    public string BaseName { get; set; } = string.Empty;
+
     [Required]
     [MaxLength(500)]
     [Column("key_name")]

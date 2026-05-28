@@ -258,6 +258,7 @@ else
                 {
                     KeyId = detail.Id,
                     KeyName = detail.KeyName,
+                    BaseName = detail.BaseName,
                     KeyPath = detail.KeyPath,
                     IsPlural = detail.IsPlural,
                     SourceText = detail.SourceText,
@@ -592,8 +593,27 @@ else
 
     private async Task OpenAddKeyDialog()
     {
+        // Build the BaseName list from what's loaded — driven by the editor's
+        // current rows. Empty for single-group projects (dialog hides the
+        // dropdown), populated for multi-group.
+        var availableBaseNames = _editedRows.Values
+            .Select(r => r.BaseName ?? string.Empty)
+            .Where(b => !string.IsNullOrEmpty(b))
+            .Distinct()
+            .OrderBy(b => b)
+            .ToList();
+
+        var parameters = new Dictionary<string, object>
+        {
+            { "ProjectId", ProjectId }
+        };
+        if (availableBaseNames.Count > 1)
+        {
+            parameters["AvailableBaseNames"] = availableBaseNames;
+        }
+
         var result = await DialogService.OpenAsync<AddKeyDialog>("Add Key",
-            new Dictionary<string, object> { { "ProjectId", ProjectId } },
+            parameters,
             new Radzen.DialogOptions { Width = "500px" });
 
         if (result is ResourceKeyDto key)
@@ -699,7 +719,7 @@ else
 
         foreach (var row in rows)
         {
-            var result = await ResourceService.DeleteResourceKeyAsync(ProjectId, row.KeyName);
+            var result = await ResourceService.DeleteResourceKeyAsync(ProjectId, row.KeyName, row.BaseName);
             if (result.IsSuccess)
                 deleted++;
             else

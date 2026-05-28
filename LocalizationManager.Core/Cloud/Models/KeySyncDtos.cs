@@ -10,6 +10,24 @@ namespace LocalizationManager.Core.Cloud.Models;
 /// <summary>
 /// Request for key-level push operation.
 /// </summary>
+/// <summary>
+/// Request to bulk-rekey resource keys from one BaseName to another.
+/// </summary>
+public class MigrateGroupsRequest
+{
+    public string FromBaseName { get; set; } = string.Empty;
+    public required string ToBaseName { get; set; }
+}
+
+/// <summary>
+/// Response from a migrate-groups operation.
+/// </summary>
+public class MigrateGroupsResponse
+{
+    public int RowsUpdated { get; set; }
+    public List<string> ConflictingKeys { get; set; } = new();
+}
+
 public class KeySyncPushRequest
 {
     /// <summary>
@@ -42,6 +60,12 @@ public class EntryChange
     /// The resource key name.
     /// </summary>
     public required string Key { get; set; }
+
+    /// <summary>
+    /// Base name of the resource group this entry belongs to.
+    /// Empty string for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
 
     /// <summary>
     /// Language code (e.g., "en", "fr", "es").
@@ -86,6 +110,12 @@ public class EntryDeletion
     /// The resource key name.
     /// </summary>
     public required string Key { get; set; }
+
+    /// <summary>
+    /// Base name of the resource group this entry belongs to.
+    /// Empty string for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
 
     /// <summary>
     /// Language code. If null, deletes the key and all its translations.
@@ -204,6 +234,13 @@ public class KeySyncPushResponse
     public Dictionary<string, Dictionary<string, string>> NewEntryHashes { get; set; } = new();
 
     /// <summary>
+    /// New hashes for successfully applied entries, scoped by resource group.
+    /// Outer key: BaseName (resource group, "" for single-group default).
+    /// Middle key: entry key name. Inner key: languageCode. Value: hash.
+    /// </summary>
+    public Dictionary<string, Dictionary<string, Dictionary<string, string>>> NewEntryHashesByGroup { get; set; } = new();
+
+    /// <summary>
     /// New hashes for successfully applied config properties.
     /// Key: property path, Value: hash
     /// </summary>
@@ -275,6 +312,12 @@ public class EntryData
     /// The resource key name.
     /// </summary>
     public required string Key { get; set; }
+
+    /// <summary>
+    /// Base name of the resource group this entry belongs to.
+    /// Empty string for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
 
     /// <summary>
     /// Comment for the key.
@@ -369,6 +412,12 @@ public class EntryConflict
     /// The resource key name.
     /// </summary>
     public required string Key { get; set; }
+
+    /// <summary>
+    /// Base name of the resource group this entry belongs to.
+    /// Empty string for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
 
     /// <summary>
     /// Language code.
@@ -493,6 +542,12 @@ public class ConflictResolution
     /// The resource key name.
     /// </summary>
     public required string Key { get; set; }
+
+    /// <summary>
+    /// Base name of the resource group this entry belongs to.
+    /// Empty string for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
 
     /// <summary>
     /// Language code. Null for config conflicts.
@@ -635,57 +690,85 @@ public class MergeResult
 /// </summary>
 public class MergeHashes
 {
-    private readonly Dictionary<string, Dictionary<string, string>> _entries = new();
+    // Outer key: BaseName ("" for single-group). Middle: Key. Inner: Lang → hash.
+    private readonly Dictionary<string, Dictionary<string, Dictionary<string, string>>> _entries = new();
 
-    public void SetEntryHash(string key, string lang, string hash)
+    public void SetEntryHash(string baseName, string key, string lang, string hash)
     {
-        if (!_entries.ContainsKey(key))
+        if (!_entries.TryGetValue(baseName, out var byKey))
         {
-            _entries[key] = new Dictionary<string, string>();
+            _entries[baseName] = byKey = new Dictionary<string, Dictionary<string, string>>();
         }
-        _entries[key][lang] = hash;
+        if (!byKey.TryGetValue(key, out var byLang))
+        {
+            byKey[key] = byLang = new Dictionary<string, string>();
+        }
+        byLang[lang] = hash;
     }
 
-    public string? GetEntryHash(string key, string lang)
+    public void SetEntryHash(string key, string lang, string hash) =>
+        SetEntryHash(string.Empty, key, lang, hash);
+
+    public string? GetEntryHash(string baseName, string key, string lang)
     {
-        if (_entries.TryGetValue(key, out var langHashes))
+        if (_entries.TryGetValue(baseName, out var byKey)
+            && byKey.TryGetValue(key, out var byLang)
+            && byLang.TryGetValue(lang, out var hash))
         {
-            if (langHashes.TryGetValue(lang, out var hash))
-            {
-                return hash;
-            }
+            return hash;
         }
         return null;
     }
 
-    public void RemoveEntryHash(string key, string? lang = null)
+    public string? GetEntryHash(string key, string lang) => GetEntryHash(string.Empty, key, lang);
+
+    public void RemoveEntryHash(string baseName, string key, string? lang = null)
     {
+        if (!_entries.TryGetValue(baseName, out var byKey)) return;
         if (lang == null)
         {
-            _entries.Remove(key);
+            byKey.Remove(key);
         }
-        else if (_entries.TryGetValue(key, out var langHashes))
+        else if (byKey.TryGetValue(key, out var byLang))
         {
-            langHashes.Remove(lang);
-            if (langHashes.Count == 0)
-            {
-                _entries.Remove(key);
-            }
+            byLang.Remove(lang);
+            if (byLang.Count == 0) byKey.Remove(key);
         }
+        if (byKey.Count == 0) _entries.Remove(baseName);
     }
 
-    public Dictionary<string, Dictionary<string, string>> ToDictionary() =>
-        new(_entries.ToDictionary(
-            kvp => kvp.Key,
-            kvp => new Dictionary<string, string>(kvp.Value)));
+    public void RemoveEntryHash(string key, string? lang = null) =>
+        RemoveEntryHash(string.Empty, key, lang);
 
-    public IEnumerable<(string Key, string Lang, string Hash)> GetAllEntries()
+    /// <summary>
+    /// Returns the legacy single-group view (BaseName="" entries only).
+    /// </summary>
+    public Dictionary<string, Dictionary<string, string>> ToDictionary() =>
+        _entries.TryGetValue(string.Empty, out var byKey)
+            ? new(byKey.ToDictionary(kvp => kvp.Key, kvp => new Dictionary<string, string>(kvp.Value)))
+            : new();
+
+    /// <summary>
+    /// Returns the multi-group view: BaseName → Key → Lang → hash.
+    /// </summary>
+    public Dictionary<string, Dictionary<string, Dictionary<string, string>>> ToDictionaryByGroup() =>
+        new(_entries.ToDictionary(
+            outer => outer.Key,
+            outer => new Dictionary<string, Dictionary<string, string>>(
+                outer.Value.ToDictionary(
+                    inner => inner.Key,
+                    inner => new Dictionary<string, string>(inner.Value)))));
+
+    public IEnumerable<(string BaseName, string Key, string Lang, string Hash)> GetAllEntries()
     {
-        foreach (var (key, langHashes) in _entries)
+        foreach (var (baseName, byKey) in _entries)
         {
-            foreach (var (lang, hash) in langHashes)
+            foreach (var (key, byLang) in byKey)
             {
-                yield return (key, lang, hash);
+                foreach (var (lang, hash) in byLang)
+                {
+                    yield return (baseName, key, lang, hash);
+                }
             }
         }
     }
@@ -700,6 +783,12 @@ public class MergedEntry
     /// Resource key name.
     /// </summary>
     public required string Key { get; set; }
+
+    /// <summary>
+    /// Base name of the resource group this entry belongs to. Routes pull
+    /// writes to the correct group file. Empty string for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
 
     /// <summary>
     /// Language code.

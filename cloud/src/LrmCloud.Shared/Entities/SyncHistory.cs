@@ -112,6 +112,13 @@ public class SyncHistory
 public class SyncChangeEntry
 {
     public required string Key { get; set; }
+
+    /// <summary>
+    /// Base name of the resource group this entry belongs to.
+    /// Empty string for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
+
     public required string Lang { get; set; }
 
     /// <summary>

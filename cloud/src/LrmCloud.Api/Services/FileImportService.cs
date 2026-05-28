@@ -33,13 +33,15 @@ public class FileImportService : IFileImportService
         string defaultLanguage)
     {
         var (languageCode, isDefault) = DetectLanguageFromPath(format, filePath, defaultLanguage);
+        var baseName = DetectBaseNameFromPath(format, filePath);
         var reader = GetReader(format);
 
         var languageInfo = new LanguageInfo
         {
             Code = languageCode,
             IsDefault = isDefault,
-            Name = languageCode
+            Name = languageCode,
+            BaseName = baseName
         };
 
         ResourceFile resourceFile;
@@ -63,6 +65,7 @@ public class FileImportService : IFileImportService
                     entries.Add(new GitHubEntry
                     {
                         Key = entry.Key,
+                        BaseName = baseName,
                         LanguageCode = languageCode,
                         PluralForm = pluralForm,
                         Value = value,
@@ -83,6 +86,7 @@ public class FileImportService : IFileImportService
                 entries.Add(new GitHubEntry
                 {
                     Key = entry.Key,
+                    BaseName = baseName,
                     LanguageCode = languageCode,
                     PluralForm = "",
                     Value = entry.Value,
@@ -94,13 +98,14 @@ public class FileImportService : IFileImportService
         }
 
         _logger.LogDebug(
-            "Parsed {EntryCount} entries from {FilePath} (language: {Language}, isDefault: {IsDefault})",
-            entries.Count, filePath, languageCode, isDefault);
+            "Parsed {EntryCount} entries from {FilePath} (group: '{BaseName}', language: {Language}, isDefault: {IsDefault})",
+            entries.Count, filePath, baseName, languageCode, isDefault);
 
         return new ParsedResourceFile
         {
             FilePath = filePath,
             LanguageCode = languageCode,
+            BaseName = baseName,
             IsDefault = isDefault,
             Entries = entries
         };
@@ -112,7 +117,7 @@ public class FileImportService : IFileImportService
         Dictionary<string, string> files,
         string defaultLanguage)
     {
-        var entries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>();
+        var entries = new Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry>();
         var parseErrors = new List<FileParseErrorInfo>();
 
         // For iOS, handle .stringsdict files specially to parse plurals
@@ -130,7 +135,7 @@ public class FileImportService : IFileImportService
 
                     foreach (var entry in parsed.Entries)
                     {
-                        var key = (entry.Key, entry.LanguageCode, entry.PluralForm);
+                        var key = (entry.BaseName, entry.Key, entry.LanguageCode, entry.PluralForm);
                         entries[key] = entry;
                     }
                 }
@@ -163,7 +168,7 @@ public class FileImportService : IFileImportService
     private void ParseIosFilesWithPlurals(
         Dictionary<string, string> files,
         string defaultLanguage,
-        Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry> result,
+        Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry> result,
         List<FileParseErrorInfo> parseErrors)
     {
         var stringsdictParser = new StringsdictParser();
@@ -179,7 +184,7 @@ public class FileImportService : IFileImportService
                 var parsed = ParseFile("ios", filePath, content, defaultLanguage);
                 foreach (var entry in parsed.Entries)
                 {
-                    var key = (entry.Key, entry.LanguageCode, entry.PluralForm);
+                    var key = (entry.BaseName, entry.Key, entry.LanguageCode, entry.PluralForm);
                     result[key] = entry;
                 }
             }
@@ -206,6 +211,7 @@ public class FileImportService : IFileImportService
                 var (languageCode, isDefault) = DetectIosLanguage(dirName, defaultLanguage);
                 // Normalize language code to lowercase for consistency
                 languageCode = languageCode.ToLowerInvariant();
+                var baseName = DetectBaseNameFromPath("ios", filePath);
 
                 var pluralEntries = stringsdictParser.Parse(content);
 
@@ -217,11 +223,12 @@ public class FileImportService : IFileImportService
                     // Create entries for each plural form, all sharing the same combined hash
                     foreach (var (pluralForm, value) in entry.PluralForms)
                     {
-                        var key = (entry.Key, languageCode, pluralForm);
+                        var key = (baseName, entry.Key, languageCode, pluralForm);
 
                         result[key] = new GitHubEntry
                         {
                             Key = entry.Key,
+                            BaseName = baseName,
                             LanguageCode = languageCode,
                             PluralForm = pluralForm,
                             Value = value,
@@ -235,7 +242,7 @@ public class FileImportService : IFileImportService
                     }
 
                     // Mark any existing singular entry for this key as plural
-                    var singularKey = (entry.Key, languageCode, "");
+                    var singularKey = (baseName, entry.Key, languageCode, "");
                     if (result.TryGetValue(singularKey, out var existingEntry))
                     {
                         // Remove the singular entry since we now have plural forms
@@ -279,6 +286,62 @@ public class FileImportService : IFileImportService
             "xliff" or "xlf" => DetectXliffLanguage(filePath, defaultLanguage),
             _ => throw new NotSupportedException($"Format '{format}' is not supported for import")
         };
+    }
+
+    /// <summary>
+    /// Derives the resource-group base name from a file path. Format-specific:
+    /// for resx/json/xliff the base name is the file's stem (before the
+    /// language code or extension); for po the stem ("messages" by convention);
+    /// for android/ios/i18next the on-disk convention has no per-group base
+    /// name so this returns the empty string (single-group).
+    /// </summary>
+    private static string DetectBaseNameFromPath(string format, string filePath)
+    {
+        var fileName = Path.GetFileName(filePath);
+        return format.ToLowerInvariant() switch
+        {
+            "resx" => ExtractStemBeforeLanguage(fileName, ".resx"),
+            "json" => ExtractStemBeforeLanguage(fileName, ".json"),
+            "xliff" or "xlf" => ExtractStemBeforeLanguage(fileName, fileName.EndsWith(".xliff", StringComparison.OrdinalIgnoreCase) ? ".xliff" : ".xlf"),
+            "po" or "gettext" => ExtractPoStem(fileName),
+            // Android/iOS/i18next don't carry a base name in their file naming.
+            _ => string.Empty
+        };
+    }
+
+    /// <summary>
+    /// For files like <c>CustomerResources.resx</c> or
+    /// <c>CustomerResources.fr.resx</c>, returns <c>"CustomerResources"</c>.
+    /// </summary>
+    private static string ExtractStemBeforeLanguage(string fileName, string extension)
+    {
+        if (!fileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
+
+        var stem = fileName.Substring(0, fileName.Length - extension.Length);
+        // If stem has dots it means there's a language code component
+        // (e.g. "CustomerResources.fr" → strip the ".fr" suffix).
+        var lastDot = stem.LastIndexOf('.');
+        if (lastDot > 0)
+        {
+            stem = stem.Substring(0, lastDot);
+        }
+        return stem;
+    }
+
+    /// <summary>
+    /// For PO files like <c>messages.po</c> or <c>messages.fr.po</c>, returns
+    /// <c>"messages"</c>. For unqualified <c>fr.po</c> (gettext convention),
+    /// returns <c>"messages"</c> as the standard default.
+    /// </summary>
+    private static string ExtractPoStem(string fileName)
+    {
+        var stem = ExtractStemBeforeLanguage(fileName, ".po");
+        if (string.IsNullOrEmpty(stem))
+            stem = ExtractStemBeforeLanguage(fileName, ".pot");
+        // Single-word filenames like "fr.po" are language-only — no base name.
+        // Caller may treat empty as "default group".
+        return stem;
     }
 
     /// <summary>

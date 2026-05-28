@@ -23,18 +23,18 @@ public class KeyLevelMerger
     {
         var result = new PushChanges();
         var localEntriesByKey = localEntries
-            .GroupBy(e => (e.Key, e.Lang))
+            .GroupBy(e => (e.BaseName, e.Key, e.Lang))
             .ToDictionary(g => g.Key, g => g.First());
 
-        // Track which keys we've seen locally
-        var seenKeys = new HashSet<(string Key, string Lang)>();
+        // Track which (BaseName, Key, Lang) tuples we've seen locally.
+        var seenKeys = new HashSet<(string BaseName, string Key, string Lang)>();
 
         foreach (var entry in localEntries)
         {
-            var keyPair = (entry.Key, entry.Lang);
-            seenKeys.Add(keyPair);
+            var keyTuple = (entry.BaseName, entry.Key, entry.Lang);
+            seenKeys.Add(keyTuple);
 
-            var baseHash = syncState?.GetEntryHash(entry.Key, entry.Lang);
+            var baseHash = syncState?.GetEntryHash(entry.BaseName, entry.Key, entry.Lang);
 
             if (baseHash == null)
             {
@@ -42,6 +42,7 @@ public class KeyLevelMerger
                 result.Additions.Add(new EntryChange
                 {
                     Key = entry.Key,
+                    BaseName = entry.BaseName,
                     Lang = entry.Lang,
                     Value = entry.Value,
                     Comment = entry.Comment,
@@ -56,6 +57,7 @@ public class KeyLevelMerger
                 result.Modifications.Add(new EntryChange
                 {
                     Key = entry.Key,
+                    BaseName = entry.BaseName,
                     Lang = entry.Lang,
                     Value = entry.Value,
                     Comment = entry.Comment,
@@ -67,22 +69,20 @@ public class KeyLevelMerger
             // If baseHash == entry.Hash, entry unchanged, skip it
         }
 
-        // Find deletions: entries in sync state but not in local
+        // Find deletions: entries in sync state but not in local.
         if (syncState != null)
         {
-            foreach (var (key, langHashes) in syncState.Entries)
+            foreach (var (baseName, key, lang, hash) in syncState.EnumerateEntries())
             {
-                foreach (var (lang, hash) in langHashes)
+                if (!seenKeys.Contains((baseName, key, lang)))
                 {
-                    if (!seenKeys.Contains((key, lang)))
+                    result.Deletions.Add(new EntryDeletion
                     {
-                        result.Deletions.Add(new EntryDeletion
-                        {
-                            Key = key,
-                            Lang = lang,
-                            BaseHash = hash
-                        });
-                    }
+                        Key = key,
+                        BaseName = baseName,
+                        Lang = lang,
+                        BaseHash = hash
+                    });
                 }
             }
         }
@@ -106,48 +106,45 @@ public class KeyLevelMerger
     {
         var result = new MergeResult();
 
-        // Build lookup for local entries
+        // Build lookup for local entries by (BaseName, Key, Lang).
         var localByKey = localEntries
-            .GroupBy(e => (e.Key, e.Lang))
+            .GroupBy(e => (e.BaseName, e.Key, e.Lang))
             .ToDictionary(g => g.Key, g => g.First());
 
         // Determine if local files use "" for default language
         // (e.g., Android/RESX use "", while XLIFF/iOS use explicit codes like "en")
         var localUsesEmptyForDefault = localEntries.Any(e => string.IsNullOrEmpty(e.Lang));
 
-        // Build lookup for remote entries
-        // Note: We use translation.Comment (per-language) rather than entry.Comment (key-level)
-        // Only normalize if local files use "" for default language
-        var remoteByKey = new Dictionary<(string Key, string Lang), (string Value, string Hash, string? Comment, bool IsPlural, Dictionary<string, string>? PluralForms)>();
+        // Build lookup for remote entries by (BaseName, Key, Lang).
+        var remoteByKey = new Dictionary<(string BaseName, string Key, string Lang),
+            (string Value, string Hash, string? Comment, bool IsPlural, Dictionary<string, string>? PluralForms)>();
         foreach (var entry in remoteEntries)
         {
             foreach (var (lang, translation) in entry.Translations)
             {
                 var normalizedLang = NormalizeLanguageCode(lang, defaultLanguage, localUsesEmptyForDefault);
-                remoteByKey[(entry.Key, normalizedLang)] = (translation.Value, translation.Hash, translation.Comment, entry.IsPlural, translation.PluralForms);
+                remoteByKey[(entry.BaseName, entry.Key, normalizedLang)] =
+                    (translation.Value, translation.Hash, translation.Comment, entry.IsPlural, translation.PluralForms);
             }
         }
 
-        // Track all keys we need to consider
-        var allKeys = new HashSet<(string Key, string Lang)>();
-        foreach (var e in localEntries) allKeys.Add((e.Key, e.Lang));
-        foreach (var key in remoteByKey.Keys) allKeys.Add(key);
+        // Track all (BaseName, Key, Lang) tuples we need to consider.
+        var allKeys = new HashSet<(string BaseName, string Key, string Lang)>();
+        foreach (var e in localEntries) allKeys.Add((e.BaseName, e.Key, e.Lang));
+        foreach (var k in remoteByKey.Keys) allKeys.Add(k);
         if (syncState != null)
         {
-            foreach (var (key, langHashes) in syncState.Entries)
+            foreach (var (baseName, key, lang, _) in syncState.EnumerateEntries())
             {
-                foreach (var lang in langHashes.Keys)
-                {
-                    allKeys.Add((key, lang));
-                }
+                allKeys.Add((baseName, key, lang));
             }
         }
 
-        foreach (var (key, lang) in allKeys)
+        foreach (var (baseName, key, lang) in allKeys)
         {
-            var baseHash = syncState?.GetEntryHash(key, lang);
-            var hasLocal = localByKey.TryGetValue((key, lang), out var localEntry);
-            var hasRemote = remoteByKey.TryGetValue((key, lang), out var remoteEntry);
+            var baseHash = syncState?.GetEntryHash(baseName, key, lang);
+            var hasLocal = localByKey.TryGetValue((baseName, key, lang), out var localEntry);
+            var hasRemote = remoteByKey.TryGetValue((baseName, key, lang), out var remoteEntry);
 
             var localHash = localEntry?.Hash;
             var remoteHash = hasRemote ? remoteEntry.Hash : null;
@@ -165,14 +162,14 @@ public class KeyLevelMerger
                 if (baseHash == null)
                 {
                     // New from remote - accept
-                    result.ToWrite.Add(CreateMergedEntry(key, lang, remoteEntry, MergeSource.Remote));
-                    result.NewHashes.SetEntryHash(key, lang, remoteEntry.Hash);
+                    result.ToWrite.Add(CreateMergedEntry(baseName, key, lang, remoteEntry, MergeSource.Remote));
+                    result.NewHashes.SetEntryHash(baseName, key, lang, remoteEntry.Hash);
                     result.AutoMerged++;
                 }
                 else if (baseHash == remoteHash)
                 {
                     // Remote unchanged, local deleted - keep deleted (don't write)
-                    result.NewHashes.RemoveEntryHash(key, lang);
+                    result.NewHashes.RemoveEntryHash(baseName, key, lang);
                 }
                 else
                 {
@@ -180,6 +177,7 @@ public class KeyLevelMerger
                     result.Conflicts.Add(new EntryConflict
                     {
                         Key = key,
+                        BaseName = baseName,
                         Lang = lang,
                         Type = ConflictType.DeletedLocallyModifiedRemotely,
                         LocalValue = null,
@@ -196,13 +194,12 @@ public class KeyLevelMerger
                 if (baseHash == null)
                 {
                     // New locally - keep (will be pushed later)
-                    result.NewHashes.SetEntryHash(key, lang, localEntry!.Hash);
+                    result.NewHashes.SetEntryHash(baseName, key, lang, localEntry!.Hash);
                 }
                 else if (baseHash == localHash)
                 {
                     // Local unchanged, remote deleted - delete locally
-                    result.NewHashes.RemoveEntryHash(key, lang);
-                    // Don't add to ToWrite - file regenerator will omit it
+                    result.NewHashes.RemoveEntryHash(baseName, key, lang);
                 }
                 else
                 {
@@ -210,6 +207,7 @@ public class KeyLevelMerger
                     result.Conflicts.Add(new EntryConflict
                     {
                         Key = key,
+                        BaseName = baseName,
                         Lang = lang,
                         Type = ConflictType.DeletedRemotelyModifiedLocally,
                         LocalValue = localEntry!.Value,
@@ -227,19 +225,19 @@ public class KeyLevelMerger
                 {
                     // Same value (or both unchanged from base)
                     result.Unchanged++;
-                    result.NewHashes.SetEntryHash(key, lang, localHash!);
+                    result.NewHashes.SetEntryHash(baseName, key, lang, localHash!);
                 }
                 else if (baseHash == localHash)
                 {
                     // Only remote changed - accept remote
-                    result.ToWrite.Add(CreateMergedEntry(key, lang, remoteEntry, MergeSource.Remote));
-                    result.NewHashes.SetEntryHash(key, lang, remoteHash!);
+                    result.ToWrite.Add(CreateMergedEntry(baseName, key, lang, remoteEntry, MergeSource.Remote));
+                    result.NewHashes.SetEntryHash(baseName, key, lang, remoteHash!);
                     result.AutoMerged++;
                 }
                 else if (baseHash == remoteHash)
                 {
                     // Only local changed - keep local (don't overwrite)
-                    result.NewHashes.SetEntryHash(key, lang, localHash!);
+                    result.NewHashes.SetEntryHash(baseName, key, lang, localHash!);
                 }
                 else if (baseHash == null)
                 {
@@ -247,6 +245,7 @@ public class KeyLevelMerger
                     result.Conflicts.Add(new EntryConflict
                     {
                         Key = key,
+                        BaseName = baseName,
                         Lang = lang,
                         Type = ConflictType.BothModified,
                         LocalValue = localEntry!.Value,
@@ -262,6 +261,7 @@ public class KeyLevelMerger
                     result.Conflicts.Add(new EntryConflict
                     {
                         Key = key,
+                        BaseName = baseName,
                         Lang = lang,
                         Type = ConflictType.BothModified,
                         LocalValue = localEntry!.Value,
@@ -300,6 +300,7 @@ public class KeyLevelMerger
                 result.ToWrite.Add(new MergedEntry
                 {
                     Key = entry.Key,
+                    BaseName = entry.BaseName,
                     Lang = normalizedLang,
                     Value = translation.Value,
                     Comment = translation.Comment,
@@ -308,7 +309,7 @@ public class KeyLevelMerger
                     Hash = translation.Hash,
                     Source = MergeSource.Remote
                 });
-                result.NewHashes.SetEntryHash(entry.Key, normalizedLang, translation.Hash);
+                result.NewHashes.SetEntryHash(entry.BaseName, entry.Key, normalizedLang, translation.Hash);
             }
         }
 
@@ -325,17 +326,17 @@ public class KeyLevelMerger
     public MergeResult ApplyResolutions(
         MergeResult mergeResult,
         IEnumerable<ConflictResolution> resolutions,
-        Dictionary<(string Key, string Lang), LocalEntry> localEntries)
+        Dictionary<(string BaseName, string Key, string Lang), LocalEntry> localEntries)
     {
         var resolutionByKey = resolutions
             .Where(r => r.TargetType == ResolutionTargetType.Entry)
-            .ToDictionary(r => (r.Key, r.Lang ?? ""));
+            .ToDictionary(r => (r.BaseName, r.Key, r.Lang ?? ""));
 
         var remainingConflicts = new List<EntryConflict>();
 
         foreach (var conflict in mergeResult.Conflicts)
         {
-            if (!resolutionByKey.TryGetValue((conflict.Key, conflict.Lang), out var resolution))
+            if (!resolutionByKey.TryGetValue((conflict.BaseName, conflict.Key, conflict.Lang), out var resolution))
             {
                 remainingConflicts.Add(conflict);
                 continue;
@@ -344,12 +345,13 @@ public class KeyLevelMerger
             switch (resolution.Resolution)
             {
                 case ResolutionChoice.Local:
-                    if (localEntries.TryGetValue((conflict.Key, conflict.Lang), out var localEntry))
+                    if (localEntries.TryGetValue((conflict.BaseName, conflict.Key, conflict.Lang), out var localEntry))
                     {
                         var hash = EntryHasher.ComputeHash(localEntry.Value, localEntry.Comment);
                         mergeResult.ToWrite.Add(new MergedEntry
                         {
                             Key = conflict.Key,
+                            BaseName = conflict.BaseName,
                             Lang = conflict.Lang,
                             Value = localEntry.Value,
                             Comment = localEntry.Comment,
@@ -358,7 +360,7 @@ public class KeyLevelMerger
                             Hash = hash,
                             Source = MergeSource.Local
                         });
-                        mergeResult.NewHashes.SetEntryHash(conflict.Key, conflict.Lang, hash);
+                        mergeResult.NewHashes.SetEntryHash(conflict.BaseName, conflict.Key, conflict.Lang, hash);
                     }
                     break;
 
@@ -368,6 +370,7 @@ public class KeyLevelMerger
                         mergeResult.ToWrite.Add(new MergedEntry
                         {
                             Key = conflict.Key,
+                            BaseName = conflict.BaseName,
                             Lang = conflict.Lang,
                             Value = conflict.RemoteValue,
                             Comment = conflict.RemoteComment,
@@ -376,7 +379,7 @@ public class KeyLevelMerger
                             Hash = conflict.RemoteHash!,
                             Source = MergeSource.Remote
                         });
-                        mergeResult.NewHashes.SetEntryHash(conflict.Key, conflict.Lang, conflict.RemoteHash!);
+                        mergeResult.NewHashes.SetEntryHash(conflict.BaseName, conflict.Key, conflict.Lang, conflict.RemoteHash!);
                     }
                     break;
 
@@ -389,6 +392,7 @@ public class KeyLevelMerger
                         mergeResult.ToWrite.Add(new MergedEntry
                         {
                             Key = conflict.Key,
+                            BaseName = conflict.BaseName,
                             Lang = conflict.Lang,
                             Value = resolution.EditedValue,
                             Comment = comment,
@@ -397,7 +401,7 @@ public class KeyLevelMerger
                             Hash = hash,
                             Source = MergeSource.Edited
                         });
-                        mergeResult.NewHashes.SetEntryHash(conflict.Key, conflict.Lang, hash);
+                        mergeResult.NewHashes.SetEntryHash(conflict.BaseName, conflict.Key, conflict.Lang, hash);
                     }
                     break;
 
@@ -413,6 +417,7 @@ public class KeyLevelMerger
     }
 
     private static MergedEntry CreateMergedEntry(
+        string baseName,
         string key,
         string lang,
         (string Value, string Hash, string? Comment, bool IsPlural, Dictionary<string, string>? PluralForms) remote,
@@ -421,6 +426,7 @@ public class KeyLevelMerger
         return new MergedEntry
         {
             Key = key,
+            BaseName = baseName,
             Lang = lang,
             Value = remote.Value,
             Comment = remote.Comment,
@@ -478,6 +484,13 @@ public class KeyLevelMerger
 public class LocalEntry
 {
     public required string Key { get; init; }
+
+    /// <summary>
+    /// Base name of the resource group this entry comes from. Empty string for
+    /// single-group projects (preserves legacy behavior).
+    /// </summary>
+    public string BaseName { get; init; } = string.Empty;
+
     public required string Lang { get; init; }
     public required string Value { get; init; }
     public string? Comment { get; init; }

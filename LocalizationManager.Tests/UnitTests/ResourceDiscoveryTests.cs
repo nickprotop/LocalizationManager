@@ -1,6 +1,7 @@
 // Copyright (c) 2025 Nikolaos Protopapas
 // Licensed under the MIT License
 
+using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Backends.Resx;
 using Xunit;
 
@@ -9,7 +10,7 @@ namespace LocalizationManager.Tests.UnitTests;
 public class ResourceDiscoveryTests
 {
     private readonly string _testDataPath;
-    private readonly ResxResourceDiscovery _discovery = new();
+    private readonly IResourceDiscovery _discovery = new ResxResourceDiscovery();
 
     public ResourceDiscoveryTests()
     {
@@ -101,6 +102,46 @@ public class ResourceDiscoveryTests
             Assert.NotNull(lang.FilePath);
             Assert.True(File.Exists(lang.FilePath), $"File path {lang.FilePath} does not exist");
             Assert.EndsWith(".resx", lang.FilePath);
+        }
+    }
+
+    [Fact]
+    public void DiscoverResourceGroups_MultiBaseDirectory_ReturnsOneGroupPerBaseName()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "TestData", "MultiGroupResx");
+
+        var directory = _discovery.DiscoverResourceGroups(path);
+
+        Assert.Equal(2, directory.Groups.Count);
+        Assert.Contains(directory.Groups, g => g.BaseName == "CustomerResources");
+        Assert.Contains(directory.Groups, g => g.BaseName == "GlassResources");
+    }
+
+    [Fact]
+    public void DiscoverResourceGroups_MultiBaseDirectory_ReturnsOneCultureCodePerLanguage()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "TestData", "MultiGroupResx");
+
+        var directory = _discovery.DiscoverResourceGroups(path);
+
+        // Two cultures: invariant ("") and Italian ("it")
+        Assert.Equal(2, directory.CultureCodes.Count);
+        Assert.Contains("", directory.CultureCodes);
+        Assert.Contains("it", directory.CultureCodes);
+    }
+
+    [Fact]
+    public void DiscoverResourceGroups_MultiBaseDirectory_EachGroupHasAllCultures()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "TestData", "MultiGroupResx");
+
+        var directory = _discovery.DiscoverResourceGroups(path);
+
+        foreach (var group in directory.Groups)
+        {
+            Assert.Equal(2, group.Files.Count);
+            Assert.Contains(group.Files, f => f.IsDefault);
+            Assert.Contains(group.Files, f => f.Code == "it");
         }
     }
 }

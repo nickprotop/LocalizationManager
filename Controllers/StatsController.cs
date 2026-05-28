@@ -22,37 +22,53 @@ public class StatsController : ControllerBase
     }
 
     /// <summary>
-    /// Get translation coverage statistics
+    /// Get translation coverage statistics. Aggregates across resource groups so
+    /// that directories containing multiple base names produce one entry per
+    /// culture (not per file).
     /// </summary>
     [HttpGet]
     public ActionResult<StatsResponse> GetStats()
     {
         try
         {
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
+            var grouped = directory.Groups
+                .SelectMany(g => g.Files.Select(f => new
+                {
+                    Group = g,
+                    File = f,
+                    Resource = _backend.Reader.Read(f)
+                }))
+                .ToList();
 
-            var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
-            if (defaultFile == null)
+            var defaultFiles = grouped.Where(x => x.File.IsDefault).ToList();
+            if (defaultFiles.Count == 0)
             {
                 return StatusCode(500, new { error = "No default language file found" });
             }
 
-            // Use ResourceFile.Count for total keys (handles plurals correctly)
-            var totalKeys = defaultFile.Count;
+            // Total keys: sum of Count across the default file of each group.
+            var totalKeys = defaultFiles.Sum(x => x.Resource.Count);
 
-            var languageStats = resourceFiles.Select(file =>
+            var cultureGroups = grouped
+                .GroupBy(x => new { Code = x.File.Code ?? string.Empty, x.File.IsDefault })
+                .OrderByDescending(g => g.Key.IsDefault)
+                .ThenBy(g => g.Key.Code)
+                .ToList();
+
+            var languageStats = cultureGroups.Select(cultureGroup =>
             {
-                // Use ResourceFile.CompletedCount (handles plurals correctly via IsEmpty property)
-                var translatedCount = file.CompletedCount;
-
+                var sample = cultureGroup.First();
+                var translatedCount = cultureGroup.Sum(x => x.Resource.CompletedCount);
                 var coverage = totalKeys > 0 ? (double)translatedCount / totalKeys * 100 : 0;
 
                 return new LanguageStats
                 {
-                    LanguageCode = file.Language.Code ?? "default",
-                    FilePath = file.Language.FilePath,
-                    IsDefault = file.Language.IsDefault,
+                    LanguageCode = sample.File.Code ?? "default",
+                    FilePath = string.Join(";", cultureGroup
+                        .Select(x => x.File.FilePath)
+                        .Where(p => !string.IsNullOrEmpty(p))),
+                    IsDefault = sample.File.IsDefault,
                     TranslatedCount = translatedCount,
                     TotalCount = totalKeys,
                     Coverage = Math.Round(coverage, 2)

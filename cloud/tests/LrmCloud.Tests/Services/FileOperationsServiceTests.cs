@@ -184,10 +184,10 @@ public class FileOperationsServiceTests : IDisposable
         _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
             .ReturnsAsync(true);
 
-        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        var parsedEntries = new Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry>
         {
-            { ("greeting", "en", ""), new GitHubEntry { Key = "greeting", LanguageCode = "en", Value = "Hello", Hash = "abc123" } },
-            { ("farewell", "en", ""), new GitHubEntry { Key = "farewell", LanguageCode = "en", Value = "Goodbye", Hash = "def456" } }
+            { ("", "greeting", "en", ""), new GitHubEntry { Key = "greeting", LanguageCode = "en", Value = "Hello", Hash = "abc123" } },
+            { ("", "farewell", "en", ""), new GitHubEntry { Key = "farewell", LanguageCode = "en", Value = "Goodbye", Hash = "def456" } }
         };
 
         _mockFileImportService.Setup(x => x.ParseFiles(
@@ -238,9 +238,9 @@ public class FileOperationsServiceTests : IDisposable
         _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
             .ReturnsAsync(true);
 
-        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        var parsedEntries = new Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry>
         {
-            { ("test", "en", ""), new GitHubEntry { Key = "test", LanguageCode = "en", Value = "Test", Hash = "abc" } }
+            { ("", "test", "en", ""), new GitHubEntry { Key = "test", LanguageCode = "en", Value = "Test", Hash = "abc" } }
         };
 
         _mockFileImportService.Setup(x => x.ParseFiles(
@@ -284,9 +284,9 @@ public class FileOperationsServiceTests : IDisposable
         _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
             .ReturnsAsync(true);
 
-        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        var parsedEntries = new Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry>
         {
-            { ("valid_key", "en", ""), new GitHubEntry { Key = "valid_key", LanguageCode = "en", Value = "Valid", Hash = "abc" } }
+            { ("", "valid_key", "en", ""), new GitHubEntry { Key = "valid_key", LanguageCode = "en", Value = "Valid", Hash = "abc" } }
         };
 
         var parseErrors = new List<FileParseErrorInfo>
@@ -341,9 +341,9 @@ public class FileOperationsServiceTests : IDisposable
         _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
             .ReturnsAsync(true);
 
-        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        var parsedEntries = new Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry>
         {
-            { ("test", "en", ""), new GitHubEntry { Key = "test", LanguageCode = "en", Value = "Test", Hash = "abc" } }
+            { ("", "test", "en", ""), new GitHubEntry { Key = "test", LanguageCode = "en", Value = "Test", Hash = "abc" } }
         };
 
         _mockFileImportService.Setup(x => x.ParseFiles(
@@ -391,9 +391,9 @@ public class FileOperationsServiceTests : IDisposable
         _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
             .ReturnsAsync(true);
 
-        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        var parsedEntries = new Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry>
         {
-            { ("test", "en", ""), new GitHubEntry { Key = "test", LanguageCode = "en", Value = "Test", Hash = "abc" } }
+            { ("", "test", "en", ""), new GitHubEntry { Key = "test", LanguageCode = "en", Value = "Test", Hash = "abc" } }
         };
 
         _mockFileImportService.Setup(x => x.ParseFiles(
@@ -643,9 +643,9 @@ public class FileOperationsServiceTests : IDisposable
         _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
             .ReturnsAsync(true);
 
-        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        var parsedEntries = new Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry>
         {
-            { ("new_key", "en", ""), new GitHubEntry { Key = "new_key", LanguageCode = "en", Value = "New Value", Hash = "abc" } }
+            { ("", "new_key", "en", ""), new GitHubEntry { Key = "new_key", LanguageCode = "en", Value = "New Value", Hash = "abc" } }
         };
 
         _mockFileImportService.Setup(x => x.ParseFiles(
@@ -689,9 +689,9 @@ public class FileOperationsServiceTests : IDisposable
             .ReturnsAsync(true);
 
         // Import same value that already exists
-        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        var parsedEntries = new Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry>
         {
-            { ("greeting", "en", ""), new GitHubEntry { Key = "greeting", LanguageCode = "en", Value = "Hello", Hash = "abc" } }
+            { ("", "greeting", "en", ""), new GitHubEntry { Key = "greeting", LanguageCode = "en", Value = "Hello", Hash = "abc" } }
         };
 
         _mockFileImportService.Setup(x => x.ParseFiles(
@@ -735,9 +735,9 @@ public class FileOperationsServiceTests : IDisposable
             .ReturnsAsync(true);
 
         // Import different value for existing key
-        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        var parsedEntries = new Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry>
         {
-            { ("greeting", "en", ""), new GitHubEntry { Key = "greeting", LanguageCode = "en", Value = "Hi there!", Hash = "abc" } }
+            { ("", "greeting", "en", ""), new GitHubEntry { Key = "greeting", LanguageCode = "en", Value = "Hi there!", Hash = "abc" } }
         };
 
         _mockFileImportService.Setup(x => x.ParseFiles(
@@ -780,14 +780,14 @@ public class FileOperationsServiceTests : IDisposable
         _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
             .ReturnsAsync(true);
 
-        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        var parsedEntries = new Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry>
         {
             // Same value - unchanged
-            { ("greeting", "en", ""), new GitHubEntry { Key = "greeting", LanguageCode = "en", Value = "Hello", Hash = "a" } },
+            { ("", "greeting", "en", ""), new GitHubEntry { Key = "greeting", LanguageCode = "en", Value = "Hello", Hash = "a" } },
             // Different value - modify
-            { ("farewell", "en", ""), new GitHubEntry { Key = "farewell", LanguageCode = "en", Value = "See ya!", Hash = "b" } },
+            { ("", "farewell", "en", ""), new GitHubEntry { Key = "farewell", LanguageCode = "en", Value = "See ya!", Hash = "b" } },
             // New key - add
-            { ("welcome", "en", ""), new GitHubEntry { Key = "welcome", LanguageCode = "en", Value = "Welcome!", Hash = "c" } }
+            { ("", "welcome", "en", ""), new GitHubEntry { Key = "welcome", LanguageCode = "en", Value = "Welcome!", Hash = "c" } }
         };
 
         _mockFileImportService.Setup(x => x.ParseFiles(
@@ -827,9 +827,9 @@ public class FileOperationsServiceTests : IDisposable
         _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
             .ReturnsAsync(true);
 
-        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        var parsedEntries = new Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry>
         {
-            { ("valid_key", "en", ""), new GitHubEntry { Key = "valid_key", LanguageCode = "en", Value = "Valid", Hash = "abc" } }
+            { ("", "valid_key", "en", ""), new GitHubEntry { Key = "valid_key", LanguageCode = "en", Value = "Valid", Hash = "abc" } }
         };
 
         var parseErrors = new List<FileParseErrorInfo>
@@ -875,11 +875,11 @@ public class FileOperationsServiceTests : IDisposable
         _mockProjectService.Setup(x => x.CanManageResourcesAsync(project.Id, user.Id))
             .ReturnsAsync(true);
 
-        var parsedEntries = new Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry>
+        var parsedEntries = new Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry>
         {
-            { ("key1", "en", ""), new GitHubEntry { Key = "key1", LanguageCode = "en", Value = "Value1", Hash = "a" } },
-            { ("key2", "en", ""), new GitHubEntry { Key = "key2", LanguageCode = "en", Value = "Value2", Hash = "b" } },
-            { ("key3", "en", ""), new GitHubEntry { Key = "key3", LanguageCode = "en", Value = "Value3", Hash = "c" } }
+            { ("", "key1", "en", ""), new GitHubEntry { Key = "key1", LanguageCode = "en", Value = "Value1", Hash = "a" } },
+            { ("", "key2", "en", ""), new GitHubEntry { Key = "key2", LanguageCode = "en", Value = "Value2", Hash = "b" } },
+            { ("", "key3", "en", ""), new GitHubEntry { Key = "key3", LanguageCode = "en", Value = "Value3", Hash = "c" } }
         };
 
         _mockFileImportService.Setup(x => x.ParseFiles(

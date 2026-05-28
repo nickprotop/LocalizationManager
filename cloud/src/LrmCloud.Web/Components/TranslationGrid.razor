@@ -33,6 +33,17 @@
             </RadzenFormField>
         }
 
+        @if (_hasMultipleGroups)
+        {
+            <RadzenFormField Text="Group" Variant="Radzen.Variant.Outlined" Style="flex: 0 1 180px; min-width: 140px;">
+                <ChildContent>
+                    <RadzenDropDown TValue="string?" @bind-Value="_groupFilter" Change="@OnGroupFilterChanged"
+                                    Data="@_availableGroups"
+                                    AllowClear="true" Placeholder="All Groups" Style="width: 100%;" />
+                </ChildContent>
+            </RadzenFormField>
+        }
+
         <RadzenSplitButton Text="Columns" Icon="view_column" Variant="Radzen.Variant.Outlined" Size="ButtonSize.Small"
                            Click="@OnColumnMenuClick" Style="margin-top: auto;">
             <ChildContent>
@@ -153,6 +164,16 @@
                 }
             </Template>
         </RadzenDataGridColumn>
+
+        @* Resource Group column — only when the project has multiple groups *@
+        @if (_hasMultipleGroups)
+        {
+            <RadzenDataGridColumn TItem="TranslationGridRow" Property="BaseName" Title="Group" Width="160px" Resizable="true" Filterable="true" Sortable="true">
+                <Template Context="row">
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">@row.BaseName</RadzenText>
+                </Template>
+            </RadzenDataGridColumn>
+        }
 
         @* Key name *@
         <RadzenDataGridColumn TItem="TranslationGridRow" Property="KeyName" Title="Key" Width="250px" Frozen="true" Resizable="true" Filterable="true">
@@ -358,6 +379,23 @@
     private IEnumerable<TranslationGridRow> _data = Enumerable.Empty<TranslationGridRow>();
     private int _count;
 
+    /// <summary>
+    /// True if the loaded data spans more than one resource group (i.e. the
+    /// project is multi-group). Drives the visibility of the "Group" column.
+    /// </summary>
+    private bool _hasMultipleGroups;
+
+    /// <summary>
+    /// Distinct base names present in the loaded data, used to populate the
+    /// Group filter dropdown.
+    /// </summary>
+    private List<string> _availableGroups = new();
+
+    /// <summary>
+    /// Currently selected group filter (null = no filter applied).
+    /// </summary>
+    private string? _groupFilter;
+
     private readonly List<object> _statusOptions = new()
     {
         new { Value = TranslationStatus.Complete, Text = "Complete" },
@@ -463,6 +501,19 @@
             var result = await ServerDataFunc(state);
             _data = result.Items ?? Enumerable.Empty<TranslationGridRow>();
             _count = result.TotalItems;
+            _availableGroups = _data
+                .Select(r => r.BaseName ?? string.Empty)
+                .Where(b => !string.IsNullOrEmpty(b))
+                .Distinct()
+                .OrderBy(b => b)
+                .ToList();
+            _hasMultipleGroups = _availableGroups.Count > 1;
+
+            // Client-side group filter — applied after fetch.
+            if (!string.IsNullOrEmpty(_groupFilter))
+            {
+                _data = _data.Where(r => string.Equals(r.BaseName, _groupFilter, StringComparison.Ordinal));
+            }
         }
         catch (Exception ex)
         {
@@ -536,11 +587,17 @@
         await ReloadAsync();
     }
 
+    private async Task OnGroupFilterChanged(object? value)
+    {
+        await ReloadAsync();
+    }
+
     private async Task ClearFilters()
     {
         _searchText = string.Empty;
         _statusFilter = null;
         _workflowStatusFilter = null;
+        _groupFilter = null;
         _hiddenLanguages.Clear();
         await OnSearchTextChanged.InvokeAsync(string.Empty);
         await ReloadAsync();

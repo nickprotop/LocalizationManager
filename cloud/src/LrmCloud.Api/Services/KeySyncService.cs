@@ -61,11 +61,13 @@ public class KeySyncService : IKeySyncService
         try
         {
             // Pre-load all existing keys for this project to avoid duplicate lookups
-            // and track newly created keys within this batch
+            // and track newly created keys within this batch. Keyed by (BaseName,
+            // KeyName) so multi-group projects with the same key name across groups
+            // don't collide.
             var existingKeys = await _db.ResourceKeys
                 .Include(k => k.Translations)
                 .Where(k => k.ProjectId == projectId)
-                .ToDictionaryAsync(k => k.KeyName, ct);
+                .ToDictionaryAsync(k => (k.BaseName, k.KeyName), ct);
 
             // Process entry changes
             foreach (var entry in request.Entries)
@@ -98,16 +100,30 @@ public class KeySyncService : IKeySyncService
                     else
                         response.Modified++;
 
+                    // Legacy single-group shape (best-effort; collides on shared key names across groups)
                     if (!response.NewEntryHashes.ContainsKey(entry.Key))
                     {
                         response.NewEntryHashes[entry.Key] = new Dictionary<string, string>();
                     }
                     response.NewEntryHashes[entry.Key][entry.Lang] = result.NewHash!;
 
+                    // Multi-group-aware shape (preferred by new clients)
+                    var baseName = entry.BaseName ?? string.Empty;
+                    if (!response.NewEntryHashesByGroup.TryGetValue(baseName, out var byKey))
+                    {
+                        response.NewEntryHashesByGroup[baseName] = byKey = new Dictionary<string, Dictionary<string, string>>();
+                    }
+                    if (!byKey.TryGetValue(entry.Key, out var byLang))
+                    {
+                        byKey[entry.Key] = byLang = new Dictionary<string, string>();
+                    }
+                    byLang[entry.Lang] = result.NewHash!;
+
                     // Track change for history (PluralForm = "" for non-plural entries)
                     historyChanges.Add(new Entities.SyncChangeEntry
                     {
                         Key = entry.Key,
+                        BaseName = entry.BaseName ?? string.Empty,
                         Lang = entry.Lang,
                         PluralForm = "",
                         ChangeType = result.WasNew ? "added" : "modified",
@@ -138,6 +154,7 @@ public class KeySyncService : IKeySyncService
                     historyChanges.Add(new Entities.SyncChangeEntry
                     {
                         Key = deletion.Key,
+                        BaseName = deletion.BaseName ?? string.Empty,
                         Lang = deletion.Lang ?? result.DeletedLang ?? "all",
                         PluralForm = "",
                         ChangeType = "deleted",
@@ -256,6 +273,7 @@ public class KeySyncService : IKeySyncService
             var entryData = new EntryDataDto
             {
                 Key = key.KeyName,
+                BaseName = key.BaseName,
                 Comment = key.Comment,
                 IsPlural = key.IsPlural,
                 SourceText = key.SourceText,
@@ -381,12 +399,93 @@ public class KeySyncService : IKeySyncService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<MigrateGroupsResponse> MigrateGroupsAsync(
+        int projectId,
+        int userId,
+        MigrateGroupsRequest request,
+        CancellationToken ct = default)
+    {
+        if (!await _projectService.CanManageResourcesAsync(projectId, userId))
+        {
+            throw new UnauthorizedAccessException("You don't have permission to migrate groups in this project");
+        }
+
+        var fromBaseName = request.FromBaseName ?? string.Empty;
+        var toBaseName = request.ToBaseName ?? string.Empty;
+
+        if (string.IsNullOrEmpty(toBaseName))
+        {
+            throw new ArgumentException("ToBaseName cannot be empty", nameof(request));
+        }
+
+        if (string.Equals(fromBaseName, toBaseName, StringComparison.Ordinal))
+        {
+            return new MigrateGroupsResponse { RowsUpdated = 0 };
+        }
+
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        try
+        {
+            // Find all rows in the source group.
+            var sourceRows = await _db.ResourceKeys
+                .Where(rk => rk.ProjectId == projectId && rk.BaseName == fromBaseName)
+                .ToListAsync(ct);
+
+            if (sourceRows.Count == 0)
+            {
+                await transaction.CommitAsync(ct);
+                return new MigrateGroupsResponse { RowsUpdated = 0 };
+            }
+
+            // Find existing rows in the target group that would conflict on key name.
+            var sourceKeyNames = sourceRows.Select(r => r.KeyName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var conflicts = await _db.ResourceKeys
+                .Where(rk => rk.ProjectId == projectId
+                          && rk.BaseName == toBaseName
+                          && sourceKeyNames.Contains(rk.KeyName))
+                .Select(rk => rk.KeyName)
+                .ToListAsync(ct);
+
+            if (conflicts.Count > 0)
+            {
+                await transaction.RollbackAsync(ct);
+                return new MigrateGroupsResponse
+                {
+                    RowsUpdated = 0,
+                    ConflictingKeys = conflicts
+                };
+            }
+
+            foreach (var row in sourceRows)
+            {
+                row.BaseName = toBaseName;
+                row.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            _logger.LogInformation(
+                "User {UserId} migrated {Count} resource keys in project {ProjectId} from BaseName '{From}' to '{To}'",
+                userId, sourceRows.Count, projectId, fromBaseName, toBaseName);
+
+            return new MigrateGroupsResponse { RowsUpdated = sourceRows.Count };
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(ct);
+            _logger.LogError(ex, "Failed to migrate groups in project {ProjectId}", projectId);
+            throw;
+        }
+    }
+
     #region Private Methods
 
     private async Task<EntryChangeResult> ApplyEntryChangeAsync(
         int projectId,
         EntryChangeDto entry,
-        Dictionary<string, Entities.ResourceKey> existingKeys,
+        Dictionary<(string BaseName, string KeyName), Entities.ResourceKey> existingKeys,
         CancellationToken ct)
     {
         // Validate key name
@@ -395,8 +494,11 @@ public class KeySyncService : IKeySyncService
             return new EntryChangeResult { Error = "Key name cannot be empty" };
         }
 
-        // Find or create the resource key (using in-memory dictionary to avoid duplicates in batch)
-        existingKeys.TryGetValue(entry.Key, out var resourceKey);
+        var baseName = entry.BaseName ?? string.Empty;
+
+        // Find or create the resource key (using in-memory dictionary to avoid duplicates in batch).
+        // Multi-group projects key by (BaseName, KeyName); single-group projects use BaseName="".
+        existingKeys.TryGetValue((baseName, entry.Key), out var resourceKey);
 
         if (resourceKey == null)
         {
@@ -404,6 +506,7 @@ public class KeySyncService : IKeySyncService
             resourceKey = new Entities.ResourceKey
             {
                 ProjectId = projectId,
+                BaseName = baseName,
                 KeyName = entry.Key,
                 IsPlural = entry.IsPlural,
                 Comment = entry.Comment,
@@ -419,7 +522,7 @@ public class KeySyncService : IKeySyncService
             };
             _db.ResourceKeys.Add(resourceKey);
             // Add to dictionary so subsequent entries for the same key use this instance
-            existingKeys[entry.Key] = resourceKey;
+            existingKeys[(baseName, entry.Key)] = resourceKey;
             // Note: Don't SaveChanges here - batch with final save for performance
         }
         else
@@ -667,7 +770,9 @@ public class KeySyncService : IKeySyncService
     {
         var resourceKey = await _db.ResourceKeys
             .Include(k => k.Translations)
-            .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == deletion.Key, ct);
+            .FirstOrDefaultAsync(k => k.ProjectId == projectId
+                                   && k.BaseName == (deletion.BaseName ?? string.Empty)
+                                   && k.KeyName == deletion.Key, ct);
 
         if (resourceKey == null)
         {
@@ -783,7 +888,9 @@ public class KeySyncService : IKeySyncService
         var resourceKey = await _db.ResourceKeys
             .Include(k => k.Translations)
             .Include(k => k.Project)
-            .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == resolution.Key, ct);
+            .FirstOrDefaultAsync(k => k.ProjectId == projectId
+                                   && k.BaseName == (resolution.BaseName ?? string.Empty)
+                                   && k.KeyName == resolution.Key, ct);
 
         if (resourceKey == null)
         {
@@ -890,4 +997,12 @@ public interface IKeySyncService
     Task<KeySyncPushResponse> PushAsync(int projectId, int userId, KeySyncPushRequest request, string source = "cli", CancellationToken ct = default);
     Task<KeySyncPullResponse> PullAsync(int projectId, int userId, DateTime? since = null, int? limit = null, int? offset = null, CancellationToken ct = default);
     Task<ConflictResolutionResponse> ResolveConflictsAsync(int projectId, int userId, ConflictResolutionRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Bulk-rekeys all resource keys in the given project from one BaseName
+    /// to another. Use this when a project that previously had a single
+    /// resource group grows a second group: existing rows live under the old
+    /// BaseName (usually "") and need to move to the new BaseName.
+    /// </summary>
+    Task<MigrateGroupsResponse> MigrateGroupsAsync(int projectId, int userId, MigrateGroupsRequest request, CancellationToken ct = default);
 }

@@ -207,7 +207,8 @@ public class PullCommand : Command<PullCommandSettings>
             }
 
             // Extract local entries
-            var languages = backend.Discovery.DiscoverLanguages(projectDirectory);
+            var directory = backend.Discovery.DiscoverResourceGroups(projectDirectory);
+            var languages = directory.Groups.SelectMany(g => g.Files).ToList();
             var extractor = new LocalEntryExtractor(backend);
 
             List<LocalEntry> localEntries = new();
@@ -272,12 +273,13 @@ public class PullCommand : Command<PullCommandSettings>
                     var resolutions = mergeResult.Conflicts.Select(c => new ConflictResolution
                     {
                         Key = c.Key,
+                        BaseName = c.BaseName,
                         Lang = c.Lang,
                         TargetType = ResolutionTargetType.Entry,
                         Resolution = ResolutionChoice.Remote
                     }).ToList();
 
-                    var localEntriesDict = localEntries.ToDictionary(e => (e.Key, e.Lang), e => e);
+                    var localEntriesDict = localEntries.ToDictionary(e => (e.BaseName, e.Key, e.Lang), e => e);
                     mergeResult = merger.ApplyResolutions(mergeResult, resolutions, localEntriesDict);
                 }
                 else if (strategy == ResolutionChoice.Local)
@@ -288,12 +290,13 @@ public class PullCommand : Command<PullCommandSettings>
                     var resolutions = mergeResult.Conflicts.Select(c => new ConflictResolution
                     {
                         Key = c.Key,
+                        BaseName = c.BaseName,
                         Lang = c.Lang,
                         TargetType = ResolutionTargetType.Entry,
                         Resolution = ResolutionChoice.Local
                     }).ToList();
 
-                    var localEntriesDict = localEntries.ToDictionary(e => (e.Key, e.Lang), e => e);
+                    var localEntriesDict = localEntries.ToDictionary(e => (e.BaseName, e.Key, e.Lang), e => e);
                     mergeResult = merger.ApplyResolutions(mergeResult, resolutions, localEntriesDict);
                 }
                 else if (strategy == ResolutionChoice.Skip)
@@ -575,7 +578,7 @@ public class PullCommand : Command<PullCommandSettings>
         }
 
         // Apply resolutions
-        var localEntriesDict = localEntries.ToDictionary(e => (e.Key, e.Lang), e => e);
+        var localEntriesDict = localEntries.ToDictionary(e => (e.BaseName, e.Key, e.Lang), e => e);
         var resolvedResult = merger.ApplyResolutions(mergeResult, resolutions, localEntriesDict);
 
         // Copy resolved entries to original result
@@ -600,43 +603,27 @@ public class PullCommand : Command<PullCommandSettings>
 
     private SyncState BuildNewSyncState(MergeResult mergeResult, List<LocalEntry> localEntries)
     {
-        var newState = new SyncState
-        {
-            Version = 2,
-            Timestamp = DateTime.UtcNow,
-            Entries = new Dictionary<string, Dictionary<string, string>>()
-        };
+        var newState = SyncState.CreateNew();
+        newState.Timestamp = DateTime.UtcNow;
 
-        // Add hashes from merged entries
-        foreach (var (key, lang, hash) in mergeResult.NewHashes.GetAllEntries())
+        // Hashes from merged entries (multi-group-aware).
+        foreach (var (baseName, key, lang, hash) in mergeResult.NewHashes.GetAllEntries())
         {
-            if (!newState.Entries.ContainsKey(key))
-            {
-                newState.Entries[key] = new Dictionary<string, string>();
-            }
-            newState.Entries[key][lang] = hash;
+            newState.SetEntryHash(baseName, key, lang, hash);
         }
 
-        // Add hashes from written entries (remote entries accepted)
+        // Hashes from written entries (remote entries accepted).
         foreach (var entry in mergeResult.ToWrite)
         {
-            if (!newState.Entries.ContainsKey(entry.Key))
-            {
-                newState.Entries[entry.Key] = new Dictionary<string, string>();
-            }
-            newState.Entries[entry.Key][entry.Lang] = entry.Hash;
+            newState.SetEntryHash(entry.BaseName, entry.Key, entry.Lang, entry.Hash);
         }
 
-        // Add hashes from local entries that weren't changed
+        // Hashes from local entries that weren't changed (don't overwrite).
         foreach (var entry in localEntries)
         {
-            if (!newState.Entries.ContainsKey(entry.Key))
+            if (newState.GetEntryHash(entry.BaseName, entry.Key, entry.Lang) == null)
             {
-                newState.Entries[entry.Key] = new Dictionary<string, string>();
-            }
-            if (!newState.Entries[entry.Key].ContainsKey(entry.Lang))
-            {
-                newState.Entries[entry.Key][entry.Lang] = entry.Hash;
+                newState.SetEntryHash(entry.BaseName, entry.Key, entry.Lang, entry.Hash);
             }
         }
 

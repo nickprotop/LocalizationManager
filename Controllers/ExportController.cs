@@ -21,57 +21,70 @@ public class ExportController : ControllerBase
     }
 
     /// <summary>
-    /// Export all keys to JSON format
+    /// Export all keys to JSON format. Includes a <c>resourceGroup</c> field per
+    /// key so multi-base directories round-trip through export/import.
     /// </summary>
     [HttpGet("json")]
     public ActionResult<object> ExportToJson([FromQuery] bool includeComments = true)
     {
         try
         {
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
 
-            var defaultFile = resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
-            if (defaultFile == null)
+            // Distinct cultures across all groups, default first.
+            var allLanguages = directory.Groups
+                .SelectMany(g => g.Files)
+                .GroupBy(f => new { Code = f.Code ?? string.Empty, f.IsDefault })
+                .Select(g => g.First())
+                .OrderByDescending(f => f.IsDefault)
+                .ThenBy(f => f.Code)
+                .ToList();
+
+            var exportData = new List<Dictionary<string, object>>();
+
+            foreach (var group in directory.Groups)
             {
-                return StatusCode(500, new { error = "No default language found" });
-            }
+                var files = group.Files.Select(f => _backend.Reader.Read(f)).ToList();
+                var defaultFile = files.FirstOrDefault(f => f.Language.IsDefault);
+                if (defaultFile == null) continue;
 
-            var allKeys = defaultFile.Entries.Select(e => e.Key).Distinct().OrderBy(k => k).ToList();
+                var keys = defaultFile.Entries.Select(e => e.Key).Distinct().OrderBy(k => k).ToList();
 
-            var exportData = allKeys.Select(key =>
-            {
-                var values = new Dictionary<string, string?>();
-                string? comment = null;
-
-                foreach (var resourceFile in resourceFiles)
+                foreach (var key in keys)
                 {
-                    var entry = resourceFile.Entries.FirstOrDefault(e => e.Key == key);
-                    values[resourceFile.Language.Code ?? "default"] = entry?.Value;
+                    var values = new Dictionary<string, string?>();
+                    string? comment = null;
 
-                    if (includeComments && comment == null && entry?.Comment != null)
+                    foreach (var file in files)
                     {
-                        comment = entry.Comment;
+                        var entry = file.Entries.FirstOrDefault(e => e.Key == key);
+                        values[file.Language.Code ?? "default"] = entry?.Value;
+
+                        if (includeComments && comment == null && entry?.Comment != null)
+                        {
+                            comment = entry.Comment;
+                        }
                     }
+
+                    var row = new Dictionary<string, object>
+                    {
+                        ["key"] = key,
+                        ["resourceGroup"] = group.BaseName,
+                        ["values"] = values
+                    };
+
+                    if (includeComments && comment != null)
+                    {
+                        row["comment"] = comment;
+                    }
+
+                    exportData.Add(row);
                 }
-
-                var result = new Dictionary<string, object>
-                {
-                    ["key"] = key,
-                    ["values"] = values
-                };
-
-                if (includeComments && comment != null)
-                {
-                    result["comment"] = comment;
-                }
-
-                return result;
-            });
+            }
 
             return Ok(new
             {
-                languages = languages.Select(l => new { code = l.Code, name = l.Name, isDefault = l.IsDefault }),
+                languages = allLanguages.Select(l => new { code = l.Code, name = l.Name, isDefault = l.IsDefault }),
                 keys = exportData
             });
         }
@@ -82,7 +95,9 @@ public class ExportController : ControllerBase
     }
 
     /// <summary>
-    /// Export all keys to CSV format (returns CSV text)
+    /// Export all keys to CSV format (returns CSV text). Adds a <c>Group</c>
+    /// column when multiple resource groups exist, so multi-base directories
+    /// can round-trip through CSV import.
     /// </summary>
     [HttpGet("csv")]
     [Produces("text/csv")]
@@ -90,20 +105,24 @@ public class ExportController : ControllerBase
     {
         try
         {
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
+            var multiGroup = directory.Groups.Count > 1;
 
-            var defaultFile = resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
-            if (defaultFile == null)
-            {
-                return StatusCode(500, "No default language found");
-            }
+            // Determine column order: distinct cultures, default first.
+            var allLanguages = directory.Groups
+                .SelectMany(g => g.Files)
+                .GroupBy(f => new { Code = f.Code ?? string.Empty, f.IsDefault })
+                .Select(g => g.First())
+                .OrderByDescending(f => f.IsDefault)
+                .ThenBy(f => f.Code)
+                .ToList();
 
             var csv = new System.Text.StringBuilder();
 
             // Header
             csv.Append("Key");
-            foreach (var lang in languages)
+            if (multiGroup) csv.Append(",Group");
+            foreach (var lang in allLanguages)
             {
                 csv.Append($",{lang.Name}");
             }
@@ -113,25 +132,37 @@ public class ExportController : ControllerBase
             }
             csv.AppendLine();
 
-            // Rows
-            var allKeys = defaultFile.Entries.Select(e => e.Key).Distinct().OrderBy(k => k).ToList();
-            foreach (var key in allKeys)
+            // Rows, ordered by group then key.
+            foreach (var group in directory.Groups.OrderBy(g => g.BaseName, StringComparer.OrdinalIgnoreCase))
             {
-                csv.Append(EscapeCsvValue(key));
+                var files = group.Files.Select(f => _backend.Reader.Read(f)).ToList();
+                var defaultFile = files.FirstOrDefault(f => f.Language.IsDefault);
+                if (defaultFile == null) continue;
 
-                foreach (var resourceFile in resourceFiles)
+                var keys = defaultFile.Entries.Select(e => e.Key).Distinct().OrderBy(k => k).ToList();
+
+                foreach (var key in keys)
                 {
-                    var entry = resourceFile.Entries.FirstOrDefault(e => e.Key == key);
-                    csv.Append($",{EscapeCsvValue(entry?.Value ?? string.Empty)}");
-                }
+                    csv.Append(EscapeCsvValue(key));
+                    if (multiGroup) csv.Append($",{EscapeCsvValue(group.BaseName)}");
 
-                if (includeComments)
-                {
-                    var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == key);
-                    csv.Append($",{EscapeCsvValue(defaultEntry?.Comment ?? string.Empty)}");
-                }
+                    foreach (var lang in allLanguages)
+                    {
+                        var file = files.FirstOrDefault(f =>
+                            (f.Language.Code ?? string.Empty) == (lang.Code ?? string.Empty) &&
+                            f.Language.IsDefault == lang.IsDefault);
+                        var entry = file?.Entries.FirstOrDefault(e => e.Key == key);
+                        csv.Append($",{EscapeCsvValue(entry?.Value ?? string.Empty)}");
+                    }
 
-                csv.AppendLine();
+                    if (includeComments)
+                    {
+                        var defaultEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == key);
+                        csv.Append($",{EscapeCsvValue(defaultEntry?.Comment ?? string.Empty)}");
+                    }
+
+                    csv.AppendLine();
+                }
             }
 
             return Content(csv.ToString(), "text/csv", System.Text.Encoding.UTF8);

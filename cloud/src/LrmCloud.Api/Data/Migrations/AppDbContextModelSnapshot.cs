@@ -162,6 +162,12 @@ namespace LrmCloud.Api.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("BaseName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("base_name");
+
                     b.Property<string>("GitHubComment")
                         .HasColumnType("text")
                         .HasColumnName("github_comment");
@@ -218,7 +224,7 @@ namespace LrmCloud.Api.Data.Migrations
 
                     b.HasIndex("SyncedAt");
 
-                    b.HasIndex("ProjectId", "KeyName", "LanguageCode", "PluralForm")
+                    b.HasIndex("ProjectId", "BaseName", "KeyName", "LanguageCode", "PluralForm")
                         .IsUnique();
 
                     b.ToTable("github_sync_state");
@@ -723,6 +729,12 @@ namespace LrmCloud.Api.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("BaseName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("base_name");
+
                     b.Property<string>("BaseValue")
                         .HasColumnType("text")
                         .HasColumnName("base_value");
@@ -1156,6 +1168,12 @@ namespace LrmCloud.Api.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("BaseName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("base_name");
+
                     b.Property<string>("Comment")
                         .HasColumnType("text")
                         .HasColumnName("comment");
@@ -1208,7 +1226,7 @@ namespace LrmCloud.Api.Data.Migrations
 
                     b.HasIndex("ProjectId");
 
-                    b.HasIndex("ProjectId", "KeyName")
+                    b.HasIndex("ProjectId", "BaseName", "KeyName")
                         .IsUnique();
 
                     b.ToTable("resource_keys");

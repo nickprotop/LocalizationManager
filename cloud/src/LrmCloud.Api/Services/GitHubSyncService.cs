@@ -535,10 +535,12 @@ public class GitHubSyncService : IGitHubSyncService
             .Include(k => k.Translations)
             .ToListAsync();
 
-        // Bulk load existing sync states to avoid N+1 queries
+        // Bulk load existing sync states to avoid N+1 queries. Keyed by
+        // (BaseName, KeyName, LanguageCode, PluralForm) so multi-group projects
+        // disambiguate correctly.
         var existingStates = await _db.GitHubSyncStates
             .Where(s => s.ProjectId == projectId)
-            .ToDictionaryAsync(s => (s.KeyName, s.LanguageCode, s.PluralForm));
+            .ToDictionaryAsync(s => (s.BaseName, s.KeyName, s.LanguageCode, s.PluralForm));
 
         var updateCount = 0;
 
@@ -553,7 +555,7 @@ public class GitHubSyncService : IGitHubSyncService
                     hash = EntryHasher.ComputeHash(translation.Value ?? "", translation.Comment);
                 }
 
-                var stateKey = (key.KeyName, translation.LanguageCode, translation.PluralForm);
+                var stateKey = (key.BaseName, key.KeyName, translation.LanguageCode, translation.PluralForm);
 
                 if (existingStates.TryGetValue(stateKey, out var syncState))
                 {
@@ -571,6 +573,7 @@ public class GitHubSyncService : IGitHubSyncService
                     syncState = new GitHubSyncState
                     {
                         ProjectId = projectId,
+                        BaseName = key.BaseName,
                         KeyName = key.KeyName,
                         LanguageCode = translation.LanguageCode,
                         PluralForm = translation.PluralForm,

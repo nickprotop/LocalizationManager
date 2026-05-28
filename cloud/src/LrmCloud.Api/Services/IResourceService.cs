@@ -19,9 +19,11 @@ public interface IResourceService
     Task<List<ResourceKeyDto>> GetResourceKeysAsync(int projectId, int userId);
 
     /// <summary>
-    /// Gets a specific resource key with all translations.
+    /// Gets a specific resource key with all translations. <paramref name="baseName"/>
+    /// disambiguates lookups in multi-group projects; empty string targets the
+    /// default group (which is the only one in single-group projects).
     /// </summary>
-    Task<ResourceKeyDetailDto?> GetResourceKeyAsync(int projectId, string keyName, int userId);
+    Task<ResourceKeyDetailDto?> GetResourceKeyAsync(int projectId, string keyName, int userId, string baseName = "");
 
     /// <summary>
     /// Gets resource keys with translations, paginated with search and sort support.
@@ -43,16 +45,18 @@ public interface IResourceService
         int projectId, int userId, CreateResourceKeyRequest request);
 
     /// <summary>
-    /// Updates a resource key.
+    /// Updates a resource key. <paramref name="baseName"/> disambiguates the
+    /// target row in multi-group projects.
     /// </summary>
     Task<(bool Success, ResourceKeyDto? Key, string? ErrorMessage)> UpdateResourceKeyAsync(
-        int projectId, string keyName, int userId, UpdateResourceKeyRequest request);
+        int projectId, string keyName, int userId, UpdateResourceKeyRequest request, string baseName = "");
 
     /// <summary>
-    /// Deletes a resource key and all its translations.
+    /// Deletes a resource key and all its translations. <paramref name="baseName"/>
+    /// disambiguates the target row in multi-group projects.
     /// </summary>
     Task<(bool Success, string? ErrorMessage)> DeleteResourceKeyAsync(
-        int projectId, string keyName, int userId);
+        int projectId, string keyName, int userId, string baseName = "");
 
     // ============================================================
     // Translations

@@ -21,6 +21,15 @@ public class PendingConflict
     public Project? Project { get; set; }
 
     /// <summary>
+    /// Base name of the resource group this conflict belongs to.
+    /// Empty string for single-group projects.
+    /// </summary>
+    [Required]
+    [MaxLength(500)]
+    [Column("base_name")]
+    public string BaseName { get; set; } = string.Empty;
+
+    /// <summary>
     /// Resource key name.
     /// </summary>
     [Required]

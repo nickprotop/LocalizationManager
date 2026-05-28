@@ -209,7 +209,8 @@ public class PushCommand : Command<PushCommandSettings>
 
             // Extract local entries
             var extractor = new LocalEntryExtractor(backend);
-            var languages = backend.Discovery.DiscoverLanguages(projectDirectory);
+            var directory = backend.Discovery.DiscoverResourceGroups(projectDirectory);
+            var languages = directory.Groups.SelectMany(g => g.Files).ToList();
 
             List<LocalEntry> localEntries = new();
             AnsiConsole.Status()
@@ -451,37 +452,52 @@ public class PushCommand : Command<PushCommandSettings>
         KeySyncPushResponse response,
         List<LocalEntry> localEntries)
     {
-        var newState = new SyncState
-        {
-            Version = 2,
-            Timestamp = DateTime.UtcNow,
-            Entries = existing?.Entries ?? new Dictionary<string, Dictionary<string, string>>()
-        };
+        var newState = SyncState.CreateNew();
+        newState.Timestamp = DateTime.UtcNow;
 
-        // Update entry hashes from response
-        foreach (var (key, langHashes) in response.NewEntryHashes)
+        // Carry forward existing hashes (preserves entries not touched by this push).
+        if (existing != null)
         {
-            if (!newState.Entries.ContainsKey(key))
+            foreach (var (baseName, key, lang, hash) in existing.EnumerateEntries())
             {
-                newState.Entries[key] = new Dictionary<string, string>();
-            }
-            foreach (var (lang, hash) in langHashes)
-            {
-                newState.Entries[key][lang] = hash;
+                newState.SetEntryHash(baseName, key, lang, hash);
             }
         }
 
-        // For entries that were pushed but not modified on server (hash unchanged),
-        // update with local hashes
+        // Update entry hashes from response. Prefer the multi-group-aware map
+        // when present; fall back to the legacy flat map (which stored
+        // BaseName="") for older servers.
+        if (response.NewEntryHashesByGroup is { Count: > 0 })
+        {
+            foreach (var (baseName, byKey) in response.NewEntryHashesByGroup)
+            {
+                foreach (var (key, byLang) in byKey)
+                {
+                    foreach (var (lang, hash) in byLang)
+                    {
+                        newState.SetEntryHash(baseName, key, lang, hash);
+                    }
+                }
+            }
+        }
+        else
+        {
+            foreach (var (key, byLang) in response.NewEntryHashes)
+            {
+                foreach (var (lang, hash) in byLang)
+                {
+                    newState.SetEntryHash(string.Empty, key, lang, hash);
+                }
+            }
+        }
+
+        // For entries that were pushed but unchanged on server (hash matches),
+        // ensure their hash is recorded.
         foreach (var entry in localEntries)
         {
-            if (!newState.Entries.ContainsKey(entry.Key))
+            if (newState.GetEntryHash(entry.BaseName, entry.Key, entry.Lang) == null)
             {
-                newState.Entries[entry.Key] = new Dictionary<string, string>();
-            }
-            if (!newState.Entries[entry.Key].ContainsKey(entry.Lang))
-            {
-                newState.Entries[entry.Key][entry.Lang] = entry.Hash;
+                newState.SetEntryHash(entry.BaseName, entry.Key, entry.Lang, entry.Hash);
             }
         }
 

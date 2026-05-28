@@ -12,6 +12,13 @@ public class CreateResourceKeyRequest
     [MaxLength(500, ErrorMessage = "Key name must not exceed 500 characters")]
     public required string KeyName { get; set; }
 
+    /// <summary>
+    /// Base name of the resource group this key belongs to.
+    /// Empty string for single-group projects (default).
+    /// </summary>
+    [MaxLength(500, ErrorMessage = "Base name must not exceed 500 characters")]
+    public string BaseName { get; set; } = string.Empty;
+
     [MaxLength(500, ErrorMessage = "Key path must not exceed 500 characters")]
     public string? KeyPath { get; set; }
 

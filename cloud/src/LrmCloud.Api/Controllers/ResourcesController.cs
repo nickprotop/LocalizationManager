@@ -54,10 +54,10 @@ public class ResourcesController : ApiControllerBase
     [ProducesResponseType(typeof(ApiResponse<ResourceKeyDetailDto>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<ActionResult<ApiResponse<ResourceKeyDetailDto>>> GetResourceKey(
-        int projectId, string keyName)
+        int projectId, string keyName, [FromQuery] string baseName = "")
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var key = await _resourceService.GetResourceKeyAsync(projectId, keyName, userId);
+        var key = await _resourceService.GetResourceKeyAsync(projectId, keyName, userId, baseName);
 
         if (key == null)
             return NotFound("RES_KEY_NOT_FOUND", "Resource key not found or access denied");
@@ -181,11 +181,11 @@ public class ResourcesController : ApiControllerBase
     [ProducesResponseType(typeof(ProblemDetails), 400)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
     public async Task<ActionResult<ApiResponse<ResourceKeyDto>>> UpdateResourceKey(
-        int projectId, string keyName, [FromBody] UpdateResourceKeyRequest request)
+        int projectId, string keyName, [FromBody] UpdateResourceKeyRequest request, [FromQuery] string baseName = "")
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var (success, key, errorMessage) = await _resourceService.UpdateResourceKeyAsync(
-            projectId, keyName, userId, request);
+            projectId, keyName, userId, request, baseName);
 
         if (!success)
         {
@@ -211,10 +211,10 @@ public class ResourcesController : ApiControllerBase
     [ProducesResponseType(typeof(ApiResponse), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 400)]
     [ProducesResponseType(typeof(ProblemDetails), 404)]
-    public async Task<ActionResult<ApiResponse>> DeleteResourceKey(int projectId, string keyName)
+    public async Task<ActionResult<ApiResponse>> DeleteResourceKey(int projectId, string keyName, [FromQuery] string baseName = "")
     {
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var (success, errorMessage) = await _resourceService.DeleteResourceKeyAsync(projectId, keyName, userId);
+        var (success, errorMessage) = await _resourceService.DeleteResourceKeyAsync(projectId, keyName, userId, baseName);
 
         if (!success)
         {

@@ -37,15 +37,19 @@ public class FileRegenerator
     {
         var result = new RegenerationResult();
 
-        // Group entries by language
-        var entriesByLang = mergedEntries
-            .GroupBy(e => e.Lang)
+        // Group entries by (BaseName, Lang) so multi-group projects route to
+        // the correct file. BaseName "" means single-group/default group.
+        var entriesByGroupAndLang = mergedEntries
+            .GroupBy(e => (BaseName: e.BaseName ?? string.Empty, e.Lang))
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        // Build lookup for existing languages
-        var existingLangFiles = existingLanguages.ToDictionary(
-            l => l.Code,
-            l => l);
+        // Lookup for existing language files keyed by (BaseName, Code).
+        var existingLangFiles = new Dictionary<(string BaseName, string Code), LanguageInfo>();
+        foreach (var lang in existingLanguages)
+        {
+            var key = (lang.BaseName ?? string.Empty, lang.Code);
+            existingLangFiles[key] = lang;
+        }
 
         // Check if the backend uses explicit language codes for the default language
         // (e.g., XLIFF uses "en" while RESX/Android use "")
@@ -57,7 +61,7 @@ public class FileRegenerator
 
         try
         {
-            foreach (var (lang, entries) in entriesByLang)
+            foreach (var ((baseName, lang), entries) in entriesByGroupAndLang)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -66,7 +70,7 @@ public class FileRegenerator
                 var resolvedLang = lang;
                 LanguageInfo? existingLang = null;
 
-                if (existingLangFiles.TryGetValue(lang, out existingLang))
+                if (existingLangFiles.TryGetValue((baseName, lang), out existingLang))
                 {
                     // Direct match found
                 }
@@ -91,6 +95,7 @@ public class FileRegenerator
                 {
                     // Create new language file
                     await CreateNewLanguageFileAsync(
+                        baseName,
                         resolvedLang,
                         entries,
                         tempDir,
@@ -218,23 +223,26 @@ public class FileRegenerator
     }
 
     /// <summary>
-    /// Creates a new language file from merged entries.
+    /// Creates a new language file from merged entries, scoped to a specific
+    /// resource group.
     /// </summary>
     private async Task CreateNewLanguageFileAsync(
+        string baseName,
         string lang,
         List<MergedEntry> entries,
         string tempDir,
         RegenerationResult result,
         CancellationToken cancellationToken)
     {
-        // Determine file path for new language
-        var filePath = GetNewLanguageFilePath(lang);
+        // Determine file path for new language, honoring the resource group's base name.
+        var filePath = GetNewLanguageFilePath(baseName, lang);
 
         // Create language info for new file
         var languageInfo = new LanguageInfo
         {
             Code = lang,
             Name = lang,
+            BaseName = baseName,
             FilePath = filePath,
             IsDefault = false
         };
@@ -345,22 +353,32 @@ public class FileRegenerator
     }
 
     /// <summary>
-    /// Gets the file path for a new language file based on backend conventions.
+    /// Gets the file path for a new language file based on backend conventions
+    /// and the resource group's base name. Empty <paramref name="baseName"/>
+    /// falls back to the historical default naming.
     /// </summary>
-    private string GetNewLanguageFilePath(string lang)
+    private string GetNewLanguageFilePath(string baseName, string lang)
     {
         // Get path convention from backend
         var backendName = _backend.Name.ToLowerInvariant();
         var isDefaultLang = string.IsNullOrEmpty(lang);
 
+        // For backends where the file name embeds the base name (resx, json,
+        // xliff), use the base name as the file root; otherwise fall back to
+        // the conventional defaults.
+        var resxRoot = string.IsNullOrEmpty(baseName) ? "Resources" : baseName;
+        var jsonRoot = string.IsNullOrEmpty(baseName) ? "strings" : baseName;
+        var xlfRoot = string.IsNullOrEmpty(baseName) ? "messages" : baseName;
+        var poRoot = string.IsNullOrEmpty(baseName) ? "messages" : baseName;
+
         return backendName switch
         {
             "resx" => isDefaultLang
-                ? Path.Combine(_projectDirectory, "Resources.resx")
-                : Path.Combine(_projectDirectory, $"Resources.{lang}.resx"),
+                ? Path.Combine(_projectDirectory, $"{resxRoot}.resx")
+                : Path.Combine(_projectDirectory, $"{resxRoot}.{lang}.resx"),
             "json" or "jsonlocalization" => isDefaultLang
-                ? Path.Combine(_projectDirectory, "strings.json")
-                : Path.Combine(_projectDirectory, $"strings.{lang}.json"),
+                ? Path.Combine(_projectDirectory, $"{jsonRoot}.json")
+                : Path.Combine(_projectDirectory, $"{jsonRoot}.{lang}.json"),
             "android" => isDefaultLang
                 ? Path.Combine(_projectDirectory, "values", "strings.xml")
                 : Path.Combine(_projectDirectory, $"values-{lang}", "strings.xml"),
@@ -371,10 +389,10 @@ public class FileRegenerator
                 ? Path.Combine(_projectDirectory, "en.json")
                 : Path.Combine(_projectDirectory, $"{lang}.json"),
             "xliff" => isDefaultLang
-                ? Path.Combine(_projectDirectory, "messages.xlf")
-                : Path.Combine(_projectDirectory, $"messages.{lang}.xlf"),
+                ? Path.Combine(_projectDirectory, $"{xlfRoot}.xlf")
+                : Path.Combine(_projectDirectory, $"{xlfRoot}.{lang}.xlf"),
             "po" or "gettext" => isDefaultLang
-                ? Path.Combine(_projectDirectory, "messages.pot")
+                ? Path.Combine(_projectDirectory, $"{poRoot}.pot")
                 : Path.Combine(_projectDirectory, $"{lang}.po"),
             _ => isDefaultLang
                 ? Path.Combine(_projectDirectory, $"strings.{backendName}")

@@ -163,7 +163,8 @@ public record GitHubPullConflict(
     string? CloudValue,
     string? BaseValue,
     DateTime? CloudModifiedAt,
-    string? CloudModifiedBy
+    string? CloudModifiedBy,
+    string BaseName = ""
 );
 
 /// <summary>
@@ -179,7 +180,8 @@ public record GitHubPullConflictResolution(
     string LanguageCode,
     string PluralForm,
     string Resolution,
-    string? EditedValue
+    string? EditedValue,
+    string BaseName = ""
 );
 
 /// <summary>

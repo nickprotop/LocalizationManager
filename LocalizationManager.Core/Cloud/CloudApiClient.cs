@@ -247,6 +247,19 @@ public class CloudApiClient : IDisposable
     }
 
     /// <summary>
+    /// Bulk-rekeys resource keys in the project from one BaseName to another.
+    /// Used when a single-group project grows a second resource group.
+    /// </summary>
+    public async Task<Models.MigrateGroupsResponse> MigrateGroupsAsync(
+        Models.MigrateGroupsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var url = await GetSyncApiUrlAsync("migrate-groups", cancellationToken);
+        var response = await PostAsync<Models.MigrateGroupsResponse>(url, request, cancellationToken);
+        return response ?? throw new CloudApiException("Failed to migrate groups");
+    }
+
+    /// <summary>
     /// Pulls all entries from the cloud for key-level merge.
     /// </summary>
     /// <param name="since">Optional timestamp for delta sync (only entries modified after this time).</param>

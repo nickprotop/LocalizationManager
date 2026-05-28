@@ -241,9 +241,12 @@ public class SyncHistoryService : ISyncHistoryService
             // Apply inverse operations
             foreach (var change in changesData.Changes)
             {
+                var changeBaseName = change.BaseName ?? string.Empty;
                 var resourceKey = await _db.ResourceKeys
                     .Include(k => k.Translations)
-                    .FirstOrDefaultAsync(k => k.ProjectId == projectId && k.KeyName == change.Key, ct);
+                    .FirstOrDefaultAsync(k => k.ProjectId == projectId
+                                           && k.BaseName == changeBaseName
+                                           && k.KeyName == change.Key, ct);
 
                 switch (change.ChangeType)
                 {
@@ -277,6 +280,7 @@ public class SyncHistoryService : ISyncHistoryService
                                 revertChanges.Add(new SyncChangeEntry
                                 {
                                     Key = change.Key,
+                                    BaseName = changeBaseName,
                                     Lang = change.Lang,
                                     PluralForm = pluralForm,
                                     ChangeType = "deleted",
@@ -301,6 +305,7 @@ public class SyncHistoryService : ISyncHistoryService
                                 revertChanges.Add(new SyncChangeEntry
                                 {
                                     Key = change.Key,
+                                    BaseName = changeBaseName,
                                     Lang = change.Lang,
                                     PluralForm = pluralForm,
                                     ChangeType = "modified",
@@ -346,6 +351,7 @@ public class SyncHistoryService : ISyncHistoryService
                                 resourceKey = new ResourceKey
                                 {
                                     ProjectId = projectId,
+                                    BaseName = changeBaseName,
                                     KeyName = change.Key,
                                     Version = 1,
                                     CreatedAt = DateTime.UtcNow,

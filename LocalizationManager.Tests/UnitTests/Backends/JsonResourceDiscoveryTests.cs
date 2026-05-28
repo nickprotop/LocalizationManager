@@ -1,6 +1,7 @@
 // Copyright (c) 2025 Nikolaos Protopapas
 // Licensed under the MIT License
 
+using LocalizationManager.Core.Abstractions;
 using LocalizationManager.Core.Backends.Json;
 using LocalizationManager.Core.Configuration;
 using Xunit;
@@ -402,6 +403,52 @@ public class JsonResourceDiscoveryTests : IDisposable
 
         // Assert
         Assert.NotEmpty(languages);
+    }
+
+    #endregion
+
+    #region Multi-Base Resource Group Discovery Tests (Issue #6)
+
+    [Fact]
+    public void DiscoverResourceGroups_MultiBaseDirectory_ReturnsOneGroupPerBaseName()
+    {
+        IResourceDiscovery discovery = new JsonResourceDiscovery();
+        var path = Path.Combine(AppContext.BaseDirectory, "TestData", "MultiGroupJson");
+
+        var directory = discovery.DiscoverResourceGroups(path);
+
+        Assert.Equal(2, directory.Groups.Count);
+        Assert.Contains(directory.Groups, g => string.Equals(g.BaseName, "customers", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(directory.Groups, g => string.Equals(g.BaseName, "glass", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DiscoverResourceGroups_MultiBaseDirectory_ReturnsOneCultureCodePerLanguage()
+    {
+        IResourceDiscovery discovery = new JsonResourceDiscovery();
+        var path = Path.Combine(AppContext.BaseDirectory, "TestData", "MultiGroupJson");
+
+        var directory = discovery.DiscoverResourceGroups(path);
+
+        Assert.Equal(2, directory.CultureCodes.Count);
+        Assert.Contains("", directory.CultureCodes);
+        Assert.Contains("it", directory.CultureCodes);
+    }
+
+    [Fact]
+    public void DiscoverResourceGroups_MultiBaseDirectory_EachGroupHasAllCultures()
+    {
+        IResourceDiscovery discovery = new JsonResourceDiscovery();
+        var path = Path.Combine(AppContext.BaseDirectory, "TestData", "MultiGroupJson");
+
+        var directory = discovery.DiscoverResourceGroups(path);
+
+        foreach (var group in directory.Groups)
+        {
+            Assert.Equal(2, group.Files.Count);
+            Assert.Contains(group.Files, f => f.IsDefault);
+            Assert.Contains(group.Files, f => f.Code == "it");
+        }
     }
 
     #endregion

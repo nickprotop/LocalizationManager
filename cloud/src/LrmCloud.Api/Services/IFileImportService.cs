@@ -6,6 +6,14 @@ namespace LrmCloud.Api.Services;
 public class GitHubEntry
 {
     public required string Key { get; init; }
+
+    /// <summary>
+    /// Base name of the resource group this entry belongs to, derived from the
+    /// file path (e.g. <c>Resources/CustomerResources.fr.resx</c> →
+    /// <c>"CustomerResources"</c>). Empty string for single-group repos.
+    /// </summary>
+    public string BaseName { get; init; } = string.Empty;
+
     public required string LanguageCode { get; init; }
     public string PluralForm { get; init; } = "";
     public string? Value { get; init; }
@@ -26,6 +34,14 @@ public class ParsedResourceFile
 {
     public required string FilePath { get; init; }
     public required string LanguageCode { get; init; }
+
+    /// <summary>
+    /// Base name of the resource group this file belongs to, derived from the
+    /// file path. Empty string for backends that don't carry a base name in
+    /// their file naming convention (Android, iOS).
+    /// </summary>
+    public string BaseName { get; init; } = string.Empty;
+
     public bool IsDefault { get; init; }
     public required List<GitHubEntry> Entries { get; init; }
 }
@@ -35,7 +51,11 @@ public class ParsedResourceFile
 /// </summary>
 public class ParseFilesResult
 {
-    public Dictionary<(string Key, string LanguageCode, string PluralForm), GitHubEntry> Entries { get; init; } = new();
+    /// <summary>
+    /// Entries keyed by (BaseName, Key, LanguageCode, PluralForm) so
+    /// multi-group repos with the same key name across groups don't collide.
+    /// </summary>
+    public Dictionary<(string BaseName, string Key, string LanguageCode, string PluralForm), GitHubEntry> Entries { get; init; } = new();
     public List<FileParseErrorInfo> ParseErrors { get; init; } = new();
 }
 

@@ -47,54 +47,58 @@ public class ResourcesController : ControllerBase
     }
 
     /// <summary>
-    /// Get all keys from all resource files (includes duplicate information)
+    /// Get all keys from all resource files. Returns one row per (Key, ResourceGroup)
+    /// tuple so that multiple resource files in the same directory (e.g.
+    /// CustomerResources.resx + GlassResources.resx) are not collapsed against each
+    /// other.
     /// </summary>
     [HttpGet("keys")]
     public ActionResult<IEnumerable<ResourceKeyInfo>> GetAllKeys()
     {
         try
         {
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
+            var rows = new List<ResourceKeyInfo>();
 
-            var allKeys = resourceFiles
-                .SelectMany(f => f.Entries.Select(e => e.Key))
-                .Distinct()
-                .OrderBy(k => k)
-                .ToList();
+            foreach (var group in directory.Groups)
+            {
+                var resources = group.Files.ToDictionary(f => f, f => _backend.Reader.Read(f));
+                var defaultFile = group.Files.FirstOrDefault(f => f.IsDefault);
+                var defaultResource = defaultFile != null ? resources[defaultFile] : null;
 
-            // Get default file to check for duplicates
-            var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
+                var keys = resources.Values
+                    .SelectMany(r => r.Entries.Select(e => e.Key))
+                    .Distinct()
+                    .OrderBy(k => k)
+                    .ToList();
 
-            var keysWithValues = allKeys.Select(key => {
-                var values = new Dictionary<string, string?>();
-                var isPlural = false;
-                foreach (var file in resourceFiles)
+                foreach (var key in keys)
                 {
-                    var entry = file.Entries.FirstOrDefault(e => e.Key == key);
-                    values[file.Language.Code ?? "default"] = entry?.Value;
-                    // Check if any entry for this key is plural
-                    if (entry?.IsPlural == true)
+                    var values = new Dictionary<string, string?>();
+                    var isPlural = false;
+
+                    foreach (var (file, resource) in resources)
                     {
-                        isPlural = true;
+                        var entry = resource.Entries.FirstOrDefault(e => e.Key == key);
+                        values[string.IsNullOrEmpty(file.Code) ? "default" : file.Code] = entry?.Value;
+                        if (entry?.IsPlural == true) isPlural = true;
                     }
+
+                    var occurrenceCount = defaultResource?.Entries.Count(e => e.Key == key) ?? 1;
+
+                    rows.Add(new ResourceKeyInfo
+                    {
+                        Key = key,
+                        ResourceGroup = group.BaseName,
+                        Values = values,
+                        OccurrenceCount = occurrenceCount,
+                        HasDuplicates = occurrenceCount > 1,
+                        IsPlural = isPlural
+                    });
                 }
+            }
 
-                // Check for duplicates in default file
-                var occurrenceCount = defaultFile?.Entries.Count(e => e.Key == key) ?? 1;
-                var hasDuplicates = occurrenceCount > 1;
-
-                return new ResourceKeyInfo
-                {
-                    Key = key,
-                    Values = values,
-                    OccurrenceCount = occurrenceCount,
-                    HasDuplicates = hasDuplicates,
-                    IsPlural = isPlural
-                };
-            });
-
-            return Ok(keysWithValues);
+            return Ok(rows);
         }
         catch (Exception)
         {
@@ -103,17 +107,43 @@ public class ResourcesController : ControllerBase
     }
 
     /// <summary>
-    /// Get details of a specific key (supports duplicates)
+    /// Get details of a specific key (supports duplicates). When the directory
+    /// contains multiple resource groups, the caller must specify <c>resourceGroup</c>
+    /// to disambiguate; otherwise the controller searches every group and uses
+    /// the first match (preserving single-group backwards compatibility).
     /// </summary>
     [HttpGet("keys/{keyName}")]
-    public ActionResult<ResourceKeyDetails> GetKey(string keyName)
+    public ActionResult<ResourceKeyDetails> GetKey(string keyName, [FromQuery] string? resourceGroup = null)
     {
         try
         {
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
+            ResourceGroup? group;
+            if (!string.IsNullOrEmpty(resourceGroup))
+            {
+                group = directory.Groups.FirstOrDefault(g => g.BaseName.Equals(resourceGroup, StringComparison.OrdinalIgnoreCase));
+                if (group is null)
+                {
+                    return NotFound(new ErrorResponse { Error = $"Resource group '{resourceGroup}' not found" });
+                }
+            }
+            else
+            {
+                // No group specified: search every group; pick the first one that has this key.
+                group = directory.Groups.FirstOrDefault(g =>
+                    g.Files.Any(f =>
+                    {
+                        var rf = _backend.Reader.Read(f);
+                        return rf.Entries.Any(e => e.Key == keyName);
+                    }));
+                if (group is null)
+                {
+                    return NotFound(new ErrorResponse { Error = $"Key '{keyName}' not found" });
+                }
+            }
 
-            // Check for key existence and duplicates
+            var resourceFiles = group.Files.Select(f => _backend.Reader.Read(f)).ToList();
+
             var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
             if (defaultFile == null)
             {
@@ -150,6 +180,7 @@ public class ResourcesController : ControllerBase
                 return Ok(new ResourceKeyDetails
                 {
                     Key = keyName,
+                    ResourceGroup = group.BaseName,
                     Values = values,
                     OccurrenceCount = 1,
                     HasDuplicates = false
@@ -203,6 +234,7 @@ public class ResourcesController : ControllerBase
             return Ok(new ResourceKeyDetails
             {
                 Key = keyName,
+                ResourceGroup = group.BaseName,
                 Values = firstValues,
                 OccurrenceCount = occurrences.Count,
                 HasDuplicates = true,
@@ -216,15 +248,21 @@ public class ResourcesController : ControllerBase
     }
 
     /// <summary>
-    /// Add a new key to all resource files
+    /// Add a new key to a specific resource group. When the directory has exactly
+    /// one group, <c>ResourceGroup</c> may be omitted; when there are multiple
+    /// groups, it is required.
     /// </summary>
     [HttpPost("keys")]
     public ActionResult<OperationResponse> AddKey([FromBody] AddKeyRequest request)
     {
         try
         {
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
+            var groupResult = ResolveGroup(directory, request.ResourceGroup);
+            if (groupResult.ErrorResult != null) return groupResult.ErrorResult;
+            var group = groupResult.Group!;
+
+            var resourceFiles = group.Files.Select(f => _backend.Reader.Read(f)).ToList();
 
             // Check if key already exists
             var defaultFile = resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
@@ -233,7 +271,7 @@ public class ResourcesController : ControllerBase
                 return Conflict(new ErrorResponse { Error = $"Key '{request.Key}' already exists" });
             }
 
-            // Add the key to all resource files
+            // Add the key to all resource files in this group
             foreach (var resourceFile in resourceFiles)
             {
                 var langCode = resourceFile.Language.Code ?? "default";
@@ -272,7 +310,7 @@ public class ResourcesController : ControllerBase
             return Ok(new OperationResponse
             {
                 Success = true,
-                Message = "Key added successfully to all resource files"
+                Message = $"Key added successfully to all resource files in group '{group.BaseName}'"
             });
         }
         catch (Exception)
@@ -282,19 +320,26 @@ public class ResourcesController : ControllerBase
     }
 
     /// <summary>
-    /// Update an existing key in all resource files (supports occurrence parameter for duplicates)
+    /// Update an existing key within a specific resource group (supports occurrence
+    /// parameter for duplicates). When the directory has exactly one group,
+    /// <c>ResourceGroup</c> may be omitted; when there are multiple groups, it
+    /// is required.
     /// </summary>
     [HttpPut("keys/{keyName}")]
     public ActionResult<OperationResponse> UpdateKey(string keyName, [FromBody] UpdateKeyRequest request)
     {
         try
         {
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
+            var groupResult = ResolveGroup(directory, request.ResourceGroup);
+            if (groupResult.ErrorResult != null) return groupResult.ErrorResult;
+            var group = groupResult.Group!;
+
+            var resourceFiles = group.Files.Select(f => _backend.Reader.Read(f)).ToList();
 
             var keyFound = false;
 
-            // Update the key in all resource files
+            // Update the key in all resource files in this group
             foreach (var resourceFile in resourceFiles)
             {
                 var langCode = string.IsNullOrEmpty(resourceFile.Language.Code) ? "default" : resourceFile.Language.Code;
@@ -369,19 +414,25 @@ public class ResourcesController : ControllerBase
     }
 
     /// <summary>
-    /// Delete a key from all resource files
+    /// Delete a key from a specific resource group's files. When the directory
+    /// has exactly one group, <c>resourceGroup</c> may be omitted; when there
+    /// are multiple groups, it is required.
     /// </summary>
     [HttpDelete("keys/{keyName}")]
-    public ActionResult<DeleteKeyResponse> DeleteKey(string keyName, [FromQuery] int? occurrence)
+    public ActionResult<DeleteKeyResponse> DeleteKey(string keyName, [FromQuery] int? occurrence, [FromQuery] string? resourceGroup = null)
     {
         try
         {
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
+            var groupResult = ResolveGroup(directory, resourceGroup);
+            if (groupResult.ErrorResult != null) return groupResult.ErrorResult;
+            var group = groupResult.Group!;
+
+            var resourceFiles = group.Files.Select(f => _backend.Reader.Read(f)).ToList();
 
             var deletedCount = 0;
 
-            // Delete the key from all resource files
+            // Delete the key from all resource files in this group
             foreach (var resourceFile in resourceFiles)
             {
                 if (occurrence.HasValue)
@@ -421,6 +472,37 @@ public class ResourcesController : ControllerBase
         {
             return StatusCode(500, new ErrorResponse { Error = "An error occurred while processing your request" });
         }
+    }
+
+    /// <summary>
+    /// Resolves a request's optional <c>ResourceGroup</c> to a concrete group.
+    /// Returns the only group if the directory contains exactly one (preserving
+    /// single-group behavior); otherwise requires the caller to specify and
+    /// returns BadRequest/NotFound if not provided/found.
+    /// </summary>
+    private (ResourceGroup? Group, ActionResult? ErrorResult) ResolveGroup(ResourceDirectory directory, string? requestedGroup)
+    {
+        if (directory.Groups.Count == 0)
+        {
+            return (null, NotFound(new ErrorResponse { Error = "No resource groups found in resource path" }));
+        }
+
+        if (!string.IsNullOrEmpty(requestedGroup))
+        {
+            var match = directory.Groups.FirstOrDefault(g => g.BaseName.Equals(requestedGroup, StringComparison.OrdinalIgnoreCase));
+            if (match is null)
+            {
+                return (null, NotFound(new ErrorResponse { Error = $"Resource group '{requestedGroup}' not found" }));
+            }
+            return (match, null);
+        }
+
+        if (directory.Groups.Count == 1)
+        {
+            return (directory.Groups[0], null);
+        }
+
+        return (null, BadRequest(new ErrorResponse { Error = "ResourceGroup is required when multiple resource groups exist in the directory" }));
     }
 
     /// <summary>

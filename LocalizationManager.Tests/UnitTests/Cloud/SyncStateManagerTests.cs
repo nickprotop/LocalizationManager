@@ -45,11 +45,12 @@ public class SyncStateManagerTests : IDisposable
         Directory.CreateDirectory(lrmDir);
         var statePath = Path.Combine(lrmDir, "sync-state.json");
 
+        // Simulate a v2 file on disk by populating LegacyEntries (serializes as "Entries").
         var state = new SyncState
         {
             Version = 2,
             Timestamp = new DateTime(2023, 12, 1, 12, 0, 0, DateTimeKind.Utc),
-            Entries = new Dictionary<string, Dictionary<string, string>>
+            LegacyEntries = new Dictionary<string, Dictionary<string, string>>
             {
                 { "WelcomeMessage", new Dictionary<string, string> { { "en", "hash1" }, { "fr", "hash2" } } }
             },
@@ -66,8 +67,9 @@ public class SyncStateManagerTests : IDisposable
         // Assert
         Assert.NotNull(result.State);
         Assert.False(result.WasCorrupted);
+        // v2 state on disk is auto-migrated to v3 on load.
         Assert.False(result.NeedsMigration);
-        Assert.Equal(2, result.State!.Version);
+        Assert.Equal(3, result.State!.Version);
         Assert.Single(result.State.Entries);
         Assert.Equal("hash1", result.State.GetEntryHash("WelcomeMessage", "en"));
     }
@@ -155,7 +157,7 @@ public class SyncStateManagerTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveAsync_WritesV2Format()
+    public async Task SaveAsync_WritesV3Format()
     {
         // Arrange
         var state = SyncState.CreateNew();
@@ -170,7 +172,7 @@ public class SyncStateManagerTests : IDisposable
         Assert.True(File.Exists(statePath));
 
         var content = await File.ReadAllTextAsync(statePath);
-        Assert.Contains("\"Version\": 2", content);
+        Assert.Contains("\"Version\": 3", content);
         Assert.Contains("TestKey", content);
         Assert.Contains("hash123", content);
         Assert.Contains("defaultLanguage", content);
@@ -193,7 +195,7 @@ public class SyncStateManagerTests : IDisposable
 
         // Assert
         var content = await File.ReadAllTextAsync(statePath);
-        Assert.Contains("\"Version\": 2", content);
+        Assert.Contains("\"Version\": 3", content);
         Assert.Contains("new", content);
     }
 
@@ -406,7 +408,7 @@ public class SyncStateManagerTests : IDisposable
 
         // Assert
         Assert.NotNull(state);
-        Assert.Equal(2, state.Version);
+        Assert.Equal(3, state.Version);
         Assert.Empty(state.Entries);
     }
 
@@ -439,7 +441,7 @@ public class SyncStateManagerTests : IDisposable
         var state = await SyncStateManager.GetOrCreateAsync(_testDirectory);
 
         // Assert
-        Assert.Equal(2, state.Version);
+        Assert.Equal(3, state.Version);
         Assert.Empty(state.Entries); // New state, not migrated
     }
 

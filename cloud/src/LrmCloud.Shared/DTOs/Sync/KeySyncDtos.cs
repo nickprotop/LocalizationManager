@@ -42,6 +42,13 @@ public class EntryChangeDto
     public required string Key { get; set; }
 
     /// <summary>
+    /// Base name of the resource group this entry belongs to (e.g.
+    /// "CustomerResources"). Empty string means "no group" / "default group"
+    /// for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
+
+    /// <summary>
     /// Language code (e.g., "en", "fr", "es").
     /// </summary>
     public required string Lang { get; set; }
@@ -96,6 +103,12 @@ public class EntryDeletionDto
     /// The resource key name.
     /// </summary>
     public required string Key { get; set; }
+
+    /// <summary>
+    /// Base name of the resource group this entry belongs to.
+    /// Empty string for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
 
     /// <summary>
     /// Language code. If null, deletes the key and all its translations.
@@ -203,10 +216,19 @@ public class KeySyncPushResponse
     public List<EntryConflictDto> Conflicts { get; set; } = new();
 
     /// <summary>
-    /// New hashes for successfully applied entries.
+    /// New hashes for successfully applied entries (legacy single-group shape).
     /// Key: entry key name, Value: { languageCode: hash }
+    /// In multi-group projects this is best-effort (may collide on shared key names);
+    /// new clients should use <see cref="NewEntryHashesByGroup"/>.
     /// </summary>
     public Dictionary<string, Dictionary<string, string>> NewEntryHashes { get; set; } = new();
+
+    /// <summary>
+    /// New hashes for successfully applied entries, scoped by resource group.
+    /// Outer key: BaseName (resource group, "" for single-group default).
+    /// Middle key: entry key name. Inner key: languageCode. Value: hash.
+    /// </summary>
+    public Dictionary<string, Dictionary<string, Dictionary<string, string>>> NewEntryHashesByGroup { get; set; } = new();
 
     /// <summary>
     /// New hashes for successfully applied config properties.
@@ -280,6 +302,12 @@ public class EntryDataDto
     /// The resource key name.
     /// </summary>
     public required string Key { get; set; }
+
+    /// <summary>
+    /// Base name of the resource group this entry belongs to.
+    /// Empty string for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
 
     /// <summary>
     /// Comment for the key.
@@ -386,6 +414,12 @@ public class EntryConflictDto
     public required string Key { get; set; }
 
     /// <summary>
+    /// Base name of the resource group this entry belongs to.
+    /// Empty string for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
+
+    /// <summary>
     /// Language code.
     /// </summary>
     public required string Lang { get; set; }
@@ -445,6 +479,12 @@ public class ConflictResolutionDto
     /// The resource key name.
     /// </summary>
     public required string Key { get; set; }
+
+    /// <summary>
+    /// Base name of the resource group this entry belongs to.
+    /// Empty string for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
 
     /// <summary>
     /// Language code. Null for config conflicts.
@@ -604,6 +644,12 @@ public class SyncChangeDto
     /// The resource key name.
     /// </summary>
     public required string Key { get; set; }
+
+    /// <summary>
+    /// Base name of the resource group this entry belongs to.
+    /// Empty string for single-group projects.
+    /// </summary>
+    public string BaseName { get; set; } = string.Empty;
 
     /// <summary>
     /// Language code.

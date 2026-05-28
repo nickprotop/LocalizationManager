@@ -15,6 +15,22 @@
                 </Helper>
             </RadzenFormField>
 
+            @if (AvailableBaseNames?.Count > 1)
+            {
+                <RadzenFormField Text="Resource Group" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenDropDown TValue="string" @bind-Value="_model.BaseName"
+                                        Data="@AvailableBaseNames" Disabled="@_isSubmitting"
+                                        AllowClear="false" Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            Which resource group should the new key be created in?
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            }
+
             <RadzenFormField Text="Comment (optional)" Variant="Radzen.Variant.Outlined" Style="width: 100%;">
                 <ChildContent>
                     <RadzenTextArea @bind-Value="_model.Comment" Placeholder="Description to help translators"
@@ -68,6 +84,14 @@
     [Parameter]
     public int ProjectId { get; set; }
 
+    /// <summary>
+    /// Optional list of base names (resource groups) in the current project.
+    /// When this contains more than one entry, the dialog shows a dropdown so
+    /// the user can pick which group the new key lands in.
+    /// </summary>
+    [Parameter]
+    public List<string>? AvailableBaseNames { get; set; }
+
     [Parameter]
     public EventCallback<ResourceKeyDto> OnKeyAdded { get; set; }
 
@@ -75,6 +99,16 @@
     private string? _errorMessage;
     private string _defaultValue = string.Empty;
     private CreateResourceKeyRequest _model = new() { KeyName = "" };
+
+    protected override void OnParametersSet()
+    {
+        // Default to the first available base name when caller provides them
+        // so the request payload always has a deterministic group target.
+        if (AvailableBaseNames?.Count > 0 && string.IsNullOrEmpty(_model.BaseName))
+        {
+            _model.BaseName = AvailableBaseNames[0];
+        }
+    }
 
     private void Close()
     {

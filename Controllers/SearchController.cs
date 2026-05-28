@@ -26,45 +26,55 @@ public class SearchController : ControllerBase
     }
 
     /// <summary>
-    /// Search and filter resource keys
+    /// Search and filter resource keys. Builds one row per (Key, ResourceGroup)
+    /// so the result mirrors the editor's row model.
     /// </summary>
     [HttpPost]
     public ActionResult<SearchResponse> Search([FromBody] SearchRequest request)
     {
         try
         {
-            // Load all keys
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
 
-            var allKeys = resourceFiles
-                .SelectMany(f => f.Entries.Select(e => e.Key))
-                .Distinct()
-                .OrderBy(k => k)
-                .ToList();
+            var keysWithValues = new List<ResourceKeyInfo>();
+            // Keep parallel structures used by status filter evaluation.
+            var allResourceFiles = new List<ResourceFile>();
+            ResourceFile? firstDefaultFile = null;
 
-            var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
-
-            var keysWithValues = allKeys.Select(key =>
+            foreach (var group in directory.Groups)
             {
-                var values = new Dictionary<string, string?>();
-                foreach (var file in resourceFiles)
+                var resources = group.Files.ToDictionary(f => f, f => _backend.Reader.Read(f));
+                allResourceFiles.AddRange(resources.Values);
+                var defaultFile = resources.Values.FirstOrDefault(r => r.Language.IsDefault);
+                firstDefaultFile ??= defaultFile;
+
+                var keys = resources.Values
+                    .SelectMany(r => r.Entries.Select(e => e.Key))
+                    .Distinct()
+                    .OrderBy(k => k)
+                    .ToList();
+
+                foreach (var key in keys)
                 {
-                    var entry = file.Entries.FirstOrDefault(e => e.Key == key);
-                    values[file.Language.Code ?? "default"] = entry?.Value;
+                    var values = new Dictionary<string, string?>();
+                    foreach (var (file, resource) in resources)
+                    {
+                        var entry = resource.Entries.FirstOrDefault(e => e.Key == key);
+                        values[string.IsNullOrEmpty(file.Code) ? "default" : file.Code] = entry?.Value;
+                    }
+
+                    var occurrenceCount = defaultFile?.Entries.Count(e => e.Key == key) ?? 1;
+
+                    keysWithValues.Add(new ResourceKeyInfo
+                    {
+                        Key = key,
+                        ResourceGroup = group.BaseName,
+                        Values = values,
+                        OccurrenceCount = occurrenceCount,
+                        HasDuplicates = occurrenceCount > 1
+                    });
                 }
-
-                var occurrenceCount = defaultFile?.Entries.Count(e => e.Key == key) ?? 1;
-                var hasDuplicates = occurrenceCount > 1;
-
-                return new ResourceKeyInfo
-                {
-                    Key = key,
-                    Values = values,
-                    OccurrenceCount = occurrenceCount,
-                    HasDuplicates = hasDuplicates
-                };
-            }).ToList();
+            }
 
             var totalCount = keysWithValues.Count;
 
@@ -83,7 +93,7 @@ public class SearchController : ControllerBase
             // Apply status filters if specified
             if (request.StatusFilters?.Any() == true)
             {
-                filtered = ApplyStatusFilters(filtered, request.StatusFilters, resourceFiles, defaultFile);
+                filtered = ApplyStatusFilters(filtered, request.StatusFilters, allResourceFiles, firstDefaultFile);
             }
 
             var filteredCount = filtered.Count;

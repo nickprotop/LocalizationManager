@@ -29,7 +29,11 @@ namespace LocalizationManager.Core.Abstractions;
 public interface IResourceDiscovery
 {
     /// <summary>
-    /// Discover all language files in the specified path.
+    /// Discover all language files in the specified path. This is a flat per-file
+    /// enumeration: in directories with multiple base names (e.g. CustomerResources.resx
+    /// and GlassResources.resx) you will get multiple entries with the same culture code.
+    /// Callers that want a count of distinct languages/cultures must use
+    /// <see cref="DiscoverResourceGroups"/> instead.
     /// </summary>
     /// <param name="searchPath">Path to search for resource files.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -44,4 +48,33 @@ public interface IResourceDiscovery
     /// <param name="searchPath">Path to search for resource files.</param>
     /// <returns>List of discovered language files.</returns>
     List<LanguageInfo> DiscoverLanguages(string searchPath);
+
+    /// <summary>
+    /// Discover all resource groups in the specified path. A resource group is a
+    /// set of files sharing the same base name (e.g. SharedResource.resx,
+    /// SharedResource.el.resx). Directories may contain multiple unrelated
+    /// groups (e.g. CustomerResources, GlassResources) that share the same set
+    /// of cultures.
+    /// </summary>
+    ResourceDirectory DiscoverResourceGroups(string searchPath)
+    {
+        var files = DiscoverLanguages(searchPath);
+        var groups = files
+            .GroupBy(f => f.BaseName, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new ResourceGroup
+            {
+                BaseName = g.Key,
+                Files = g.ToList()
+            })
+            .ToList();
+        var codes = files
+            .Select(f => f.Code ?? string.Empty)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return new ResourceDirectory { Groups = groups, CultureCodes = codes };
+    }
+
+    /// <summary>Async version of <see cref="DiscoverResourceGroups"/>.</summary>
+    Task<ResourceDirectory> DiscoverResourceGroupsAsync(string searchPath, CancellationToken ct = default)
+        => Task.Run(() => DiscoverResourceGroups(searchPath), ct);
 }

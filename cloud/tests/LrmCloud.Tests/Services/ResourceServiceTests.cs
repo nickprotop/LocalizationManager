@@ -181,7 +181,7 @@ public class ResourceServiceTests : IDisposable
         // Assert
         Assert.False(success);
         Assert.Null(key);
-        Assert.Equal("Resource key 'duplicate.key' already exists", errorMessage);
+        Assert.Equal("Resource key 'duplicate.key' already exists in resource group ''", errorMessage);
     }
 
     [Fact]

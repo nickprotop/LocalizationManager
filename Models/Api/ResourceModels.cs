@@ -14,6 +14,11 @@ public class ResourceFileInfo
 public class ResourceKeyInfo
 {
     public string Key { get; set; } = string.Empty;
+    /// <summary>
+    /// Base name of the resource group this key belongs to (e.g. "CustomerResources").
+    /// Disambiguates rows when the same key exists in multiple groups in a directory.
+    /// </summary>
+    public string ResourceGroup { get; set; } = string.Empty;
     public Dictionary<string, string?> Values { get; set; } = new();
     public int OccurrenceCount { get; set; } = 1;
     public bool HasDuplicates { get; set; }
@@ -23,6 +28,10 @@ public class ResourceKeyInfo
 public class ResourceKeyDetails
 {
     public string Key { get; set; } = string.Empty;
+    /// <summary>
+    /// Base name of the resource group this key belongs to.
+    /// </summary>
+    public string ResourceGroup { get; set; } = string.Empty;
     public Dictionary<string, ResourceValue> Values { get; set; } = new();
     public int OccurrenceCount { get; set; } = 1;
     public bool HasDuplicates { get; set; }
@@ -52,6 +61,12 @@ public class AddKeyRequest
     public string Key { get; set; } = string.Empty;
 
     /// <summary>
+    /// Base name of the resource group to add this key to (e.g. "CustomerResources").
+    /// Optional when the directory contains exactly one group; required otherwise.
+    /// </summary>
+    public string? ResourceGroup { get; set; }
+
+    /// <summary>
     /// Simple string values per language (for non-plural keys).
     /// </summary>
     public Dictionary<string, string>? Values { get; set; }
@@ -73,6 +88,12 @@ public class AddKeyRequest
 
 public class UpdateKeyRequest
 {
+    /// <summary>
+    /// Base name of the resource group to update (e.g. "CustomerResources").
+    /// Optional when the directory contains exactly one group; required otherwise.
+    /// </summary>
+    public string? ResourceGroup { get; set; }
+
     /// <summary>
     /// Values per language. Each entry can contain a value and optionally a comment.
     /// </summary>

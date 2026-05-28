@@ -10,6 +10,8 @@ export interface ResourceFile {
 
 export interface ResourceKey {
     key: string;
+    /** Base name of the resource group this key belongs to (e.g. "CustomerResources"). */
+    resourceGroup: string;
     values: { [language: string]: string };
     occurrenceCount: number;
     hasDuplicates: boolean;
@@ -25,6 +27,8 @@ export interface ResourceValueDetail {
 
 export interface ResourceKeyDetails {
     key: string;
+    /** Base name of the resource group this key belongs to. */
+    resourceGroup: string;
     values: { [language: string]: ResourceValueDetail };
     occurrenceCount: number;
     hasDuplicates: boolean;
@@ -140,6 +144,11 @@ export interface Statistics {
 
 export interface AddKeyRequest {
     key: string;
+    /**
+     * Base name of the resource group to add this key to (e.g. "CustomerResources").
+     * Optional when the directory contains exactly one group; required otherwise.
+     */
+    resourceGroup?: string;
     values?: { [language: string]: string };
     comment?: string;
     isPlural?: boolean;
@@ -154,6 +163,11 @@ export interface ResourceValueUpdate {
 }
 
 export interface UpdateKeyRequest {
+    /**
+     * Base name of the resource group to update. Optional in single-group
+     * directories; required in multi-group directories.
+     */
+    resourceGroup?: string;
     values: { [language: string]: ResourceValueUpdate };
     comment?: string;  // Global fallback comment
 }
@@ -224,8 +238,10 @@ export class ApiClient {
         return response.data;
     }
 
-    async getKeyDetails(keyName: string, occurrence?: number): Promise<ResourceKeyDetails> {
-        const params = occurrence !== undefined ? { occurrence } : {};
+    async getKeyDetails(keyName: string, occurrence?: number, resourceGroup?: string): Promise<ResourceKeyDetails> {
+        const params: any = {};
+        if (occurrence !== undefined) params.occurrence = occurrence;
+        if (resourceGroup !== undefined) params.resourceGroup = resourceGroup;
         const response = await this.client.get(`/api/resources/keys/${encodeURIComponent(keyName)}`, { params });
         return response.data;
     }
@@ -239,13 +255,16 @@ export class ApiClient {
         await this.client.put(`/api/resources/keys/${encodeURIComponent(keyName)}`, request, { params });
     }
 
-    async deleteKey(keyName: string, occurrence?: number, allDuplicates?: boolean): Promise<void> {
+    async deleteKey(keyName: string, occurrence?: number, allDuplicates?: boolean, resourceGroup?: string): Promise<void> {
         const params: any = {};
         if (occurrence !== undefined) {
             params.occurrence = occurrence;
         }
         if (allDuplicates !== undefined) {
             params.allDuplicates = allDuplicates;
+        }
+        if (resourceGroup !== undefined) {
+            params.resourceGroup = resourceGroup;
         }
         await this.client.delete(`/api/resources/keys/${encodeURIComponent(keyName)}`, { params });
     }

@@ -41,26 +41,22 @@ public class TranslationController : ControllerBase
     }
 
     /// <summary>
-    /// Translate keys using specified provider
+    /// Translate keys using specified provider. Runs the translation
+    /// independently per resource group so that keys never cross group
+    /// boundaries (a key in CustomerResources stays in CustomerResources;
+    /// translations never leak into GlassResources's files).
     /// </summary>
     [HttpPost("translate")]
     public async Task<ActionResult<Models.Api.TranslationResponse>> Translate([FromBody] TranslateRequest request)
     {
         try
         {
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
 
-            var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
-            if (defaultFile == null)
-            {
-                return StatusCode(500, new ErrorResponse { Error = "No default language file found" });
-            }
-
-            // Load configuration
+            // Load configuration once.
             var (config, _) = Core.Configuration.ConfigurationManager.LoadConfiguration(null, _resourcePath);
 
-            // Get provider
+            // Get provider once.
             var provider = TranslationProviderFactory.Create(
                 request.Provider ?? "google",
                 config
@@ -69,39 +65,48 @@ public class TranslationController : ControllerBase
             var results = new List<TranslationResult>();
             var errors = new List<TranslationError>();
 
-            // Get keys to translate
-            var keysToTranslate = new List<string>();
-            if (request.Keys?.Any() == true)
+            foreach (var group in directory.Groups)
             {
-                keysToTranslate = request.Keys;
-            }
-            else if (request.OnlyMissing)
-            {
-                // Get all keys that are missing translations
-                foreach (var file in resourceFiles.Where(f => !f.Language.IsDefault))
+                var resourceFiles = group.Files.Select(f => _backend.Reader.Read(f)).ToList();
+                var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
+                if (defaultFile == null) continue;
+
+                // Get keys to translate for this group.
+                var keysToTranslate = new List<string>();
+                if (request.Keys?.Any() == true)
                 {
-                    var defaultKeys = defaultFile.Entries.Select(e => e.Key).ToHashSet();
-                    var fileKeys = file.Entries.Where(e => !string.IsNullOrWhiteSpace(e.Value)).Select(e => e.Key).ToHashSet();
-                    var missingKeys = defaultKeys.Except(fileKeys);
-                    keysToTranslate.AddRange(missingKeys);
+                    // Restrict explicit keys to those that exist in this group's default.
+                    var groupKeys = defaultFile.Entries.Select(e => e.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    keysToTranslate = request.Keys.Where(k => groupKeys.Contains(k)).ToList();
                 }
-                keysToTranslate = keysToTranslate.Distinct().ToList();
-            }
-            else
-            {
-                keysToTranslate = defaultFile.Entries.Select(e => e.Key).Distinct().ToList();
-            }
-
-            // Translate each key for each target language
-            foreach (var targetFile in resourceFiles.Where(f => !f.Language.IsDefault))
-            {
-                var targetLang = targetFile.Language.Code ?? "en";
-
-                foreach (var key in keysToTranslate)
+                else if (request.OnlyMissing)
                 {
-                    var sourceEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == key);
-                    if (sourceEntry == null || string.IsNullOrWhiteSpace(sourceEntry.Value))
-                        continue;
+                    foreach (var file in resourceFiles.Where(f => !f.Language.IsDefault))
+                    {
+                        var defaultKeys = defaultFile.Entries.Select(e => e.Key).ToHashSet();
+                        var fileKeys = file.Entries.Where(e => !string.IsNullOrWhiteSpace(e.Value)).Select(e => e.Key).ToHashSet();
+                        var missingKeys = defaultKeys.Except(fileKeys);
+                        keysToTranslate.AddRange(missingKeys);
+                    }
+                    keysToTranslate = keysToTranslate.Distinct().ToList();
+                }
+                else
+                {
+                    keysToTranslate = defaultFile.Entries.Select(e => e.Key).Distinct().ToList();
+                }
+
+                if (keysToTranslate.Count == 0) continue;
+
+                // Translate each key for each target language within this group.
+                foreach (var targetFile in resourceFiles.Where(f => !f.Language.IsDefault))
+                {
+                    var targetLang = targetFile.Language.Code ?? "en";
+
+                    foreach (var key in keysToTranslate)
+                    {
+                        var sourceEntry = defaultFile.Entries.FirstOrDefault(e => e.Key == key);
+                        if (sourceEntry == null || string.IsNullOrWhiteSpace(sourceEntry.Value))
+                            continue;
 
                     try
                     {
@@ -209,12 +214,13 @@ public class TranslationController : ControllerBase
                             Error = sanitizedError
                         });
                     }
-                }
+                    }
 
-                // Save the file if not dry run
-                if (!request.DryRun)
-                {
-                    _backend.Writer.Write(targetFile);
+                    // Save the file if not dry run
+                    if (!request.DryRun)
+                    {
+                        _backend.Writer.Write(targetFile);
+                    }
                 }
             }
 

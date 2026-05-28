@@ -205,7 +205,11 @@ public class AppDbContext : DbContext
         // =====================================================================
         modelBuilder.Entity<ResourceKey>(entity =>
         {
-            entity.HasIndex(e => new { e.ProjectId, e.KeyName }).IsUnique();
+            // Unique per project + base name + key name. BaseName="" means
+            // "default group" (single-group projects); multi-group projects
+            // use the .resx / .json base name to disambiguate keys that share
+            // a name across groups.
+            entity.HasIndex(e => new { e.ProjectId, e.BaseName, e.KeyName }).IsUnique();
             entity.HasIndex(e => e.ProjectId);
         });
 
@@ -303,8 +307,10 @@ public class AppDbContext : DbContext
         // =====================================================================
         modelBuilder.Entity<GitHubSyncState>(entity =>
         {
-            // Unique per project + key + language + plural form
-            entity.HasIndex(e => new { e.ProjectId, e.KeyName, e.LanguageCode, e.PluralForm }).IsUnique();
+            // Unique per project + base name + key + language + plural form.
+            // Multi-group projects need BaseName in the key to allow the same
+            // KeyName under different resource groups.
+            entity.HasIndex(e => new { e.ProjectId, e.BaseName, e.KeyName, e.LanguageCode, e.PluralForm }).IsUnique();
             entity.HasIndex(e => e.ProjectId);
             entity.HasIndex(e => e.SyncedAt);
 

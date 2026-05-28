@@ -32,10 +32,11 @@ public class ResourceService
     /// <summary>
     /// Gets a specific resource key with all translations
     /// </summary>
-    public async Task<ResourceKeyDetailDto?> GetResourceKeyAsync(int projectId, string keyName)
+    public async Task<ResourceKeyDetailDto?> GetResourceKeyAsync(int projectId, string keyName, string baseName = "")
     {
         var encodedKeyName = Uri.EscapeDataString(keyName);
-        var response = await _httpClient.GetAsync($"projects/{projectId}/keys/{encodedKeyName}");
+        var query = string.IsNullOrEmpty(baseName) ? "" : $"?baseName={Uri.EscapeDataString(baseName)}";
+        var response = await _httpClient.GetAsync($"projects/{projectId}/keys/{encodedKeyName}{query}");
 
         if (!response.IsSuccessStatusCode)
             return null;
@@ -122,12 +123,13 @@ public class ResourceService
     /// <summary>
     /// Updates a resource key
     /// </summary>
-    public async Task<ServiceResult<ResourceKeyDto>> UpdateResourceKeyAsync(int projectId, string keyName, UpdateResourceKeyRequest request)
+    public async Task<ServiceResult<ResourceKeyDto>> UpdateResourceKeyAsync(int projectId, string keyName, UpdateResourceKeyRequest request, string baseName = "")
     {
         try
         {
             var encodedKeyName = Uri.EscapeDataString(keyName);
-            var response = await _httpClient.PutAsJsonAsync($"projects/{projectId}/keys/{encodedKeyName}", request);
+            var query = string.IsNullOrEmpty(baseName) ? "" : $"?baseName={Uri.EscapeDataString(baseName)}";
+            var response = await _httpClient.PutAsJsonAsync($"projects/{projectId}/keys/{encodedKeyName}{query}", request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -148,12 +150,13 @@ public class ResourceService
     /// <summary>
     /// Deletes a resource key
     /// </summary>
-    public async Task<ServiceResult> DeleteResourceKeyAsync(int projectId, string keyName)
+    public async Task<ServiceResult> DeleteResourceKeyAsync(int projectId, string keyName, string baseName = "")
     {
         try
         {
             var encodedKeyName = Uri.EscapeDataString(keyName);
-            var response = await _httpClient.DeleteAsync($"projects/{projectId}/keys/{encodedKeyName}");
+            var query = string.IsNullOrEmpty(baseName) ? "" : $"?baseName={Uri.EscapeDataString(baseName)}";
+            var response = await _httpClient.DeleteAsync($"projects/{projectId}/keys/{encodedKeyName}{query}");
 
             if (response.IsSuccessStatusCode)
                 return ServiceResult.Success("Key deleted successfully");

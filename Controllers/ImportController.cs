@@ -24,7 +24,10 @@ public class ImportController : ControllerBase
     }
 
     /// <summary>
-    /// Import keys from CSV format
+    /// Import keys from CSV format. When the directory contains multiple
+    /// resource groups, the CSV must include a "Group" column to disambiguate;
+    /// when there is exactly one group, the column is optional and defaults to
+    /// that group.
     /// </summary>
     [HttpPost("csv")]
     public ActionResult<ImportResult> ImportFromCsv([FromBody] ImportCsvRequest request)
@@ -36,8 +39,12 @@ public class ImportController : ControllerBase
                 return BadRequest(new ErrorResponse { Error = "CSV data is required" });
             }
 
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
+            // Read every group's files once.
+            var groupFiles = directory.Groups.ToDictionary(
+                g => g.BaseName,
+                g => g.Files.Select(f => _backend.Reader.Read(f)).ToList(),
+                StringComparer.OrdinalIgnoreCase);
 
             // Parse CSV
             var lines = request.CsvData.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -53,9 +60,17 @@ public class ImportController : ControllerBase
                 return BadRequest(new ErrorResponse { Error = "First column must be 'Key'" });
             }
 
+            // Detect optional Group column.
+            var groupColumnIndex = Array.FindIndex(headers, h => string.Equals(h, "Group", StringComparison.OrdinalIgnoreCase));
+            if (groupColumnIndex < 0 && directory.Groups.Count > 1)
+            {
+                return BadRequest(new ErrorResponse { Error = "CSV must include a 'Group' column when the resource directory contains multiple resource groups." });
+            }
+
             var addedCount = 0;
             var updatedCount = 0;
             var errors = new List<string>();
+            var touchedFiles = new HashSet<ResourceFile>();
 
             // Process each row
             for (int i = 1; i < lines.Length; i++)
@@ -67,11 +82,31 @@ public class ImportController : ControllerBase
                         continue;
 
                     var key = values[0].Trim();
+
+                    // Resolve the target group for this row.
+                    string targetGroup;
+                    if (groupColumnIndex >= 0 && groupColumnIndex < values.Length && !string.IsNullOrWhiteSpace(values[groupColumnIndex]))
+                    {
+                        targetGroup = values[groupColumnIndex].Trim();
+                    }
+                    else
+                    {
+                        targetGroup = directory.Groups[0].BaseName; // safe: multi-group case errored above
+                    }
+
+                    if (!groupFiles.TryGetValue(targetGroup, out var resourceFiles))
+                    {
+                        errors.Add($"Row {i + 1}: resource group '{targetGroup}' not found");
+                        continue;
+                    }
+
                     var keyExists = resourceFiles.Any(rf => rf.Entries.Any(e => e.Key == key));
 
                     // Extract values for each language
                     for (int j = 1; j < Math.Min(values.Length, headers.Length); j++)
                     {
+                        if (j == groupColumnIndex) continue;
+
                         var langHeader = headers[j];
                         if (langHeader.ToLower() == "comment")
                             continue;
@@ -96,6 +131,7 @@ public class ImportController : ControllerBase
                                 Comment = null
                             });
                         }
+                        touchedFiles.Add(resourceFile);
                     }
 
                     if (keyExists)
@@ -109,8 +145,8 @@ public class ImportController : ControllerBase
                 }
             }
 
-            // Save all files
-            foreach (var resourceFile in resourceFiles)
+            // Save only files that were actually touched.
+            foreach (var resourceFile in touchedFiles)
             {
                 _backend.Writer.Write(resourceFile);
             }

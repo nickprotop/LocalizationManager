@@ -26,25 +26,46 @@ public class LanguageController : ControllerBase
     }
 
     /// <summary>
-    /// List all languages
+    /// List all languages. Aggregates across resource groups so that directories
+    /// containing multiple base names (e.g. CustomerResources.resx +
+    /// GlassResources.resx) report one entry per distinct culture, not per file.
     /// </summary>
     [HttpGet]
     public ActionResult<LanguagesResponse> GetLanguages()
     {
         try
         {
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var resourceFiles = languages.Select(l => _backend.Reader.Read(l)).ToList();
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
+            var groupedFiles = directory.Groups
+                .SelectMany(g => g.Files.Select(f => new
+                {
+                    Group = g,
+                    File = f,
+                    Resource = _backend.Reader.Read(f)
+                }))
+                .ToList();
 
-            var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
-            var totalKeys = defaultFile?.Entries.Select(e => e.Key).Distinct().Count() ?? 0;
+            // Total keys: distinct (BaseName::Key) across all default files.
+            var totalKeys = groupedFiles
+                .Where(x => x.File.IsDefault)
+                .SelectMany(x => x.Resource.Entries.Select(e => $"{x.Group.BaseName}::{e.Key}"))
+                .Distinct()
+                .Count();
 
-            var result = languages.Select(lang =>
+            // One returned entry per distinct culture (keyed by Code + IsDefault).
+            var cultureGroups = groupedFiles
+                .GroupBy(x => new { Code = x.File.Code ?? string.Empty, x.File.IsDefault })
+                .OrderByDescending(g => g.Key.IsDefault)
+                .ThenBy(g => g.Key.Code)
+                .ToList();
+
+            var result = cultureGroups.Select(cultureGroup =>
             {
-                var file = resourceFiles.First(f => f.Language.Code == lang.Code && f.Language.IsDefault == lang.IsDefault);
-                var translatedCount = file.Entries
-                    .Where(e => !string.IsNullOrWhiteSpace(e.Value))
-                    .Select(e => e.Key)
+                var sample = cultureGroup.First();
+                var translatedCount = cultureGroup
+                    .SelectMany(x => x.Resource.Entries
+                        .Where(e => !string.IsNullOrWhiteSpace(e.Value))
+                        .Select(e => $"{x.Group.BaseName}::{e.Key}"))
                     .Distinct()
                     .Count();
 
@@ -52,12 +73,14 @@ public class LanguageController : ControllerBase
 
                 return new Models.Api.LanguageInfo
                 {
-                    Code = lang.Code,
-                    IsDefault = lang.IsDefault,
-                    Name = lang.Name,
-                    FilePath = lang.FilePath,
-                    DisplayName = _languageManager.GetCultureDisplayName(lang.Code ?? "default"),
-                    TotalKeys = file.Entries.Select(e => e.Key).Distinct().Count(),
+                    Code = sample.File.Code,
+                    IsDefault = sample.File.IsDefault,
+                    Name = sample.File.Name,
+                    FilePath = string.Join(";", cultureGroup
+                        .Select(x => x.File.FilePath)
+                        .Where(p => !string.IsNullOrEmpty(p))),
+                    DisplayName = _languageManager.GetCultureDisplayName(sample.File.Code ?? "default"),
+                    TotalKeys = totalKeys,
                     TranslatedKeys = translatedCount,
                     Coverage = Math.Round(coverage, 2)
                 };
@@ -72,7 +95,10 @@ public class LanguageController : ControllerBase
     }
 
     /// <summary>
-    /// Add a new language
+    /// Add a new language. When the directory contains multiple resource groups
+    /// (e.g. CustomerResources.resx and GlassResources.resx), a new
+    /// <c>{group}.{culture}.resx</c> is created for EACH group, so the new
+    /// culture appears as a single column across the editor.
     /// </summary>
     [HttpPost]
     public ActionResult<AddLanguageResponse> AddLanguage([FromBody] AddLanguageRequest request)
@@ -84,42 +110,59 @@ public class LanguageController : ControllerBase
                 return BadRequest(new ErrorResponse { Error = $"Invalid culture code: {request.CultureCode}" });
             }
 
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var baseName = languages.First().BaseName;
-
-            if (_languageManager.LanguageFileExists(baseName, request.CultureCode, _resourcePath))
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
+            if (directory.Groups.Count == 0)
             {
-                return Conflict(new ErrorResponse { Error = $"Language file for '{request.CultureCode}' already exists" });
+                return NotFound(new ErrorResponse { Error = "No resource groups found in resource path" });
             }
 
-            ResourceFile? sourceFile = null;
-            if (!string.IsNullOrEmpty(request.CopyFrom))
+            // Reject if any group already has this culture.
+            var existingGroup = directory.Groups.FirstOrDefault(g =>
+                _languageManager.LanguageFileExists(g.BaseName, request.CultureCode, _resourcePath));
+            if (existingGroup != null)
             {
-                var sourceLanguage = languages.FirstOrDefault(l => l.Code == request.CopyFrom);
-                if (sourceLanguage != null)
+                return Conflict(new ErrorResponse { Error = $"Language file for '{request.CultureCode}' already exists (group '{existingGroup.BaseName}')" });
+            }
+
+            var createdFiles = new List<string>();
+            foreach (var group in directory.Groups)
+            {
+                ResourceFile? sourceFile = null;
+                if (!string.IsNullOrEmpty(request.CopyFrom))
                 {
-                    sourceFile = _backend.Reader.Read(sourceLanguage);
+                    var sourceLanguage = group.Files.FirstOrDefault(l => (l.Code ?? string.Empty) == request.CopyFrom);
+                    if (sourceLanguage != null)
+                    {
+                        sourceFile = _backend.Reader.Read(sourceLanguage);
+                    }
+                }
+
+                var newFile = _languageManager.CreateLanguageFile(
+                    group.BaseName,
+                    request.CultureCode,
+                    _resourcePath,
+                    sourceFile
+                );
+
+                if (!request.Empty)
+                {
+                    _backend.Writer.Write(newFile);
+                }
+
+                if (!string.IsNullOrEmpty(newFile.Language.FilePath))
+                {
+                    createdFiles.Add(newFile.Language.FilePath);
                 }
             }
 
-            var newFile = _languageManager.CreateLanguageFile(
-                baseName,
-                request.CultureCode,
-                _resourcePath,
-                sourceFile
-            );
-
-            if (!request.Empty)
-            {
-                _backend.Writer.Write(newFile);
-            }
-
+            // Pick the first created file as the representative; FilePath in the
+            // response carries a joined list of all created paths.
             return Ok(new AddLanguageResponse
             {
                 Success = true,
                 CultureCode = request.CultureCode,
-                FileName = newFile.Language.Name,
-                FilePath = newFile.Language.FilePath,
+                FileName = Path.GetFileName(createdFiles.FirstOrDefault() ?? string.Empty),
+                FilePath = string.Join(";", createdFiles),
                 DisplayName = _languageManager.GetCultureDisplayName(request.CultureCode)
             });
         }
@@ -130,34 +173,43 @@ public class LanguageController : ControllerBase
     }
 
     /// <summary>
-    /// Remove a language
+    /// Remove a language. When the directory contains multiple resource groups,
+    /// the <c>{group}.{culture}.resx</c> file for every group is deleted, so the
+    /// culture disappears as a column.
     /// </summary>
     [HttpDelete("{cultureCode}")]
     public ActionResult<RemoveLanguageResponse> RemoveLanguage(string cultureCode)
     {
         try
         {
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var language = languages.FirstOrDefault(l => l.Code == cultureCode);
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
 
-            if (language == null)
+            var matchingFiles = directory.Groups
+                .SelectMany(g => g.Files)
+                .Where(l => (l.Code ?? string.Empty) == cultureCode)
+                .ToList();
+
+            if (matchingFiles.Count == 0)
             {
                 return NotFound(new ErrorResponse { Error = $"Language '{cultureCode}' not found" });
             }
 
-            if (language.IsDefault)
+            if (matchingFiles.Any(l => l.IsDefault))
             {
                 return BadRequest(new ErrorResponse { Error = "Cannot delete the default language file" });
             }
 
-            _languageManager.DeleteLanguageFile(language);
+            foreach (var file in matchingFiles)
+            {
+                _languageManager.DeleteLanguageFile(file);
+            }
 
             return Ok(new RemoveLanguageResponse
             {
                 Success = true,
                 CultureCode = cultureCode,
-                FileName = language.Name,
-                Message = "Language file deleted successfully"
+                FileName = string.Join(";", matchingFiles.Select(f => f.Name)),
+                Message = $"Removed {matchingFiles.Count} language file(s) for '{cultureCode}'"
             });
         }
         catch (Exception)
