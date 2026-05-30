@@ -239,7 +239,7 @@ public class PoResourceReaderTests
     #region POT Template Tests
 
     [Fact]
-    public void Read_PotTemplate_ReturnsEmptyValues()
+    public void Read_PotTemplate_UsesMsgIdAsSourceValue()
     {
         // Arrange
         var reader = new PoResourceReader();
@@ -259,7 +259,10 @@ public class PoResourceReaderTests
         Assert.NotNull(result);
         var helloEntry = result.Entries.FirstOrDefault(e => e.Key == "Hello");
         Assert.NotNull(helloEntry);
-        Assert.Equal("", helloEntry.Value);
+        // For the source/default file (POT), msgstr is empty so the msgid is
+        // surfaced as both the value and the SourceText.
+        Assert.Equal("Hello", helloEntry.Value);
+        Assert.Equal("Hello", helloEntry.SourceText);
     }
 
     #endregion
