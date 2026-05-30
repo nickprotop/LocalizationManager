@@ -33,6 +33,9 @@
     <PackageReference Include="Spectre.Console.Cli" Version="0.53.0" />
     <PackageReference Include="Terminal.Gui" Version="1.19.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+
+    <!-- Web GUI components -->
+    <PackageReference Include="Radzen.Blazor" Version="6.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -91,5 +94,20 @@
   <ItemGroup>
     <EmbeddedResource Include="wwwroot\**\*" />
   </ItemGroup>
+
+  <!-- Copy Radzen static assets to wwwroot for embedding in single-file executable -->
+  <Target Name="CopyRadzenAssets" BeforeTargets="Build" Condition="!Exists('wwwroot/lib/radzen/Radzen.Blazor.js')">
+    <PropertyGroup>
+      <RadzenPackagePath>$(NuGetPackageRoot)radzen.blazor/6.0.0/staticwebassets</RadzenPackagePath>
+    </PropertyGroup>
+    <ItemGroup>
+      <RadzenCssFiles Include="$(RadzenPackagePath)/**/*.css" />
+      <RadzenJsFile Include="$(RadzenPackagePath)/Radzen.Blazor.js" />
+    </ItemGroup>
+    <MakeDir Directories="wwwroot/lib/radzen" />
+    <Copy SourceFiles="@(RadzenCssFiles)" DestinationFolder="wwwroot/lib/radzen/%(RecursiveDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(RadzenJsFile)" DestinationFolder="wwwroot/lib/radzen" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Copied Radzen assets to wwwroot/lib/radzen/" />
+  </Target>
 
 </Project>

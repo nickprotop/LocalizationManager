@@ -8,412 +8,278 @@
 @inject ScanCacheService ScanCache
 @inject SearchApiClient SearchApi
 @inject NavigationManager Navigation
+@inject DialogService DialogService
+@inject NotificationService NotificationService
 
 <PageTitle>Editor - Localization Manager</PageTitle>
 
-<div class="lrm-page">
-    <h1 class="lrm-page-title">Resource Editor</h1>
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">Resource Editor</RadzenText>
 
-    @if (isLoading)
-    {
-        <div class="lrm-card">
-            <p>Loading resources...</p>
-        </div>
-    }
-    else if (errorMessage != null)
-    {
-        <div class="lrm-card lrm-error">
-            <h3>Error</h3>
-            <p>@errorMessage</p>
-            <button class="lrm-button" @onclick="LoadResources">Retry</button>
-        </div>
-    }
-    else if (keys != null && languages != null)
-    {
-        <!-- Toolbar -->
-        <div class="lrm-card">
-            <div class="lrm-editor-toolbar">
-                <div class="lrm-search-container">
-                    <input type="text"
-                           class="lrm-search-input"
-                           placeholder="@GetSearchPlaceholder()"
-                           @bind="searchFilter"
-                           @bind:event="oninput"
-                           @onkeyup="OnSearchKeyUp" />
-                    @if (!string.IsNullOrEmpty(searchFilter))
-                    {
-                        <button class="lrm-search-clear" @onclick="ClearSearch" title="Clear search">x</button>
-                    }
-                </div>
+@if (isLoading)
+{
+    <RadzenCard>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+            <RadzenText>Loading resources...</RadzenText>
+        </RadzenStack>
+    </RadzenCard>
+}
+else if (errorMessage != null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="true" Close="@(() => errorMessage = null)">
+        <strong>Error:</strong> @errorMessage
+        <RadzenButton Text="Retry" Size="ButtonSize.Small" class="rz-ml-2" Click="@LoadResources" />
+    </RadzenAlert>
+}
+else if (keys != null && languages != null)
+{
+    <!-- Toolbar -->
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Gap="0.75rem">
+            <!-- Search Row -->
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                <RadzenTextBox @bind-Value="@searchFilter" Placeholder="@GetSearchPlaceholder()"
+                              Style="width: 300px;" @oninput="OnSearchInput" />
+                @if (!string.IsNullOrEmpty(searchFilter))
+                {
+                    <RadzenButton Icon="close" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@ClearSearch" />
+                }
 
-                <label class="lrm-checkbox-label" title="Use wildcards (* and ?) for search">
-                    <input type="checkbox" @bind="useWildcard" @bind:after="OnFilterModeChanged" />
-                    Wildcard
-                </label>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                    <RadzenCheckBox @bind-Value="@useWildcard" Name="cbWildcard" Change="@((bool _) => OnFilterModeChanged())" />
+                    <RadzenLabel Text="Wildcard" Component="cbWildcard" class="rz-text-secondary-color" />
+                </RadzenStack>
 
-                <label class="lrm-checkbox-label" title="Use regular expression for search">
-                    <input type="checkbox" @bind="useRegex" @bind:after="OnFilterModeChanged" />
-                    Regex
-                </label>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                    <RadzenCheckBox @bind-Value="@useRegex" Name="cbRegex" Change="@((bool _) => OnFilterModeChanged())" />
+                    <RadzenLabel Text="Regex" Component="cbRegex" class="rz-text-secondary-color" />
+                </RadzenStack>
 
-                <label class="lrm-checkbox-label" title="Case sensitive search">
-                    <input type="checkbox" @bind="caseSensitive" @bind:after="OnFilterModeChanged" />
-                    Match Case
-                </label>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                    <RadzenCheckBox @bind-Value="@caseSensitive" Name="cbCase" Change="@((bool _) => OnFilterModeChanged())" />
+                    <RadzenLabel Text="Match Case" Component="cbCase" class="rz-text-secondary-color" />
+                </RadzenStack>
 
-                <span class="lrm-toolbar-info">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
                     @filteredKeys.Count / @keys.Count keys
                     @if (scanResult != null)
                     {
                         <text> | Scanned</text>
                     }
-                </span>
-            </div>
+                </RadzenText>
+            </RadzenStack>
 
-            <!-- Actions Toolbar -->
-            <div class="lrm-editor-toolbar">
-                <a href="/editor/add" class="lrm-button lrm-button-primary">+ Add Key</a>
+            <!-- Actions Row -->
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                <RadzenButton Text="Add Key" Icon="add" Click="@(() => Navigation.NavigateTo("/editor/add"))" />
 
                 @if (duplicateCount > 0)
                 {
-                    <a href="/editor/merge-duplicates" class="lrm-button">
-                        <span class="lrm-status-icon lrm-status-duplicate">◆</span>
-                        Merge Duplicates (@duplicateCount)
-                    </a>
+                    <RadzenButton Text="@($"Merge Duplicates ({duplicateCount})")" Icon="merge_type"
+                                 ButtonStyle="ButtonStyle.Warning" Click="@(() => Navigation.NavigateTo("/editor/merge-duplicates"))" />
                 }
 
-                @if (!isScanning)
-                {
-                    <button class="lrm-button" @onclick="RunCodeScan" title="Scan source code for key usage">
-                        Scan Code
-                    </button>
-                }
-                else
-                {
-                    <button class="lrm-button" disabled>Scanning...</button>
-                }
+                <RadzenButton Text="@(isScanning ? "Scanning..." : "Scan Code")" Icon="search"
+                             ButtonStyle="ButtonStyle.Secondary" Click="@RunCodeScan" Disabled="@isScanning" />
 
-                <button class="lrm-button" @onclick="LoadResources" title="Refresh data">
-                    Refresh
-                </button>
-            </div>
+                <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadResources" />
+            </RadzenStack>
 
-            <!-- Bulk Actions Toolbar (shown when items are selected) -->
+            <!-- Bulk Actions Row (shown when items are selected) -->
             @if (selectedKeys.Count > 0)
             {
-                <div class="lrm-editor-toolbar lrm-bulk-actions">
-                    <span class="lrm-toolbar-info">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem"
+                            class="rz-p-2 rz-border-radius-1" Style="background: var(--rz-primary-lighter);">
+                    <RadzenText TextStyle="TextStyle.Body2">
                         <strong>@selectedKeys.Count</strong> @(selectedKeys.Count == 1 ? "key" : "keys") selected
-                    </span>
-                    <button class="lrm-button" @onclick="BulkTranslate" title="Translate selected keys">
-                        Translate Selected
-                    </button>
-                    <button class="lrm-button lrm-button-danger" @onclick="BulkDelete" title="Delete selected keys">
-                        Delete Selected
-                    </button>
-                    <button class="lrm-button" @onclick="ClearSelection" title="Clear selection">
-                        Clear Selection
-                    </button>
-                </div>
+                    </RadzenText>
+                    <RadzenButton Text="Translate Selected" Icon="translate" Size="ButtonSize.Small" Click="@BulkTranslate" />
+                    <RadzenButton Text="Delete Selected" Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Click="@BulkDelete" />
+                    <RadzenButton Text="Clear Selection" Icon="clear" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@ClearSelection" />
+                </RadzenStack>
             }
-        </div>
+        </RadzenStack>
+    </RadzenCard>
 
-        <!-- Filter Panel -->
-        <div class="lrm-filter-panel">
-            <div class="lrm-filter-group">
-                <span class="lrm-filter-label">Status:</span>
+    <!-- Filter Panel -->
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Gap="0.75rem">
+            <!-- Status Filters -->
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" Wrap="FlexWrap.Wrap">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Status:</RadzenText>
 
-                <label class="lrm-checkbox-label" title="Keys missing translations in non-default languages">
-                    <input type="checkbox" @bind="filterMissing" @bind:after="OnFilterModeChanged" />
-                    <span class="lrm-status-icon lrm-status-missing">!</span> Missing (@missingCount)
-                </label>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                    <RadzenCheckBox @bind-Value="@filterMissing" Name="cbMissing" Change="@((bool _) => OnFilterModeChanged())" />
+                    <RadzenLabel Component="cbMissing">
+                        <span class="rz-color-danger">Missing (@missingCount)</span>
+                    </RadzenLabel>
+                </RadzenStack>
 
-                <label class="lrm-checkbox-label" title="Keys present in non-default but not in default language">
-                    <input type="checkbox" @bind="filterExtra" @bind:after="OnFilterModeChanged" />
-                    <span class="lrm-status-icon lrm-status-extra">*</span> Extra (@extraCount)
-                </label>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                    <RadzenCheckBox @bind-Value="@filterExtra" Name="cbExtra" Change="@((bool _) => OnFilterModeChanged())" />
+                    <RadzenLabel Component="cbExtra">
+                        <span class="rz-color-warning">Extra (@extraCount)</span>
+                    </RadzenLabel>
+                </RadzenStack>
 
-                <label class="lrm-checkbox-label" title="Keys with duplicate entries">
-                    <input type="checkbox" @bind="filterDuplicates" @bind:after="OnFilterModeChanged" />
-                    <span class="lrm-status-icon lrm-status-duplicate">◆</span> Duplicates (@duplicateCount)
-                </label>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                    <RadzenCheckBox @bind-Value="@filterDuplicates" Name="cbDups" Change="@((bool _) => OnFilterModeChanged())" />
+                    <RadzenLabel Component="cbDups">
+                        <span style="color: var(--rz-warning);">Duplicates (@duplicateCount)</span>
+                    </RadzenLabel>
+                </RadzenStack>
 
                 @if (scanResult != null)
                 {
-                    <label class="lrm-checkbox-label" title="Keys not referenced in source code">
-                        <input type="checkbox" @bind="filterUnused" @bind:after="ApplyLocalFilters" />
-                        <span class="lrm-status-icon lrm-status-unused">∅</span> Unused (@unusedKeys.Count)
-                    </label>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                        <RadzenCheckBox @bind-Value="@filterUnused" Name="cbUnused" Change="@((bool _) => ApplyLocalFilters())" />
+                        <RadzenLabel Component="cbUnused" class="rz-color-secondary">
+                            Unused (@unusedKeys.Count)
+                        </RadzenLabel>
+                    </RadzenStack>
 
-                    <label class="lrm-checkbox-label" title="Keys used in code but not in resources">
-                        <input type="checkbox" @bind="filterMissingFromCode" @bind:after="ApplyLocalFilters" />
-                        <span class="lrm-status-icon lrm-status-missing-code">✗</span> Missing in Resources (@missingFromResources.Count)
-                    </label>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                        <RadzenCheckBox @bind-Value="@filterMissingFromCode" Name="cbMissingCode" Change="@((bool _) => ApplyLocalFilters())" />
+                        <RadzenLabel Component="cbMissingCode" class="rz-color-danger">
+                            Missing in Resources (@missingFromResources.Count)
+                        </RadzenLabel>
+                    </RadzenStack>
                 }
-            </div>
+            </RadzenStack>
 
-            <div class="lrm-filter-group">
-                <span class="lrm-filter-label">Languages:</span>
+            <!-- Language Filters -->
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" Wrap="FlexWrap.Wrap">
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Languages:</RadzenText>
                 @foreach (var lang in languages)
                 {
                     var langCode = lang.Code ?? "default";
-                    <label class="lrm-checkbox-label">
-                        <input type="checkbox"
-                               checked="@visibleLanguages.Contains(langCode)"
-                               @onchange="(e) => ToggleLanguage(langCode, (bool)e.Value!)" />
-                        @langCode
-                    </label>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                        <RadzenCheckBox Value="@visibleLanguages.Contains(langCode)" Name="@($"cbLang_{langCode}")"
+                                       ValueChanged="@((bool v) => ToggleLanguage(langCode, v))" />
+                        <RadzenLabel Component="@($"cbLang_{langCode}")">@langCode</RadzenLabel>
+                    </RadzenStack>
                 }
-            </div>
-        </div>
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
 
-        <!-- Missing from Resources (keys found in code but not in .resx) -->
-        @if (filterMissingFromCode && missingFromResources.Count > 0)
-        {
-            <div class="lrm-card lrm-warning">
-                <h3><span class="lrm-status-icon lrm-status-missing-code">✗</span> Keys Found in Code but Missing from Resources</h3>
-                <p>These keys are referenced in source code but don't exist in your resource files:</p>
-                <ul>
-                    @foreach (var key in missingFromResources.Take(20))
-                    {
-                        <li><code>@key</code></li>
-                    }
-                    @if (missingFromResources.Count > 20)
-                    {
-                        <li><em>...and @(missingFromResources.Count - 20) more</em></li>
-                    }
-                </ul>
-            </div>
-        }
+    <!-- Missing from Resources Alert -->
+    @if (filterMissingFromCode && missingFromResources.Count > 0)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Warning" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="false" class="rz-mb-4">
+            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Keys Found in Code but Missing from Resources</RadzenText>
+            <RadzenText class="rz-mb-2">These keys are referenced in source code but don't exist in your resource files:</RadzenText>
+            <ul>
+                @foreach (var key in missingFromResources.Take(20))
+                {
+                    <li><code class="key-name">@key</code></li>
+                }
+                @if (missingFromResources.Count > 20)
+                {
+                    <li><em>...and @(missingFromResources.Count - 20) more</em></li>
+                }
+            </ul>
+        </RadzenAlert>
+    }
 
-        <!-- Data Table -->
-        <div class="lrm-card">
-            <div class="lrm-editor-grid">
-                <table class="lrm-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 40px;">
-                                <input type="checkbox"
-                                       checked="@IsAllVisibleSelected()"
-                                       @onchange="ToggleSelectAll"
-                                       title="Select/deselect all visible keys" />
-                            </th>
-                            <th>Status</th>
-                            <th>Key</th>
-                            @foreach (var lang in languages.Where(l => visibleLanguages.Contains(l.Code ?? "default")))
-                            {
-                                <th>@(lang.Code ?? "default")</th>
-                            }
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var key in filteredKeys.Take(pageSize))
-                        {
-                            var status = GetKeyStatus(key);
-                            var isSelected = selectedKeys.Contains(key.Key);
-                            var rowClass = isSelected ? $"{status.RowClass} lrm-row-selected" : status.RowClass;
-                            <tr class="@rowClass">
-                                <td>
-                                    <input type="checkbox"
-                                           checked="@isSelected"
-                                           @onchange="() => ToggleKeySelection(key.Key)"
-                                           title="Select this key" />
-                                </td>
-                                <td>
-                                    @foreach (var icon in status.Icons)
-                                    {
-                                        <span class="lrm-status-icon @icon.CssClass" title="@icon.Title">@icon.Symbol</span>
-                                    }
-                                </td>
-                                <td>
-                                    <strong>@key.Key</strong>
-                                    @if (key.HasDuplicates)
-                                    {
-                                        <span class="lrm-badge lrm-badge-warning">x@key.OccurrenceCount</span>
-                                    }
-                                </td>
-                                @foreach (var lang in languages.Where(l => visibleLanguages.Contains(l.Code ?? "default")))
-                                {
-                                    var langCode = lang.Code ?? "default";
-                                    var value = key.Values.ContainsKey(langCode) ? key.Values[langCode] : null;
-                                    var isEmpty = string.IsNullOrWhiteSpace(value);
+    <!-- Data Grid -->
+    <RadzenCard>
+        <RadzenDataGrid @ref="grid" Data="@filteredKeys" TItem="ResourceKeyInfo" AllowSorting="true"
+                       AllowPaging="true" PageSize="50" PagerHorizontalAlign="HorizontalAlign.Center"
+                       SelectionMode="DataGridSelectionMode.Multiple" @bind-Value="@selectedItems"
+                       RowRender="@OnRowRender" Style="height: auto;">
+            <Columns>
+                <RadzenDataGridColumn TItem="ResourceKeyInfo" Width="50px" Sortable="false" Filterable="false">
+                    <HeaderTemplate>
+                        <RadzenCheckBox Value="@IsAllVisibleSelected()" TValue="bool"
+                                       ValueChanged="@((bool v) => ToggleSelectAll(v))" />
+                    </HeaderTemplate>
+                    <Template Context="item">
+                        <RadzenCheckBox Value="@selectedKeys.Contains(item.Key)" TValue="bool"
+                                       ValueChanged="@((bool v) => ToggleKeySelection(item.Key, v))" />
+                    </Template>
+                </RadzenDataGridColumn>
 
-                                    <td class="@(isEmpty ? "lrm-cell-empty" : "")">
-                                        @if (isEmpty)
-                                        {
-                                            <em class="lrm-text-muted">(empty)</em>
-                                        }
-                                        else if (value!.Length > 50)
-                                        {
-                                            <span title="@value">@value.Substring(0, 47)...</span>
-                                        }
-                                        else
-                                        {
-                                            <span>@value</span>
-                                        }
-                                    </td>
-                                }
-                                <td class="lrm-inline-actions">
-                                    <a href="/editor/key/@Uri.EscapeDataString(key.Key)" class="lrm-button-small" title="Edit and translate">Edit</a>
-                                    <button class="lrm-button-small"
-                                            @onclick="() => ViewReferences(key.Key)"
-                                            title="View code references">
-                                        Refs
-                                    </button>
-                                    <button class="lrm-button-small"
-                                            @onclick="() => DeleteKey(key.Key)"
-                                            title="Delete this key">
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
+                <RadzenDataGridColumn TItem="ResourceKeyInfo" Title="Status" Width="80px" Sortable="false">
+                    <Template Context="item">
+                        @{
+                            var status = GetKeyStatus(item);
                         }
-                    </tbody>
-                </table>
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem">
+                            @foreach (var icon in status.Icons)
+                            {
+                                <RadzenBadge BadgeStyle="@icon.BadgeStyle" title="@icon.Title" Text="@icon.Symbol" />
+                            }
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
 
-                @if (filteredKeys.Count > pageSize)
-                {
-                    <div class="mt-md">
-                        <p class="lrm-text-muted">
-                            Showing first @pageSize of @filteredKeys.Count keys.
-                            <button class="lrm-button-small" @onclick="ShowMore">Show More</button>
-                        </p>
-                    </div>
-                }
-                else if (filteredKeys.Count == 0)
-                {
-                    <p class="lrm-text-muted p-md">No keys match the current filters.</p>
-                }
-            </div>
-        </div>
-    }
+                <RadzenDataGridColumn TItem="ResourceKeyInfo" Property="Key" Title="Key" Width="250px" Frozen="true">
+                    <Template Context="item">
+                        <span class="key-name">@item.Key</span>
+                        @if (item.HasDuplicates)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="@($"x{item.OccurrenceCount}")" class="rz-ml-1" />
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
 
-    <!-- Delete Confirmation Modal -->
-    @if (showDeleteConfirm)
-    {
-        <div class="lrm-modal-overlay" @onclick="CancelDelete">
-            <div class="lrm-modal" @onclick:stopPropagation="true">
-                <div class="lrm-modal-header">
-                    <h3 class="lrm-modal-title">Confirm Delete</h3>
-                    <button class="lrm-modal-close" @onclick="CancelDelete">x</button>
-                </div>
-                <p>Are you sure you want to delete the key <strong>@keyToDelete</strong>?</p>
-                <p class="lrm-text-muted">This will remove the key from all language files.</p>
-                <div class="lrm-modal-footer">
-                    <button class="lrm-button" @onclick="CancelDelete">Cancel</button>
-                    <button class="lrm-button lrm-button-danger" @onclick="ConfirmDelete">Delete</button>
-                </div>
-            </div>
-        </div>
-    }
-
-    <!-- Bulk Delete Confirmation Modal -->
-    @if (showBulkDeleteConfirm)
-    {
-        <div class="lrm-modal-overlay" @onclick="CancelBulkDelete">
-            <div class="lrm-modal" @onclick:stopPropagation="true">
-                <div class="lrm-modal-header">
-                    <h3 class="lrm-modal-title">Confirm Bulk Delete</h3>
-                    <button class="lrm-modal-close" @onclick="CancelBulkDelete">x</button>
-                </div>
-                <p>Are you sure you want to delete <strong>@selectedKeys.Count</strong> selected @(selectedKeys.Count == 1 ? "key" : "keys")?</p>
-                <p class="lrm-text-muted">This will remove the keys from all language files.</p>
-                @if (isDeletingBulk)
+                @foreach (var lang in languages.Where(l => visibleLanguages.Contains(l.Code ?? "default")))
                 {
-                    <div class="lrm-progress-indicator">
-                        <p>Deleting @bulkDeleteProgress / @selectedKeys.Count keys...</p>
-                    </div>
-                }
-                <div class="lrm-modal-footer">
-                    <button class="lrm-button" @onclick="CancelBulkDelete" disabled="@isDeletingBulk">Cancel</button>
-                    <button class="lrm-button lrm-button-danger" @onclick="ConfirmBulkDelete" disabled="@isDeletingBulk">Delete All</button>
-                </div>
-            </div>
-        </div>
-    }
-
-
-    <!-- References Modal -->
-    @if (showReferencesModal)
-    {
-        <div class="lrm-modal-overlay" @onclick="CloseReferencesModal">
-            <div class="lrm-modal" style="max-width: 800px;" @onclick:stopPropagation="true">
-                <div class="lrm-modal-header">
-                    <h3 class="lrm-modal-title">Code References: @keyToViewReferences</h3>
-                    <button class="lrm-modal-close" @onclick="CloseReferencesModal">x</button>
-                </div>
-
-                @if (isLoadingReferences)
-                {
-                    <p>Scanning source code...</p>
-                }
-                else if (referencesError != null)
-                {
-                    <div class="lrm-error p-sm">@referencesError</div>
-                }
-                else if (currentReferences != null)
-                {
-                    @if (currentReferences.Count == 0)
-                    {
-                        <p class="lrm-text-muted">
-                            <span class="lrm-status-icon lrm-status-unused">∅</span>
-                            No references found in source code. This key may be unused.
-                        </p>
-                    }
-                    else
-                    {
-                        <p class="text-success">Found @currentReferences.Count reference(s):</p>
-                        <table class="lrm-table">
-                            <thead>
-                                <tr>
-                                    <th>File</th>
-                                    <th>Line</th>
-                                    <th>Pattern</th>
-                                    <th>Confidence</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var reference in currentReferences)
-                                {
-                                    <tr>
-                                        <td><code title="@reference.File">@GetFileName(reference.File)</code></td>
-                                        <td>@reference.Line</td>
-                                        <td><code>@reference.Pattern</code></td>
-                                        <td>
-                                            @if (reference.Confidence == "High")
-                                            {
-                                                <span class="lrm-badge lrm-badge-success">@reference.Confidence</span>
-                                            }
-                                            else if (reference.Confidence == "Medium")
-                                            {
-                                                <span class="lrm-badge lrm-badge-warning">@reference.Confidence</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="lrm-badge lrm-badge-info">@reference.Confidence</span>
-                                            }
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    }
+                    var langCode = lang.Code ?? "default";
+                    <RadzenDataGridColumn TItem="ResourceKeyInfo" Title="@langCode" Width="200px">
+                        <Template Context="item">
+                            @{
+                                var value = item.Values.ContainsKey(langCode) ? item.Values[langCode] : null;
+                                var isEmpty = string.IsNullOrWhiteSpace(value);
+                            }
+                            @if (isEmpty)
+                            {
+                                <em class="rz-color-secondary">(empty)</em>
+                            }
+                            else if (value!.Length > 50)
+                            {
+                                <span title="@value">@value.Substring(0, 47)...</span>
+                            }
+                            else
+                            {
+                                <span>@value</span>
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
                 }
 
-                <div class="lrm-modal-footer">
-                    <button class="lrm-button" @onclick="CloseReferencesModal">Close</button>
-                </div>
-            </div>
-        </div>
-    }
-</div>
+                <RadzenDataGridColumn TItem="ResourceKeyInfo" Title="Actions" Width="150px" Sortable="false" Filterable="false" TextAlign="TextAlign.Center">
+                    <Template Context="item">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" JustifyContent="JustifyContent.Center">
+                            <RadzenButton Icon="edit" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                         Click="@(() => Navigation.NavigateTo($"/editor/key/{Uri.EscapeDataString(item.Key)}"))"
+                                         title="Edit and translate" />
+                            <RadzenButton Icon="code" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                         Click="@(() => ViewReferences(item.Key))" title="View code references" />
+                            <RadzenButton Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger"
+                                         Click="@(() => DeleteKey(item.Key))" title="Delete this key" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+
+        @if (filteredKeys.Count == 0)
+        {
+            <RadzenText class="rz-p-4 rz-color-secondary rz-text-align-center">No keys match the current filters.</RadzenText>
+        }
+    </RadzenCard>
+}
 
 @code {
+    private RadzenDataGrid<ResourceKeyInfo>? grid;
+
     // Data
     private List<ResourceKeyInfo>? keys;
     private List<ResourceFileInfo>? languages;
     private List<ResourceKeyInfo> filteredKeys = new();
+    private IList<ResourceKeyInfo> selectedItems = new List<ResourceKeyInfo>();
     private ScanResponse? scanResult;
     private ValidationResponse? validationResult;
 
@@ -433,7 +299,6 @@
     private bool isScanning = false;
     private bool isLoadingReferences = false;
     private string? errorMessage;
-    private int pageSize = 100;
 
     // Search & Filters
     private string searchFilter = "";
@@ -451,26 +316,11 @@
     private CancellationTokenSource? _searchDebounceToken;
     private const int SearchDebounceMs = 300;
 
-    // Delete modal
-    private bool showDeleteConfirm = false;
-    private string? keyToDelete;
-
-    // Bulk delete modal
-    private bool showBulkDeleteConfirm = false;
-    private bool isDeletingBulk = false;
-    private int bulkDeleteProgress = 0;
-
     // Multi-select state
     private HashSet<string> selectedKeys = new();
 
-    // Default language code (for display)
+    // Default language code
     private string? defaultLanguageCode;
-
-    // References modal
-    private bool showReferencesModal = false;
-    private string? keyToViewReferences;
-    private List<CodeReference>? currentReferences;
-    private string? referencesError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -492,10 +342,8 @@
 
         try
         {
-            // Load languages
             languages = (await ResourceApi.GetResourceFilesAsync())?.ToList();
 
-            // Initialize visible languages and find default language
             if (languages != null)
             {
                 var defaultLang = languages.FirstOrDefault(l => l.IsDefault);
@@ -510,18 +358,15 @@
                 }
             }
 
-            // Load all keys
             keys = (await ResourceApi.GetAllKeysAsync())?.ToList();
 
-            // Load validation results for missing/extra detection
             try
             {
                 validationResult = await ValidationApi.ValidateAsync();
                 ComputeValidationStatus();
             }
-            catch { /* Validation errors don't block editor */ }
+            catch { }
 
-            // Initial search (no filters)
             await PerformSearchAsync();
         }
         catch (Exception ex)
@@ -544,7 +389,6 @@
 
         if (validationResult != null)
         {
-            // Missing translations
             foreach (var kvp in validationResult.MissingKeys)
             {
                 foreach (var key in kvp.Value)
@@ -554,7 +398,6 @@
             }
             missingCount = missingTranslationKeys.Count;
 
-            // Extra keys
             foreach (var kvp in validationResult.ExtraKeys)
             {
                 foreach (var key in kvp.Value)
@@ -565,7 +408,6 @@
             extraCount = extraKeys.Count;
         }
 
-        // Duplicates
         if (keys != null)
         {
             duplicateCount = keys.Count(k => k.HasDuplicates);
@@ -582,15 +424,14 @@
             {
                 unusedKeys = scanResult.Unused?.ToHashSet() ?? new HashSet<string>();
                 missingFromResources = scanResult.Missing?.ToHashSet() ?? new HashSet<string>();
-
-                // Cache the scan results for use across pages
                 ScanCache.CacheScanResult(scanResult);
             }
             await PerformSearchAsync();
+            NotificationService.Notify(NotificationSeverity.Success, "Scan Complete", "Code scan finished successfully");
         }
         catch (Exception ex)
         {
-            errorMessage = $"Scan failed: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Scan Failed", ex.Message);
         }
         finally
         {
@@ -598,12 +439,11 @@
         }
     }
 
-    private void OnSearchKeyUp(KeyboardEventArgs e)
+    private void OnSearchInput(ChangeEventArgs e)
     {
-        // Debounce search to avoid overwhelming API on every keystroke
+        searchFilter = e.Value?.ToString() ?? "";
         _searchDebounceToken?.Cancel();
         _searchDebounceToken = new CancellationTokenSource();
-
         _ = DebounceSearchAsync(_searchDebounceToken.Token);
     }
 
@@ -617,10 +457,7 @@
                 await PerformSearchAsync();
             }
         }
-        catch (TaskCanceledException)
-        {
-            // Search was cancelled by new input - expected behavior
-        }
+        catch (TaskCanceledException) { }
     }
 
     private void ClearSearch()
@@ -632,7 +469,6 @@
 
     private void OnFilterModeChanged()
     {
-        // Immediate search on filter mode change (no debounce needed)
         _searchDebounceToken?.Cancel();
         _ = PerformSearchAsync();
     }
@@ -641,13 +477,11 @@
     {
         if (keys == null) return;
 
-        // Build status filters list
         var statusFilters = new List<string>();
         if (filterMissing) statusFilters.Add("missing");
         if (filterExtra) statusFilters.Add("extra");
         if (filterDuplicates) statusFilters.Add("duplicates");
 
-        // Determine filter mode
         string filterMode = "substring";
         if (useRegex) filterMode = "regex";
         else if (useWildcard) filterMode = "wildcard";
@@ -666,30 +500,24 @@
             if (response != null)
             {
                 filteredKeys = response.Results;
-
-                // Apply local filters for scan results (unused keys are not in API yet)
                 ApplyLocalFilters();
             }
         }
         catch
         {
-            // On API error, fall back to showing all keys
             filteredKeys = keys.OrderBy(k => k.Key).ToList();
         }
 
-        pageSize = 100; // Reset page size on filter change
         StateHasChanged();
     }
 
     private void ApplyLocalFilters()
     {
-        // Apply additional local-only filters (unused from code scan)
         if (filterUnused && unusedKeys.Any())
         {
             filteredKeys = filteredKeys.Where(k => unusedKeys.Contains(k.Key)).ToList();
         }
-
-        // Note: filterMissingFromCode shows a separate section, doesn't filter the main list
+        StateHasChanged();
     }
 
     private string GetSearchPlaceholder()
@@ -701,127 +529,107 @@
 
     private void ToggleLanguage(string langCode, bool visible)
     {
-        if (visible)
-        {
-            visibleLanguages.Add(langCode);
-        }
-        else
-        {
-            visibleLanguages.Remove(langCode);
-        }
+        if (visible) visibleLanguages.Add(langCode);
+        else visibleLanguages.Remove(langCode);
     }
 
-    private void ShowMore()
+    private void OnRowRender(RowRenderEventArgs<ResourceKeyInfo> args)
     {
-        pageSize += 100;
+        var status = GetKeyStatus(args.Data);
+        if (!string.IsNullOrEmpty(status.RowClass))
+        {
+            args.Attributes.Add("class", status.RowClass);
+        }
     }
 
-    // Status computation for a key
     private KeyStatus GetKeyStatus(ResourceKeyInfo key)
     {
         var status = new KeyStatus();
 
         if (key.HasDuplicates)
         {
-            status.Icons.Add(new StatusIcon("◆", "lrm-status-duplicate", "Duplicate key"));
-            status.RowClass = "lrm-row-duplicate";
+            status.Icons.Add(new StatusIcon("D", BadgeStyle.Warning, "Duplicate key"));
         }
 
         if (missingTranslationKeys.Contains(key.Key))
         {
-            status.Icons.Add(new StatusIcon("!", "lrm-status-missing", "Missing translations"));
-            if (string.IsNullOrEmpty(status.RowClass))
-                status.RowClass = "lrm-row-missing";
+            status.Icons.Add(new StatusIcon("M", BadgeStyle.Danger, "Missing translations"));
         }
 
         if (extraKeys.Contains(key.Key))
         {
-            status.Icons.Add(new StatusIcon("*", "lrm-status-extra", "Extra key (not in default language)"));
-            if (string.IsNullOrEmpty(status.RowClass))
-                status.RowClass = "lrm-row-extra";
+            status.Icons.Add(new StatusIcon("E", BadgeStyle.Info, "Extra key"));
         }
 
         if (unusedKeys.Contains(key.Key))
         {
-            status.Icons.Add(new StatusIcon("∅", "lrm-status-unused", "Unused in code"));
-            if (string.IsNullOrEmpty(status.RowClass))
-                status.RowClass = "lrm-row-unused";
+            status.Icons.Add(new StatusIcon("U", BadgeStyle.Light, "Unused in code"));
         }
 
         return status;
     }
 
-    // Delete key
-    private void DeleteKey(string key)
+    private async Task DeleteKey(string key)
     {
-        keyToDelete = key;
-        showDeleteConfirm = true;
-    }
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to delete the key <strong>{key}</strong>?<br/><br/>This will remove the key from all language files.",
+            "Confirm Delete",
+            new ConfirmOptions { OkButtonText = "Delete", CancelButtonText = "Cancel" });
 
-    private void CancelDelete()
-    {
-        showDeleteConfirm = false;
-        keyToDelete = null;
-    }
-
-    private async Task ConfirmDelete()
-    {
-        if (string.IsNullOrEmpty(keyToDelete)) return;
-
-        try
+        if (confirmed == true)
         {
-            await ResourceApi.DeleteKeyAsync(keyToDelete);
-            showDeleteConfirm = false;
-            keyToDelete = null;
-            await LoadResources();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Failed to delete key: {ex.Message}";
-            showDeleteConfirm = false;
+            try
+            {
+                await ResourceApi.DeleteKeyAsync(key);
+                NotificationService.Notify(NotificationSeverity.Success, "Deleted", $"Key '{key}' deleted successfully");
+                await LoadResources();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Delete Failed", ex.Message);
+            }
         }
     }
 
-    // View References - uses cache if available
     private async Task ViewReferences(string key)
     {
-        keyToViewReferences = key;
-        currentReferences = null;
-        referencesError = null;
-        showReferencesModal = true;
+        List<CodeReference>? refs = null;
+        string? error = null;
 
-        // Check cache first
         if (ScanCache.TryGetReferences(key, out var cachedRefs))
         {
-            currentReferences = cachedRefs ?? new List<CodeReference>();
-            isLoadingReferences = false;
+            refs = cachedRefs ?? new List<CodeReference>();
+        }
+        else
+        {
+            try
+            {
+                refs = await ScanApi.GetReferencesAsync(key) ?? new List<CodeReference>();
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+            }
+        }
+
+        if (error != null)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Scan Failed", error);
             return;
         }
 
-        // No cache, need to scan
-        isLoadingReferences = true;
+        if (refs == null || refs.Count == 0)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "No References", $"No code references found for '{key}'. This key may be unused.");
+        }
+        else
+        {
+            var message = $"Found {refs.Count} reference(s):\n" +
+                         string.Join("\n", refs.Take(10).Select(r => $"• {GetFileName(r.File)}:{r.Line}"));
+            if (refs.Count > 10) message += $"\n... and {refs.Count - 10} more";
 
-        try
-        {
-            currentReferences = await ScanApi.GetReferencesAsync(key) ?? new List<CodeReference>();
+            await DialogService.Alert(message, $"Code References: {key}");
         }
-        catch (Exception ex)
-        {
-            referencesError = $"Failed to scan for references: {ex.Message}";
-            currentReferences = new List<CodeReference>();
-        }
-        finally
-        {
-            isLoadingReferences = false;
-        }
-    }
-
-    private void CloseReferencesModal()
-    {
-        showReferencesModal = false;
-        keyToViewReferences = null;
-        currentReferences = null;
-        referencesError = null;
     }
 
     private string GetFileName(string filePath)
@@ -832,106 +640,74 @@
     }
 
     // Multi-select methods
-    private void ToggleKeySelection(string key)
+    private void ToggleKeySelection(string key, bool selected)
     {
-        if (selectedKeys.Contains(key))
-        {
-            selectedKeys.Remove(key);
-        }
-        else
-        {
-            selectedKeys.Add(key);
-        }
+        if (selected) selectedKeys.Add(key);
+        else selectedKeys.Remove(key);
     }
 
     private bool IsAllVisibleSelected()
     {
         if (!filteredKeys.Any()) return false;
-        var visibleKeys = filteredKeys.Take(pageSize).Select(k => k.Key).ToList();
+        var visibleKeys = filteredKeys.Take(50).Select(k => k.Key).ToList();
         return visibleKeys.All(k => selectedKeys.Contains(k));
     }
 
-    private void ToggleSelectAll(ChangeEventArgs e)
+    private void ToggleSelectAll(bool selectAll)
     {
-        var isChecked = (bool)(e.Value ?? false);
-        if (isChecked)
+        if (selectAll)
         {
-            // Select all visible keys
-            foreach (var key in filteredKeys.Take(pageSize))
+            foreach (var key in filteredKeys.Take(50))
             {
                 selectedKeys.Add(key.Key);
             }
         }
         else
         {
-            // Deselect all visible keys
-            var visibleKeys = filteredKeys.Take(pageSize).Select(k => k.Key).ToHashSet();
+            var visibleKeys = filteredKeys.Take(50).Select(k => k.Key).ToHashSet();
             selectedKeys.RemoveWhere(k => visibleKeys.Contains(k));
         }
     }
 
-    private void ClearSelection()
-    {
-        selectedKeys.Clear();
-    }
+    private void ClearSelection() => selectedKeys.Clear();
 
-    // Bulk operations
     private void BulkTranslate()
     {
         if (!selectedKeys.Any()) return;
-
-        // Navigate to translation page with selected keys
         var keysParam = string.Join(",", selectedKeys.Select(Uri.EscapeDataString));
         Navigation.NavigateTo($"/translation?keys={keysParam}");
     }
 
-    private void BulkDelete()
-    {
-        if (!selectedKeys.Any()) return;
-        showBulkDeleteConfirm = true;
-    }
-
-    private void CancelBulkDelete()
-    {
-        showBulkDeleteConfirm = false;
-        bulkDeleteProgress = 0;
-    }
-
-    private async Task ConfirmBulkDelete()
+    private async Task BulkDelete()
     {
         if (!selectedKeys.Any()) return;
 
-        isDeletingBulk = true;
-        bulkDeleteProgress = 0;
-        var keysToDelete = selectedKeys.ToList();
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to delete <strong>{selectedKeys.Count}</strong> selected keys?<br/><br/>This will remove the keys from all language files.",
+            "Confirm Bulk Delete",
+            new ConfirmOptions { OkButtonText = "Delete All", CancelButtonText = "Cancel" });
 
-        try
+        if (confirmed == true)
         {
+            var keysToDelete = selectedKeys.ToList();
+            var deleted = 0;
+
             foreach (var key in keysToDelete)
             {
-                await ResourceApi.DeleteKeyAsync(key);
-                bulkDeleteProgress++;
-                StateHasChanged(); // Update progress
+                try
+                {
+                    await ResourceApi.DeleteKeyAsync(key);
+                    deleted++;
+                }
+                catch { }
             }
 
-            // Clear selection and reload
             selectedKeys.Clear();
-            showBulkDeleteConfirm = false;
+            NotificationService.Notify(NotificationSeverity.Success, "Bulk Delete", $"Deleted {deleted} of {keysToDelete.Count} keys");
             await LoadResources();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Failed to delete some keys: {ex.Message}";
-            showBulkDeleteConfirm = false;
-        }
-        finally
-        {
-            isDeletingBulk = false;
-            bulkDeleteProgress = 0;
         }
     }
 
-    // Helper classes
     private class KeyStatus
     {
         public List<StatusIcon> Icons { get; set; } = new();
@@ -941,13 +717,13 @@
     private class StatusIcon
     {
         public string Symbol { get; set; }
-        public string CssClass { get; set; }
+        public BadgeStyle BadgeStyle { get; set; }
         public string Title { get; set; }
 
-        public StatusIcon(string symbol, string cssClass, string title)
+        public StatusIcon(string symbol, BadgeStyle style, string title)
         {
             Symbol = symbol;
-            CssClass = cssClass;
+            BadgeStyle = style;
             Title = title;
         }
     }

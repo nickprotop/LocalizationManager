@@ -2,152 +2,216 @@
 @using LocalizationManager.Services
 @using LocalizationManager.Models.Api
 @inject BackupApiClient BackupApi
+@inject DialogService DialogService
+@inject NotificationService NotificationService
 
 <PageTitle>Backups - Localization Manager</PageTitle>
 
-<div class="lrm-page">
-    <h1 class="lrm-page-title">Backup Management</h1>
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">Backup Management</RadzenText>
 
-    @if (isLoading)
+@if (isLoading)
+{
+    <RadzenCard>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+            <RadzenText>Loading backups...</RadzenText>
+        </RadzenStack>
+    </RadzenCard>
+}
+else if (errorMessage != null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="true" Close="@(() => errorMessage = null)">
+        <strong>Error:</strong> @errorMessage
+    </RadzenAlert>
+}
+else
+{
+    <!-- Actions Card -->
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+            <RadzenButton Text="@(isCreatingBackup ? "Creating..." : "Create Backup")" Icon="backup"
+                         Click="@CreateBackup" Disabled="@isCreatingBackup" IsBusy="@isCreatingBackup" />
+            <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadBackups" />
+        </RadzenStack>
+    </RadzenCard>
+
+    @if (backups != null && backups.Backups.Any())
     {
-        <div class="lrm-card">
-            <p>Loading backups...</p>
-        </div>
-    }
-    else if (errorMessage != null)
-    {
-        <div class="lrm-card lrm-error">
-            <h3>Error</h3>
-            <p>@errorMessage</p>
-        </div>
+        <RadzenCard class="rz-mb-4">
+            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-4">
+                Available Backups (@backups.Backups.Count)
+            </RadzenText>
+            <RadzenDataGrid Data="@backups.Backups.OrderByDescending(b => b.Timestamp)" TItem="BackupInfo"
+                           AllowSorting="true" AllowPaging="true" PageSize="10"
+                           PagerHorizontalAlign="HorizontalAlign.Center">
+                <Columns>
+                    <RadzenDataGridColumn TItem="BackupInfo" Property="FileName" Title="File" Width="200px">
+                        <Template Context="b">
+                            <code class="key-name">@b.FileName</code>
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="BackupInfo" Property="Version" Title="Version" Width="80px" TextAlign="TextAlign.Center">
+                        <Template Context="b">
+                            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"v{b.Version}")" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="BackupInfo" Property="Timestamp" Title="Created" Width="180px">
+                        <Template Context="b">
+                            @b.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="BackupInfo" Property="KeyCount" Title="Keys" Width="80px" TextAlign="TextAlign.Right" />
+                    <RadzenDataGridColumn TItem="BackupInfo" Property="ChangedKeys" Title="Changed" Width="100px">
+                        <Template Context="b">
+                            @if (b.ChangedKeys > 0)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="@($"{b.ChangedKeys} changed")" />
+                            }
+                            else
+                            {
+                                <RadzenText class="rz-color-secondary">No changes</RadzenText>
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="BackupInfo" Title="Actions" Width="200px" Sortable="false" TextAlign="TextAlign.Center">
+                        <Template Context="b">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" JustifyContent="JustifyContent.Center">
+                                <RadzenButton Text="Diff" Icon="compare" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                             Click="@(() => ShowRestorePreview(b))" title="Preview changes" />
+                                <RadzenButton Text="Restore" Icon="restore" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Secondary"
+                                             Click="@(() => ConfirmRestoreBackup(b))" title="Restore this backup" />
+                                <RadzenButton Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger"
+                                             Click="@(() => ConfirmDeleteBackup(b))" title="Delete this backup" />
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenCard>
     }
     else
     {
-        <div class="lrm-card">
-            <div class="lrm-actions">
-                <button class="lrm-button lrm-button-primary" @onclick="CreateBackup" disabled="@isCreatingBackup">
-                    @if (isCreatingBackup)
+        <RadzenCard>
+            <RadzenStack AlignItems="AlignItems.Center" Gap="1rem" class="rz-p-4">
+                <RadzenIcon Icon="inventory_2" Style="font-size: 3rem;" class="rz-color-secondary" />
+                <RadzenText class="rz-color-secondary">No backups found. Create your first backup to protect your localization files.</RadzenText>
+            </RadzenStack>
+        </RadzenCard>
+    }
+
+    <!-- Restore Preview / Diff View -->
+    @if (restorePreview != null && selectedBackup != null)
+    {
+        <RadzenCard class="rz-mb-4">
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                    <RadzenText TextStyle="TextStyle.H6">
+                        Changes: @selectedBackup.FileName (v@selectedBackup.Version)
+                    </RadzenText>
+                    <RadzenButton Icon="close" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@CancelRestore" />
+                </RadzenStack>
+
+                <!-- Summary Badges -->
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                    @if (restorePreview.AddedCount > 0)
                     {
-                        <text>Creating...</text>
+                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="@($"+{restorePreview.AddedCount} Added")" />
                     }
-                    else
+                    @if (restorePreview.ModifiedCount > 0)
                     {
-                        <text>Create Backup</text>
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="@($"~{restorePreview.ModifiedCount} Modified")" />
                     }
-                </button>
-                <button class="lrm-button" @onclick="LoadBackups">Refresh</button>
-            </div>
-        </div>
+                    @if (restorePreview.RemovedCount > 0)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="@($"-{restorePreview.RemovedCount} Removed")" />
+                    }
+                    @if (restorePreview.AddedCount == 0 && restorePreview.ModifiedCount == 0 && restorePreview.RemovedCount == 0)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="No differences" />
+                    }
+                </RadzenStack>
 
-        @if (backups != null && backups.Backups.Any())
-        {
-            <div class="lrm-card">
-                <h2>Available Backups (@backups.Backups.Count)</h2>
-                <table class="lrm-table">
-                    <thead>
-                        <tr>
-                            <th>File</th>
-                            <th>Version</th>
-                            <th>Timestamp</th>
-                            <th>Size</th>
-                            <th>Changes</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var backup in backups.Backups.OrderByDescending(b => b.Timestamp))
-                        {
-                            <tr>
-                                <td><code>@backup.FileName</code></td>
-                                <td>v@backup.Version</td>
-                                <td>@backup.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                                <td>@(backup.KeyCount) keys</td>
-                                <td>
-                                    <small>@(backup.ChangedKeys) changed</small>
-                                </td>
-                                <td>
-                                    <button class="lrm-button-small" @onclick="() => ShowRestorePreview(backup)">Preview</button>
-                                    <button class="lrm-button-small" @onclick="() => RestoreBackup(backup)">Restore</button>
-                                    <button class="lrm-button-small" @onclick="() => DeleteBackup(backup)">Delete</button>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
-        else
-        {
-            <div class="lrm-card">
-                <p>No backups found.</p>
-            </div>
-        }
-
-        @if (restorePreview != null)
-        {
-            <div class="lrm-card lrm-warning">
-                <h3>Restore Preview</h3>
-                <p>
-                    <strong>File:</strong> @selectedBackup?.FileName (v@selectedBackup?.Version)<br />
-                    <strong>Changes:</strong>
-                    @if (restorePreview.AddedCount > 0) { <span>+@restorePreview.AddedCount added </span> }
-                    @if (restorePreview.ModifiedCount > 0) { <span>~@restorePreview.ModifiedCount modified </span> }
-                    @if (restorePreview.RemovedCount > 0) { <span>-@restorePreview.RemovedCount removed</span> }
-                </p>
-
-                @if (restorePreview.Changes != null)
+                <!-- Tabbed Diff View -->
+                @if (restorePreview.Changes != null && (restorePreview.AddedCount > 0 || restorePreview.ModifiedCount > 0 || restorePreview.RemovedCount > 0))
                 {
-                    @if (restorePreview.Changes.Added?.Any() == true)
-                    {
-                        <details class="lrm-details">
-                            <summary>Added keys (@restorePreview.Changes.Added.Count)</summary>
-                            <ul>
-                                @foreach (var key in restorePreview.Changes.Added.Take(20))
-                                {
-                                    <li><code>@key</code></li>
-                                }
-                            </ul>
-                        </details>
-                    }
+                    <RadzenTabs>
+                        <Tabs>
+                            @if (restorePreview.Changes.Added?.Any() == true)
+                            {
+                                <RadzenTabsItem Text="@($"Added ({restorePreview.Changes.Added.Count})")">
+                                    <RadzenDataGrid Data="@restorePreview.Changes.Added" TItem="string"
+                                                   AllowPaging="true" PageSize="10" PagerHorizontalAlign="HorizontalAlign.Center">
+                                        <Columns>
+                                            <RadzenDataGridColumn TItem="string" Title="Key">
+                                                <Template Context="key">
+                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                        <RadzenIcon Icon="add_circle" Style="color: var(--rz-success);" />
+                                                        <code class="key-name rz-color-success">@key</code>
+                                                    </RadzenStack>
+                                                </Template>
+                                            </RadzenDataGridColumn>
+                                        </Columns>
+                                    </RadzenDataGrid>
+                                </RadzenTabsItem>
+                            }
 
-                    @if (restorePreview.Changes.Modified?.Any() == true)
-                    {
-                        <details class="lrm-details">
-                            <summary>Modified keys (@restorePreview.Changes.Modified.Count)</summary>
-                            <ul>
-                                @foreach (var mod in restorePreview.Changes.Modified.Take(20))
-                                {
-                                    <li>
-                                        <code>@mod.Key</code>:
-                                        <del>@mod.CurrentValue</del> → <ins>@mod.BackupValue</ins>
-                                    </li>
-                                }
-                            </ul>
-                        </details>
-                    }
+                            @if (restorePreview.Changes.Modified?.Any() == true)
+                            {
+                                <RadzenTabsItem Text="@($"Modified ({restorePreview.Changes.Modified.Count})")">
+                                    <RadzenDataGrid Data="@restorePreview.Changes.Modified" TItem="ModifiedKeyInfo"
+                                                   AllowPaging="true" PageSize="10" PagerHorizontalAlign="HorizontalAlign.Center">
+                                        <Columns>
+                                            <RadzenDataGridColumn TItem="ModifiedKeyInfo" Property="Key" Title="Key" Width="200px">
+                                                <Template Context="mod">
+                                                    <code class="key-name">@mod.Key</code>
+                                                </Template>
+                                            </RadzenDataGridColumn>
+                                            <RadzenDataGridColumn TItem="ModifiedKeyInfo" Title="Current Value">
+                                                <Template Context="mod">
+                                                    <span class="rz-color-danger">@mod.CurrentValue</span>
+                                                </Template>
+                                            </RadzenDataGridColumn>
+                                            <RadzenDataGridColumn TItem="ModifiedKeyInfo" Title="Backup Value">
+                                                <Template Context="mod">
+                                                    <span class="rz-color-success">@mod.BackupValue</span>
+                                                </Template>
+                                            </RadzenDataGridColumn>
+                                        </Columns>
+                                    </RadzenDataGrid>
+                                </RadzenTabsItem>
+                            }
 
-                    @if (restorePreview.Changes.Removed?.Any() == true)
-                    {
-                        <details class="lrm-details">
-                            <summary>Removed keys (@restorePreview.Changes.Removed.Count)</summary>
-                            <ul>
-                                @foreach (var key in restorePreview.Changes.Removed.Take(20))
-                                {
-                                    <li><code>@key</code></li>
-                                }
-                            </ul>
-                        </details>
-                    }
+                            @if (restorePreview.Changes.Removed?.Any() == true)
+                            {
+                                <RadzenTabsItem Text="@($"Removed ({restorePreview.Changes.Removed.Count})")">
+                                    <RadzenDataGrid Data="@restorePreview.Changes.Removed" TItem="string"
+                                                   AllowPaging="true" PageSize="10" PagerHorizontalAlign="HorizontalAlign.Center">
+                                        <Columns>
+                                            <RadzenDataGridColumn TItem="string" Title="Key">
+                                                <Template Context="key">
+                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                        <RadzenIcon Icon="remove_circle" Style="color: var(--rz-danger);" />
+                                                        <code class="key-name rz-color-danger">@key</code>
+                                                    </RadzenStack>
+                                                </Template>
+                                            </RadzenDataGridColumn>
+                                        </Columns>
+                                    </RadzenDataGrid>
+                                </RadzenTabsItem>
+                            }
+                        </Tabs>
+                    </RadzenTabs>
                 }
 
-                <div class="lrm-actions">
-                    <button class="lrm-button lrm-button-primary" @onclick="ConfirmRestore">Confirm Restore</button>
-                    <button class="lrm-button" @onclick="CancelRestore">Cancel</button>
-                </div>
-            </div>
-        }
+                <!-- Action Buttons -->
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                    <RadzenButton Text="Restore This Backup" Icon="restore" Click="@ConfirmRestore" />
+                    <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@CancelRestore" />
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenCard>
     }
-</div>
+}
 
 @code {
     private BackupListResponse? backups;
@@ -189,11 +253,13 @@
         try
         {
             await BackupApi.CreateBackupAsync();
+            NotificationService.Notify(NotificationSeverity.Success, "Backup Created", "Backup created successfully");
             await LoadBackups();
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to create backup: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Backup Failed", ex.Message);
         }
         finally
         {
@@ -213,32 +279,27 @@
         catch (Exception ex)
         {
             errorMessage = $"Failed to load restore preview: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Preview Failed", ex.Message);
+        }
+    }
+
+    private async Task ConfirmRestoreBackup(BackupInfo backup)
+    {
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to restore <strong>{backup.FileName}</strong> (v{backup.Version})?<br/><br/>A backup of the current state will be created before restoring.",
+            "Confirm Restore",
+            new ConfirmOptions { OkButtonText = "Restore", CancelButtonText = "Cancel" });
+
+        if (confirmed == true)
+        {
+            await RestoreBackup(backup);
         }
     }
 
     private async Task ConfirmRestore()
     {
         if (selectedBackup == null) return;
-
-        errorMessage = null;
-
-        try
-        {
-            await BackupApi.RestoreBackupAsync(selectedBackup.FileName, selectedBackup.Version, preview: false);
-            restorePreview = null;
-            selectedBackup = null;
-            await LoadBackups();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Failed to restore backup: {ex.Message}";
-        }
-    }
-
-    private void CancelRestore()
-    {
-        restorePreview = null;
-        selectedBackup = null;
+        await RestoreBackup(selectedBackup);
     }
 
     private async Task RestoreBackup(BackupInfo backup)
@@ -248,11 +309,34 @@
         try
         {
             await BackupApi.RestoreBackupAsync(backup.FileName, backup.Version, preview: false);
+            NotificationService.Notify(NotificationSeverity.Success, "Restore Complete", $"Restored {backup.FileName} v{backup.Version}");
+            restorePreview = null;
+            selectedBackup = null;
             await LoadBackups();
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to restore backup: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Restore Failed", ex.Message);
+        }
+    }
+
+    private void CancelRestore()
+    {
+        restorePreview = null;
+        selectedBackup = null;
+    }
+
+    private async Task ConfirmDeleteBackup(BackupInfo backup)
+    {
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to delete <strong>{backup.FileName}</strong> (v{backup.Version})?<br/><br/>This action cannot be undone.",
+            "Confirm Delete",
+            new ConfirmOptions { OkButtonText = "Delete", CancelButtonText = "Cancel" });
+
+        if (confirmed == true)
+        {
+            await DeleteBackup(backup);
         }
     }
 
@@ -263,11 +347,13 @@
         try
         {
             await BackupApi.DeleteBackupAsync(backup.FileName, backup.Version);
+            NotificationService.Notify(NotificationSeverity.Success, "Deleted", $"Backup {backup.FileName} v{backup.Version} deleted");
             await LoadBackups();
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to delete backup: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Delete Failed", ex.Message);
         }
     }
 }

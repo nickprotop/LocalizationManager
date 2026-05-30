@@ -4,160 +4,140 @@
 @inject MergeDuplicatesApiClient MergeApi
 @inject ResourceApiClient ResourceApi
 @inject NavigationManager Navigation
+@inject NotificationService NotificationService
+@inject DialogService DialogService
 
 <PageTitle>Merge Duplicates - Localization Manager</PageTitle>
 
-<div class="lrm-page">
-    <h1 class="lrm-page-title">
-        <a href="/editor" class="lrm-back-link">← Editor</a>
-        Merge Duplicate Keys
-    </h1>
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+    <RadzenButton Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("/editor"))" />
+    <RadzenText TextStyle="TextStyle.H4">Merge Duplicate Keys</RadzenText>
+</RadzenStack>
 
-    @if (errorMessage != null)
-    {
-        <div class="lrm-card lrm-error">
-            <h3>Error</h3>
-            <p>@errorMessage</p>
-        </div>
-    }
+@if (errorMessage != null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="true" Close="@(() => errorMessage = null)" class="rz-mb-4">
+        <strong>Error:</strong> @errorMessage
+    </RadzenAlert>
+}
 
-    @if (successMessage != null)
-    {
-        <div class="lrm-card lrm-success">
-            <p>@successMessage</p>
-            <div class="lrm-actions">
-                <button class="lrm-button lrm-button-primary" @onclick="LoadDuplicates">Refresh</button>
-                <a href="/editor" class="lrm-button">Back to Editor</a>
-            </div>
-        </div>
-    }
+@if (successMessage != null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Success" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="true" Close="@(() => successMessage = null)" class="rz-mb-4">
+        @successMessage
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-2">
+            <RadzenButton Text="Refresh" Size="ButtonSize.Small" Click="@LoadDuplicates" />
+            <RadzenButton Text="Back to Editor" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("/editor"))" />
+        </RadzenStack>
+    </RadzenAlert>
+}
 
-    @if (isLoading)
-    {
-        <div class="lrm-card">
-            <p>Loading duplicates...</p>
-        </div>
-    }
-    else if (duplicates == null || duplicates.Count == 0)
-    {
-        <div class="lrm-card lrm-success">
-            <h3>No Duplicates Found</h3>
-            <p>All keys in your resource files are unique. Great job!</p>
-            <div class="lrm-actions">
-                <a href="/editor" class="lrm-button">Back to Editor</a>
-            </div>
-        </div>
-    }
-    else
-    {
-        <div class="lrm-card">
-            <div class="lrm-editor-toolbar">
-                <div>
-                    <strong>@duplicates.Count</strong> duplicate key(s) found
-                </div>
-                <div class="lrm-actions" style="margin: 0;">
-                    <button class="lrm-button lrm-button-danger"
-                            @onclick="MergeAllDuplicates"
-                            disabled="@isMerging">
-                        @if (isMerging)
-                        {
-                            <text>Merging...</text>
-                        }
-                        else
-                        {
-                            <text>Merge All (Keep First)</text>
-                        }
-                    </button>
-                </div>
-            </div>
-        </div>
+@if (isLoading)
+{
+    <RadzenCard>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+            <RadzenText>Loading duplicates...</RadzenText>
+        </RadzenStack>
+    </RadzenCard>
+}
+else if (duplicates == null || duplicates.Count == 0)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Success" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="false">
+        <RadzenText TextStyle="TextStyle.H6">No Duplicates Found</RadzenText>
+        <RadzenText>All keys in your resource files are unique.</RadzenText>
+        <RadzenButton Text="Back to Editor" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" class="rz-mt-2"
+                     Click="@(() => Navigation.NavigateTo("/editor"))" />
+    </RadzenAlert>
+}
+else
+{
+    <RadzenCard class="rz-mb-4">
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+            <RadzenText><strong>@duplicates.Count</strong> duplicate key(s) found</RadzenText>
+            <RadzenButton Text="@(isMerging ? "Merging..." : "Merge All (Keep First)")"
+                         Icon="merge_type" ButtonStyle="ButtonStyle.Danger"
+                         Click="@MergeAllDuplicates" Disabled="@isMerging" IsBusy="@isMerging" />
+        </RadzenStack>
+    </RadzenCard>
 
-        @foreach (var dup in duplicates)
-        {
-            <div class="lrm-card">
-                <div class="lrm-modal-header" style="border: none; padding: 0; margin-bottom: 1rem;">
-                    <h3 class="lrm-modal-title" style="margin: 0;">
-                        <span class="lrm-status-icon lrm-status-duplicate">◆</span>
-                        @dup.Key
-                    </h3>
-                    <div class="lrm-inline-actions">
-                        <span class="lrm-badge lrm-badge-warning">@dup.OccurrenceCount occurrences</span>
-                        <button class="lrm-button-small lrm-button-primary"
-                                @onclick="() => MergeSingleKey(dup.Key)"
-                                disabled="@isMerging">
-                            Merge (Keep First)
-                        </button>
-                    </div>
-                </div>
+    @foreach (var dup in duplicates)
+    {
+        <RadzenCard class="rz-mb-4">
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="D" />
+                        <code class="key-name">@dup.Key</code>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="@($"{dup.OccurrenceCount} occurrences")" />
+                        <RadzenButton Text="Merge (Keep First)" Size="ButtonSize.Small"
+                                     Click="@(() => MergeSingleKey(dup.Key))" Disabled="@isMerging" />
+                    </RadzenStack>
+                </RadzenStack>
 
                 @if (expandedKeys.Contains(dup.Key))
                 {
-                    <div class="mb-md">
-                        <button class="lrm-button-small" @onclick="() => ToggleExpand(dup.Key)">
-                            Hide Details
-                        </button>
-                    </div>
+                    <RadzenButton Text="Hide Details" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                 Click="@(() => ToggleExpand(dup.Key))" />
 
                     @foreach (var langValues in dup.ValuesByLanguage)
                     {
-                        <div class="mb-md">
-                            <strong>@langValues.Key:</strong>
+                        <RadzenFieldset Text="@langValues.Key">
                             @if (langValues.Value.Count > 1)
                             {
-                                <div class="mt-sm">
-                                    @for (int i = 0; i < langValues.Value.Count; i++)
-                                    {
-                                        var index = i + 1;
-                                        var value = langValues.Value[i];
-                                        var isFirst = i == 0;
-                                        <div class="lrm-merge-option @(isFirst ? "selected" : "")">
-                                            <div class="lrm-merge-meta">
-                                                Occurrence @index
-                                                @if (isFirst)
-                                                {
-                                                    <span class="lrm-badge lrm-badge-success">Will Keep</span>
-                                                }
-                                                else
-                                                {
-                                                    <span class="lrm-badge lrm-badge-error">Will Remove</span>
-                                                }
-                                            </div>
-                                            <div class="lrm-merge-value">
-                                                @if (string.IsNullOrEmpty(value))
-                                                {
-                                                    <span class="lrm-cell-empty">(empty)</span>
-                                                }
-                                                else
-                                                {
-                                                    @value
-                                                }
-                                            </div>
-                                        </div>
-                                    }
-                                </div>
+                                @for (int i = 0; i < langValues.Value.Count; i++)
+                                {
+                                    var index = i + 1;
+                                    var value = langValues.Value[i];
+                                    var isFirst = i == 0;
+                                    <RadzenCard class="rz-mb-2" Style="@(isFirst ? "border-left: 3px solid var(--rz-success);" : "border-left: 3px solid var(--rz-danger);")">
+                                        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                                            <RadzenText>Occurrence @index</RadzenText>
+                                            @if (isFirst)
+                                            {
+                                                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Will Keep" />
+                                            }
+                                            else
+                                            {
+                                                <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="Will Remove" />
+                                            }
+                                        </RadzenStack>
+                                        <RadzenText class="rz-mt-2">
+                                            @if (string.IsNullOrEmpty(value))
+                                            {
+                                                <em class="rz-color-secondary">(empty)</em>
+                                            }
+                                            else
+                                            {
+                                                @value
+                                            }
+                                        </RadzenText>
+                                    </RadzenCard>
+                                }
                             }
                             else
                             {
-                                <span class="lrm-text-muted"> @(langValues.Value.FirstOrDefault() ?? "(empty)")</span>
+                                <RadzenText class="rz-color-secondary">@(langValues.Value.FirstOrDefault() ?? "(empty)")</RadzenText>
                             }
-                        </div>
+                        </RadzenFieldset>
                     }
                 }
                 else
                 {
-                    <div>
-                        <button class="lrm-button-small" @onclick="() => ToggleExpand(dup.Key)">
-                            Show Details
-                        </button>
-                        <span class="lrm-text-muted ml-md">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenButton Text="Show Details" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                     Click="@(() => ToggleExpand(dup.Key))" />
+                        <RadzenText class="rz-color-secondary">
                             Languages: @string.Join(", ", dup.ValuesByLanguage.Keys)
-                        </span>
-                    </div>
+                        </RadzenText>
+                    </RadzenStack>
                 }
-            </div>
-        }
+            </RadzenStack>
+        </RadzenCard>
     }
-</div>
+}
 
 @code {
     private List<DuplicateKeyInfo>? duplicates;
@@ -218,6 +198,7 @@
             if (result?.Success == true)
             {
                 successMessage = result.Message ?? $"Successfully merged '{key}'";
+                NotificationService.Notify(NotificationSeverity.Success, "Merged", successMessage);
                 await LoadDuplicates();
             }
             else
@@ -228,6 +209,7 @@
         catch (Exception ex)
         {
             errorMessage = $"Failed to merge key: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Merge Failed", ex.Message);
         }
         finally
         {
@@ -239,6 +221,13 @@
     {
         if (duplicates == null || duplicates.Count == 0) return;
 
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to merge all <strong>{duplicates.Count}</strong> duplicate keys?<br/><br/>This will keep the first occurrence and remove duplicates.",
+            "Confirm Merge All",
+            new ConfirmOptions { OkButtonText = "Merge All", CancelButtonText = "Cancel" });
+
+        if (confirmed != true) return;
+
         isMerging = true;
         errorMessage = null;
         successMessage = null;
@@ -249,6 +238,7 @@
             if (result?.Success == true)
             {
                 successMessage = result.Message ?? $"Successfully merged {result.MergedCount} duplicate key(s)";
+                NotificationService.Notify(NotificationSeverity.Success, "Merged All", successMessage);
                 await LoadDuplicates();
             }
             else
@@ -259,6 +249,7 @@
         catch (Exception ex)
         {
             errorMessage = $"Failed to merge duplicates: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Merge Failed", ex.Message);
         }
         finally
         {

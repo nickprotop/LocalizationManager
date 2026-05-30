@@ -9,7 +9,10 @@
     <title>Localization Resource Manager</title>
     <base href="~/" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
-    <link rel="stylesheet" href="css/terminal-theme.css" />
+    <!-- Radzen default theme -->
+    <link rel="stylesheet" href="lib/radzen/css/default-base.css" />
+    <!-- Custom theme overrides -->
+    <link rel="stylesheet" href="css/app.css" />
     <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered" />
 </head>
 <body>
@@ -20,6 +23,7 @@
         An error has occurred. Reload the page or check the console.
     </div>
 
+    <script src="lib/radzen/Radzen.Blazor.js"></script>
     <script src="_framework/blazor.server.js"></script>
     <script>
         function downloadFile(filename, base64Data) {

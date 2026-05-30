@@ -1,0 +1,65 @@
+@using LocalizationManager.Models.Api
+
+<RadzenStack Gap="1rem">
+    @if (References == null || !References.Any())
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="false">
+            No references found in source code. This key may be unused.
+        </RadzenAlert>
+    }
+    else
+    {
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+            Found @References.Count reference(s):
+        </RadzenText>
+        <RadzenDataGrid Data="@References" TItem="CodeReference"
+                       AllowSorting="true" AllowPaging="true" PageSize="10"
+                       PagerHorizontalAlign="HorizontalAlign.Center"
+                       Style="height: 350px;">
+            <Columns>
+                <RadzenDataGridColumn TItem="CodeReference" Property="File" Title="File">
+                    <Template Context="reference">
+                        <code title="@reference.File">@GetFileName(reference.File)</code>
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="CodeReference" Property="Line" Title="Line" Width="70px" TextAlign="TextAlign.Center" />
+                <RadzenDataGridColumn TItem="CodeReference" Property="Pattern" Title="Pattern" Width="150px">
+                    <Template Context="reference">
+                        <code>@reference.Pattern</code>
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="CodeReference" Property="Confidence" Title="Confidence" Width="100px" TextAlign="TextAlign.Center">
+                    <Template Context="reference">
+                        @if (reference.Confidence == "High")
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="@reference.Confidence" />
+                        }
+                        else if (reference.Confidence == "Medium")
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="@reference.Confidence" />
+                        }
+                        else
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@reference.Confidence" />
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    }
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public List<CodeReference>? References { get; set; }
+
+    [Parameter]
+    public string? KeyName { get; set; }
+
+    private string GetFileName(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath)) return filePath ?? "";
+        var lastSlash = filePath.LastIndexOfAny(new[] { '/', '\\' });
+        return lastSlash >= 0 ? filePath.Substring(lastSlash + 1) : filePath;
+    }
+}

@@ -62,6 +62,13 @@ public class ResourceEntry
     public string? SourcePluralText { get; set; }
 
     /// <summary>
+    /// Source text for this entry (PO format: msgid).
+    /// For PO format, this contains the msgid which is the untranslated source text.
+    /// For other formats, this is typically populated with the Value from the default language file.
+    /// </summary>
+    public string? SourceText { get; set; }
+
+    /// <summary>
     /// Indicates if this entry is empty/null.
     /// For plural entries, checks if all plural forms are empty.
     /// </summary>

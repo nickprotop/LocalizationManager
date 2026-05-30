@@ -48,6 +48,8 @@ public class KeyLevelMerger
                     Comment = entry.Comment,
                     IsPlural = entry.IsPlural,
                     PluralForms = entry.PluralForms,
+                    SourceText = entry.SourceText,
+                    SourcePluralText = entry.SourcePluralText,
                     BaseHash = null
                 });
             }
@@ -63,6 +65,8 @@ public class KeyLevelMerger
                     Comment = entry.Comment,
                     IsPlural = entry.IsPlural,
                     PluralForms = entry.PluralForms,
+                    SourceText = entry.SourceText,
+                    SourcePluralText = entry.SourcePluralText,
                     BaseHash = baseHash
                 });
             }
@@ -497,6 +501,18 @@ public class LocalEntry
     public bool IsPlural { get; init; }
     public Dictionary<string, string>? PluralForms { get; init; }
     public required string Hash { get; init; }
+
+    /// <summary>
+    /// Source text for the key (value from default language file, msgid for PO format).
+    /// Only set for entries from the default/source language.
+    /// </summary>
+    public string? SourceText { get; init; }
+
+    /// <summary>
+    /// Source plural text for plural keys (msgid_plural for PO, "other" form for others).
+    /// Only set for plural entries from the default/source language.
+    /// </summary>
+    public string? SourcePluralText { get; init; }
 }
 
 /// <summary>

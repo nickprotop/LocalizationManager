@@ -3,153 +3,159 @@
 @using LocalizationManager.Models.Api
 @inject StatsApiClient StatsApi
 @inject ValidationApiClient ValidationApi
+@inject NavigationManager Navigation
 
 <PageTitle>Dashboard - Localization Manager</PageTitle>
 
-<div class="lrm-page">
-    <h1 class="lrm-page-title">Dashboard</h1>
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">Dashboard</RadzenText>
 
-    @if (isLoading)
+@if (isLoading)
+{
+    <RadzenCard>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+            <RadzenText>Loading dashboard...</RadzenText>
+        </RadzenStack>
+    </RadzenCard>
+}
+else if (errorMessage != null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="false">
+        <strong>Error:</strong> @errorMessage
+    </RadzenAlert>
+}
+else if (stats != null)
+{
+    <RadzenCard class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Welcome to Localization Manager</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body1" class="rz-mb-4">
+            A powerful CLI/TUI/Web tool for managing .NET localization files.
+        </RadzenText>
+
+        <RadzenRow Gap="1rem" class="rz-mb-4">
+            <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+                <RadzenCard>
+                    <RadzenText TextStyle="TextStyle.Overline" class="rz-color-secondary">Resource Files</RadzenText>
+                    <RadzenText TextStyle="TextStyle.H3" class="rz-color-primary">@stats.Languages.Count</RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+                <RadzenCard>
+                    <RadzenText TextStyle="TextStyle.Overline" class="rz-color-secondary">Total Keys</RadzenText>
+                    <RadzenText TextStyle="TextStyle.H3" class="rz-color-primary">@stats.TotalKeys</RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+                <RadzenCard>
+                    <RadzenText TextStyle="TextStyle.Overline" class="rz-color-secondary">Languages</RadzenText>
+                    <RadzenText TextStyle="TextStyle.H3" class="rz-color-primary">@stats.Languages.Count(l => !l.IsDefault)</RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+                <RadzenCard>
+                    <RadzenText TextStyle="TextStyle.Overline" class="rz-color-secondary">Translation Coverage</RadzenText>
+                    <RadzenText TextStyle="TextStyle.H3" class="rz-color-primary">@stats.OverallCoverage%</RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+            <RadzenButton Text="Open Editor" Icon="edit" Click="@(() => Navigation.NavigateTo("/editor"))" />
+            <RadzenButton Text="Validate Resources" Icon="check_circle" ButtonStyle="ButtonStyle.Secondary" Click="@(() => Navigation.NavigateTo("/validation"))" />
+            <RadzenButton Text="Translate Missing" Icon="translate" ButtonStyle="ButtonStyle.Secondary" Click="@(() => Navigation.NavigateTo("/translation"))" />
+        </RadzenStack>
+    </RadzenCard>
+
+    @if (validationSummary != null && validationSummary.HasIssues)
     {
-        <div class="lrm-card">
-            <p>Loading dashboard...</p>
-        </div>
+        <RadzenAlert AlertStyle="AlertStyle.Warning" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="false" class="rz-mb-4">
+            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Validation Issues Found</RadzenText>
+            <RadzenText>@validationSummary.TotalIssues total issue(s) detected:</RadzenText>
+            <ul class="rz-mt-2">
+                @if (validationSummary.MissingCount > 0)
+                {
+                    <li>Missing translations: @validationSummary.MissingCount</li>
+                }
+                @if (validationSummary.DuplicatesCount > 0)
+                {
+                    <li>Duplicate keys: @validationSummary.DuplicatesCount</li>
+                }
+                @if (validationSummary.EmptyCount > 0)
+                {
+                    <li>Empty values: @validationSummary.EmptyCount</li>
+                }
+                @if (validationSummary.ExtraCount > 0)
+                {
+                    <li>Extra keys: @validationSummary.ExtraCount</li>
+                }
+                @if (validationSummary.PlaceholderCount > 0)
+                {
+                    <li>Placeholder mismatches: @validationSummary.PlaceholderCount</li>
+                }
+            </ul>
+            <RadzenButton Text="View Details" Size="ButtonSize.Small" class="rz-mt-2" Click="@(() => Navigation.NavigateTo("/validation"))" />
+        </RadzenAlert>
     }
-    else if (errorMessage != null)
+    else if (validationSummary != null)
     {
-        <div class="lrm-card lrm-error">
-            <h3>Error</h3>
-            <p>@errorMessage</p>
-        </div>
+        <RadzenAlert AlertStyle="AlertStyle.Success" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="false" class="rz-mb-4">
+            <RadzenText TextStyle="TextStyle.H6">All Validations Passed</RadzenText>
+            <RadzenText>No issues found in resource files.</RadzenText>
+        </RadzenAlert>
     }
-    else if (stats != null)
-    {
-        <div class="lrm-card">
-            <h2>Welcome to Localization Manager</h2>
-            <p>A powerful CLI/TUI/Web tool for managing .NET .resx localization files.</p>
 
-            <div class="lrm-stats">
-                <div class="lrm-stat-card">
-                    <div class="lrm-stat-value">@stats.Languages.Count</div>
-                    <div class="lrm-stat-label">Resource Files</div>
-                </div>
-                <div class="lrm-stat-card">
-                    <div class="lrm-stat-value">@stats.TotalKeys</div>
-                    <div class="lrm-stat-label">Total Keys</div>
-                </div>
-                <div class="lrm-stat-card">
-                    <div class="lrm-stat-value">@stats.Languages.Count(l => !l.IsDefault)</div>
-                    <div class="lrm-stat-label">Languages</div>
-                </div>
-                <div class="lrm-stat-card">
-                    <div class="lrm-stat-value">@stats.OverallCoverage%</div>
-                    <div class="lrm-stat-label">Translation Coverage</div>
-                </div>
-            </div>
-
-            <div class="lrm-actions">
-                <a href="/editor" class="lrm-button lrm-button-primary">
-                    ✏️ Open Editor
-                </a>
-                <a href="/validation" class="lrm-button">
-                    ✓ Validate Resources
-                </a>
-                <a href="/translation" class="lrm-button">
-                    🌐 Translate Missing
-                </a>
-            </div>
-        </div>
-
-        @if (validationSummary != null && validationSummary.HasIssues)
+    <RadzenCard class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-4">Language Coverage</RadzenText>
+        @if (stats.Languages.Any())
         {
-            <div class="lrm-card lrm-warning">
-                <h3>⚠️ Validation Issues Found</h3>
-                <p>@validationSummary.TotalIssues total issue(s) detected:</p>
-                <ul>
-                    @if (validationSummary.MissingCount > 0)
-                    {
-                        <li>Missing translations: @validationSummary.MissingCount</li>
-                    }
-                    @if (validationSummary.DuplicatesCount > 0)
-                    {
-                        <li>Duplicate keys: @validationSummary.DuplicatesCount</li>
-                    }
-                    @if (validationSummary.EmptyCount > 0)
-                    {
-                        <li>Empty values: @validationSummary.EmptyCount</li>
-                    }
-                    @if (validationSummary.ExtraCount > 0)
-                    {
-                        <li>Extra keys: @validationSummary.ExtraCount</li>
-                    }
-                    @if (validationSummary.PlaceholderCount > 0)
-                    {
-                        <li>Placeholder mismatches: @validationSummary.PlaceholderCount</li>
-                    }
-                </ul>
-                <a href="/validation" class="lrm-button">View Details</a>
-            </div>
+            <RadzenDataGrid Data="@stats.Languages.OrderByDescending(l => l.IsDefault).ThenBy(l => l.LanguageCode)" TItem="LanguageStats" AllowSorting="true">
+                <Columns>
+                    <RadzenDataGridColumn TItem="LanguageStats" Property="LanguageCode" Title="Language" Width="150px">
+                        <Template Context="lang">
+                            @lang.LanguageCode
+                            @if (lang.IsDefault)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Default" class="rz-ml-2" />
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="LanguageStats" Property="FilePath" Title="File" Width="200px">
+                        <Template Context="lang">
+                            @Path.GetFileName(lang.FilePath)
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="LanguageStats" Title="Progress" Width="auto" Sortable="false">
+                        <Template Context="lang">
+                            <RadzenStack Gap="0.25rem">
+                                <RadzenProgressBar Value="@lang.Coverage" Max="100" ShowValue="false" Style="height: 8px;" />
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@lang.TranslatedCount / @lang.TotalCount keys</RadzenText>
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="LanguageStats" Property="Coverage" Title="Coverage" Width="100px" TextAlign="TextAlign.Right">
+                        <Template Context="lang">
+                            <RadzenText TextStyle="TextStyle.Body2" class="@(lang.Coverage == 100 ? "rz-color-success" : lang.Coverage < 50 ? "rz-color-danger" : "")">
+                                @lang.Coverage%
+                            </RadzenText>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
         }
-        else if (validationSummary != null)
+        else
         {
-            <div class="lrm-card lrm-success">
-                <h3>✓ All Validations Passed</h3>
-                <p>No issues found in resource files.</p>
-            </div>
+            <RadzenText class="rz-color-secondary">No resource files found.</RadzenText>
         }
+    </RadzenCard>
+}
 
-        <div class="lrm-card">
-            <h3>Language Coverage</h3>
-            @if (stats.Languages.Any())
-            {
-                <table class="lrm-table">
-                    <thead>
-                        <tr>
-                            <th>Language</th>
-                            <th>File</th>
-                            <th>Progress</th>
-                            <th>Coverage</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var lang in stats.Languages.OrderByDescending(l => l.IsDefault).ThenBy(l => l.LanguageCode))
-                        {
-                            <tr>
-                                <td>
-                                    @lang.LanguageCode
-                                    @if (lang.IsDefault)
-                                    {
-                                        <span class="lrm-badge">Default</span>
-                                    }
-                                </td>
-                                <td>@Path.GetFileName(lang.FilePath)</td>
-                                <td>
-                                    <div class="lrm-progress-bar">
-                                        <div class="lrm-progress-fill" style="width: @lang.Coverage%"></div>
-                                    </div>
-                                    <small>@lang.TranslatedCount / @lang.TotalCount keys</small>
-                                </td>
-                                <td>@lang.Coverage%</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            }
-            else
-            {
-                <p>No resource files found.</p>
-            }
-        </div>
-    }
-
-    <div class="lrm-card">
-        <h3>Quick Links</h3>
-        <ul class="lrm-link-list">
-            <li><a href="/swagger" target="_blank">API Documentation (Swagger UI)</a></li>
-            <li><a href="https://github.com/nickprotop/LocalizationManager" target="_blank">GitHub Repository</a></li>
-        </ul>
-    </div>
-</div>
+<RadzenCard>
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Quick Links</RadzenText>
+    <RadzenStack Gap="0.5rem">
+        <RadzenLink Path="/swagger" Target="_blank" Text="API Documentation (Swagger UI)" Icon="description" />
+        <RadzenLink Path="https://github.com/nickprotop/LocalizationManager" Target="_blank" Text="GitHub Repository" Icon="open_in_new" />
+    </RadzenStack>
+</RadzenCard>
 
 @code {
     private StatsResponse? stats;

@@ -85,7 +85,7 @@ public class PoResourceReader : IResourceReader
             }
 
             // Convert to ResourceEntry
-            var resourceEntry = ConvertToResourceEntry(poEntry, metadata.Code);
+            var resourceEntry = ConvertToResourceEntry(poEntry, metadata);
             entries.Add(resourceEntry);
         }
 
@@ -302,7 +302,7 @@ public class PoResourceReader : IResourceReader
         }
     }
 
-    private ResourceEntry ConvertToResourceEntry(PoEntry poEntry, string languageCode)
+    private ResourceEntry ConvertToResourceEntry(PoEntry poEntry, LanguageInfo language)
     {
         var key = poEntry.GenerateKey(_config.KeyStrategy);
 
@@ -310,22 +310,30 @@ public class PoResourceReader : IResourceReader
         {
             // Convert plural indices to CLDR categories
             var pluralForms = new Dictionary<string, string>();
-            foreach (var (index, value) in poEntry.MsgStrPlural)
+            foreach (var (index, pluralValue) in poEntry.MsgStrPlural)
             {
-                var category = PoPluralMapper.IndexToCategory(languageCode, index);
-                pluralForms[category] = value;
+                var category = PoPluralMapper.IndexToCategory(language.Code, index);
+                pluralForms[category] = pluralValue;
             }
+
+            // For source language (POT files), use msgid as value since msgstr is empty
+            var entryValue = language.IsDefault
+                ? poEntry.MsgId ?? ""
+                : (pluralForms.GetValueOrDefault("other")
+                    ?? pluralForms.GetValueOrDefault("one")
+                    ?? pluralForms.Values.FirstOrDefault()
+                    ?? "");
 
             return new ResourceEntry
             {
                 Key = key,
-                Value = pluralForms.GetValueOrDefault("other")
-                    ?? pluralForms.GetValueOrDefault("one")
-                    ?? pluralForms.Values.FirstOrDefault()
-                    ?? "",
+                Value = entryValue,
                 Comment = poEntry.GetCombinedComment(),
                 IsPlural = true,
-                PluralForms = pluralForms,
+                PluralForms = language.IsDefault ? null : pluralForms, // Don't store plural forms for source language
+                // Store msgid as SourceText (the untranslated source) for all files, not just POT
+                // This allows cloud to have the source text regardless of which language file it came from
+                SourceText = poEntry.MsgId,
                 // Store msgid_plural for translation (source plural text)
                 SourcePluralText = poEntry.MsgIdPlural,
                 References = poEntry.References,  // Transfer references
@@ -338,11 +346,18 @@ public class PoResourceReader : IResourceReader
             };
         }
 
+        // For source language (POT files), use msgid as value since msgstr is empty
+        // In PO format: msgid = source text, msgstr = translation
+        var value = language.IsDefault ? poEntry.MsgId : poEntry.MsgStr;
+
         return new ResourceEntry
         {
             Key = key,
-            Value = poEntry.MsgStr,
+            Value = value,
             Comment = poEntry.GetCombinedComment(),
+            // Store msgid as SourceText for all PO files (not just POT)
+            // This ensures the cloud always has access to the source text
+            SourceText = poEntry.MsgId,
             References = poEntry.References,  // Transfer references
             // Preserve original formatting
             OriginalFormatting = poEntry.OriginalMsgStrLines != null && poEntry.OriginalMsgStrLines.Any()

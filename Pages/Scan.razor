@@ -3,298 +3,230 @@
 @using LocalizationManager.Models.Api
 @inject ScanApiClient ScanApi
 @inject ScanCacheService ScanCache
+@inject DialogService DialogService
+@inject NotificationService NotificationService
 
 <PageTitle>Code Scanner - Localization Manager</PageTitle>
 
-<div class="lrm-page">
-    <h1 class="lrm-page-title">Code Scanner</h1>
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">Code Scanner</RadzenText>
 
-    <div class="lrm-card">
-        <h2>Scan Source Code</h2>
-        <p>Scan your codebase to find localization key usage and detect unused or missing keys.</p>
+<RadzenCard class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Scan Source Code</RadzenText>
+    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4 rz-color-secondary">
+        Scan your codebase to find localization key usage and detect unused or missing keys.
+    </RadzenText>
 
-        <div class="lrm-form">
-            <div class="lrm-actions">
-                <button class="lrm-button lrm-button-primary"
-                        @onclick="RunScan"
-                        disabled="@isScanning">
-                    @if (isScanning)
-                    {
-                        <text>Scanning...</text>
-                    }
-                    else
-                    {
-                        <text>Run Scan</text>
-                    }
-                </button>
-                <button class="lrm-button" @onclick="LoadUnusedKeys">Show Unused Keys</button>
-                <button class="lrm-button" @onclick="LoadMissingKeys">Show Missing Keys</button>
-                @if (ScanCache.HasCachedScan)
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+        <RadzenButton Text="@(isScanning ? "Scanning..." : "Run Scan")" Icon="search"
+                     Click="@RunScan" Disabled="@isScanning" IsBusy="@isScanning" />
+        <RadzenButton Text="Show Unused Keys" Icon="delete_sweep" ButtonStyle="ButtonStyle.Secondary" Click="@LoadUnusedKeys" />
+        <RadzenButton Text="Show Missing Keys" Icon="error_outline" ButtonStyle="ButtonStyle.Secondary" Click="@LoadMissingKeys" />
+        @if (ScanCache.HasCachedScan)
+        {
+            <RadzenButton Text="Clear Cache" Icon="clear" ButtonStyle="ButtonStyle.Light" Click="@ClearCache" />
+        }
+    </RadzenStack>
+
+    @if (ScanCache.HasCachedScan && ScanCache.ScanTimestamp.HasValue)
+    {
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-2">
+            Last scan: @ScanCache.ScanTimestamp.Value.ToString("HH:mm:ss")
+        </RadzenText>
+    }
+</RadzenCard>
+
+@if (errorMessage != null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="true" Close="@(() => errorMessage = null)" class="rz-mb-4">
+        <strong>Error:</strong> @errorMessage
+    </RadzenAlert>
+}
+
+@if (scanResult != null)
+{
+    <!-- Summary Card -->
+    <RadzenCard class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-4">Scan Results</RadzenText>
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1.5rem" Wrap="FlexWrap.Wrap">
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.H4" class="rz-color-primary">@scanResult.ScannedFiles</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption">Files Scanned</RadzenText>
+            </RadzenStack>
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.H4" class="rz-color-primary">@scanResult.TotalReferences</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption">References Found</RadzenText>
+            </RadzenStack>
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.H4" class="@(scanResult.UnusedKeysCount > 0 ? "rz-color-warning" : "rz-color-success")">@scanResult.UnusedKeysCount</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption">Unused Keys</RadzenText>
+            </RadzenStack>
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.H4" class="@(scanResult.MissingKeysCount > 0 ? "rz-color-danger" : "rz-color-success")">@scanResult.MissingKeysCount</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption">Missing Keys</RadzenText>
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
+
+    <!-- Tabbed Results -->
+    <RadzenCard class="rz-mb-4">
+        <RadzenTabs>
+            <Tabs>
+                @if (scanResult.Unused.Any())
                 {
-                    <button class="lrm-button" @onclick="ClearCache">Clear Cache</button>
-                }
-            </div>
-            @if (ScanCache.HasCachedScan && ScanCache.ScanTimestamp.HasValue)
-            {
-                <p class="lrm-text-muted mt-sm">
-                    Last scan: @ScanCache.ScanTimestamp.Value.ToString("HH:mm:ss")
-                </p>
-            }
-        </div>
-    </div>
-
-    @if (errorMessage != null)
-    {
-        <div class="lrm-card lrm-error">
-            <h3>Error</h3>
-            <p>@errorMessage</p>
-        </div>
-    }
-
-    @if (scanResult != null)
-    {
-        <div class="lrm-card @(scanResult.Unused.Any() || scanResult.Missing.Any() ? "lrm-warning" : "lrm-success")">
-            <h3>Scan Results</h3>
-            <p>
-                <strong>Files Scanned:</strong> @scanResult.ScannedFiles<br />
-                <strong>Total References:</strong> @scanResult.TotalReferences<br />
-                <strong>Unused Keys:</strong> @scanResult.UnusedKeysCount<br />
-                <strong>Missing Keys:</strong> @scanResult.MissingKeysCount
-            </p>
-
-            @if (scanResult.Unused.Any())
-            {
-                <details class="lrm-details">
-                    <summary class="lrm-warning">Unused Keys (@scanResult.Unused.Count)</summary>
-                    <p>These keys exist in resource files but are not referenced in code:</p>
-                    <table class="lrm-table">
-                        <thead>
-                            <tr>
-                                <th>Key</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var key in scanResult.Unused.Take(50))
-                            {
-                                <tr>
-                                    <td><code>@key</code></td>
-                                    <td class="lrm-inline-actions">
-                                        <a href="/editor/key/@Uri.EscapeDataString(key)" class="lrm-button-small">Edit</a>
-                                        <button class="lrm-button-small" @onclick="() => ShowReferences(key)">Refs</button>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                    @if (scanResult.Unused.Count > 50)
-                    {
-                        <p class="lrm-text-muted">Showing first 50 of @scanResult.Unused.Count keys</p>
-                    }
-                </details>
-            }
-
-            @if (scanResult.Missing.Any())
-            {
-                <details class="lrm-details">
-                    <summary class="lrm-error">Missing Keys (@scanResult.Missing.Count)</summary>
-                    <p>These keys are referenced in code but don't exist in resource files:</p>
-                    <table class="lrm-table">
-                        <thead>
-                            <tr>
-                                <th>Key</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var key in scanResult.Missing.Take(50))
-                            {
-                                <tr>
-                                    <td><code>@key</code></td>
-                                    <td class="lrm-inline-actions">
-                                        <button class="lrm-button-small" @onclick="() => ShowReferences(key)">Refs</button>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                    @if (scanResult.Missing.Count > 50)
-                    {
-                        <p class="lrm-text-muted">Showing first 50 of @scanResult.Missing.Count keys</p>
-                    }
-                </details>
-            }
-
-            @if (scanResult.References?.Any() == true)
-            {
-                <details class="lrm-details">
-                    <summary>Key Usage Details (@scanResult.References.Count keys)</summary>
-                    <table class="lrm-table">
-                        <thead>
-                            <tr>
-                                <th>Key</th>
-                                <th>References</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var refInfo in scanResult.References.OrderByDescending(x => x.ReferenceCount).Take(50))
-                            {
-                                <tr>
-                                    <td><code>@refInfo.Key</code></td>
-                                    <td>@refInfo.ReferenceCount</td>
-                                    <td class="lrm-inline-actions">
-                                        <a href="/editor/key/@Uri.EscapeDataString(refInfo.Key)" class="lrm-button-small">Edit</a>
-                                        <button class="lrm-button-small" @onclick="@(() => ShowReferences(refInfo.Key))">
-                                            Refs
-                                        </button>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                    @if (scanResult.References.Count > 50)
-                    {
-                        <p class="lrm-text-muted">Showing top 50 of @scanResult.References.Count keys</p>
-                    }
-                </details>
-            }
-        </div>
-    }
-
-    @if (unusedKeys != null)
-    {
-        <div class="lrm-card lrm-warning">
-            <h3>Unused Keys (@unusedKeys.Count)</h3>
-            <p>These keys exist in resource files but are not referenced in code:</p>
-            <table class="lrm-table">
-                <thead>
-                    <tr>
-                        <th>Key</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var key in unusedKeys.Take(100))
-                    {
-                        <tr>
-                            <td><code>@key</code></td>
-                            <td class="lrm-inline-actions">
-                                <a href="/editor/key/@Uri.EscapeDataString(key)" class="lrm-button-small">Edit</a>
-                                <button class="lrm-button-small" @onclick="() => ShowReferences(key)">Refs</button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-            @if (unusedKeys.Count > 100)
-            {
-                <p class="lrm-text-muted">Showing first 100 of @unusedKeys.Count keys</p>
-            }
-        </div>
-    }
-
-    @if (missingKeys != null)
-    {
-        <div class="lrm-card lrm-error">
-            <h3>Missing Keys (@missingKeys.Count)</h3>
-            <p>These keys are referenced in code but don't exist in resource files:</p>
-            <table class="lrm-table">
-                <thead>
-                    <tr>
-                        <th>Key</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var key in missingKeys.Take(100))
-                    {
-                        <tr>
-                            <td><code>@key</code></td>
-                            <td class="lrm-inline-actions">
-                                <button class="lrm-button-small" @onclick="() => ShowReferences(key)">Refs</button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-            @if (missingKeys.Count > 100)
-            {
-                <p class="lrm-text-muted">Showing first 100 of @missingKeys.Count keys</p>
-            }
-        </div>
-    }
-
-    <!-- References Modal -->
-    @if (showReferencesModal)
-    {
-        <div class="lrm-modal-overlay" @onclick="ClearReferences">
-            <div class="lrm-modal" style="max-width: 800px;" @onclick:stopPropagation="true">
-                <div class="lrm-modal-header">
-                    <h3 class="lrm-modal-title">Code References: <code>@selectedKeyName</code></h3>
-                    <button class="lrm-modal-close" @onclick="ClearReferences">x</button>
-                </div>
-
-                @if (isLoadingReferences)
-                {
-                    <p>Loading references...</p>
-                }
-                else if (selectedKeyReferences != null)
-                {
-                    @if (selectedKeyReferences.Count == 0)
-                    {
-                        <p class="lrm-text-muted">
-                            <span class="lrm-status-icon lrm-status-unused">∅</span>
-                            No references found in source code. This key may be unused.
-                        </p>
-                    }
-                    else
-                    {
-                        <p>Found @selectedKeyReferences.Count reference(s):</p>
-                        <table class="lrm-table">
-                            <thead>
-                                <tr>
-                                    <th>File</th>
-                                    <th>Line</th>
-                                    <th>Pattern</th>
-                                    <th>Confidence</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var reference in selectedKeyReferences)
-                                {
-                                    <tr>
-                                        <td><code title="@reference.File">@GetFileName(reference.File)</code></td>
-                                        <td>@reference.Line</td>
-                                        <td><code>@reference.Pattern</code></td>
-                                        <td>
-                                            @if (reference.Confidence == "High")
-                                            {
-                                                <span class="lrm-badge lrm-badge-success">@reference.Confidence</span>
-                                            }
-                                            else if (reference.Confidence == "Medium")
-                                            {
-                                                <span class="lrm-badge lrm-badge-warning">@reference.Confidence</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="lrm-badge lrm-badge-info">@reference.Confidence</span>
-                                            }
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    }
+                    <RadzenTabsItem Text="@($"Unused Keys ({scanResult.Unused.Count})")">
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4 rz-color-secondary">
+                            These keys exist in resource files but are not referenced in code:
+                        </RadzenText>
+                        <RadzenDataGrid Data="@scanResult.Unused" TItem="string"
+                                       AllowSorting="true" AllowPaging="true" PageSize="20"
+                                       PagerHorizontalAlign="HorizontalAlign.Center">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="string" Title="Key">
+                                    <Template Context="key">
+                                        <code class="key-name rz-color-warning">@key</code>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="string" Title="Actions" Width="150px" Sortable="false" TextAlign="TextAlign.Center">
+                                    <Template Context="key">
+                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" JustifyContent="JustifyContent.Center">
+                                            <RadzenButton Text="Edit" Icon="edit" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                                         Click="@(() => NavigateToKey(key))" />
+                                            <RadzenButton Text="Refs" Icon="code" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                                         Click="@(() => ShowReferences(key))" />
+                                        </RadzenStack>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
+                    </RadzenTabsItem>
                 }
 
-                <div class="lrm-modal-footer">
-                    <button class="lrm-button" @onclick="ClearReferences">Close</button>
-                </div>
-            </div>
-        </div>
-    }
-</div>
+                @if (scanResult.Missing.Any())
+                {
+                    <RadzenTabsItem Text="@($"Missing Keys ({scanResult.Missing.Count})")">
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4 rz-color-secondary">
+                            These keys are referenced in code but don't exist in resource files:
+                        </RadzenText>
+                        <RadzenDataGrid Data="@scanResult.Missing" TItem="string"
+                                       AllowSorting="true" AllowPaging="true" PageSize="20"
+                                       PagerHorizontalAlign="HorizontalAlign.Center">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="string" Title="Key">
+                                    <Template Context="key">
+                                        <code class="key-name rz-color-danger">@key</code>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="string" Title="Actions" Width="100px" Sortable="false" TextAlign="TextAlign.Center">
+                                    <Template Context="key">
+                                        <RadzenButton Text="Refs" Icon="code" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                                     Click="@(() => ShowReferences(key))" />
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
+                    </RadzenTabsItem>
+                }
+
+                @if (scanResult.References?.Any() == true)
+                {
+                    <RadzenTabsItem Text="@($"All References ({scanResult.References.Count})")">
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4 rz-color-secondary">
+                            Key usage details sorted by reference count:
+                        </RadzenText>
+                        <RadzenDataGrid Data="@scanResult.References.OrderByDescending(x => x.ReferenceCount)" TItem="KeyReferenceInfo"
+                                       AllowSorting="true" AllowPaging="true" PageSize="20"
+                                       PagerHorizontalAlign="HorizontalAlign.Center">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="KeyReferenceInfo" Property="Key" Title="Key">
+                                    <Template Context="refInfo">
+                                        <code class="key-name">@refInfo.Key</code>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="KeyReferenceInfo" Property="ReferenceCount" Title="Refs" Width="80px" TextAlign="TextAlign.Center">
+                                    <Template Context="refInfo">
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"{refInfo.ReferenceCount}")" />
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="KeyReferenceInfo" Title="Actions" Width="150px" Sortable="false" TextAlign="TextAlign.Center">
+                                    <Template Context="refInfo">
+                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" JustifyContent="JustifyContent.Center">
+                                            <RadzenButton Text="Edit" Icon="edit" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                                         Click="@(() => NavigateToKey(refInfo.Key))" />
+                                            <RadzenButton Text="Refs" Icon="code" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                                         Click="@(() => ShowReferences(refInfo.Key))" />
+                                        </RadzenStack>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
+                    </RadzenTabsItem>
+                }
+            </Tabs>
+        </RadzenTabs>
+    </RadzenCard>
+}
+
+@if (unusedKeys != null && scanResult == null)
+{
+    <RadzenCard class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-4 rz-color-warning">
+            Unused Keys (@unusedKeys.Count)
+        </RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4 rz-color-secondary">
+            These keys exist in resource files but are not referenced in code:
+        </RadzenText>
+        <RadzenDataGrid Data="@unusedKeys" TItem="string"
+                       AllowSorting="true" AllowPaging="true" PageSize="25"
+                       PagerHorizontalAlign="HorizontalAlign.Center">
+            <Columns>
+                <RadzenDataGridColumn TItem="string" Title="Key">
+                    <Template Context="key">
+                        <code class="key-name rz-color-warning">@key</code>
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="string" Title="Actions" Width="150px" Sortable="false" TextAlign="TextAlign.Center">
+                    <Template Context="key">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" JustifyContent="JustifyContent.Center">
+                            <RadzenButton Text="Edit" Icon="edit" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                         Click="@(() => NavigateToKey(key))" />
+                            <RadzenButton Text="Refs" Icon="code" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                         Click="@(() => ShowReferences(key))" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+}
+
+@if (missingKeys != null && scanResult == null)
+{
+    <RadzenCard class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-4 rz-color-danger">
+            Missing Keys (@missingKeys.Count)
+        </RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4 rz-color-secondary">
+            These keys are referenced in code but don't exist in resource files:
+        </RadzenText>
+        <RadzenDataGrid Data="@missingKeys" TItem="string"
+                       AllowSorting="true" AllowPaging="true" PageSize="25"
+                       PagerHorizontalAlign="HorizontalAlign.Center">
+            <Columns>
+                <RadzenDataGridColumn TItem="string" Title="Key">
+                    <Template Context="key">
+                        <code class="key-name rz-color-danger">@key</code>
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="string" Title="Actions" Width="100px" Sortable="false" TextAlign="TextAlign.Center">
+                    <Template Context="key">
+                        <RadzenButton Text="Refs" Icon="code" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                     Click="@(() => ShowReferences(key))" />
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+}
 
 @code {
     private ScanResponse? scanResult;
@@ -304,12 +236,13 @@
     private string? selectedKeyName;
     private bool isScanning = false;
     private bool isLoadingReferences = false;
-    private bool showReferencesModal = false;
     private string? errorMessage;
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
 
     protected override void OnInitialized()
     {
-        // Load from cache if available
         if (ScanCache.HasCachedScan)
         {
             scanResult = ScanCache.ScanResult;
@@ -330,13 +263,15 @@
             scanResult = await ScanApi.ScanAsync();
             if (scanResult != null)
             {
-                // Cache the result
                 ScanCache.CacheScanResult(scanResult);
+                NotificationService.Notify(NotificationSeverity.Success, "Scan Complete",
+                    $"Found {scanResult.TotalReferences} references in {scanResult.ScannedFiles} files");
             }
         }
         catch (Exception ex)
         {
             errorMessage = $"Scan failed: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Scan Failed", ex.Message);
         }
         finally
         {
@@ -354,7 +289,6 @@
 
         try
         {
-            // Try cache first
             if (ScanCache.HasCachedScan)
             {
                 unusedKeys = ScanCache.GetUnusedKeys();
@@ -380,7 +314,6 @@
 
         try
         {
-            // Try cache first
             if (ScanCache.HasCachedScan)
             {
                 missingKeys = ScanCache.GetMissingKeys();
@@ -400,13 +333,11 @@
     {
         selectedKeyName = keyName;
         selectedKeyReferences = null;
-        showReferencesModal = true;
         isLoadingReferences = true;
         errorMessage = null;
 
         try
         {
-            // Try cache first
             if (ScanCache.TryGetReferences(keyName, out var cached))
             {
                 selectedKeyReferences = cached ?? new List<CodeReference>();
@@ -415,22 +346,21 @@
             {
                 selectedKeyReferences = await ScanApi.GetReferencesAsync(keyName) ?? new List<CodeReference>();
             }
+
+            // Show references in dialog
+            await DialogService.OpenAsync<ReferencesDialog>($"Code References: {keyName}",
+                new Dictionary<string, object> { { "References", selectedKeyReferences }, { "KeyName", keyName } },
+                new DialogOptions { Width = "800px", Height = "500px", Resizable = true, Draggable = true });
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to load references: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Failed to Load", ex.Message);
         }
         finally
         {
             isLoadingReferences = false;
         }
-    }
-
-    private void ClearReferences()
-    {
-        showReferencesModal = false;
-        selectedKeyReferences = null;
-        selectedKeyName = null;
     }
 
     private void ClearCache()
@@ -440,12 +370,11 @@
         unusedKeys = null;
         missingKeys = null;
         selectedKeyReferences = null;
+        NotificationService.Notify(NotificationSeverity.Info, "Cache Cleared", "Scan cache has been cleared");
     }
 
-    private string GetFileName(string filePath)
+    private void NavigateToKey(string key)
     {
-        if (string.IsNullOrEmpty(filePath)) return filePath;
-        var lastSlash = filePath.LastIndexOfAny(new[] { '/', '\\' });
-        return lastSlash >= 0 ? filePath.Substring(lastSlash + 1) : filePath;
+        Navigation.NavigateTo($"/editor/key/{Uri.EscapeDataString(key)}");
     }
 }

@@ -57,7 +57,13 @@ public class LocalEntryExtractor
                     Comment = entry.Comment,
                     IsPlural = entry.IsPlural,
                     PluralForms = entry.PluralForms,
-                    Hash = hash
+                    Hash = hash,
+                    // Pass SourceText for storage in ResourceKey.SourceText
+                    // For default language: use entry.SourceText (e.g. msgid for PO) or fall back to Value
+                    // For non-default language: pass entry.SourceText if available (PO format has msgid in all files)
+                    SourceText = lang.IsDefault ? (entry.SourceText ?? entry.Value) : entry.SourceText,
+                    // Pass SourcePluralText (msgid_plural for PO, available in all PO files)
+                    SourcePluralText = entry.SourcePluralText
                 });
             }
         }

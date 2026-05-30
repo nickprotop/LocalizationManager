@@ -21,6 +21,7 @@
 
 using System.ComponentModel;
 using Microsoft.Extensions.FileProviders;
+using Radzen;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using LocalizationManager.Core.Backends.Json;
@@ -146,6 +147,9 @@ public class WebCommand : Command<WebCommand.Settings>
         // Blazor Server services
         builder.Services.AddRazorPages();
         builder.Services.AddServerSideBlazor();
+
+        // Radzen Blazor components
+        builder.Services.AddRadzenComponents();
 
         // HttpClient for API communication (Blazor components will call localhost API)
         builder.Services.AddHttpClient("LrmApi", client =>

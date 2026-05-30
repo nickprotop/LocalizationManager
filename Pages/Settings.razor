@@ -3,221 +3,183 @@
 @using LocalizationManager.Models.Api
 @inject ConfigurationApiClient ConfigApi
 @inject LanguageApiClient LanguageApi
+@inject DialogService DialogService
+@inject NotificationService NotificationService
 
 <PageTitle>Settings - Localization Manager</PageTitle>
 
-<div class="lrm-page">
-    <h1 class="lrm-page-title">Settings</h1>
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">Settings</RadzenText>
 
-    @if (isLoading)
-    {
-        <div class="lrm-card">
-            <p>Loading settings...</p>
-        </div>
-    }
-    else if (errorMessage != null)
-    {
-        <div class="lrm-card lrm-error">
-            <h3>Error</h3>
-            <p>@errorMessage</p>
-        </div>
-    }
-    else
-    {
-        <div class="lrm-card">
-            <h2>Language Management</h2>
+@if (isLoading)
+{
+    <RadzenCard>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+            <RadzenText>Loading settings...</RadzenText>
+        </RadzenStack>
+    </RadzenCard>
+}
+else if (errorMessage != null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="true" Close="@(() => errorMessage = null)">
+        <strong>Error:</strong> @errorMessage
+    </RadzenAlert>
+}
+else
+{
+    <RadzenTabs>
+        <Tabs>
+            <!-- Languages Tab -->
+            <RadzenTabsItem Text="Languages">
+                <RadzenCard class="rz-mt-4">
+                    <RadzenStack Gap="1rem">
+                        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                            <RadzenText TextStyle="TextStyle.H6">Language Management</RadzenText>
+                            <RadzenButton Text="Add Language" Icon="add" Size="ButtonSize.Small" Click="@ShowAddLanguageDialog" />
+                        </RadzenStack>
 
-            @if (languages != null)
-            {
-                <table class="lrm-table">
-                    <thead>
-                        <tr>
-                            <th>Language</th>
-                            <th>Code</th>
-                            <th>File</th>
-                            <th>Keys</th>
-                            <th>Coverage</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var lang in languages.Languages.OrderByDescending(l => l.IsDefault))
+                        @if (languages != null)
                         {
-                            <tr>
-                                <td>
-                                    @lang.DisplayName
-                                    @if (lang.IsDefault)
-                                    {
-                                        <span class="lrm-badge">Default</span>
-                                    }
-                                </td>
-                                <td><code>@(lang.Code ?? "default")</code></td>
-                                <td><small>@Path.GetFileName(lang.FilePath)</small></td>
-                                <td>@lang.TranslatedKeys / @lang.TotalKeys</td>
-                                <td>@lang.Coverage%</td>
-                                <td>
-                                    @if (!lang.IsDefault)
-                                    {
-                                        <button class="lrm-button-small" @onclick="() => RemoveLanguage(lang.Code!)">Remove</button>
-                                    }
-                                </td>
-                            </tr>
+                            <RadzenDataGrid Data="@languages.Languages.OrderByDescending(l => l.IsDefault)" TItem="LanguageInfo"
+                                           AllowSorting="true">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="LanguageInfo" Property="DisplayName" Title="Language" Width="200px">
+                                        <Template Context="lang">
+                                            @lang.DisplayName
+                                            @if (lang.IsDefault)
+                                            {
+                                                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Default" class="rz-ml-2" />
+                                            }
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="LanguageInfo" Property="Code" Title="Code" Width="100px">
+                                        <Template Context="lang">
+                                            <code>@(lang.Code ?? "default")</code>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="LanguageInfo" Property="FilePath" Title="File" Width="200px">
+                                        <Template Context="lang">
+                                            <RadzenText TextStyle="TextStyle.Caption">@Path.GetFileName(lang.FilePath)</RadzenText>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="LanguageInfo" Title="Keys" Width="120px" TextAlign="TextAlign.Center">
+                                        <Template Context="lang">
+                                            @lang.TranslatedKeys / @lang.TotalKeys
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="LanguageInfo" Property="Coverage" Title="Coverage" Width="120px">
+                                        <Template Context="lang">
+                                            <RadzenStack Gap="0.25rem">
+                                                <RadzenProgressBar Value="@lang.Coverage" Max="100" ShowValue="false" Style="height: 6px;" />
+                                                <RadzenText TextStyle="TextStyle.Caption" class="@(lang.Coverage == 100 ? "rz-color-success" : lang.Coverage < 50 ? "rz-color-danger" : "")">
+                                                    @lang.Coverage%
+                                                </RadzenText>
+                                            </RadzenStack>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="LanguageInfo" Title="Actions" Width="100px" Sortable="false" TextAlign="TextAlign.Center">
+                                        <Template Context="lang">
+                                            @if (!lang.IsDefault)
+                                            {
+                                                <RadzenButton Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger"
+                                                             Click="@(() => ConfirmRemoveLanguage(lang))" title="Remove language" />
+                                            }
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
                         }
-                    </tbody>
-                </table>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenTabsItem>
 
-                <div class="lrm-actions">
-                    <button class="lrm-button" @onclick="ShowAddLanguageForm">Add Language</button>
-                </div>
-            }
-        </div>
+            <!-- Configuration Tab -->
+            <RadzenTabsItem Text="Configuration">
+                <RadzenCard class="rz-mt-4">
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.H6">Configuration File (lrm.json)</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                            View and manage your project's localization configuration.
+                        </RadzenText>
 
-        @if (showAddLanguageForm)
-        {
-            <div class="lrm-card">
-                <h3>Add New Language</h3>
-                <div class="lrm-form">
-                    <div class="lrm-form-group">
-                        <label>Culture Code (e.g., fr, de, es, zh-CN)</label>
-                        <input type="text"
-                               class="lrm-input"
-                               placeholder="Culture code"
-                               @bind="newLanguageCode" />
-                    </div>
-
-                    <div class="lrm-form-group">
-                        <label class="lrm-checkbox-label">
-                            <input type="checkbox" @bind="createEmpty" />
-                            Create empty language file (no pre-filled keys)
-                        </label>
-                    </div>
-
-                    <div class="lrm-actions">
-                        <button class="lrm-button lrm-button-primary"
-                                @onclick="AddLanguage"
-                                disabled="@(isAddingLanguage || string.IsNullOrWhiteSpace(newLanguageCode))">
-                            @if (isAddingLanguage)
+                        @if (config != null && config.Configuration != null)
+                        {
+                            @if (!isEditingConfig)
                             {
-                                <text>Adding...</text>
+                                <RadzenTextArea Value="@System.Text.Json.JsonSerializer.Serialize(config.Configuration, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })"
+                                               ReadOnly="true" Rows="15" Style="width: 100%; font-family: monospace; font-size: 0.85rem;" />
+
+                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                    <RadzenButton Text="Validate" Icon="check_circle" ButtonStyle="ButtonStyle.Secondary" Click="@ValidateConfiguration" />
+                                    <RadzenButton Text="Edit" Icon="edit" Click="@StartEditingConfig" />
+                                </RadzenStack>
                             }
                             else
                             {
-                                <text>Add Language</text>
+                                <RadzenStack Gap="0.5rem">
+                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                        <RadzenButton Text="Current Values" Size="ButtonSize.Small"
+                                                     ButtonStyle="@(showSchemaView ? ButtonStyle.Light : ButtonStyle.Primary)"
+                                                     Click="@(() => ToggleSchemaView(false))" />
+                                        <RadzenButton Text="With Schema (All Options)" Size="ButtonSize.Small"
+                                                     ButtonStyle="@(showSchemaView ? ButtonStyle.Primary : ButtonStyle.Light)"
+                                                     Click="@(() => ToggleSchemaView(true))" />
+                                    </RadzenStack>
+
+                                    <RadzenTextArea @bind-Value="@editedConfigJson" Rows="20"
+                                                   Style="width: 100%; font-family: monospace; font-size: 0.85rem;" />
+
+                                    @if (showSchemaView)
+                                    {
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            Showing all available configuration options with inline documentation.
+                                            Lines starting with // are commented out and won't be saved.
+                                        </RadzenText>
+                                    }
+                                </RadzenStack>
+
+                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                    <RadzenButton Text="@(isSavingConfig ? "Saving..." : "Save Configuration")" Icon="save"
+                                                 Click="@SaveConfiguration" Disabled="@isSavingConfig" IsBusy="@isSavingConfig" />
+                                    <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@CancelEditingConfig" />
+                                </RadzenStack>
                             }
-                        </button>
-                        <button class="lrm-button" @onclick="CancelAddLanguage">Cancel</button>
-                    </div>
-                </div>
-            </div>
-        }
-
-        <div class="lrm-card">
-            <h2>Configuration</h2>
-            <p>View and manage lrm.json configuration file.</p>
-
-            @if (config != null && config.Configuration != null)
-            {
-                @if (!isEditingConfig)
-                {
-                    <details class="lrm-details">
-                        <summary>View Configuration</summary>
-                        <pre class="lrm-code">@System.Text.Json.JsonSerializer.Serialize(config.Configuration, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
-                    </details>
-
-                    <div class="lrm-actions">
-                        <button class="lrm-button" @onclick="ValidateConfiguration">Validate Configuration</button>
-                        <button class="lrm-button" @onclick="StartEditingConfig">Edit Configuration</button>
-                    </div>
-                }
-                else
-                {
-                    <div class="lrm-form">
-                        <div class="lrm-form-group">
-                            <label>Configuration JSON</label>
-                            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                <button class="lrm-button-small"
-                                        @onclick="() => ToggleSchemaView(false)"
-                                        style="@(showSchemaView ? "" : "background: var(--color-primary); color: var(--color-bg);")">
-                                    Current Values
-                                </button>
-                                <button class="lrm-button-small"
-                                        @onclick="() => ToggleSchemaView(true)"
-                                        style="@(showSchemaView ? "background: var(--color-primary); color: var(--color-bg);" : "")">
-                                    With Schema (All Options)
-                                </button>
-                            </div>
-                            <textarea class="lrm-textarea"
-                                      rows="25"
-                                      style="font-family: 'Courier New', Courier, monospace; font-size: 0.9rem;"
-                                      @bind="editedConfigJson"></textarea>
-                            @if (showSchemaView)
-                            {
-                                <small class="lrm-text-muted">
-                                    📘 Showing all available configuration options with inline documentation.
-                                    Lines starting with // are commented out and won't be saved.
-                                    Uncomment and modify values as needed.
-                                </small>
-                            }
-                            else
-                            {
-                                <small class="lrm-text-muted">Edit the JSON configuration directly. Be careful with syntax!</small>
-                            }
-                        </div>
-
-                        <div class="lrm-actions">
-                            <button class="lrm-button lrm-button-primary"
-                                    @onclick="SaveConfiguration"
-                                    disabled="@isSavingConfig">
-                                @if (isSavingConfig)
-                                {
-                                    <text>Saving...</text>
-                                }
-                                else
-                                {
-                                    <text>Save Configuration</text>
-                                }
-                            </button>
-                            <button class="lrm-button" @onclick="CancelEditingConfig">Cancel</button>
-                        </div>
-                    </div>
-                }
-            }
-            else
-            {
-                <p class="lrm-text-muted">No configuration file found.</p>
-                <button class="lrm-button" @onclick="CreateDefaultConfig">Create Default Configuration</button>
-            }
-        </div>
-
-        @if (configValidation != null)
-        {
-            <div class="lrm-card @(configValidation.IsValid ? "lrm-success" : "lrm-error")">
-                <h3>Configuration Validation</h3>
-                @if (configValidation.IsValid)
-                {
-                    <p>Configuration is valid.</p>
-                }
-                else
-                {
-                    <p>Configuration has errors:</p>
-                    <ul>
-                        @foreach (var error in configValidation.Errors ?? new List<string>())
-                        {
-                            <li>@error</li>
                         }
-                    </ul>
-                }
-            </div>
-        }
+                        else
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="false">
+                                No configuration file found.
+                            </RadzenAlert>
+                            <RadzenButton Text="Create Default Configuration" Icon="add" Click="@CreateDefaultConfig" />
+                        }
+                    </RadzenStack>
+                </RadzenCard>
 
-        @if (successMessage != null)
-        {
-            <div class="lrm-card lrm-success">
-                <p>@successMessage</p>
-            </div>
-        }
-    }
-</div>
+                @if (configValidation != null)
+                {
+                    <RadzenAlert AlertStyle="@(configValidation.IsValid ? AlertStyle.Success : AlertStyle.Danger)"
+                                Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="true" Close="@(() => configValidation = null)" class="rz-mt-4">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Configuration Validation</RadzenText>
+                        @if (configValidation.IsValid)
+                        {
+                            <RadzenText>Configuration is valid.</RadzenText>
+                        }
+                        else
+                        {
+                            <RadzenText>Configuration has errors:</RadzenText>
+                            <ul>
+                                @foreach (var error in configValidation.Errors ?? new List<string>())
+                                {
+                                    <li>@error</li>
+                                }
+                            </ul>
+                        }
+                    </RadzenAlert>
+                }
+            </RadzenTabsItem>
+        </Tabs>
+    </RadzenTabs>
+}
 
 @code {
     private LanguagesResponse? languages;
@@ -226,12 +188,10 @@
     private SchemaEnrichedConfigResponse? schemaEnrichedConfig;
     private bool isLoading = true;
     private bool isAddingLanguage = false;
-    private bool showAddLanguageForm = false;
     private bool isEditingConfig = false;
     private bool isSavingConfig = false;
     private bool showSchemaView = true;
     private string? errorMessage;
-    private string? successMessage;
     private string newLanguageCode = "";
     private bool createEmpty = false;
     private string editedConfigJson = string.Empty;
@@ -247,7 +207,6 @@
     {
         isLoading = true;
         errorMessage = null;
-        successMessage = null;
 
         try
         {
@@ -264,23 +223,40 @@
         }
     }
 
-    private void ShowAddLanguageForm()
+    private async Task ShowAddLanguageDialog()
     {
-        showAddLanguageForm = true;
         newLanguageCode = "";
         createEmpty = false;
-    }
 
-    private void CancelAddLanguage()
-    {
-        showAddLanguageForm = false;
+        var result = await DialogService.OpenAsync("Add New Language", ds =>
+            @<RadzenStack Gap="1rem">
+                <RadzenFormField Text="Culture Code (e.g., fr, de, es, zh-CN)" Style="width: 100%;">
+                    <RadzenTextBox @bind-Value="@newLanguageCode" Style="width: 100%;" />
+                </RadzenFormField>
+
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                    <RadzenCheckBox @bind-Value="@createEmpty" Name="cbCreateEmpty" />
+                    <RadzenLabel Text="Create empty language file (no pre-filled keys)" Component="cbCreateEmpty" />
+                </RadzenStack>
+
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
+                    <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@(() => ds.Close(false))" />
+                    <RadzenButton Text="Add Language" Click="@(() => ds.Close(true))"
+                                 Disabled="@string.IsNullOrWhiteSpace(newLanguageCode)" />
+                </RadzenStack>
+            </RadzenStack>,
+            new DialogOptions { Width = "400px" });
+
+        if (result == true && !string.IsNullOrWhiteSpace(newLanguageCode))
+        {
+            await AddLanguage();
+        }
     }
 
     private async Task AddLanguage()
     {
         isAddingLanguage = true;
         errorMessage = null;
-        successMessage = null;
 
         try
         {
@@ -293,14 +269,14 @@
             var result = await LanguageApi.AddLanguageAsync(request);
             if (result?.Success == true)
             {
-                successMessage = $"Added language: {result.DisplayName}";
-                showAddLanguageForm = false;
+                NotificationService.Notify(NotificationSeverity.Success, "Language Added", $"Added {result.DisplayName}");
                 await LoadData();
             }
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to add language: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Failed to Add Language", ex.Message);
         }
         finally
         {
@@ -308,23 +284,36 @@
         }
     }
 
+    private async Task ConfirmRemoveLanguage(LanguageInfo lang)
+    {
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to remove <strong>{lang.DisplayName}</strong>?<br/><br/>This will delete the language file.",
+            "Confirm Remove Language",
+            new ConfirmOptions { OkButtonText = "Remove", CancelButtonText = "Cancel" });
+
+        if (confirmed == true)
+        {
+            await RemoveLanguage(lang.Code!);
+        }
+    }
+
     private async Task RemoveLanguage(string cultureCode)
     {
         errorMessage = null;
-        successMessage = null;
 
         try
         {
             var result = await LanguageApi.RemoveLanguageAsync(cultureCode);
             if (result?.Success == true)
             {
-                successMessage = result.Message;
+                NotificationService.Notify(NotificationSeverity.Success, "Language Removed", result.Message);
                 await LoadData();
             }
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to remove language: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Failed to Remove Language", ex.Message);
         }
     }
 
@@ -336,6 +325,15 @@
         try
         {
             configValidation = await ConfigApi.ValidateConfigurationAsync();
+
+            if (configValidation.IsValid)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Valid", "Configuration is valid");
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Invalid", $"{configValidation.Errors?.Count ?? 0} error(s) found");
+            }
         }
         catch (Exception ex)
         {
@@ -346,20 +344,20 @@
     private async Task CreateDefaultConfig()
     {
         errorMessage = null;
-        successMessage = null;
 
         try
         {
             var result = await ConfigApi.CreateConfigurationAsync();
             if (result?.Success == true)
             {
-                successMessage = result.Message ?? "Created default configuration file";
+                NotificationService.Notify(NotificationSeverity.Success, "Created", result.Message ?? "Created default configuration file");
                 await LoadData();
             }
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to create configuration: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Failed", ex.Message);
         }
     }
 
@@ -367,13 +365,11 @@
     {
         if (config?.Configuration != null)
         {
-            // Prepare current values JSON
             currentValuesJson = System.Text.Json.JsonSerializer.Serialize(
                 config.Configuration,
                 new System.Text.Json.JsonSerializerOptions { WriteIndented = true }
             );
 
-            // Load schema-enriched JSON
             try
             {
                 schemaEnrichedConfig = await ConfigApi.GetSchemaEnrichedConfigAsync();
@@ -381,24 +377,19 @@
             }
             catch (Exception)
             {
-                // Fallback to current values if schema service fails
                 schemaEnrichedJson = currentValuesJson;
             }
 
-            // Set the editor to show schema view by default
             showSchemaView = true;
             editedConfigJson = schemaEnrichedJson;
-
             isEditingConfig = true;
             errorMessage = null;
-            successMessage = null;
         }
     }
 
     private void ToggleSchemaView(bool showSchema)
     {
         showSchemaView = showSchema;
-        // Switch the textarea content but preserve any edits if going back
         editedConfigJson = showSchema ? schemaEnrichedJson : currentValuesJson;
     }
 
@@ -412,14 +403,11 @@
     {
         isSavingConfig = true;
         errorMessage = null;
-        successMessage = null;
 
         try
         {
-            // Strip comments from JSON if present (for schema-enriched view)
             var cleanedJson = StripJsonComments(editedConfigJson);
 
-            // Parse the JSON to validate it
             var configModel = System.Text.Json.JsonSerializer.Deserialize<LocalizationManager.Core.Configuration.ConfigurationModel>(
                 cleanedJson,
                 new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }
@@ -431,11 +419,10 @@
                 return;
             }
 
-            // Update configuration
             var result = await ConfigApi.UpdateConfigurationAsync(configModel);
             if (result?.Success == true)
             {
-                successMessage = result.Message ?? "Configuration updated successfully";
+                NotificationService.Notify(NotificationSeverity.Success, "Saved", result.Message ?? "Configuration updated successfully");
                 isEditingConfig = false;
                 await LoadData();
             }
@@ -443,10 +430,12 @@
         catch (System.Text.Json.JsonException ex)
         {
             errorMessage = $"Invalid JSON: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Invalid JSON", ex.Message);
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to save configuration: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Save Failed", ex.Message);
         }
         finally
         {
@@ -454,10 +443,6 @@
         }
     }
 
-    /// <summary>
-    /// Removes single-line (//) and multi-line (/* */) comments from JSON.
-    /// This allows users to use the schema-enriched view which includes comments.
-    /// </summary>
     private string StripJsonComments(string jsonWithComments)
     {
         if (string.IsNullOrWhiteSpace(jsonWithComments))
@@ -470,19 +455,15 @@
         {
             var trimmedLine = line.TrimStart();
 
-            // Skip lines that are entirely comments
             if (trimmedLine.StartsWith("//"))
                 continue;
 
-            // Remove inline comments (e.g., "value": "foo"  // comment)
             var commentIndex = line.IndexOf("//");
             if (commentIndex > 0)
             {
-                // Only remove comment if it's not inside a string
                 var beforeComment = line.Substring(0, commentIndex);
                 var quoteCount = beforeComment.Count(c => c == '"');
 
-                // If even number of quotes, the // is outside a string
                 if (quoteCount % 2 == 0)
                 {
                     cleanedLines.Add(beforeComment.TrimEnd());

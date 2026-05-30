@@ -1,67 +1,45 @@
 @inherits LayoutComponentBase
+@inject NavigationManager Navigation
 
-<div class="lrm-container">
-    <nav class="lrm-nav">
-        <div class="lrm-nav-header">
-            <h1 class="lrm-title">
-                <span class="lrm-icon">⚙</span> Localization Manager
-            </h1>
-        </div>
-        <ul class="lrm-nav-menu">
-            <li>
-                <NavLink class="lrm-nav-link" href="" Match="NavLinkMatch.All">
-                    <span class="lrm-nav-icon">📊</span> Dashboard
-                </NavLink>
-            </li>
-            <li>
-                <NavLink class="lrm-nav-link" href="editor">
-                    <span class="lrm-nav-icon">✏️</span> Editor
-                </NavLink>
-            </li>
-            <li>
-                <NavLink class="lrm-nav-link" href="validation">
-                    <span class="lrm-nav-icon">✓</span> Validation
-                </NavLink>
-            </li>
-            <li>
-                <NavLink class="lrm-nav-link" href="translation">
-                    <span class="lrm-nav-icon">🌐</span> Translation
-                </NavLink>
-            </li>
-            <li>
-                <NavLink class="lrm-nav-link" href="scan">
-                    <span class="lrm-nav-icon">🔍</span> Code Scanner
-                </NavLink>
-            </li>
-            <li>
-                <NavLink class="lrm-nav-link" href="backup">
-                    <span class="lrm-nav-icon">💾</span> Backups
-                </NavLink>
-            </li>
-            <li>
-                <NavLink class="lrm-nav-link" href="export">
-                    <span class="lrm-nav-icon">📤</span> Export
-                </NavLink>
-            </li>
-            <li>
-                <NavLink class="lrm-nav-link" href="import">
-                    <span class="lrm-nav-icon">📥</span> Import
-                </NavLink>
-            </li>
-            <li>
-                <NavLink class="lrm-nav-link" href="settings">
-                    <span class="lrm-nav-icon">⚙</span> Settings
-                </NavLink>
-            </li>
-        </ul>
-        <div class="lrm-nav-footer">
-            <a href="/swagger" target="_blank" class="lrm-nav-link-small">
-                <span class="lrm-nav-icon">📖</span> API Docs
-            </a>
-        </div>
-    </nav>
+<RadzenLayout>
+    <RadzenHeader>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-p-2">
+            <RadzenSidebarToggle Click="@(() => sidebarExpanded = !sidebarExpanded)" />
+            <RadzenText TextStyle="TextStyle.H5" class="rz-m-0">
+                <strong>LRM</strong> <span class="rz-color-on-secondary-lighter">Localization Resource Manager</span>
+            </RadzenText>
+        </RadzenStack>
+    </RadzenHeader>
 
-    <main class="lrm-main">
-        @Body
-    </main>
-</div>
+    <RadzenSidebar @bind-Expanded="@sidebarExpanded">
+        <RadzenPanelMenu>
+            <RadzenPanelMenuItem Text="Dashboard" Icon="dashboard" Path="/" />
+            <RadzenPanelMenuItem Text="Editor" Icon="edit" Path="/editor" />
+            <RadzenPanelMenuItem Text="Validation" Icon="check_circle" Path="/validation" />
+            <RadzenPanelMenuItem Text="Translation" Icon="translate" Path="/translation" />
+            <RadzenPanelMenuItem Text="Code Scanner" Icon="search" Path="/scan" />
+            <RadzenPanelMenuItem Text="Backups" Icon="backup" Path="/backup" />
+            <RadzenPanelMenuItem Text="Export" Icon="file_download" Path="/export" />
+            <RadzenPanelMenuItem Text="Import" Icon="file_upload" Path="/import" />
+            <RadzenPanelMenuItem Text="Settings" Icon="settings" Path="/settings" />
+        </RadzenPanelMenu>
+        <div class="rz-p-2" style="position: absolute; bottom: 0; width: 100%;">
+            <RadzenLink Path="/swagger" Target="_blank" Text="API Docs" Icon="description" class="rz-text-secondary-color" />
+        </div>
+    </RadzenSidebar>
+
+    <RadzenBody>
+        <div class="rz-p-4">
+            @Body
+        </div>
+    </RadzenBody>
+</RadzenLayout>
+
+<RadzenDialog />
+<RadzenNotification />
+<RadzenContextMenu />
+<RadzenTooltip />
+
+@code {
+    bool sidebarExpanded = true;
+}

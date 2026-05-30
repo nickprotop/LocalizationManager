@@ -2,155 +2,238 @@
 @using LocalizationManager.Services
 @using LocalizationManager.Models.Api
 @inject ValidationApiClient ValidationApi
+@inject NotificationService NotificationService
 
 <PageTitle>Validation - Localization Manager</PageTitle>
 
-<div class="lrm-page">
-    <h1 class="lrm-page-title">Resource Validation</h1>
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">Resource Validation</RadzenText>
 
-    @if (isLoading)
+@if (isLoading)
+{
+    <RadzenCard>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+            <RadzenText>Running validation...</RadzenText>
+        </RadzenStack>
+    </RadzenCard>
+}
+else if (errorMessage != null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="true" Close="@(() => errorMessage = null)">
+        <strong>Error:</strong> @errorMessage
+    </RadzenAlert>
+}
+else if (result != null)
+{
+    <!-- Summary Card -->
+    @if (result.IsValid)
     {
-        <div class="lrm-card">
-            <p>Running validation...</p>
-        </div>
+        <RadzenAlert AlertStyle="AlertStyle.Success" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="false" class="rz-mb-4">
+            <RadzenText TextStyle="TextStyle.H6">All Validations Passed</RadzenText>
+            <RadzenText>No issues found in resource files.</RadzenText>
+        </RadzenAlert>
     }
-    else if (errorMessage != null)
+    else
     {
-        <div class="lrm-card lrm-error">
-            <h3>Error</h3>
-            <p>@errorMessage</p>
-        </div>
+        <RadzenAlert AlertStyle="AlertStyle.Warning" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="false" class="rz-mb-4">
+            <RadzenText TextStyle="TextStyle.H6">Validation Issues Found</RadzenText>
+            <RadzenText><strong>@result.Summary?.TotalIssues</strong> total issue(s) detected</RadzenText>
+        </RadzenAlert>
+
+        <!-- Summary Badges -->
+        <RadzenCard class="rz-mb-4">
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
+                @if (result.Summary?.MissingCount > 0)
+                {
+                    <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                        <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="@($"{result.Summary.MissingCount}")" />
+                        <RadzenText TextStyle="TextStyle.Caption">Missing</RadzenText>
+                    </RadzenStack>
+                }
+                @if (result.Summary?.DuplicatesCount > 0)
+                {
+                    <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="@($"{result.Summary.DuplicatesCount}")" />
+                        <RadzenText TextStyle="TextStyle.Caption">Duplicates</RadzenText>
+                    </RadzenStack>
+                }
+                @if (result.Summary?.EmptyCount > 0)
+                {
+                    <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="@($"{result.Summary.EmptyCount}")" />
+                        <RadzenText TextStyle="TextStyle.Caption">Empty</RadzenText>
+                    </RadzenStack>
+                }
+                @if (result.Summary?.ExtraCount > 0)
+                {
+                    <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"{result.Summary.ExtraCount}")" />
+                        <RadzenText TextStyle="TextStyle.Caption">Extra</RadzenText>
+                    </RadzenStack>
+                }
+                @if (result.Summary?.PlaceholderCount > 0)
+                {
+                    <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="@($"{result.Summary.PlaceholderCount}")" />
+                        <RadzenText TextStyle="TextStyle.Caption">Placeholders</RadzenText>
+                    </RadzenStack>
+                }
+            </RadzenStack>
+        </RadzenCard>
+
+        <!-- Tabbed Issue View -->
+        <RadzenCard class="rz-mb-4">
+            <RadzenTabs>
+                <Tabs>
+                    @if (result.MissingKeys.Any())
+                    {
+                        <RadzenTabsItem Text="@($"Missing ({result.Summary?.MissingCount})")">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4 rz-color-secondary">
+                                Keys that are missing in some language files:
+                            </RadzenText>
+                            <RadzenDataGrid Data="@GetMissingKeysFlat()" TItem="ValidationIssue"
+                                           AllowSorting="true" AllowPaging="true" PageSize="15"
+                                           PagerHorizontalAlign="HorizontalAlign.Center">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="ValidationIssue" Property="Language" Title="Language" Width="120px">
+                                        <Template Context="issue">
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@issue.Language" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="ValidationIssue" Property="Key" Title="Key">
+                                        <Template Context="issue">
+                                            <code class="key-name rz-color-danger">@issue.Key</code>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        </RadzenTabsItem>
+                    }
+
+                    @if (result.DuplicateKeys.Any())
+                    {
+                        <RadzenTabsItem Text="@($"Duplicates ({result.Summary?.DuplicatesCount})")">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4 rz-color-secondary">
+                                Keys that appear multiple times in the same file:
+                            </RadzenText>
+                            <RadzenDataGrid Data="@GetDuplicateKeysFlat()" TItem="ValidationIssue"
+                                           AllowSorting="true" AllowPaging="true" PageSize="15"
+                                           PagerHorizontalAlign="HorizontalAlign.Center">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="ValidationIssue" Property="Language" Title="Language" Width="120px">
+                                        <Template Context="issue">
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@issue.Language" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="ValidationIssue" Property="Key" Title="Key">
+                                        <Template Context="issue">
+                                            <code class="key-name rz-color-warning">@issue.Key</code>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        </RadzenTabsItem>
+                    }
+
+                    @if (result.EmptyValues.Any())
+                    {
+                        <RadzenTabsItem Text="@($"Empty ({result.Summary?.EmptyCount})")">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4 rz-color-secondary">
+                                Keys that have empty or whitespace-only values:
+                            </RadzenText>
+                            <RadzenDataGrid Data="@GetEmptyValuesFlat()" TItem="ValidationIssue"
+                                           AllowSorting="true" AllowPaging="true" PageSize="15"
+                                           PagerHorizontalAlign="HorizontalAlign.Center">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="ValidationIssue" Property="Language" Title="Language" Width="120px">
+                                        <Template Context="issue">
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@issue.Language" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="ValidationIssue" Property="Key" Title="Key">
+                                        <Template Context="issue">
+                                            <code class="key-name">@issue.Key</code>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        </RadzenTabsItem>
+                    }
+
+                    @if (result.ExtraKeys.Any())
+                    {
+                        <RadzenTabsItem Text="@($"Extra ({result.Summary?.ExtraCount})")">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4 rz-color-secondary">
+                                Keys that exist in translation files but not in the default language:
+                            </RadzenText>
+                            <RadzenDataGrid Data="@GetExtraKeysFlat()" TItem="ValidationIssue"
+                                           AllowSorting="true" AllowPaging="true" PageSize="15"
+                                           PagerHorizontalAlign="HorizontalAlign.Center">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="ValidationIssue" Property="Language" Title="Language" Width="120px">
+                                        <Template Context="issue">
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@issue.Language" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="ValidationIssue" Property="Key" Title="Key">
+                                        <Template Context="issue">
+                                            <code class="key-name">@issue.Key</code>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        </RadzenTabsItem>
+                    }
+
+                    @if (result.PlaceholderMismatches.Any())
+                    {
+                        <RadzenTabsItem Text="@($"Placeholders ({result.Summary?.PlaceholderCount})")">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4 rz-color-secondary">
+                                Keys where placeholder patterns don't match between languages:
+                            </RadzenText>
+                            <RadzenDataGrid Data="@GetPlaceholderMismatchesFlat()" TItem="ValidationIssue"
+                                           AllowSorting="true" AllowPaging="true" PageSize="15"
+                                           PagerHorizontalAlign="HorizontalAlign.Center">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="ValidationIssue" Property="Key" Title="Key" Width="250px">
+                                        <Template Context="issue">
+                                            <code class="key-name">@issue.Key</code>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="ValidationIssue" Property="Language" Title="Affected Languages">
+                                        <Template Context="issue">
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="@issue.Language" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        </RadzenTabsItem>
+                    }
+                </Tabs>
+            </RadzenTabs>
+        </RadzenCard>
     }
-    else if (result != null)
-    {
-        @if (result.IsValid)
-        {
-            <div class="lrm-card lrm-success">
-                <h2>✓ All Validations Passed</h2>
-                <p>No issues found in resource files.</p>
-            </div>
-        }
-        else
-        {
-            <div class="lrm-card lrm-warning">
-                <h2>⚠️ Validation Issues Found</h2>
-                <p><strong>@result.Summary?.TotalIssues</strong> total issue(s) detected</p>
-            </div>
 
-            @if (result.MissingKeys.Any())
-            {
-                <div class="lrm-card">
-                    <h3>Missing Translations (@result.Summary?.MissingCount)</h3>
-                    <p>Keys that are missing in some language files:</p>
-                    @foreach (var langGroup in result.MissingKeys.OrderBy(kv => kv.Key))
-                    {
-                        <details class="lrm-details">
-                            <summary><strong>@langGroup.Key</strong> - @langGroup.Value.Count missing key(s)</summary>
-                            <ul>
-                                @foreach (var key in langGroup.Value.OrderBy(k => k))
-                                {
-                                    <li><code>@key</code></li>
-                                }
-                            </ul>
-                        </details>
-                    }
-                </div>
-            }
-
-            @if (result.DuplicateKeys.Any())
-            {
-                <div class="lrm-card">
-                    <h3>Duplicate Keys (@result.Summary?.DuplicatesCount)</h3>
-                    <p>Keys that appear multiple times in the same file:</p>
-                    @foreach (var langGroup in result.DuplicateKeys.OrderBy(kv => kv.Key))
-                    {
-                        <details class="lrm-details">
-                            <summary><strong>@langGroup.Key</strong> - @langGroup.Value.Count duplicate(s)</summary>
-                            <ul>
-                                @foreach (var key in langGroup.Value.OrderBy(k => k))
-                                {
-                                    <li><code>@key</code></li>
-                                }
-                            </ul>
-                        </details>
-                    }
-                </div>
-            }
-
-            @if (result.EmptyValues.Any())
-            {
-                <div class="lrm-card">
-                    <h3>Empty Values (@result.Summary?.EmptyCount)</h3>
-                    <p>Keys that have empty or whitespace-only values:</p>
-                    @foreach (var langGroup in result.EmptyValues.OrderBy(kv => kv.Key))
-                    {
-                        <details class="lrm-details">
-                            <summary><strong>@langGroup.Key</strong> - @langGroup.Value.Count empty value(s)</summary>
-                            <ul>
-                                @foreach (var key in langGroup.Value.OrderBy(k => k))
-                                {
-                                    <li><code>@key</code></li>
-                                }
-                            </ul>
-                        </details>
-                    }
-                </div>
-            }
-
-            @if (result.ExtraKeys.Any())
-            {
-                <div class="lrm-card">
-                    <h3>Extra Keys (@result.Summary?.ExtraCount)</h3>
-                    <p>Keys that exist in translation files but not in the default language:</p>
-                    @foreach (var langGroup in result.ExtraKeys.OrderBy(kv => kv.Key))
-                    {
-                        <details class="lrm-details">
-                            <summary><strong>@langGroup.Key</strong> - @langGroup.Value.Count extra key(s)</summary>
-                            <ul>
-                                @foreach (var key in langGroup.Value.OrderBy(k => k))
-                                {
-                                    <li><code>@key</code></li>
-                                }
-                            </ul>
-                        </details>
-                    }
-                </div>
-            }
-
-            @if (result.PlaceholderMismatches.Any())
-            {
-                <div class="lrm-card">
-                    <h3>Placeholder Mismatches (@result.Summary?.PlaceholderCount)</h3>
-                    <p>Keys where placeholder patterns don't match between languages:</p>
-                    @foreach (var keyGroup in result.PlaceholderMismatches.OrderBy(kv => kv.Key))
-                    {
-                        <details class="lrm-details">
-                            <summary><code>@keyGroup.Key</code> - @keyGroup.Value.Count language(s) with mismatches</summary>
-                            <ul>
-                                @foreach (var lang in keyGroup.Value.OrderBy(l => l))
-                                {
-                                    <li>@lang</li>
-                                }
-                            </ul>
-                        </details>
-                    }
-                </div>
-            }
-        }
-
-        <div class="lrm-actions">
-            <button class="lrm-button lrm-button-primary" @onclick="RunValidation">
-                ↻ Re-run Validation
-            </button>
-            <a href="/" class="lrm-button">← Back to Dashboard</a>
-        </div>
-    }
-</div>
+    <!-- Actions -->
+    <RadzenCard>
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+            <RadzenButton Text="@(isLoading ? "Validating..." : "Re-run Validation")" Icon="refresh"
+                         Click="@RunValidation" Disabled="@isLoading" IsBusy="@isLoading" />
+        </RadzenStack>
+    </RadzenCard>
+}
 
 @code {
     private ValidationResponse? result;
     private bool isLoading = true;
     private string? errorMessage;
+
+    // Helper class for flat data grid display
+    private class ValidationIssue
+    {
+        public string Language { get; set; } = "";
+        public string Key { get; set; } = "";
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -165,14 +248,54 @@
         try
         {
             result = await ValidationApi.ValidateAsync();
+
+            if (result.IsValid)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Validation Complete", "No issues found");
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Validation Complete", $"{result.Summary?.TotalIssues} issue(s) found");
+            }
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to run validation: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Validation Failed", ex.Message);
         }
         finally
         {
             isLoading = false;
         }
+    }
+
+    private IEnumerable<ValidationIssue> GetMissingKeysFlat()
+    {
+        if (result?.MissingKeys == null) return Enumerable.Empty<ValidationIssue>();
+        return result.MissingKeys.SelectMany(kv => kv.Value.Select(key => new ValidationIssue { Language = kv.Key, Key = key }));
+    }
+
+    private IEnumerable<ValidationIssue> GetDuplicateKeysFlat()
+    {
+        if (result?.DuplicateKeys == null) return Enumerable.Empty<ValidationIssue>();
+        return result.DuplicateKeys.SelectMany(kv => kv.Value.Select(key => new ValidationIssue { Language = kv.Key, Key = key }));
+    }
+
+    private IEnumerable<ValidationIssue> GetEmptyValuesFlat()
+    {
+        if (result?.EmptyValues == null) return Enumerable.Empty<ValidationIssue>();
+        return result.EmptyValues.SelectMany(kv => kv.Value.Select(key => new ValidationIssue { Language = kv.Key, Key = key }));
+    }
+
+    private IEnumerable<ValidationIssue> GetExtraKeysFlat()
+    {
+        if (result?.ExtraKeys == null) return Enumerable.Empty<ValidationIssue>();
+        return result.ExtraKeys.SelectMany(kv => kv.Value.Select(key => new ValidationIssue { Language = kv.Key, Key = key }));
+    }
+
+    private IEnumerable<ValidationIssue> GetPlaceholderMismatchesFlat()
+    {
+        if (result?.PlaceholderMismatches == null) return Enumerable.Empty<ValidationIssue>();
+        return result.PlaceholderMismatches.SelectMany(kv => kv.Value.Select(lang => new ValidationIssue { Key = kv.Key, Language = lang }));
     }
 }

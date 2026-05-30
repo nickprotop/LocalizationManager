@@ -3,131 +3,107 @@
 @using LocalizationManager.Models.Api
 @inject ResourceApiClient ResourceApi
 @inject NavigationManager Navigation
+@inject NotificationService NotificationService
 
 <PageTitle>Add Key - Localization Manager</PageTitle>
 
-<div class="lrm-page">
-    <h1 class="lrm-page-title">
-        <a href="/editor" class="lrm-back-link">← Editor</a>
-        Add New Key
-    </h1>
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+    <RadzenButton Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("/editor"))" />
+    <RadzenText TextStyle="TextStyle.H4">Add New Key</RadzenText>
+</RadzenStack>
 
-    @if (errorMessage != null)
-    {
-        <div class="lrm-card lrm-error">
-            <h3>Error</h3>
-            <p>@errorMessage</p>
-        </div>
-    }
+@if (errorMessage != null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="true" Close="@(() => errorMessage = null)" class="rz-mb-4">
+        <strong>Error:</strong> @errorMessage
+    </RadzenAlert>
+}
 
-    @if (successMessage != null)
-    {
-        <div class="lrm-card lrm-success">
-            <p>@successMessage</p>
-            <div class="lrm-actions">
-                <a href="/editor/key/@Uri.EscapeDataString(newKeyName)" class="lrm-button lrm-button-primary">Edit Key</a>
-                <button class="lrm-button" @onclick="ResetForm">Add Another</button>
-                <a href="/editor" class="lrm-button">Back to Editor</a>
-            </div>
-        </div>
-    }
-    else
-    {
-        <div class="lrm-card">
-            <div class="lrm-form">
-                <div class="lrm-form-group">
-                    <label class="lrm-label">Key Name *</label>
-                    <input type="text"
-                           class="lrm-input"
-                           placeholder="Enter key name (e.g., Button_Save, ErrorMessage_Required)"
-                           @bind="newKeyName"
-                           @bind:event="oninput" />
-                    <small class="lrm-text-muted">The key name must be unique across all resource files.</small>
-                </div>
+@if (successMessage != null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Success" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="false" class="rz-mb-4">
+        @successMessage
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-2">
+            <RadzenButton Text="Edit Key" Click="@(() => Navigation.NavigateTo($"/editor/key/{Uri.EscapeDataString(newKeyName)}"))" />
+            <RadzenButton Text="Add Another" ButtonStyle="ButtonStyle.Secondary" Click="@ResetForm" />
+            <RadzenButton Text="Back to Editor" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("/editor"))" />
+        </RadzenStack>
+    </RadzenAlert>
+}
+else
+{
+    <RadzenCard>
+        <RadzenStack Gap="1rem">
+            <RadzenFormField Text="Key Name *" Style="width: 100%;">
+                <RadzenTextBox @bind-Value="@newKeyName" Placeholder="Enter key name (e.g., Button_Save, ErrorMessage_Required)" Style="width: 100%;" />
+            </RadzenFormField>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">The key name must be unique across all resource files.</RadzenText>
 
-                @if (supportsPlurals)
+            @if (supportsPlurals)
+            {
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                    <RadzenCheckBox @bind-Value="@isPlural" Name="cbPlural" />
+                    <RadzenLabel Text="This is a plural key" Component="cbPlural" />
+                </RadzenStack>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Plural keys have different values for different quantities (one, other, zero, etc.)</RadzenText>
+            }
+
+            @if (languages != null)
+            {
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mt-2">Values by Language</RadzenText>
+                @foreach (var lang in languages)
                 {
-                    <div class="lrm-form-group">
-                        <label class="lrm-checkbox-label">
-                            <input type="checkbox" @bind="isPlural" />
-                            <span>This is a plural key</span>
-                        </label>
-                        <small class="lrm-text-muted">Plural keys have different values for different quantities (one, other, zero, etc.)</small>
-                    </div>
-                }
-
-                @if (languages != null)
-                {
-                    <h3>Values by Language</h3>
-                    @foreach (var lang in languages)
-                    {
-                        var langCode = lang.Code ?? "default";
-                        var currentLangCode = langCode; // Capture for closure
-                        <div class="lrm-form-group" @key="langCode">
-                            <label class="lrm-label">
-                                @langCode
+                    var langCode = lang.Code ?? "default";
+                    var currentLangCode = langCode;
+                    <RadzenFieldset>
+                        <HeaderTemplate>
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                <RadzenText>@langCode</RadzenText>
                                 @if (lang.IsDefault)
                                 {
-                                    <span class="lrm-badge lrm-badge-info">Default</span>
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Default" />
                                 }
-                            </label>
+                            </RadzenStack>
+                        </HeaderTemplate>
+                        <ChildContent>
                             @if (isPlural)
                             {
-                                <div class="lrm-plural-forms">
+                                <RadzenStack Gap="0.5rem">
                                     @foreach (var form in pluralFormNames)
                                     {
-                                        var currentForm = form; // Capture for closure
-                                        var formKey = $"{currentLangCode}:{currentForm}";
-                                        <div class="lrm-plural-form-row" @key="formKey">
-                                            <label class="lrm-plural-label">@form</label>
-                                            <input type="text"
-                                                   class="lrm-input lrm-input-plural"
-                                                   placeholder="@GetPluralPlaceholder(form)"
-                                                   value="@GetPluralValue(currentLangCode, currentForm)"
-                                                   @oninput="e => SetPluralValue(currentLangCode, currentForm, e.Value?.ToString() ?? string.Empty)" />
-                                        </div>
+                                        var currentForm = form;
+                                        <RadzenFormField Text="@form" Style="width: 100%;">
+                                            <RadzenTextBox Value="@GetPluralValue(currentLangCode, currentForm)"
+                                                          ValueChanged="@((string v) => SetPluralValue(currentLangCode, currentForm, v))"
+                                                          Placeholder="@GetPluralPlaceholder(form)" Style="width: 100%;" />
+                                        </RadzenFormField>
                                     }
-                                </div>
+                                </RadzenStack>
                             }
                             else
                             {
-                                <input type="text"
-                                       class="lrm-input"
-                                       placeholder="Enter value for @langCode"
-                                       value="@GetSimpleValue(currentLangCode)"
-                                       @oninput="e => SetSimpleValue(currentLangCode, e.Value?.ToString() ?? string.Empty)" />
+                                <RadzenTextBox Value="@GetSimpleValue(currentLangCode)"
+                                              ValueChanged="@((string v) => SetSimpleValue(currentLangCode, v))"
+                                              Placeholder="@($"Enter value for {langCode}")" Style="width: 100%;" />
                             }
-                        </div>
-                    }
+                        </ChildContent>
+                    </RadzenFieldset>
                 }
+            }
 
-                <div class="lrm-form-group">
-                    <label class="lrm-label">Comment (Optional)</label>
-                    <input type="text"
-                           class="lrm-input"
-                           placeholder="Add a comment to help translators"
-                           @bind="comment" />
-                </div>
+            <RadzenFormField Text="Comment (Optional)" Style="width: 100%;">
+                <RadzenTextBox @bind-Value="@comment" Placeholder="Add a comment to help translators" Style="width: 100%;" />
+            </RadzenFormField>
 
-                <div class="lrm-actions">
-                    <button class="lrm-button lrm-button-primary"
-                            @onclick="AddNewKey"
-                            disabled="@(isAdding || string.IsNullOrWhiteSpace(newKeyName))">
-                        @if (isAdding)
-                        {
-                            <text>Adding...</text>
-                        }
-                        else
-                        {
-                            <text>Add Key</text>
-                        }
-                    </button>
-                    <a href="/editor" class="lrm-button">Cancel</a>
-                </div>
-            </div>
-        </div>
-    }
-</div>
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                <RadzenButton Text="@(isAdding ? "Adding..." : "Add Key")" Icon="add"
+                             Click="@AddNewKey" Disabled="@(isAdding || string.IsNullOrWhiteSpace(newKeyName))"
+                             IsBusy="@isAdding" />
+                <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("/editor"))" />
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
+}
 
 @code {
     private List<ResourceFileInfo>? languages;
@@ -164,14 +140,12 @@
             languages = await ResourceApi.GetResourceFilesAsync();
             if (languages != null)
             {
-                // Check if using JSON backend (supports plurals)
                 supportsPlurals = languages.Any(l => l.FilePath?.EndsWith(".json", StringComparison.OrdinalIgnoreCase) == true);
 
                 foreach (var lang in languages)
                 {
                     var langCode = lang.Code ?? "default";
                     values[langCode] = "";
-                    // Initialize plural form values
                     foreach (var form in pluralFormNames)
                     {
                         pluralValues[$"{langCode}:{form}"] = "";
@@ -207,7 +181,6 @@
 
             if (isPlural)
             {
-                // Build plural values dictionary: { "default": { "one": "...", "other": "..." }, ... }
                 var pluralValuesPerLang = new Dictionary<string, Dictionary<string, string>>();
                 if (languages != null)
                 {
@@ -241,6 +214,7 @@
             if (result?.Success == true)
             {
                 successMessage = result.Message ?? $"Key '{newKeyName}' added successfully!";
+                NotificationService.Notify(NotificationSeverity.Success, "Key Added", successMessage);
             }
             else
             {
@@ -250,10 +224,12 @@
         catch (HttpRequestException ex)
         {
             errorMessage = $"Failed to add key: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Error", errorMessage);
         }
         catch (Exception ex)
         {
             errorMessage = $"An error occurred: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Error", errorMessage);
         }
         finally
         {

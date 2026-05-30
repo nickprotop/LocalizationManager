@@ -3,100 +3,81 @@
 @using Microsoft.JSInterop
 @inject ExportApiClient ExportApi
 @inject IJSRuntime JSRuntime
+@inject NotificationService NotificationService
 
 <PageTitle>Export - Localization Manager</PageTitle>
 
-<div class="lrm-page">
-    <h1 class="lrm-page-title">Export Resources</h1>
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">Export Resources</RadzenText>
 
-    <div class="lrm-card">
-        <h2>Export to JSON</h2>
-        <p>Export all resources to JSON format for backup or integration purposes.</p>
+<RadzenRow Gap="1rem">
+    <RadzenColumn Size="12" SizeMD="6">
+        <RadzenCard>
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="code" />
+                    <RadzenText TextStyle="TextStyle.H6">Export to JSON</RadzenText>
+                </RadzenStack>
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                    Export all resources to JSON format for backup or integration purposes.
+                </RadzenText>
 
-        <div class="lrm-form">
-            <div class="lrm-form-group">
-                <label class="lrm-checkbox-label">
-                    <input type="checkbox" @bind="includeCommentsJson" />
-                    Include comments in export
-                </label>
-            </div>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                    <RadzenCheckBox @bind-Value="@includeCommentsJson" Name="cbJsonComments" />
+                    <RadzenLabel Text="Include comments in export" Component="cbJsonComments" />
+                </RadzenStack>
 
-            <div class="lrm-actions">
-                <button class="lrm-button lrm-button-primary"
-                        @onclick="ExportToJson"
-                        disabled="@isExportingJson">
-                    @if (isExportingJson)
-                    {
-                        <text>Exporting...</text>
-                    }
-                    else
-                    {
-                        <text>Export to JSON</text>
-                    }
-                </button>
-            </div>
-        </div>
-    </div>
+                <RadzenButton Text="@(isExportingJson ? "Exporting..." : "Export to JSON")" Icon="file_download"
+                             Click="@ExportToJson" Disabled="@isExportingJson" IsBusy="@isExportingJson" />
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
 
-    <div class="lrm-card">
-        <h2>Export to CSV</h2>
-        <p>Export all resources to CSV format for editing in spreadsheet applications.</p>
+    <RadzenColumn Size="12" SizeMD="6">
+        <RadzenCard>
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="table_chart" />
+                    <RadzenText TextStyle="TextStyle.H6">Export to CSV</RadzenText>
+                </RadzenStack>
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                    Export all resources to CSV format for editing in spreadsheet applications.
+                </RadzenText>
 
-        <div class="lrm-form">
-            <div class="lrm-form-group">
-                <label class="lrm-checkbox-label">
-                    <input type="checkbox" @bind="includeCommentsCsv" />
-                    Include comments in export
-                </label>
-            </div>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                    <RadzenCheckBox @bind-Value="@includeCommentsCsv" Name="cbCsvComments" />
+                    <RadzenLabel Text="Include comments in export" Component="cbCsvComments" />
+                </RadzenStack>
 
-            <div class="lrm-actions">
-                <button class="lrm-button lrm-button-primary"
-                        @onclick="ExportToCsv"
-                        disabled="@isExportingCsv">
-                    @if (isExportingCsv)
-                    {
-                        <text>Exporting...</text>
-                    }
-                    else
-                    {
-                        <text>Export to CSV</text>
-                    }
-                </button>
-            </div>
-        </div>
-    </div>
+                <RadzenButton Text="@(isExportingCsv ? "Exporting..." : "Export to CSV")" Icon="file_download"
+                             Click="@ExportToCsv" Disabled="@isExportingCsv" IsBusy="@isExportingCsv" />
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
 
-    @if (errorMessage != null)
-    {
-        <div class="lrm-card lrm-error">
-            <h3>Error</h3>
-            <p>@errorMessage</p>
-        </div>
-    }
+@if (errorMessage != null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="true" Close="@(() => errorMessage = null)" class="rz-mt-4">
+        <strong>Error:</strong> @errorMessage
+    </RadzenAlert>
+}
 
-    @if (successMessage != null)
-    {
-        <div class="lrm-card lrm-success">
-            <p>@successMessage</p>
-        </div>
-    }
+@if (!string.IsNullOrEmpty(exportedData))
+{
+    <RadzenCard class="rz-mt-4">
+        <RadzenStack Gap="1rem">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                <RadzenText TextStyle="TextStyle.H6">Exported Data (@exportedFormat.ToUpper())</RadzenText>
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                    <RadzenButton Text="Copy" Icon="content_copy" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@CopyToClipboard" />
+                    <RadzenButton Text="Download" Icon="download" Size="ButtonSize.Small" Click="@DownloadFile" />
+                </RadzenStack>
+            </RadzenStack>
 
-    @if (!string.IsNullOrEmpty(exportedData))
-    {
-        <div class="lrm-card">
-            <h3>Exported Data</h3>
-            <details class="lrm-details">
-                <summary>View exported content</summary>
-                <pre class="lrm-code">@exportedData</pre>
-            </details>
-            <div class="lrm-actions">
-                <button class="lrm-button" @onclick="CopyToClipboard">Copy to Clipboard</button>
-                <button class="lrm-button" @onclick="DownloadFile">Download File</button>
-            </div>
-        </div>
-    }
-</div>
+            <RadzenTextArea Value="@exportedData" ReadOnly="true" Rows="15" Style="width: 100%; font-family: monospace; font-size: 0.85rem;" />
+        </RadzenStack>
+    </RadzenCard>
+}
 
 @code {
     private bool includeCommentsJson = false;
@@ -104,7 +85,6 @@
     private bool isExportingJson = false;
     private bool isExportingCsv = false;
     private string? errorMessage;
-    private string? successMessage;
     private string? exportedData;
     private string exportedFormat = string.Empty;
 
@@ -112,18 +92,18 @@
     {
         isExportingJson = true;
         errorMessage = null;
-        successMessage = null;
         exportedData = null;
 
         try
         {
             exportedData = await ExportApi.ExportToJsonAsync(includeCommentsJson);
             exportedFormat = "json";
-            successMessage = "Resources exported to JSON successfully";
+            NotificationService.Notify(NotificationSeverity.Success, "Export Complete", "Resources exported to JSON");
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to export to JSON: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Export Failed", ex.Message);
         }
         finally
         {
@@ -135,18 +115,18 @@
     {
         isExportingCsv = true;
         errorMessage = null;
-        successMessage = null;
         exportedData = null;
 
         try
         {
             exportedData = await ExportApi.ExportToCsvAsync(includeCommentsCsv);
             exportedFormat = "csv";
-            successMessage = "Resources exported to CSV successfully";
+            NotificationService.Notify(NotificationSeverity.Success, "Export Complete", "Resources exported to CSV");
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to export to CSV: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Export Failed", ex.Message);
         }
         finally
         {
@@ -161,7 +141,7 @@
         try
         {
             await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", exportedData);
-            successMessage = "Copied to clipboard!";
+            NotificationService.Notify(NotificationSeverity.Success, "Copied", "Content copied to clipboard");
         }
         catch (Exception ex)
         {
@@ -179,7 +159,7 @@
             var bytes = System.Text.Encoding.UTF8.GetBytes(exportedData);
             var base64 = Convert.ToBase64String(bytes);
             await JSRuntime.InvokeVoidAsync("downloadFile", fileName, base64);
-            successMessage = $"Downloaded as {fileName}";
+            NotificationService.Notify(NotificationSeverity.Success, "Downloaded", $"Saved as {fileName}");
         }
         catch (Exception ex)
         {

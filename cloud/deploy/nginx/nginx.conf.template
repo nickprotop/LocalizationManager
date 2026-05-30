@@ -41,6 +41,9 @@ http {
     keepalive_timeout 65;
     types_hash_max_size 2048;
 
+    # Request body size (for large push operations)
+    client_max_body_size 100m;
+
     # Gzip compression
     gzip on;
     gzip_vary on;

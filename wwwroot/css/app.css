@@ -1,0 +1,26 @@
+/* LRM - Minimal styles (using standard Radzen default theme) */
+
+/* Monospace font for localization keys */
+.key-name {
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+}
+
+/* Blazor error UI */
+#blazor-error-ui {
+    background: var(--rz-danger);
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    z-index: 10000;
+    padding: 0.5rem;
+    display: none;
+    color: white;
+    text-align: center;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 1rem;
+    top: 0.5rem;
+}

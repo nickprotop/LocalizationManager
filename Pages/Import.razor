@@ -2,134 +2,148 @@
 @using LocalizationManager.Services
 @using LocalizationManager.Models.Api
 @inject ImportApiClient ImportApi
+@inject NotificationService NotificationService
 
 <PageTitle>Import - Localization Manager</PageTitle>
 
-<div class="lrm-page">
-    <h1 class="lrm-page-title">Import Resources</h1>
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">Import Resources</RadzenText>
 
-    <div class="lrm-card">
-        <h2>Import from CSV</h2>
-        <p>Import resource keys and translations from CSV format. CSV should have columns: Key, [language codes], and optionally Comment.</p>
+<RadzenCard class="rz-mb-4">
+    <RadzenStack Gap="1rem">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="file_upload" />
+            <RadzenText TextStyle="TextStyle.H6">Import from CSV</RadzenText>
+        </RadzenStack>
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+            Import resource keys and translations from CSV format. CSV should have columns: Key, [language codes], and optionally Comment.
+        </RadzenText>
 
-        <div class="lrm-form">
-            <div class="lrm-form-group">
-                <label>CSV Data</label>
-                <textarea class="lrm-textarea"
-                          rows="15"
-                          placeholder="Paste CSV content here&#10;Example:&#10;Key,en,fr,Comment&#10;Hello,Hello,Bonjour,Greeting message&#10;Goodbye,Goodbye,Au revoir,"
-                          @bind="csvData"></textarea>
-            </div>
+        <RadzenFormField Text="CSV Data" Style="width: 100%;">
+            <RadzenTextArea @bind-Value="@csvData" Rows="12" Placeholder="Paste CSV content here&#10;Example:&#10;Key,en,fr,Comment&#10;Hello,Hello,Bonjour,Greeting message&#10;Goodbye,Goodbye,Au revoir," Style="width: 100%; font-family: monospace;" />
+        </RadzenFormField>
 
-            <div class="lrm-form-group">
-                <label class="lrm-checkbox-label">
-                    <input type="checkbox" @bind="updateExisting" />
-                    Update existing keys
-                </label>
-                <small class="lrm-text-muted">If unchecked, only new keys will be added</small>
-            </div>
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1.5rem" Wrap="FlexWrap.Wrap">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                <RadzenCheckBox @bind-Value="@updateExisting" Name="cbUpdateExisting" />
+                <RadzenLabel Text="Update existing keys" Component="cbUpdateExisting" />
+            </RadzenStack>
 
-            <div class="lrm-form-group">
-                <label class="lrm-checkbox-label">
-                    <input type="checkbox" @bind="dryRun" />
-                    Dry run (preview without saving)
-                </label>
-            </div>
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                <RadzenCheckBox @bind-Value="@dryRun" Name="cbDryRun" />
+                <RadzenLabel Text="Dry run (preview without saving)" Component="cbDryRun" />
+            </RadzenStack>
+        </RadzenStack>
 
-            <div class="lrm-actions">
-                <button class="lrm-button lrm-button-primary"
-                        @onclick="ImportCsv"
-                        disabled="@(isImporting || string.IsNullOrWhiteSpace(csvData))">
-                    @if (isImporting)
-                    {
-                        <text>Importing...</text>
-                    }
-                    else
-                    {
-                        <text>Import CSV</text>
-                    }
-                </button>
-                <button class="lrm-button" @onclick="ClearForm">Clear</button>
-            </div>
-        </div>
-    </div>
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+            <RadzenButton Text="@(isImporting ? "Importing..." : "Import CSV")" Icon="file_upload"
+                         Click="@ImportCsv" Disabled="@(isImporting || string.IsNullOrWhiteSpace(csvData))"
+                         IsBusy="@isImporting" />
+            <RadzenButton Text="Clear" Icon="clear" ButtonStyle="ButtonStyle.Light" Click="@ClearForm" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenCard>
 
-    @if (errorMessage != null)
+@if (errorMessage != null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="true" Close="@(() => errorMessage = null)" class="rz-mb-4">
+        <strong>Error:</strong> @errorMessage
+    </RadzenAlert>
+}
+
+@if (importResult != null)
+{
+    <RadzenAlert AlertStyle="@(importResult.Success ? AlertStyle.Success : AlertStyle.Warning)"
+                Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="false" class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Import Results</RadzenText>
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1.5rem" Wrap="FlexWrap.Wrap" class="rz-mb-2">
+            <RadzenText><strong>Added:</strong> @importResult.AddedCount keys</RadzenText>
+            <RadzenText><strong>Updated:</strong> @importResult.UpdatedCount keys</RadzenText>
+            <RadzenText><strong>Skipped:</strong> @importResult.SkippedCount keys</RadzenText>
+            <RadzenText><strong>Errors:</strong> @importResult.ErrorCount</RadzenText>
+        </RadzenStack>
+        @if (importResult.DryRun)
+        {
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                <em>Dry run - no changes saved</em>
+            </RadzenText>
+        }
+    </RadzenAlert>
+
+    @if (importResult.AddedKeys?.Any() == true || importResult.UpdatedKeys?.Any() == true || importResult.Errors?.Any() == true)
     {
-        <div class="lrm-card lrm-error">
-            <h3>Error</h3>
-            <p>@errorMessage</p>
-        </div>
+        <RadzenCard>
+            <RadzenTabs>
+                <Tabs>
+                    @if (importResult.AddedKeys?.Any() == true)
+                    {
+                        <RadzenTabsItem Text="@($"Added ({importResult.AddedKeys.Count})")">
+                            <RadzenDataGrid Data="@importResult.AddedKeys.Take(100)" TItem="string"
+                                           AllowPaging="true" PageSize="20" PagerHorizontalAlign="HorizontalAlign.Center">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="string" Title="Key">
+                                        <Template Context="key">
+                                            <code class="key-name rz-color-success">@key</code>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                            @if (importResult.AddedKeys.Count > 100)
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-2">
+                                    Showing first 100 of @importResult.AddedKeys.Count keys
+                                </RadzenText>
+                            }
+                        </RadzenTabsItem>
+                    }
+
+                    @if (importResult.UpdatedKeys?.Any() == true)
+                    {
+                        <RadzenTabsItem Text="@($"Updated ({importResult.UpdatedKeys.Count})")">
+                            <RadzenDataGrid Data="@importResult.UpdatedKeys.Take(100)" TItem="string"
+                                           AllowPaging="true" PageSize="20" PagerHorizontalAlign="HorizontalAlign.Center">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="string" Title="Key">
+                                        <Template Context="key">
+                                            <code class="key-name">@key</code>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                            @if (importResult.UpdatedKeys.Count > 100)
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-2">
+                                    Showing first 100 of @importResult.UpdatedKeys.Count keys
+                                </RadzenText>
+                            }
+                        </RadzenTabsItem>
+                    }
+
+                    @if (importResult.Errors?.Any() == true)
+                    {
+                        <RadzenTabsItem Text="@($"Errors ({importResult.Errors.Count})")">
+                            <RadzenDataGrid Data="@importResult.Errors.Take(50)" TItem="string"
+                                           AllowPaging="true" PageSize="10" PagerHorizontalAlign="HorizontalAlign.Center">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="string" Title="Error">
+                                        <Template Context="error">
+                                            <RadzenText class="rz-color-danger">@error</RadzenText>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                            @if (importResult.Errors.Count > 50)
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-2">
+                                    Showing first 50 of @importResult.Errors.Count errors
+                                </RadzenText>
+                            }
+                        </RadzenTabsItem>
+                    }
+                </Tabs>
+            </RadzenTabs>
+        </RadzenCard>
     }
-
-    @if (importResult != null)
-    {
-        <div class="lrm-card @(importResult.Success ? "lrm-success" : "lrm-warning")">
-            <h3>Import Results</h3>
-            <p>
-                <strong>Added:</strong> @importResult.AddedCount keys<br />
-                <strong>Updated:</strong> @importResult.UpdatedCount keys<br />
-                <strong>Skipped:</strong> @importResult.SkippedCount keys<br />
-                <strong>Errors:</strong> @importResult.ErrorCount<br />
-                @if (importResult.DryRun)
-                {
-                    <em>(Dry run - no changes saved)</em>
-                }
-            </p>
-
-            @if (importResult.AddedKeys?.Any() == true)
-            {
-                <details class="lrm-details">
-                    <summary>Added keys (@importResult.AddedKeys.Count)</summary>
-                    <ul>
-                        @foreach (var key in importResult.AddedKeys.Take(50))
-                        {
-                            <li><code>@key</code></li>
-                        }
-                    </ul>
-                    @if (importResult.AddedKeys.Count > 50)
-                    {
-                        <p class="lrm-text-muted">Showing first 50 of @importResult.AddedKeys.Count keys</p>
-                    }
-                </details>
-            }
-
-            @if (importResult.UpdatedKeys?.Any() == true)
-            {
-                <details class="lrm-details">
-                    <summary>Updated keys (@importResult.UpdatedKeys.Count)</summary>
-                    <ul>
-                        @foreach (var key in importResult.UpdatedKeys.Take(50))
-                        {
-                            <li><code>@key</code></li>
-                        }
-                    </ul>
-                    @if (importResult.UpdatedKeys.Count > 50)
-                    {
-                        <p class="lrm-text-muted">Showing first 50 of @importResult.UpdatedKeys.Count keys</p>
-                    }
-                </details>
-            }
-
-            @if (importResult.Errors?.Any() == true)
-            {
-                <details class="lrm-details">
-                    <summary class="lrm-error">Import errors (@importResult.Errors.Count)</summary>
-                    <ul>
-                        @foreach (var error in importResult.Errors.Take(20))
-                        {
-                            <li>@error</li>
-                        }
-                    </ul>
-                    @if (importResult.Errors.Count > 20)
-                    {
-                        <p class="lrm-text-muted">Showing first 20 of @importResult.Errors.Count errors</p>
-                    }
-                </details>
-            }
-        </div>
-    }
-</div>
+}
 
 @code {
     private string csvData = string.Empty;
@@ -155,10 +169,22 @@
             };
 
             importResult = await ImportApi.ImportFromCsvAsync(request);
+
+            if (importResult.Success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Import Complete",
+                    $"Added {importResult.AddedCount}, Updated {importResult.UpdatedCount}" + (dryRun ? " (dry run)" : ""));
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Import Completed with Errors",
+                    $"{importResult.ErrorCount} error(s) occurred");
+            }
         }
         catch (Exception ex)
         {
             errorMessage = $"Import failed: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Import Failed", ex.Message);
         }
         finally
         {

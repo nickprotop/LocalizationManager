@@ -1,0 +1,185 @@
+@using LocalizationManager.Services
+@using LocalizationManager.Models.Api
+@inject TranslationApiClient TranslationApi
+@inject DialogService DialogService
+
+<RadzenStack Gap="1rem">
+    <RadzenStack Gap="0.25rem">
+        <RadzenText><strong>Key:</strong> <code class="key-name">@KeyName</code></RadzenText>
+        <RadzenText><strong>Source Text:</strong> @(GetSourceValue() ?? "(empty)")</RadzenText>
+    </RadzenStack>
+
+    @if (errorMessage != null)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="true" Close="@(() => errorMessage = null)">
+            @errorMessage
+        </RadzenAlert>
+    }
+
+    @if (successMessage != null)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Success" Variant="Variant.Flat" Shade="Shade.Dark" AllowClose="false">
+            @successMessage
+        </RadzenAlert>
+    }
+    else
+    {
+        <RadzenFormField Text="Translation Provider" Style="width: 100%;">
+            <RadzenDropDown @bind-Value="@selectedProvider" Data="@AvailableProviders"
+                           TextProperty="DisplayName" ValueProperty="Name" Style="width: 100%;" />
+        </RadzenFormField>
+
+        <RadzenFieldset Text="Target Languages">
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
+                @foreach (var langCode in EditedValues.Keys.Where(k => k != DefaultLanguageCode))
+                {
+                    var isEmpty = string.IsNullOrWhiteSpace(EditedValues[langCode].Value);
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                        <RadzenCheckBox Value="@targetLanguages.Contains(langCode)" TValue="bool"
+                                       ValueChanged="@((bool v) => ToggleLanguage(langCode, v))"
+                                       Name="@($"cbLang_{langCode}")" />
+                        <RadzenLabel Component="@($"cbLang_{langCode}")">
+                            @langCode
+                            @if (isEmpty)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="empty" Style="font-size: 0.7rem;" class="rz-ml-1" />
+                            }
+                        </RadzenLabel>
+                    </RadzenStack>
+                }
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+            <RadzenCheckBox @bind-Value="@onlyMissing" Name="cbOnlyMissing" />
+            <RadzenLabel Text="Only translate empty values" Component="cbOnlyMissing" />
+        </RadzenStack>
+
+        @if (isTranslating)
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+                <RadzenText class="rz-color-secondary">Translating...</RadzenText>
+            </RadzenStack>
+        }
+    }
+
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
+        <RadzenButton Text="@(successMessage != null ? "Close" : "Cancel")" ButtonStyle="ButtonStyle.Light"
+                     Click="@(() => DialogService.Close(null))" />
+        @if (successMessage == null)
+        {
+            <RadzenButton Text="@(isTranslating ? "Translating..." : "Translate")"
+                         Click="@ExecuteTranslation"
+                         Disabled="@(isTranslating || !targetLanguages.Any() || string.IsNullOrWhiteSpace(GetSourceValue()))"
+                         IsBusy="@isTranslating" />
+        }
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public string KeyName { get; set; } = string.Empty;
+
+    [Parameter]
+    public Dictionary<string, ResourceValue> EditedValues { get; set; } = new();
+
+    [Parameter]
+    public string DefaultLanguageCode { get; set; } = "default";
+
+    [Parameter]
+    public List<TranslationProviderInfo> AvailableProviders { get; set; } = new();
+
+    private string selectedProvider = "google";
+    private HashSet<string> targetLanguages = new();
+    private bool onlyMissing = true;
+    private bool isTranslating = false;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override void OnInitialized()
+    {
+        // Initialize target languages (all non-default)
+        targetLanguages = EditedValues.Keys
+            .Where(k => k != DefaultLanguageCode)
+            .ToHashSet();
+    }
+
+    private string? GetSourceValue()
+    {
+        if (EditedValues.TryGetValue(DefaultLanguageCode, out var val))
+        {
+            return val.Value;
+        }
+        return EditedValues.Values.FirstOrDefault()?.Value;
+    }
+
+    private void ToggleLanguage(string langCode, bool selected)
+    {
+        if (selected) targetLanguages.Add(langCode);
+        else targetLanguages.Remove(langCode);
+    }
+
+    private async Task ExecuteTranslation()
+    {
+        isTranslating = true;
+        errorMessage = null;
+
+        try
+        {
+            var targets = targetLanguages.ToList();
+            if (onlyMissing)
+            {
+                targets = targets.Where(lang =>
+                    !EditedValues.ContainsKey(lang) ||
+                    string.IsNullOrWhiteSpace(EditedValues[lang].Value))
+                    .ToList();
+            }
+
+            if (!targets.Any())
+            {
+                successMessage = "No languages need translation (all have values).";
+                return;
+            }
+
+            var request = new TranslateRequest
+            {
+                Keys = new List<string> { KeyName },
+                Provider = selectedProvider,
+                TargetLanguages = targets,
+                OnlyMissing = false
+            };
+
+            var result = await TranslationApi.TranslateAsync(request);
+            if (result?.Success == true && result.Results?.Any() == true)
+            {
+                var translations = new Dictionary<string, string>();
+                foreach (var translation in result.Results.Where(r => r.Success))
+                {
+                    translations[translation.Language] = translation.TranslatedValue ?? string.Empty;
+                }
+
+                if (translations.Count > 0)
+                {
+                    DialogService.Close(translations);
+                }
+                else
+                {
+                    errorMessage = "No translations were applied.";
+                }
+            }
+            else
+            {
+                errorMessage = result?.Errors?.FirstOrDefault()?.Error ?? "Translation failed. Check provider settings.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Translation failed: {ex.Message}";
+        }
+        finally
+        {
+            isTranslating = false;
+        }
+    }
+}
