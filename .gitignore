@@ -528,3 +528,6 @@ vscode-extension/.vscode-test/
 vscode-extension/package-lock.json
 # LRM sync state (contains credentials)
 .lrm/
+
+# Superpowers scratch state
+.superpowers/
