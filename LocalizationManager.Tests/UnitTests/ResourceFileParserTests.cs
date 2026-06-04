@@ -15,7 +15,7 @@ public class ResourceFileParserTests
 
     public ResourceFileParserTests()
     {
-        _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData");
+        _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "FlatResx");
     }
 
     [Fact]

@@ -17,7 +17,7 @@ public class JsonResourceDiscoveryTests : IDisposable
     public JsonResourceDiscoveryTests()
     {
         _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "JsonResources");
-        _i18nextTestDataPath = Path.Combine(_testDataPath, "I18next");
+        _i18nextTestDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "JsonResourcesI18next");
         _tempDirectory = Path.Combine(Path.GetTempPath(), $"JsonDiscoveryTests_{Guid.NewGuid()}");
         Directory.CreateDirectory(_tempDirectory);
     }
@@ -55,10 +55,11 @@ public class JsonResourceDiscoveryTests : IDisposable
         // Act
         var languages = discovery.DiscoverLanguages(_testDataPath);
 
-        // Assert
+        // Assert - the suffix-less default file adopts the configured defaultLanguageCode
+        // ("en" in this fixture's lrm.json) instead of an empty code.
         var defaultLang = languages.FirstOrDefault(l => l.IsDefault);
         Assert.NotNull(defaultLang);
-        Assert.Equal("", defaultLang.Code);
+        Assert.Equal("en", defaultLang.Code);
         Assert.Contains("Default", defaultLang.Name);
     }
 
@@ -124,6 +125,39 @@ public class JsonResourceDiscoveryTests : IDisposable
 
         // Assert - should not include lrm.json
         Assert.DoesNotContain(languages, l => l.FilePath.EndsWith("lrm.json", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DiscoverLanguages_StandardFormat_FilesInSubfolders_AreDiscovered()
+    {
+        // Bug #4: JSON files nested under subfolders must be discovered recursively.
+        var nested = Path.Combine(_tempDirectory, "Components", "Account");
+        Directory.CreateDirectory(nested);
+        File.WriteAllText(Path.Combine(nested, "strings.json"), @"{""hello"": ""Hello""}");
+        File.WriteAllText(Path.Combine(nested, "strings.it.json"), @"{""hello"": ""Ciao""}");
+
+        var discovery = new JsonResourceDiscovery(new JsonFormatConfiguration());
+        var languages = discovery.DiscoverLanguages(_tempDirectory);
+
+        Assert.Equal(2, languages.Count);
+        Assert.Contains(languages, l => l.IsDefault);
+        Assert.Contains(languages, l => l.Code == "it");
+    }
+
+    [Fact]
+    public void DiscoverLanguages_StandardFormat_DoesNotRecurseIntoExcludedDirectories()
+    {
+        // Backups/build output must never be surfaced as resources.
+        var backups = Path.Combine(_tempDirectory, ".lrm", "backups");
+        Directory.CreateDirectory(backups);
+        File.WriteAllText(Path.Combine(_tempDirectory, "strings.json"), @"{""hello"": ""Hello""}");
+        File.WriteAllText(Path.Combine(backups, "strings.json"), @"{""hello"": ""Old""}");
+
+        var discovery = new JsonResourceDiscovery(new JsonFormatConfiguration());
+        var languages = discovery.DiscoverLanguages(_tempDirectory);
+
+        Assert.Single(languages);
+        Assert.DoesNotContain(languages, l => l.FilePath!.Contains(".lrm"));
     }
 
     #endregion

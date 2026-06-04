@@ -394,13 +394,19 @@ public class CodeScanner
 
     private HashSet<string> GetAllResourceKeys(List<ResourceFile> resourceFiles)
     {
-        // Get keys from default language file
-        var defaultFile = resourceFiles.FirstOrDefault(f => f.Language.IsDefault);
+        // Union the keys from every default language file. In multi-group projects
+        // (e.g. CustomerResources, GlassResources, SharedResources) each base resource
+        // has its own default file, so taking only the first one would flag keys defined
+        // in the other groups as "missing" even though they exist.
+        var defaultFiles = resourceFiles.Where(f => f.Language.IsDefault).ToList();
 
-        if (defaultFile == null)
-            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Fall back to all files if none are explicitly marked default (defensive).
+        if (defaultFiles.Count == 0)
+            defaultFiles = resourceFiles;
 
-        return new HashSet<string>(defaultFile.Entries.Select(e => e.Key), StringComparer.OrdinalIgnoreCase);
+        return new HashSet<string>(
+            defaultFiles.SelectMany(f => f.Entries.Select(e => e.Key)),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     private List<string> GetLanguagesForKey(List<ResourceFile> resourceFiles, string key)

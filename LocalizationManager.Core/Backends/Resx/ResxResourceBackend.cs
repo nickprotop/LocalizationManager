@@ -47,9 +47,16 @@ public class ResxResourceBackend : IResourceBackend
     /// <inheritdoc />
     public IResourceValidator Validator { get; }
 
-    public ResxResourceBackend()
+    /// <summary>
+    /// Creates a RESX backend.
+    /// </summary>
+    /// <param name="defaultLanguageCode">
+    /// The default/source language code from configuration (e.g. "it"). Used to label the
+    /// suffix-less default file with the real language code instead of an empty string.
+    /// </param>
+    public ResxResourceBackend(string? defaultLanguageCode = null)
     {
-        Discovery = new ResxResourceDiscovery();
+        Discovery = new ResxResourceDiscovery(defaultLanguageCode);
         Reader = new ResxResourceReader();
         Writer = new ResxResourceWriter();
         Validator = new ResxResourceValidator();
@@ -61,6 +68,7 @@ public class ResxResourceBackend : IResourceBackend
         if (!Directory.Exists(path))
             return false;
 
-        return Directory.GetFiles(path, "*.resx", SearchOption.TopDirectoryOnly).Any();
+        // Recurse: a project may keep its .resx files only in subfolders.
+        return Directory.EnumerateFiles(path, "*.resx", SearchOption.AllDirectories).Any();
     }
 }

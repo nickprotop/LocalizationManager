@@ -84,6 +84,19 @@ export class DashboardPanel {
         }
     }
 
+    /**
+     * Resolves a culture code (e.g. "it") to a display name (e.g. "Italian"),
+     * falling back to the upper-cased code when the code is unknown.
+     */
+    private formatLanguageName(code: string): string {
+        try {
+            const cultureName = new Intl.DisplayNames(['en'], { type: 'language' });
+            return cultureName.of(code) || code.toUpperCase();
+        } catch {
+            return code.toUpperCase();
+        }
+    }
+
     private getHtmlContent(stats: any): string {
         // Calculate translation coverage for each language
         const languageStats = stats.languages || [];
@@ -262,18 +275,18 @@ export class DashboardPanel {
             const percentage = Math.round(lang.coverage);
             const translated = lang.translatedCount;
 
-            // Format language name from languageCode
+            // Format language name from languageCode. The default file carries the
+            // configured defaultLanguageCode (e.g. "it"); only fall back to a generic
+            // label when the backend reports no concrete code for it.
+            const code = lang.languageCode;
+            const hasConcreteCode = code && code !== '' && code !== 'default';
             let langName: string;
-            if (lang.isDefault || lang.languageCode === '' || lang.languageCode === 'default') {
-                langName = 'English (Default)';
+            if (lang.isDefault) {
+                langName = hasConcreteCode
+                    ? `${this.formatLanguageName(code)} (Default)`
+                    : 'Default';
             } else {
-                // Try to get proper language name from CultureInfo
-                try {
-                    const cultureName = new Intl.DisplayNames(['en'], { type: 'language' });
-                    langName = cultureName.of(lang.languageCode) || lang.languageCode.toUpperCase();
-                } catch {
-                    langName = lang.languageCode.toUpperCase();
-                }
+                langName = this.formatLanguageName(code);
             }
 
             return `

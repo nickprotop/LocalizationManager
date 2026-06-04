@@ -52,8 +52,11 @@ public class JsonResourceDiscovery : IResourceDiscovery
         var config = _config ?? LoadConfigFromPath(searchPath);
         var defaultLanguageCode = LoadDefaultLanguageFromPath(searchPath);
 
-        var jsonFiles = Directory.GetFiles(searchPath, "*.json", SearchOption.TopDirectoryOnly)
+        // Recurse so JSON files in nested subfolders of the resource path are discovered.
+        // Skip config files (lrm*.json) and well-known non-source directories.
+        var jsonFiles = Directory.GetFiles(searchPath, "*.json", SearchOption.AllDirectories)
             .Where(f => !Path.GetFileName(f).StartsWith("lrm", StringComparison.OrdinalIgnoreCase))
+            .Where(f => !IsInExcludedDirectory(f, searchPath))
             .ToList();
 
         if (!jsonFiles.Any())
@@ -135,15 +138,23 @@ public class JsonResourceDiscovery : IResourceDiscovery
                 // 1. It has no culture code (e.g., strings.json), OR
                 // 2. Its culture code matches the defaultLanguageCode from lrm.json
                 var cultureCode = file!.Value.CultureCode;
-                var isDefault = string.IsNullOrEmpty(cultureCode) ||
+                var isSuffixless = string.IsNullOrEmpty(cultureCode);
+                var isDefault = isSuffixless ||
                                (!string.IsNullOrEmpty(configDefaultLanguage) &&
                                 cultureCode.Equals(configDefaultLanguage, StringComparison.OrdinalIgnoreCase));
+
+                // A suffix-less default file (e.g. strings.json) adopts the configured
+                // default language code so clients label it as the real language rather
+                // than as an unnamed default.
+                var effectiveCode = isSuffixless && !string.IsNullOrEmpty(configDefaultLanguage)
+                    ? configDefaultLanguage!
+                    : cultureCode;
                 var displayName = isDefault ? "Default" : GetCultureDisplayName(cultureCode);
 
                 result.Add(new LanguageInfo
                 {
                     BaseName = file.Value.BaseName,
-                    Code = cultureCode,
+                    Code = effectiveCode,
                     Name = displayName,
                     IsDefault = isDefault,
                     FilePath = file.Value.FilePath
@@ -371,6 +382,23 @@ public class JsonResourceDiscovery : IResourceDiscovery
         {
             return code.ToUpper();
         }
+    }
+
+    /// <summary>
+    /// Directories that should never be treated as resource sources when recursing.
+    /// </summary>
+    private static readonly string[] ExcludedDirectories =
+        { ".lrm", ".backups", "bin", "obj", ".git", "node_modules" };
+
+    /// <summary>
+    /// Returns true if the file lives under an excluded directory relative to the search root.
+    /// </summary>
+    private static bool IsInExcludedDirectory(string filePath, string searchPath)
+    {
+        var relative = Path.GetRelativePath(searchPath, filePath);
+        var segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return segments.Take(segments.Length - 1)
+            .Any(seg => ExcludedDirectories.Contains(seg, StringComparer.OrdinalIgnoreCase));
     }
 
     /// <inheritdoc />

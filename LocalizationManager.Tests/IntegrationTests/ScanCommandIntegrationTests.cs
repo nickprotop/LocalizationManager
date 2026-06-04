@@ -32,7 +32,7 @@ public class ScanCommandIntegrationTests : IDisposable
 
         // Copy TestResource.resx to temp directory
         var testDataPath = Path.Combine(Directory.GetCurrentDirectory(), "TestData");
-        var sourceResxPath = Path.Combine(testDataPath, "TestResource.resx");
+        var sourceResxPath = Path.Combine(testDataPath, "FlatResx", "TestResource.resx");
 
         if (File.Exists(sourceResxPath))
         {

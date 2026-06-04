@@ -14,7 +14,7 @@ public class ResourceDiscoveryTests
 
     public ResourceDiscoveryTests()
     {
-        _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData");
+        _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "FlatResx");
     }
 
     [Fact]
@@ -144,4 +144,123 @@ public class ResourceDiscoveryTests
             Assert.Contains(group.Files, f => f.Code == "it");
         }
     }
+
+    [Fact]
+    public void DiscoverLanguages_FilesInSubfolders_AreDiscovered()
+    {
+        // Bug #4: .resx files nested under subfolders of the resource path were
+        // not discovered (TopDirectoryOnly). They must now be found recursively.
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var nested = Path.Combine(tempDir, "Components", "Account", "Pages");
+        Directory.CreateDirectory(nested);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(nested, "Login.resx"), EmptyResx);
+            File.WriteAllText(Path.Combine(nested, "Login.it.resx"), EmptyResx);
+
+            var languages = _discovery.DiscoverLanguages(tempDir);
+
+            Assert.Equal(2, languages.Count);
+            Assert.Contains(languages, l => l.IsDefault && l.FilePath.EndsWith("Login.resx"));
+            Assert.Contains(languages, l => l.Code == "it");
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public void DiscoverResourceGroups_DistinctlyNamedGroupsInSubfolders_AreDiscovered()
+    {
+        // The reported scenario: distinctly-named resource groups living in different
+        // subfolders must each be discovered with their default + culture files.
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var folderA = Path.Combine(tempDir, "Customers", "Pages");
+        var folderB = Path.Combine(tempDir, "Account");
+        Directory.CreateDirectory(folderA);
+        Directory.CreateDirectory(folderB);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(folderA, "CustomerResources.resx"), EmptyResx);
+            File.WriteAllText(Path.Combine(folderA, "CustomerResources.it.resx"), EmptyResx);
+            File.WriteAllText(Path.Combine(folderB, "Login.resx"), EmptyResx);
+            File.WriteAllText(Path.Combine(folderB, "Login.it.resx"), EmptyResx);
+
+            var directory = _discovery.DiscoverResourceGroups(tempDir);
+
+            Assert.Equal(2, directory.Groups.Count);
+            Assert.Contains(directory.Groups, g => g.BaseName == "CustomerResources");
+            Assert.Contains(directory.Groups, g => g.BaseName == "Login");
+            foreach (var group in directory.Groups)
+            {
+                Assert.Equal(2, group.Files.Count);
+                Assert.Contains(group.Files, f => f.IsDefault);
+                Assert.Contains(group.Files, f => f.Code == "it");
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public void DiscoverLanguages_WithDefaultLanguageCode_LabelsSuffixlessFileWithConfiguredCode()
+    {
+        // Bug #1: the suffix-less default file must carry the configured default
+        // language code (e.g. "it") instead of an empty code, so every client
+        // shows it as the real language rather than guessing "English".
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(tempDir, "CustomerResources.resx"), EmptyResx);
+            File.WriteAllText(Path.Combine(tempDir, "CustomerResources.it.resx"), EmptyResx);
+
+            var discovery = new ResxResourceDiscovery("it");
+            var languages = discovery.DiscoverLanguages(tempDir);
+
+            var defaultLang = languages.Single(l => l.IsDefault);
+            Assert.Equal("it", defaultLang.Code);
+            Assert.EndsWith("CustomerResources.resx", defaultLang.FilePath);
+
+            // The suffixed .it file should not be a second, duplicate "it" default.
+            Assert.Single(languages, l => l.IsDefault);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public void DiscoverLanguages_WithoutDefaultLanguageCode_KeepsEmptyDefaultCode()
+    {
+        // Backward compatibility: with no configured default, the suffix-less file
+        // keeps Code = "" as before.
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(tempDir, "CustomerResources.resx"), EmptyResx);
+
+            var discovery = new ResxResourceDiscovery();
+            var languages = discovery.DiscoverLanguages(tempDir);
+
+            var defaultLang = languages.Single(l => l.IsDefault);
+            Assert.Equal("", defaultLang.Code);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+        }
+    }
+
+    private const string EmptyResx =
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root>\n  <resheader name=\"resmimetype\"><value>text/microsoft-resx</value></resheader>\n  <resheader name=\"version\"><value>2.0</value></resheader>\n  <resheader name=\"reader\"><value>System.Resources.ResXResourceReader</value></resheader>\n  <resheader name=\"writer\"><value>System.Resources.ResXResourceWriter</value></resheader>\n</root>\n";
 }

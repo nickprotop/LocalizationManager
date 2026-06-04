@@ -17,7 +17,7 @@ public class JsonResourceReaderTests
     public JsonResourceReaderTests()
     {
         _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "JsonResources");
-        _i18nextTestDataPath = Path.Combine(_testDataPath, "I18next");
+        _i18nextTestDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "JsonResourcesI18next");
     }
 
     #region Standard Format Tests

@@ -31,6 +31,22 @@ namespace LocalizationManager.Core.Backends.Resx;
 /// </summary>
 public class ResxResourceDiscovery : IResourceDiscovery
 {
+    private readonly string? _defaultLanguageCode;
+
+    /// <summary>
+    /// Creates a RESX discovery instance.
+    /// </summary>
+    /// <param name="defaultLanguageCode">
+    /// The default/source language code from configuration (e.g. "it"). When set, the
+    /// suffix-less default file (e.g. CustomerResources.resx) is reported with this code
+    /// instead of an empty string, so every client labels it as the real language rather
+    /// than guessing "English". When null, the default file keeps an empty code.
+    /// </param>
+    public ResxResourceDiscovery(string? defaultLanguageCode = null)
+    {
+        _defaultLanguageCode = string.IsNullOrWhiteSpace(defaultLanguageCode) ? null : defaultLanguageCode;
+    }
+
     /// <inheritdoc />
     public List<LanguageInfo> DiscoverLanguages(string searchPath)
     {
@@ -41,9 +57,12 @@ public class ResxResourceDiscovery : IResourceDiscovery
 
         var languages = new List<LanguageInfo>();
 
-        // Find all .resx files (exclude .Designer.cs files)
-        var resxFiles = Directory.GetFiles(searchPath, "*.resx", SearchOption.TopDirectoryOnly)
+        // Find all .resx files recursively (exclude .Designer.cs files and well-known
+        // non-source directories like backups/build output). Files may live in nested
+        // subfolders of the resource path (e.g. Resources/Components/.../Login.it.resx).
+        var resxFiles = Directory.GetFiles(searchPath, "*.resx", SearchOption.AllDirectories)
             .Where(f => !f.EndsWith(".Designer.cs", StringComparison.OrdinalIgnoreCase))
+            .Where(f => !IsInExcludedDirectory(f, searchPath))
             .ToList();
 
         if (!resxFiles.Any())
@@ -51,14 +70,16 @@ public class ResxResourceDiscovery : IResourceDiscovery
             return languages;
         }
 
-        // Group by base name (e.g., "SharedResource" from "SharedResource.resx" and "SharedResource.el.resx")
+        // Group by directory + base name so unrelated files that share a base name in
+        // different subfolders (e.g. Customers/Resources.resx and Glass/Resources.resx)
+        // are kept as separate resource groups rather than merged.
         var groups = resxFiles
-            .GroupBy(f => GetBaseName(f))
+            .GroupBy(f => GetGroupKey(f))
             .ToList();
 
         foreach (var group in groups)
         {
-            var baseName = group.Key;
+            var baseName = GetBaseName(group.First());
 
             foreach (var file in group)
             {
@@ -67,12 +88,13 @@ public class ResxResourceDiscovery : IResourceDiscovery
 
                 if (parts.Length == 1)
                 {
-                    // Default language (e.g., SharedResource.resx)
+                    // Default language (e.g., SharedResource.resx). Adopt the configured
+                    // default language code when available; otherwise leave it blank.
                     languages.Add(new LanguageInfo
                     {
                         BaseName = baseName,
-                        Code = "",
-                        Name = "Default",
+                        Code = _defaultLanguageCode ?? "",
+                        Name = _defaultLanguageCode != null ? GetCultureName(_defaultLanguageCode) : "Default",
                         IsDefault = true,
                         FilePath = file
                     });
@@ -114,6 +136,35 @@ public class ResxResourceDiscovery : IResourceDiscovery
         var fileName = Path.GetFileNameWithoutExtension(filePath);
         // Return the first part before any dots
         return fileName.Split('.')[0];
+    }
+
+    /// <summary>
+    /// Builds a grouping key from the containing directory and base name, so that files
+    /// sharing a base name in different subfolders form separate resource groups.
+    /// </summary>
+    private static string GetGroupKey(string filePath)
+    {
+        var directory = Path.GetDirectoryName(filePath) ?? string.Empty;
+        return $"{directory}{Path.DirectorySeparatorChar}{GetBaseName(filePath)}";
+    }
+
+    /// <summary>
+    /// Directories that should never be treated as resource sources when recursing
+    /// (backups, build output, VCS and package directories).
+    /// </summary>
+    private static readonly string[] ExcludedDirectories =
+        { ".lrm", ".backups", "bin", "obj", ".git", "node_modules" };
+
+    /// <summary>
+    /// Returns true if the file lives under an excluded directory relative to the search root.
+    /// </summary>
+    private static bool IsInExcludedDirectory(string filePath, string searchPath)
+    {
+        var relative = Path.GetRelativePath(searchPath, filePath);
+        var segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        // All segments except the final file name are directory names.
+        return segments.Take(segments.Length - 1)
+            .Any(seg => ExcludedDirectories.Contains(seg, StringComparer.OrdinalIgnoreCase));
     }
 
     /// <summary>

@@ -99,8 +99,8 @@ public class JsonResourceBackend : IResourceBackend
         if (!Directory.Exists(path))
             return false;
 
-        // Check for JSON files, excluding lrm*.json config files
-        return Directory.GetFiles(path, "*.json", SearchOption.TopDirectoryOnly)
+        // Check for JSON files (including nested subfolders), excluding lrm*.json config files
+        return Directory.EnumerateFiles(path, "*.json", SearchOption.AllDirectories)
             .Any(f => !Path.GetFileName(f).StartsWith("lrm", StringComparison.OrdinalIgnoreCase));
     }
 }

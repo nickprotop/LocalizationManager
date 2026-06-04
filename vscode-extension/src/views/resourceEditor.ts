@@ -455,13 +455,16 @@ export class ResourceEditorPanel {
                 throw new Error('No workspace folder open');
             }
 
-            // If filePath is relative, resolve it against workspace root
-            let fullPath = filePath;
-            if (!path.isAbsolute(filePath)) {
-                fullPath = path.join(workspaceFolders[0].uri.fsPath, filePath);
-            }
+            // Build a URI for the target file. Absolute paths (the scanner returns
+            // absolute paths) must be opened via Uri.file directly — joining them onto
+            // the workspace root produces a malformed doubled path on Windows
+            // (e.g. c:\\workspace\\c:\\Users\\...). Only relative paths are resolved
+            // against the workspace root.
+            const fileUri = path.isAbsolute(filePath)
+                ? vscode.Uri.file(filePath)
+                : vscode.Uri.joinPath(workspaceFolders[0].uri, filePath);
 
-            const document = await vscode.workspace.openTextDocument(fullPath);
+            const document = await vscode.workspace.openTextDocument(fileUri);
             const editor = await vscode.window.showTextDocument(document);
 
             // Navigate to the specified line
@@ -1807,7 +1810,7 @@ export class ResourceEditorPanel {
                 return \`
                     <div style="padding: 10px; margin-bottom: 10px; background: var(--vscode-editor-background); border-radius: 4px; border-left: 3px solid \${confidenceColor};">
                         <div>
-                            <a href="#" onclick="openFile('\${escapeHtml(ref.file)}', \${ref.line}); return false;"
+                            <a href="#" class="lrm-open-file" data-file="\${escapeHtml(ref.file)}" data-line="\${ref.line}"
                                style="color: var(--vscode-textLink-foreground); text-decoration: none; font-weight: bold;">
                                 \${escapeHtml(ref.file)}:\${ref.line}
                             </a>
@@ -1893,7 +1896,7 @@ export class ResourceEditorPanel {
                                           'var(--vscode-editorInfo-foreground)';
                     return \`
                         <div style="padding: 4px 0; margin-left: 20px; border-bottom: 1px solid var(--vscode-widget-border);">
-                            <a href="#" onclick="openFile('\${escapeHtml(r.file)}', \${r.line}); return false;"
+                            <a href="#" class="lrm-open-file" data-file="\${escapeHtml(r.file)}" data-line="\${r.line}"
                                style="color: var(--vscode-textLink-foreground); text-decoration: none;">
                                 \${escapeHtml(r.file)}:\${r.line}
                             </a>
@@ -1922,6 +1925,19 @@ export class ResourceEditorPanel {
                 line: line
             });
         }
+
+        // Delegated handler for reference links. The file path is carried in a
+        // data-file attribute (HTML-escaped) rather than embedded in an inline
+        // onclick JS string, so Windows backslashes (e.g. \\t in a path segment)
+        // are preserved verbatim instead of being parsed as escape sequences.
+        document.addEventListener('click', function (event) {
+            const link = event.target.closest('.lrm-open-file');
+            if (!link) {
+                return;
+            }
+            event.preventDefault();
+            openFile(link.dataset.file, parseInt(link.dataset.line, 10));
+        });
 
         function escapeHtml(text) {
             const div = document.createElement('div');

@@ -18,7 +18,7 @@ public class ViewCommandIntegrationTests
     public ViewCommandIntegrationTests()
     {
         // Use persistent TestData folder
-        _testDirectory = Path.Combine(AppContext.BaseDirectory, "TestData");
+        _testDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "FlatResx");
 
         // Using _reader and _writer initialized above
         // Using _discovery initialized above
