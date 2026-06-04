@@ -38,10 +38,17 @@ namespace LocalizationManager.UI;
 /// </summary>
 public partial class ResourceEditorWindow : Window
 {
-    private void EditKey(string key, int occurrenceNumber = 1)
+    private void EditKey(string key, int occurrenceNumber = 1, string? baseName = null)
     {
+        // Resolve which resource group this key belongs to. When not supplied, fall back to
+        // the (single) group so behaviour is unchanged for single-group directories.
+        baseName ??= ResolveBaseNameForKey(key);
+
+        // The files that make up this resource group
+        var groupFiles = GetGroupFiles(baseName);
+
         // Check if this is a duplicate key
-        var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
+        var defaultFile = groupFiles.FirstOrDefault(rf => rf.Language.IsDefault);
         var totalOccurrences = defaultFile?.Entries.Count(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)) ?? 0;
         var titleSuffix = totalOccurrences > 1 ? $" [{occurrenceNumber}]" : "";
 
@@ -51,7 +58,7 @@ public partial class ResourceEditorWindow : Window
 
         if (isPlural)
         {
-            EditPluralKey(key, occurrenceNumber, titleSuffix);
+            EditPluralKey(key, occurrenceNumber, titleSuffix, baseName);
             return;
         }
 
@@ -66,7 +73,7 @@ public partial class ResourceEditorWindow : Window
         var commentFields = new Dictionary<string, TextField>();
         var yPos = 1;
 
-        foreach (var rf in _resourceFiles)
+        foreach (var rf in groupFiles)
         {
             // Get the Nth occurrence of this key
             var entry = GetNthOccurrence(rf, key, occurrenceNumber);
@@ -145,7 +152,7 @@ public partial class ResourceEditorWindow : Window
             // Save values - update the Nth occurrence
             foreach (var kvp in fields)
             {
-                var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                var rf = groupFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
                 if (rf != null)
                 {
                     var entry = GetNthOccurrence(rf, key, occurrenceNumber);
@@ -160,7 +167,7 @@ public partial class ResourceEditorWindow : Window
             // Save comments
             foreach (var kvp in commentFields)
             {
-                var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                var rf = groupFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
                 if (rf != null)
                 {
                     var entry = GetNthOccurrence(rf, key, occurrenceNumber);
@@ -214,7 +221,7 @@ public partial class ResourceEditorWindow : Window
                 // Save current values first
                 foreach (var kvp in fields)
                 {
-                    var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                    var rf = groupFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
                     if (rf != null)
                     {
                         var entry = GetNthOccurrence(rf, key, occurrenceNumber);
@@ -235,7 +242,7 @@ public partial class ResourceEditorWindow : Window
                 // Save comments
                 foreach (var kvp in commentFields)
                 {
-                    var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                    var rf = groupFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
                     if (rf != null)
                     {
                         var entry = GetNthOccurrence(rf, key, occurrenceNumber);
@@ -253,7 +260,7 @@ public partial class ResourceEditorWindow : Window
                 Application.MainLoop.Invoke(() =>
                 {
                     MessageBox.Query("Converted", "Key converted to plural. Opening plural editor.", "OK");
-                    EditPluralKey(key, occurrenceNumber, titleSuffix);
+                    EditPluralKey(key, occurrenceNumber, titleSuffix, baseName);
                 });
             };
         }
@@ -267,8 +274,11 @@ public partial class ResourceEditorWindow : Window
         dialog.Dispose();
     }
 
-    private void EditPluralKey(string key, int occurrenceNumber, string titleSuffix)
+    private void EditPluralKey(string key, int occurrenceNumber, string titleSuffix, string? baseName = null)
     {
+        baseName ??= ResolveBaseNameForKey(key);
+        var groupFiles = GetGroupFiles(baseName);
+
         var dialog = new Dialog
         {
             Title = $"Edit Plural: {key}{titleSuffix}",
@@ -293,7 +303,7 @@ public partial class ResourceEditorWindow : Window
         dialog.Add(infoLabel);
         yPos += 2;
 
-        foreach (var rf in _resourceFiles)
+        foreach (var rf in groupFiles)
         {
             var entry = GetNthOccurrence(rf, key, occurrenceNumber);
             var currentPluralForms = entry?.PluralForms ?? new Dictionary<string, string>();
@@ -378,7 +388,7 @@ public partial class ResourceEditorWindow : Window
             // Save plural form values
             foreach (var langCode in formFields.Keys)
             {
-                var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == langCode);
+                var rf = groupFiles.FirstOrDefault(r => r.Language.Code == langCode);
                 if (rf != null)
                 {
                     var entry = GetNthOccurrence(rf, key, occurrenceNumber);
@@ -409,7 +419,7 @@ public partial class ResourceEditorWindow : Window
             // Save comments
             foreach (var kvp in commentFields)
             {
-                var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                var rf = groupFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
                 if (rf != null)
                 {
                     var entry = GetNthOccurrence(rf, key, occurrenceNumber);
@@ -458,7 +468,7 @@ public partial class ResourceEditorWindow : Window
             // Convert from plural to simple: copy 'other' form (or first available) to Value
             foreach (var langCode in formFields.Keys)
             {
-                var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == langCode);
+                var rf = groupFiles.FirstOrDefault(r => r.Language.Code == langCode);
                 if (rf != null)
                 {
                     var entry = GetNthOccurrence(rf, key, occurrenceNumber);
@@ -487,7 +497,7 @@ public partial class ResourceEditorWindow : Window
             // Save comments
             foreach (var kvp in commentFields)
             {
-                var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                var rf = groupFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
                 if (rf != null)
                 {
                     var entry = GetNthOccurrence(rf, key, occurrenceNumber);
@@ -505,7 +515,7 @@ public partial class ResourceEditorWindow : Window
             Application.MainLoop.Invoke(() =>
             {
                 MessageBox.Query("Converted", "Key converted to simple. Opening standard editor.", "OK");
-                EditKey(key, occurrenceNumber);
+                EditKey(key, occurrenceNumber, baseName);
             });
         };
 
@@ -520,10 +530,14 @@ public partial class ResourceEditorWindow : Window
         var supportsPlurals = _backend is Core.Backends.Json.JsonResourceBackend;
         var isPlural = false;
 
+        // One field set per distinct culture code; the key is added to one group at a time.
+        var languageColumns = GetLanguageColumns();
+
         // Calculate dialog height: base + languages * (simple or plural rows) + extra for plural option
         var dialogHeight = supportsPlurals
-            ? 14 + _resourceFiles.Count * 5  // Room for plural checkbox
-            : 10 + _resourceFiles.Count * 5;
+            ? 14 + languageColumns.Count * 5  // Room for plural checkbox
+            : 10 + languageColumns.Count * 5;
+        if (_isMultiGroup) dialogHeight += 2;
 
         var dialog = new Dialog
         {
@@ -550,6 +564,29 @@ public partial class ResourceEditorWindow : Window
         dialog.Add(keyLabel, keyField);
 
         var yPos = 4;
+
+        // Group selector (only when more than one resource group exists)
+        ComboBox? groupCombo = null;
+        if (_isMultiGroup)
+        {
+            var groupLabel = new Label { Text = "Group:", X = 1, Y = yPos };
+            groupCombo = new ComboBox
+            {
+                X = 10,
+                Y = yPos,
+                Width = Dim.Fill() - 1,
+                Height = Math.Min(_groups.Count + 1, 6)
+            };
+            groupCombo.SetSource(_groups);
+            groupCombo.SelectedItem = 0;
+            dialog.Add(groupLabel, groupCombo);
+            yPos += 2;
+        }
+
+        // The group these fields target. For single-group dirs this is the only group.
+        string SelectedGroup() => _isMultiGroup && groupCombo != null && groupCombo.SelectedItem >= 0
+            ? _groups[groupCombo.SelectedItem]
+            : (_groups.FirstOrDefault() ?? string.Empty);
 
         // Add plural checkbox if supported
         CheckBox? pluralCheckbox = null;
@@ -581,12 +618,12 @@ public partial class ResourceEditorWindow : Window
         var simpleYPos = yPos;
         var pluralYPos = yPos;
 
-        // Create simple value fields
-        foreach (var rf in _resourceFiles)
+        // Create simple value fields (one per distinct culture code)
+        foreach (var (code, header) in languageColumns)
         {
             var valueLabel = new Label
             {
-                Text = $"{rf.Language.Name}:",
+                Text = $"{header}:",
                 X = 1,
                 Y = simpleYPos
             };
@@ -614,8 +651,8 @@ public partial class ResourceEditorWindow : Window
                 Text = ""
             };
 
-            simpleValueFields[rf.Language.Code] = valueField;
-            simpleCommentFields[rf.Language.Code] = commentField;
+            simpleValueFields[code] = valueField;
+            simpleCommentFields[code] = commentField;
             simpleControls.AddRange(new View[] { valueLabel, valueField, commentLabel, commentField });
             simpleYPos += 5;
         }
@@ -623,11 +660,11 @@ public partial class ResourceEditorWindow : Window
         // Create plural form fields (only if supported)
         if (supportsPlurals)
         {
-            foreach (var rf in _resourceFiles)
+            foreach (var (code, header) in languageColumns)
             {
                 var langHeader = new Label
                 {
-                    Text = $"── {rf.Language.Name} ──",
+                    Text = $"── {header} ──",
                     X = 1,
                     Y = pluralYPos,
                     ColorScheme = new ColorScheme { Normal = Terminal.Gui.Attribute.Make(Color.BrightYellow, Color.Black) }
@@ -635,7 +672,7 @@ public partial class ResourceEditorWindow : Window
                 pluralControls.Add(langHeader);
                 pluralYPos++;
 
-                pluralFormFields[rf.Language.Code] = new Dictionary<string, TextField>();
+                pluralFormFields[code] = new Dictionary<string, TextField>();
 
                 foreach (var form in pluralForms)
                 {
@@ -662,7 +699,7 @@ public partial class ResourceEditorWindow : Window
                         Text = ""
                     };
 
-                    pluralFormFields[rf.Language.Code][form] = formField;
+                    pluralFormFields[code][form] = formField;
                     pluralControls.AddRange(new View[] { formLabel, formField });
                     pluralYPos++;
                 }
@@ -683,7 +720,7 @@ public partial class ResourceEditorWindow : Window
                     Text = ""
                 };
 
-                pluralCommentFields[rf.Language.Code] = commentField;
+                pluralCommentFields[code] = commentField;
                 pluralControls.AddRange(new View[] { commentLabel, commentField });
                 pluralYPos += 2;
             }
@@ -763,16 +800,23 @@ public partial class ResourceEditorWindow : Window
                 return;
             }
 
-            if (_allKeys.Contains(key))
+            var targetGroup = SelectedGroup();
+            var targetFiles = GetGroupFiles(targetGroup);
+
+            // Duplicate check is scoped to the target group: the same key may legitimately
+            // exist in another group.
+            var groupDefault = targetFiles.FirstOrDefault(rf => rf.Language.IsDefault);
+            if (groupDefault != null && groupDefault.Entries.Any(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)))
             {
-                MessageBox.ErrorQuery("Error", "Key already exists", "OK");
+                var where = _isMultiGroup ? $" in group '{targetGroup}'" : "";
+                MessageBox.ErrorQuery("Error", $"Key already exists{where}", "OK");
                 return;
             }
 
             if (isPlural)
             {
-                // Add plural entries
-                foreach (var rf in _resourceFiles)
+                // Add plural entries to every file in the target group
+                foreach (var rf in targetFiles)
                 {
                     var langCode = rf.Language.Code;
                     var pluralFormsDict = new Dictionary<string, string>();
@@ -806,10 +850,10 @@ public partial class ResourceEditorWindow : Window
             }
             else
             {
-                // Add simple entries
+                // Add simple entries to every file in the target group
                 foreach (var kvp in simpleValueFields)
                 {
-                    var rf = _resourceFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                    var rf = targetFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
                     if (rf != null)
                     {
                         var comment = simpleCommentFields.ContainsKey(kvp.Key)
@@ -826,8 +870,10 @@ public partial class ResourceEditorWindow : Window
                 }
             }
 
-            _allKeys.Add(key);
-            _allKeys = _allKeys.OrderBy(k => k).ToList();
+            // Rebuild entry references so the new key picks up the correct group/occurrence,
+            // then refresh the derived key list.
+            BuildEntryReferences();
+            _allKeys = _allEntries.Select(e => e.Key).Distinct().OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
 
             // Rebuild the entire table to account for new key
             if (_showComments)
@@ -881,7 +927,7 @@ public partial class ResourceEditorWindow : Window
 
             if (result == 0)
             {
-                DeleteAllOccurrences(entryRef.Key);
+                DeleteAllOccurrences(entryRef.Key, entryRef.BaseName);
             }
         }
     }
@@ -941,7 +987,7 @@ public partial class ResourceEditorWindow : Window
             var result = MessageBox.Query("Confirm Delete", confirmMessage, "Yes", "No");
             if (result == 0)
             {
-                DeleteSpecificOccurrence(entryRef.Key, entryRef.OccurrenceNumber);
+                DeleteSpecificOccurrence(entryRef.Key, entryRef.OccurrenceNumber, entryRef.BaseName);
             }
         };
 
@@ -952,14 +998,14 @@ public partial class ResourceEditorWindow : Window
             var result = MessageBox.Query("Confirm Delete", confirmMessage, "Yes", "No");
             if (result == 0)
             {
-                DeleteAllOccurrences(entryRef.Key);
+                DeleteAllOccurrences(entryRef.Key, entryRef.BaseName);
             }
         };
 
         btnMerge.Clicked += () =>
         {
             Application.RequestStop();
-            Application.MainLoop.Invoke(() => PerformMerge(entryRef.Key));
+            Application.MainLoop.Invoke(() => PerformMerge(entryRef.Key, entryRef.BaseName));
         };
 
         btnCancel.Clicked += () => Application.RequestStop();
@@ -1234,7 +1280,7 @@ public partial class ResourceEditorWindow : Window
             if (selectedEntry != null)
             {
                 Application.RequestStop();
-                PerformMerge(selectedEntry.Key);
+                PerformMerge(selectedEntry.Key, selectedEntry.BaseName);
             }
         };
 
@@ -1428,12 +1474,16 @@ public partial class ResourceEditorWindow : Window
             Height = Dim.Percent(60)
         };
 
-        var languageList = _resourceFiles.Select(rf =>
-        {
-            var code = string.IsNullOrEmpty(rf.Language.Code) ? $"({_defaultLanguageCode})" : rf.Language.Code;
-            var isDefault = rf.Language.IsDefault ? " [DEFAULT]" : "";
-            return $"{code,-12} {rf.Language.Name,-25} ({rf.Entries.Count,4} entries){isDefault}";
-        }).ToList();
+        var languageList = _resourceFiles
+            .OrderBy(rf => rf.Language.BaseName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(rf => rf.Language.IsDefault ? 0 : 1)
+            .Select(rf =>
+            {
+                var code = string.IsNullOrEmpty(rf.Language.Code) ? $"({_defaultLanguageCode})" : rf.Language.Code;
+                var isDefault = rf.Language.IsDefault ? " [DEFAULT]" : "";
+                var groupPrefix = _isMultiGroup ? $"{rf.Language.BaseName,-20} " : "";
+                return $"{groupPrefix}{code,-12} {rf.Language.Name,-25} ({rf.Entries.Count,4} entries){isDefault}";
+            }).ToList();
 
         var listView = new ListView(languageList)
         {
@@ -1482,9 +1532,12 @@ public partial class ResourceEditorWindow : Window
         var statusLabel = new Label { X = 22, Y = 2, Width = Dim.Fill() - 1, ColorScheme = Colors.Base };
 
         var copyFromLabel = new Label("Copy entries from:") { X = 1, Y = 4 };
-        var languageOptions = _resourceFiles.Select(rf =>
-            string.IsNullOrEmpty(rf.Language.Code) ? "Default" : $"{rf.Language.Code} ({rf.Language.Name})"
-        ).ToList();
+        // Offer one entry per distinct culture code; the new file in each group copies from
+        // that group's file of the chosen code.
+        var copyFromColumns = GetLanguageColumns();
+        var languageOptions = copyFromColumns
+            .Select(c => string.IsNullOrEmpty(c.Code) ? $"{_defaultLanguageCode} (Default)" : c.Header)
+            .ToList();
 
         var copyFromCombo = new ComboBox
         {
@@ -1494,6 +1547,7 @@ public partial class ResourceEditorWindow : Window
             Height = 5
         };
         copyFromCombo.SetSource(languageOptions);
+        copyFromCombo.SelectedItem = 0;
 
         var emptyCheckbox = new CheckBox("Create empty (no entries)")
         {
@@ -1546,10 +1600,26 @@ public partial class ResourceEditorWindow : Window
                 return;
             }
 
-            var baseName = _resourceFiles[0].Language.BaseName;
-            var resourcePath = Path.GetDirectoryName(_resourceFiles[0].Language.FilePath) ?? "";
+            // The culture code chosen as the copy source (by index into the distinct columns)
+            var sourceCode = copyFromColumns.Count > 0 && copyFromCombo.SelectedItem >= 0
+                ? copyFromColumns[copyFromCombo.SelectedItem].Code
+                : string.Empty;
 
-            if (manager.LanguageFileExists(baseName, code, resourcePath))
+            // Determine which groups still need this language created.
+            var groupsToCreate = new List<(string BaseName, string ResourcePath)>();
+            foreach (var baseName in _groups)
+            {
+                var groupFile = _resourceFiles.FirstOrDefault(rf =>
+                    string.Equals(rf.Language.BaseName, baseName, StringComparison.OrdinalIgnoreCase));
+                if (groupFile == null) continue;
+                var resourcePath = Path.GetDirectoryName(groupFile.Language.FilePath) ?? "";
+                if (!manager.LanguageFileExists(baseName, code, resourcePath))
+                {
+                    groupsToCreate.Add((baseName, resourcePath));
+                }
+            }
+
+            if (groupsToCreate.Count == 0)
             {
                 MessageBox.ErrorQuery("Error", $"Language '{code}' already exists.", "OK");
                 return;
@@ -1557,40 +1627,47 @@ public partial class ResourceEditorWindow : Window
 
             try
             {
-                // Get source file
-                ResourceFile? sourceFile = null;
-                if (!emptyCheckbox.Checked)
+                var createdFiles = new List<ResourceFile>();
+                foreach (var (baseName, resourcePath) in groupsToCreate)
                 {
-                    var selectedIdx = copyFromCombo.SelectedItem;
-                    sourceFile = _resourceFiles[selectedIdx];
+                    // Per-group copy source: the file of the chosen code within this group.
+                    ResourceFile? sourceFile = null;
+                    if (!emptyCheckbox.Checked)
+                    {
+                        sourceFile = _resourceFiles.FirstOrDefault(rf =>
+                            string.Equals(rf.Language.BaseName, baseName, StringComparison.OrdinalIgnoreCase) &&
+                            rf.Language.Code == sourceCode);
+                    }
+
+                    var newFile = manager.CreateLanguageFile(
+                        baseName,
+                        code,
+                        resourcePath,
+                        sourceFile,
+                        copyEntries: !emptyCheckbox.Checked
+                    );
+
+                    _resourceFiles.Add(newFile);
+                    createdFiles.Add(newFile);
                 }
 
-                // Create new language file
-                var newFile = manager.CreateLanguageFile(
-                    baseName,
-                    code,
-                    resourcePath,
-                    sourceFile,
-                    copyEntries: !emptyCheckbox.Checked
-                );
-
-                // Add to resource files list
-                _resourceFiles.Add(newFile);
-
-                // Rebuild DataTable with new column
-                var newDataTable = BuildDataTable();
-                _dataTable = newDataTable;
+                // Make the new culture visible and rebuild from the updated file set.
+                if (!_filterCriteria.VisibleLanguageCodes.Contains(code))
+                {
+                    _filterCriteria.VisibleLanguageCodes.Add(code);
+                }
+                BuildEntryReferences();
+                _dataTable = BuildDataTable();
                 if (_tableView != null)
                 {
                     _tableView.Table = _dataTable;
-
                 }
 
                 UpdateStatus();
 
+                var fileList = string.Join("\n", createdFiles.Select(f => $"  {Path.GetFileName(f.Language.FilePath)}"));
                 MessageBox.Query("Success",
-                    $"Added {culture!.DisplayName} ({code}) language\n" +
-                    $"File: {Path.GetFileName(newFile.Language.FilePath)}",
+                    $"Added {culture!.DisplayName} ({code}) language across {createdFiles.Count} group(s):\n{fileList}",
                     "OK");
 
                 Application.RequestStop();
@@ -1614,11 +1691,16 @@ public partial class ResourceEditorWindow : Window
 
     private void RemoveLanguage()
     {
-        var removableLanguages = _resourceFiles
+        // Remove a culture across every group at once. Group removable languages by code so
+        // the user picks "it" once and it is removed from all groups that have it.
+        var removableCodes = _resourceFiles
             .Where(rf => !rf.Language.IsDefault)
+            .GroupBy(rf => rf.Language.Code)
+            .Select(g => (Code: g.Key, Files: g.ToList(), Name: g.First().Language.Name))
+            .OrderBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (!removableLanguages.Any())
+        if (!removableCodes.Any())
         {
             MessageBox.ErrorQuery("Error", "No languages to remove.\nCannot delete the default language.", "OK");
             return;
@@ -1633,9 +1715,12 @@ public partial class ResourceEditorWindow : Window
 
         var label = new Label("Select language to remove:") { X = 1, Y = 1 };
 
-        var languageList = removableLanguages.Select(rf =>
-            $"{rf.Language.Code,-12} {rf.Language.Name,-25} ({rf.Entries.Count,4} entries)"
-        ).ToList();
+        var languageList = removableCodes.Select(x =>
+        {
+            var groupNote = _isMultiGroup ? $" in {x.Files.Count} group(s)" : "";
+            var entryCount = x.Files.Sum(f => f.Entries.Count);
+            return $"{x.Code,-12} {x.Name,-25} ({entryCount,4} entries{groupNote})";
+        }).ToList();
 
         var listView = new ListView(languageList)
         {
@@ -1660,43 +1745,49 @@ public partial class ResourceEditorWindow : Window
         btnRemove.Clicked += () =>
         {
             var selectedIdx = listView.SelectedItem;
-            if (selectedIdx < 0 || selectedIdx >= removableLanguages.Count)
+            if (selectedIdx < 0 || selectedIdx >= removableCodes.Count)
             {
                 MessageBox.ErrorQuery("Error", "Please select a language to remove.", "OK");
                 return;
             }
 
-            var rf = removableLanguages[selectedIdx];
+            var selected = removableCodes[selectedIdx];
+            var fileNote = _isMultiGroup
+                ? $"{selected.Files.Count} files across all groups will be deleted."
+                : $"File: {Path.GetFileName(selected.Files[0].Language.FilePath)}";
             var result = MessageBox.Query("Confirm Delete",
-                $"Delete {rf.Language.Name} ({rf.Language.Code})?\n\n" +
-                $"{rf.Entries.Count} entries will be lost.\n" +
-                $"File: {Path.GetFileName(rf.Language.FilePath)}",
+                $"Delete {selected.Name} ({selected.Code})?\n\n" +
+                $"{selected.Files.Sum(f => f.Entries.Count)} entries will be lost.\n" +
+                fileNote,
                 "Delete", "Cancel");
 
             if (result == 0)
             {
                 try
                 {
-                    // Create backup if requested
-                    if (!noBackupCheckbox.Checked)
-                    {
-                        var backup = new BackupVersionManager(10);
-                        var basePath = Path.GetDirectoryName(rf.Language.FilePath) ?? Environment.CurrentDirectory;
-                        backup.CreateBackupAsync(rf.Language.FilePath, "tui-delete-language", basePath)
-                            .GetAwaiter().GetResult();
-                    }
-
-                    // Delete the file
                     var manager = new LanguageFileManager();
                     manager.SetBackend(_backend);
-                    manager.DeleteLanguageFile(rf.Language);
 
-                    // Remove from list
-                    _resourceFiles.Remove(rf);
+                    foreach (var rf in selected.Files)
+                    {
+                        // Create backup if requested
+                        if (!noBackupCheckbox.Checked)
+                        {
+                            var backup = new BackupVersionManager(10);
+                            var basePath = Path.GetDirectoryName(rf.Language.FilePath) ?? Environment.CurrentDirectory;
+                            backup.CreateBackupAsync(rf.Language.FilePath, "tui-delete-language", basePath)
+                                .GetAwaiter().GetResult();
+                        }
 
-                    // Rebuild DataTable without this column
-                    var newDataTable = BuildDataTable();
-                    _dataTable = newDataTable;
+                        manager.DeleteLanguageFile(rf.Language);
+                        _resourceFiles.Remove(rf);
+                    }
+
+                    _filterCriteria.VisibleLanguageCodes.Remove(selected.Code);
+
+                    // Rebuild from the updated file set
+                    BuildEntryReferences();
+                    _dataTable = BuildDataTable();
                     if (_tableView != null)
                     {
                         _tableView.Table = _dataTable;
@@ -1705,7 +1796,7 @@ public partial class ResourceEditorWindow : Window
                     UpdateStatus();
 
                     MessageBox.Query("Success",
-                        $"Removed {rf.Language.Name} ({rf.Language.Code})",
+                        $"Removed {selected.Name} ({selected.Code})",
                         "OK");
 
                     Application.RequestStop();
@@ -2000,18 +2091,20 @@ public partial class ResourceEditorWindow : Window
         var checkboxes = new List<CheckBox>();
         var yPos = 3;
 
-        foreach (var rf in _resourceFiles)
+        // One checkbox per distinct culture code (shared across groups)
+        var distinctLanguages = GetLanguageColumns();
+        foreach (var (code, header) in distinctLanguages)
         {
-            var displayName = string.IsNullOrEmpty(rf.Language.Code)
-                ? $"{_defaultLanguageCode} ({rf.Language.Name})"
-                : $"{rf.Language.Code} ({rf.Language.Name})";
+            var displayName = string.IsNullOrEmpty(code)
+                ? $"{_defaultLanguageCode} ({header})"
+                : header;
 
             var checkbox = new CheckBox
             {
                 Text = displayName,
                 X = 1,
                 Y = yPos,
-                Checked = _filterCriteria.VisibleLanguageCodes.Contains(rf.Language.Code)
+                Checked = _filterCriteria.VisibleLanguageCodes.Contains(code)
             };
 
             checkboxes.Add(checkbox);
@@ -2070,20 +2163,20 @@ public partial class ResourceEditorWindow : Window
         };
         btnApply.Clicked += () =>
         {
-            // Update visible language codes
+            // Update visible language codes (by distinct culture code)
             _filterCriteria.VisibleLanguageCodes.Clear();
             for (int i = 0; i < checkboxes.Count; i++)
             {
                 if (checkboxes[i].Checked)
                 {
-                    _filterCriteria.VisibleLanguageCodes.Add(_resourceFiles[i].Language.Code);
+                    _filterCriteria.VisibleLanguageCodes.Add(distinctLanguages[i].Code);
                 }
             }
 
             // Update quick checkboxes in main UI
-            for (int i = 0; i < _languageCheckboxes.Count && i < _resourceFiles.Count; i++)
+            for (int i = 0; i < _languageCheckboxes.Count && i < distinctLanguages.Count; i++)
             {
-                _languageCheckboxes[i].Checked = _filterCriteria.VisibleLanguageCodes.Contains(_resourceFiles[i].Language.Code);
+                _languageCheckboxes[i].Checked = _filterCriteria.VisibleLanguageCodes.Contains(distinctLanguages[i].Code);
             }
 
             // Rebuild table
@@ -2120,7 +2213,8 @@ public partial class ResourceEditorWindow : Window
         if (keysToTranslate.Count == 1)
         {
             var key = keysToTranslate[0];
-            var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
+            var ctxGroup = ResolveBaseNameForKey(key);
+            var defaultFile = GetGroupFiles(ctxGroup).FirstOrDefault(rf => rf.Language.IsDefault);
             var entry = defaultFile?.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
 
             var contextLabel = new Label("Translation Context:")
@@ -2195,11 +2289,12 @@ public partial class ResourceEditorWindow : Window
 
         yPos += 3; // Move past provider label and combo
 
-        // Target languages selection
+        // Target languages selection (distinct non-default culture codes across all groups)
         var langLabel = new Label("Target Languages:") { X = 1, Y = yPos };
         var targetLanguages = _resourceFiles
             .Where(rf => !rf.Language.IsDefault)
             .Select(rf => rf.Language.Code)
+            .Distinct()
             .ToList();
 
         var langCheckboxes = new List<CheckBox>();
@@ -2285,32 +2380,48 @@ public partial class ResourceEditorWindow : Window
                 progressBar.Fraction = 0f;
                 Application.Refresh();
 
-                // Translate each key
-                var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
-                if (defaultFile == null) return;
+                // Expand the requested keys into group-qualified work items so the same key in
+                // several groups is translated within each group using that group's own files.
+                var workItems = new List<(string BaseName, string Key)>();
+                foreach (var key in keysToTranslate)
+                {
+                    foreach (var baseName in _groups)
+                    {
+                        var groupDefault = GetGroupFiles(baseName).FirstOrDefault(rf => rf.Language.IsDefault);
+                        if (groupDefault != null && groupDefault.Entries.Any(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            workItems.Add((baseName, key));
+                        }
+                    }
+                }
 
                 using var cache = new TranslationCache();
                 int translated = 0;
                 int totalOperations = 0;
                 int completedOperations = 0;
 
-                // Calculate total operations (keys × target languages × occurrences)
-                foreach (var key in keysToTranslate)
+                // Calculate total operations (work items × target languages × occurrences)
+                foreach (var (baseName, key) in workItems)
                 {
-                    var sourceEntries = defaultFile.Entries.Where(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).ToList();
+                    var groupDefault = GetGroupFiles(baseName).FirstOrDefault(rf => rf.Language.IsDefault);
+                    var sourceEntries = groupDefault?.Entries.Where(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).ToList() ?? new();
                     totalOperations += sourceEntries.Count * selectedLangs.Count;
                 }
 
-                foreach (var key in keysToTranslate)
+                foreach (var (baseName, key) in workItems)
                 {
-                    // Get all occurrences of this key in the default file
+                    var groupFiles = GetGroupFiles(baseName);
+                    var defaultFile = groupFiles.FirstOrDefault(rf => rf.Language.IsDefault);
+                    if (defaultFile == null) continue;
+
+                    // Get all occurrences of this key in the group's default file
                     var sourceEntries = defaultFile.Entries.Where(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).ToList();
                     if (sourceEntries.Count == 0)
                         continue;
 
                     foreach (var targetLang in selectedLangs)
                     {
-                        var targetFile = _resourceFiles.FirstOrDefault(rf => rf.Language.Code == targetLang);
+                        var targetFile = groupFiles.FirstOrDefault(rf => rf.Language.Code == targetLang);
                         if (targetFile == null) continue;
 
                         // Get all occurrences in target language

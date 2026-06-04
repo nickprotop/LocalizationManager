@@ -47,8 +47,8 @@ public partial class ResourceEditorWindow : Window
             var entryRef = GetEntryReferenceFromSelectedRow(_tableView.SelectedRow);
             if (entryRef == null) return;
 
-            // Get the default language file
-            var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
+            // Get the default language file for this entry's group
+            var defaultFile = GetGroupFiles(entryRef.BaseName).FirstOrDefault(rf => rf.Language.IsDefault);
             if (defaultFile == null) return;
 
             // Get the value for this key
@@ -105,8 +105,8 @@ public partial class ResourceEditorWindow : Window
             var entryRef = GetEntryReferenceFromSelectedRow(_tableView.SelectedRow);
             if (entryRef == null) return;
 
-            // Get the default language file
-            var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
+            // Get the default language file for this entry's group
+            var defaultFile = GetGroupFiles(entryRef.BaseName).FirstOrDefault(rf => rf.Language.IsDefault);
             if (defaultFile == null) return;
 
             // Find and update the entry
@@ -151,10 +151,12 @@ public partial class ResourceEditorWindow : Window
         }
     }
 
-    private void DeleteSpecificOccurrence(string key, int occurrenceNumber)
+    private void DeleteSpecificOccurrence(string key, int occurrenceNumber, string? baseName = null)
     {
-        // Delete the Nth occurrence from all language files
-        foreach (var rf in _resourceFiles)
+        baseName ??= ResolveBaseNameForKey(key);
+
+        // Delete the Nth occurrence from this group's language files only
+        foreach (var rf in GetGroupFiles(baseName))
         {
             var occurrences = rf.Entries
                 .Select((e, i) => (Entry: e, Index: i))
@@ -173,10 +175,12 @@ public partial class ResourceEditorWindow : Window
         _hasUnsavedChanges = true;
     }
 
-    private void DeleteAllOccurrences(string key)
+    private void DeleteAllOccurrences(string key, string? baseName = null)
     {
-        // Delete all occurrences from all files
-        foreach (var rf in _resourceFiles)
+        baseName ??= ResolveBaseNameForKey(key);
+
+        // Delete all occurrences from this group's files only
+        foreach (var rf in GetGroupFiles(baseName))
         {
             rf.Entries.RemoveAll(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
         }
@@ -513,9 +517,12 @@ public partial class ResourceEditorWindow : Window
 
     // Merge Duplicates Functionality
 
-    private void PerformMerge(string key)
+    private void PerformMerge(string key, string? baseName = null)
     {
-        var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
+        baseName ??= ResolveBaseNameForKey(key);
+        var groupFiles = GetGroupFiles(baseName);
+
+        var defaultFile = groupFiles.FirstOrDefault(rf => rf.Language.IsDefault);
         if (defaultFile == null) return;
 
         var occurrences = defaultFile.Entries.Where(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -546,7 +553,7 @@ public partial class ResourceEditorWindow : Window
         // Collect selections for each language
         var selections = new Dictionary<string, int>(); // language code -> selected occurrence index (1-based)
 
-        foreach (var rf in _resourceFiles)
+        foreach (var rf in groupFiles)
         {
             var langOccurrences = rf.Entries.Where(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).ToList();
 
@@ -573,7 +580,7 @@ public partial class ResourceEditorWindow : Window
         }
 
         // Apply the merge
-        foreach (var rf in _resourceFiles)
+        foreach (var rf in groupFiles)
         {
             if (!selections.ContainsKey(rf.Language.Code))
                 continue;
@@ -622,21 +629,28 @@ public partial class ResourceEditorWindow : Window
 
     private void PerformMergeAll()
     {
-        var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
-        if (defaultFile == null) return;
+        // Find all (group, key) pairs with duplicates across every group's default file.
+        var pairsToMerge = new List<(string BaseName, string Key)>();
+        foreach (var baseName in _groups)
+        {
+            var defaultFile = GetGroupFiles(baseName).FirstOrDefault(rf => rf.Language.IsDefault);
+            if (defaultFile == null) continue;
 
-        // Find all keys with duplicates
-        var keysToMerge = defaultFile.Entries
-            .GroupBy(e => e.Key)
-            .Where(g => g.Count() > 1)
-            .Select(g => g.Key)
-            .ToList();
+            foreach (var dupKey in defaultFile.Entries
+                .GroupBy(e => e.Key)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key))
+            {
+                pairsToMerge.Add((baseName, dupKey));
+            }
+        }
 
-        if (keysToMerge.Count == 0)
+        if (pairsToMerge.Count == 0)
         {
             MessageBox.Query("No Duplicates", "No duplicate keys found.", "OK");
             return;
         }
+        var keysToMerge = pairsToMerge;
 
         var confirmMessage = $"Found {keysToMerge.Count} key(s) with duplicates.\n\n" +
                            "You will be asked to select which occurrence to keep\n" +
@@ -649,10 +663,10 @@ public partial class ResourceEditorWindow : Window
             return;
         }
 
-        // Merge each key
-        foreach (var key in keysToMerge)
+        // Merge each (group, key) pair
+        foreach (var (baseName, key) in keysToMerge)
         {
-            PerformMerge(key);
+            PerformMerge(key, baseName);
         }
     }
 

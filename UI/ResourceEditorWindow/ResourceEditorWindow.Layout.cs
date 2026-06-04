@@ -63,7 +63,7 @@ public partial class ResourceEditorWindow : Window
                         var entryRef = GetEntryReferenceFromSelectedRow(_tableView.SelectedRow);
                         if (entryRef != null)
                         {
-                            EditKey(entryRef.Key, entryRef.OccurrenceNumber);
+                            EditKey(entryRef.Key, entryRef.OccurrenceNumber, entryRef.BaseName);
                         }
                     }
                 }, null, null, Key.Enter),
@@ -247,16 +247,16 @@ public partial class ResourceEditorWindow : Window
             Y = 3
         };
 
-        // Add checkboxes for first 3-4 languages
-        var maxVisibleLangs = Math.Min(4, _resourceFiles.Count);
+        // Add checkboxes for the first 3-4 distinct languages (one per culture code,
+        // shared across resource groups)
+        var distinctLanguages = GetLanguageColumns();
+        var maxVisibleLangs = Math.Min(4, distinctLanguages.Count);
         var currentX = Pos.Right(langLabel) + 1;
 
         for (int i = 0; i < maxVisibleLangs; i++)
         {
-            var rf = _resourceFiles[i];
-            var displayName = string.IsNullOrEmpty(rf.Language.Code)
-                ? _defaultLanguageCode
-                : rf.Language.Code;
+            var (code, _) = distinctLanguages[i];
+            var displayName = string.IsNullOrEmpty(code) ? _defaultLanguageCode : code;
 
             var checkbox = new CheckBox
             {
@@ -266,7 +266,7 @@ public partial class ResourceEditorWindow : Window
                 Checked = true // All visible by default
             };
 
-            var languageCode = rf.Language.Code; // Capture for closure
+            var languageCode = code; // Capture for closure
             checkbox.Toggled += (prev) =>
             {
                 if (checkbox.Checked)
@@ -375,7 +375,7 @@ public partial class ResourceEditorWindow : Window
             var entryRef = GetEntryReferenceFromSelectedRow(args.Row);
             if (entryRef != null)
             {
-                EditKey(entryRef.Key, entryRef.OccurrenceNumber);
+                EditKey(entryRef.Key, entryRef.OccurrenceNumber, entryRef.BaseName);
             }
         };
 

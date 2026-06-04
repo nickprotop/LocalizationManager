@@ -45,20 +45,30 @@ public partial class ResourceEditorWindow : Window
         // Add Key column
         dt.Columns.Add("Key", typeof(string));
 
-        // Add column for each language
-        foreach (var rf in _resourceFiles)
+        // Add a Group column when more than one resource group is present
+        if (_isMultiGroup)
         {
-            dt.Columns.Add(rf.Language.Name, typeof(string));
+            dt.Columns.Add("Group", typeof(string));
         }
 
-        // Add comment columns for each language (hidden, used for filtering)
-        foreach (var rf in _resourceFiles)
+        // Add one column per distinct culture code (shared across groups)
+        var languageColumns = GetLanguageColumns();
+        foreach (var (_, header) in languageColumns)
         {
-            var commentColumn = dt.Columns.Add($"_Comment_{rf.Language.Code}", typeof(string));
+            dt.Columns.Add(header, typeof(string));
+        }
+
+        // Add comment columns for each language (hidden, used for filtering), keyed by code
+        foreach (var (code, _) in languageColumns)
+        {
+            var commentColumn = dt.Columns.Add($"_Comment_{code}", typeof(string));
             commentColumn.ColumnMapping = MappingType.Hidden;
         }
 
         // Add internal columns for tracking occurrences (hidden from display)
+        var baseNameColumn = dt.Columns.Add("_BaseName", typeof(string));
+        baseNameColumn.ColumnMapping = MappingType.Hidden;
+
         var actualKeyColumn = dt.Columns.Add("_ActualKey", typeof(string));
         actualKeyColumn.ColumnMapping = MappingType.Hidden;
 
@@ -76,15 +86,20 @@ public partial class ResourceEditorWindow : Window
         {
             var row = dt.NewRow();
 
+            row["_BaseName"] = entryRef.BaseName;
             row["_ActualKey"] = entryRef.Key;
             row["_OccurrenceNumber"] = entryRef.OccurrenceNumber;
             row["_Visible"] = true;
             row["_HasExtraKey"] = false;
-
-            // Get the Nth occurrence from each language file
-            foreach (var rf in _resourceFiles)
+            if (_isMultiGroup)
             {
-                var entry = GetNthOccurrence(rf, entryRef.Key, entryRef.OccurrenceNumber);
+                row["Group"] = entryRef.BaseName;
+            }
+
+            // Get the Nth occurrence from each language column, scoped to this entry's group
+            foreach (var (code, header) in languageColumns)
+            {
+                var entry = GetEntryForCell(entryRef.BaseName, entryRef.Key, entryRef.OccurrenceNumber, code);
                 // For plural entries, show a summary; for simple entries, show the value
                 string displayValue;
                 if (entry?.IsPlural == true && entry.PluralForms != null && entry.PluralForms.Count > 0)
@@ -98,8 +113,8 @@ public partial class ResourceEditorWindow : Window
                 {
                     displayValue = entry?.Value ?? "";
                 }
-                row[rf.Language.Name] = displayValue;
-                row[$"_Comment_{rf.Language.Code}"] = entry?.Comment ?? "";
+                row[header] = displayValue;
+                row[$"_Comment_{code}"] = entry?.Comment ?? "";
             }
 
             // Build display key with selection marker and status indicator
@@ -135,10 +150,17 @@ public partial class ResourceEditorWindow : Window
         // Add Key column
         dt.Columns.Add("Key", typeof(string));
 
-        // Add column for each language
-        foreach (var rf in _resourceFiles)
+        // Add a Group column when more than one resource group is present
+        if (_isMultiGroup)
         {
-            dt.Columns.Add(rf.Language.Name, typeof(string));
+            dt.Columns.Add("Group", typeof(string));
+        }
+
+        // Add one column per distinct culture code (shared across groups)
+        var languageColumns = GetLanguageColumns();
+        foreach (var (_, header) in languageColumns)
+        {
+            dt.Columns.Add(header, typeof(string));
         }
 
         // Add hidden metadata columns
@@ -147,6 +169,9 @@ public partial class ResourceEditorWindow : Window
 
         var logicalKeyColumn = dt.Columns.Add("_LogicalKey", typeof(string));
         logicalKeyColumn.ColumnMapping = MappingType.Hidden;
+
+        var doubleBaseNameColumn = dt.Columns.Add("_BaseName", typeof(string));
+        doubleBaseNameColumn.ColumnMapping = MappingType.Hidden;
 
         var actualKeyColumn = dt.Columns.Add("_ActualKey", typeof(string));
         actualKeyColumn.ColumnMapping = MappingType.Hidden;
@@ -168,15 +193,20 @@ public partial class ResourceEditorWindow : Window
             valueRow["Key"] = entryRef.DisplayKey;
             valueRow["_RowType"] = "Value";
             valueRow["_LogicalKey"] = entryRef.DisplayKey;
+            valueRow["_BaseName"] = entryRef.BaseName;
             valueRow["_ActualKey"] = entryRef.Key;
             valueRow["_OccurrenceNumber"] = entryRef.OccurrenceNumber;
             valueRow["_Visible"] = true;
             valueRow["_HasExtraKey"] = false;
-
-            // Get the Nth occurrence from each language file
-            foreach (var rf in _resourceFiles)
+            if (_isMultiGroup)
             {
-                var entry = GetNthOccurrence(rf, entryRef.Key, entryRef.OccurrenceNumber);
+                valueRow["Group"] = entryRef.BaseName;
+            }
+
+            // Get the Nth occurrence from each language column, scoped to this entry's group
+            foreach (var (code, header) in languageColumns)
+            {
+                var entry = GetEntryForCell(entryRef.BaseName, entryRef.Key, entryRef.OccurrenceNumber, code);
                 // For plural entries, show a summary; for simple entries, show the value
                 string displayValue;
                 if (entry?.IsPlural == true && entry.PluralForms != null && entry.PluralForms.Count > 0)
@@ -189,7 +219,7 @@ public partial class ResourceEditorWindow : Window
                 {
                     displayValue = entry?.Value ?? "";
                 }
-                valueRow[rf.Language.Name] = displayValue;
+                valueRow[header] = displayValue;
             }
             dt.Rows.Add(valueRow);
 
@@ -198,15 +228,20 @@ public partial class ResourceEditorWindow : Window
             commentRow["Key"] = "  \u2514\u2500 Comment";  // "  └─ Comment"
             commentRow["_RowType"] = "Comment";
             commentRow["_LogicalKey"] = entryRef.DisplayKey;
+            commentRow["_BaseName"] = entryRef.BaseName;
             commentRow["_ActualKey"] = entryRef.Key;
             commentRow["_OccurrenceNumber"] = entryRef.OccurrenceNumber;
             commentRow["_Visible"] = true;
             commentRow["_HasExtraKey"] = false;
-
-            foreach (var rf in _resourceFiles)
+            if (_isMultiGroup)
             {
-                var entry = GetNthOccurrence(rf, entryRef.Key, entryRef.OccurrenceNumber);
-                commentRow[rf.Language.Name] = entry?.Comment ?? "";
+                commentRow["Group"] = entryRef.BaseName;
+            }
+
+            foreach (var (code, header) in languageColumns)
+            {
+                var entry = GetEntryForCell(entryRef.BaseName, entryRef.Key, entryRef.OccurrenceNumber, code);
+                commentRow[header] = entry?.Comment ?? "";
             }
             dt.Rows.Add(commentRow);
         }
@@ -221,43 +256,132 @@ public partial class ResourceEditorWindow : Window
     {
         _allEntries.Clear();
 
-        var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
-        if (defaultFile == null) return;
-
-        // Count occurrences of each key (case-insensitive per ResX specification)
-        var occurrenceCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in defaultFile.Entries)
+        // One block of entries per resource group, ordered by group then key, so that
+        // keys from CustomerResources and GlassResources are both present and never
+        // collapsed into each other.
+        foreach (var baseName in _groups)
         {
-            if (!occurrenceCounts.ContainsKey(entry.Key))
+            var defaultFile = _resourceFiles.FirstOrDefault(rf =>
+                rf.Language.IsDefault &&
+                string.Equals(rf.Language.BaseName, baseName, StringComparison.OrdinalIgnoreCase));
+
+            // Fall back to any file of the group if none is flagged default (defensive).
+            defaultFile ??= _resourceFiles.FirstOrDefault(rf =>
+                string.Equals(rf.Language.BaseName, baseName, StringComparison.OrdinalIgnoreCase));
+
+            if (defaultFile == null) continue;
+
+            // Count occurrences of each key (case-insensitive per ResX specification)
+            var occurrenceCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in defaultFile.Entries)
             {
-                occurrenceCounts[entry.Key] = 0;
+                if (!occurrenceCounts.ContainsKey(entry.Key))
+                {
+                    occurrenceCounts[entry.Key] = 0;
+                }
+                occurrenceCounts[entry.Key]++;
             }
-            occurrenceCounts[entry.Key]++;
+
+            // Sort entries so case-variants appear together (e.g., Devices, devices)
+            var sortedEntries = defaultFile.Entries
+                .OrderBy(e => e.Key, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(e => e.Key, StringComparer.Ordinal)
+                .ToList();
+
+            // Build entry references with occurrence numbers (case-insensitive)
+            var occurrenceIndices = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in sortedEntries)
+            {
+                if (!occurrenceIndices.ContainsKey(entry.Key))
+                {
+                    occurrenceIndices[entry.Key] = 0;
+                }
+                occurrenceIndices[entry.Key]++;
+
+                _allEntries.Add(new EntryReference
+                {
+                    Key = entry.Key,
+                    OccurrenceNumber = occurrenceIndices[entry.Key],
+                    TotalOccurrences = occurrenceCounts[entry.Key],
+                    BaseName = baseName
+                });
+            }
+        }
+    }
+
+    /// <summary>
+    /// The distinct culture columns to display, in default-first order. Each entry pairs the
+    /// culture code with the column header. The same code shared by several groups is one column.
+    /// </summary>
+    private List<(string Code, string Header)> GetLanguageColumns()
+    {
+        var seen = new HashSet<string>();
+        var columns = new List<(string Code, string Header)>();
+
+        foreach (var rf in _resourceFiles
+            .OrderBy(rf => rf.Language.IsDefault ? 0 : 1)
+            .ThenBy(rf => rf.Language.Code, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!seen.Add(rf.Language.Code)) continue;
+            columns.Add((rf.Language.Code, GetLanguageColumnHeader(rf.Language)));
         }
 
-        // Sort entries so case-variants appear together (e.g., Devices, devices)
-        var sortedEntries = defaultFile.Entries
-            .OrderBy(e => e.Key, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(e => e.Key, StringComparer.Ordinal)
+        return columns;
+    }
+
+    /// <summary>
+    /// Column header for a language: the configured default code marked "(Default)", else the
+    /// culture display name. Independent of the group so the same code maps to one column.
+    /// </summary>
+    private string GetLanguageColumnHeader(LanguageInfo language)
+    {
+        if (language.IsDefault)
+        {
+            var code = string.IsNullOrEmpty(language.Code) ? _defaultLanguageCode : language.Code;
+            return $"{code} (Default)";
+        }
+        return language.Name;
+    }
+
+    /// <summary>
+    /// All resource files belonging to a resource group (by base name).
+    /// </summary>
+    private List<ResourceFile> GetGroupFiles(string baseName)
+        => _resourceFiles
+            .Where(rf => string.Equals(rf.Language.BaseName, baseName, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        // Build entry references with occurrence numbers (case-insensitive)
-        var occurrenceIndices = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in sortedEntries)
-        {
-            if (!occurrenceIndices.ContainsKey(entry.Key))
-            {
-                occurrenceIndices[entry.Key] = 0;
-            }
-            occurrenceIndices[entry.Key]++;
+    /// <summary>
+    /// Determines the group (base name) a key belongs to. With a single group this is just
+    /// that group; otherwise the first group whose default file contains the key, falling
+    /// back to the first group.
+    /// </summary>
+    private string ResolveBaseNameForKey(string key)
+    {
+        if (_groups.Count <= 1)
+            return _groups.FirstOrDefault() ?? string.Empty;
 
-            _allEntries.Add(new EntryReference
-            {
-                Key = entry.Key,
-                OccurrenceNumber = occurrenceIndices[entry.Key],
-                TotalOccurrences = occurrenceCounts[entry.Key]
-            });
+        foreach (var baseName in _groups)
+        {
+            var defaultFile = _resourceFiles.FirstOrDefault(rf =>
+                rf.Language.IsDefault &&
+                string.Equals(rf.Language.BaseName, baseName, StringComparison.OrdinalIgnoreCase));
+            if (defaultFile != null && defaultFile.Entries.Any(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)))
+                return baseName;
         }
+        return _groups.First();
+    }
+
+    /// <summary>
+    /// Resolves the value/comment to display for a given (group, key, occurrence, culture code).
+    /// Looks only within the entry's own group so values never leak between groups.
+    /// </summary>
+    private ResourceEntry? GetEntryForCell(string baseName, string key, int occurrenceNumber, string code)
+    {
+        var file = _resourceFiles.FirstOrDefault(rf =>
+            string.Equals(rf.Language.BaseName, baseName, StringComparison.OrdinalIgnoreCase) &&
+            rf.Language.Code == code);
+        return file == null ? null : GetNthOccurrence(file, key, occurrenceNumber);
     }
 
     /// <summary>
@@ -318,10 +442,16 @@ public partial class ResourceEditorWindow : Window
                 return RowStatus.Duplicate;
             }
 
-            // Check for missing translations
-            foreach (var rf in _resourceFiles)
+            // Check for missing translations within this row's own group. A blank cell is
+            // only "missing" when the group actually has a file for that culture.
+            var baseName = row.Table.Columns.Contains("_BaseName") ? row["_BaseName"] as string ?? string.Empty : string.Empty;
+            foreach (var (code, header) in GetLanguageColumns())
             {
-                if (!rf.Language.IsDefault && row[rf.Language.Name] is string value && string.IsNullOrWhiteSpace(value))
+                var file = _resourceFiles.FirstOrDefault(rf =>
+                    string.Equals(rf.Language.BaseName, baseName, StringComparison.OrdinalIgnoreCase) &&
+                    rf.Language.Code == code);
+                if (file == null || file.Language.IsDefault) continue;
+                if (row.Table.Columns.Contains(header) && row[header] is string value && string.IsNullOrWhiteSpace(value))
                 {
                     return RowStatus.Missing;
                 }
@@ -414,11 +544,13 @@ public partial class ResourceEditorWindow : Window
     {
         _caseInsensitiveDuplicates.Clear();
 
-        var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
-        if (defaultFile == null) return;
+        // Inspect every resource group's default file for duplicate keys.
+        var defaultFiles = _resourceFiles.Where(rf => rf.Language.IsDefault).ToList();
+        if (defaultFiles.Count == 0) return;
 
-        // Find duplicates (case-insensitive per ResX specification)
-        var duplicateGroups = defaultFile.Entries
+        // Find duplicates (case-insensitive per ResX specification) across all groups' defaults
+        var duplicateGroups = defaultFiles
+            .SelectMany(f => f.Entries)
             .GroupBy(e => e.Key, StringComparer.OrdinalIgnoreCase)
             .Where(g => g.Count() > 1)
             .ToList();
@@ -451,55 +583,67 @@ public partial class ResourceEditorWindow : Window
 
     private void RebuildTableWithVisibleLanguages()
     {
-        // Rebuild DataTable with only visible language columns
+        // Rebuild DataTable with only visible language columns, preserving group and
+        // occurrence tracking (one row per entry reference, scoped to its group).
         var dt = new DataTable();
 
         // Add Key column
         dt.Columns.Add("Key", typeof(string));
 
-        // Add columns only for visible languages
-        var visibleResourceFiles = _resourceFiles
-            .Where(rf => _filterCriteria.VisibleLanguageCodes.Contains(rf.Language.Code))
-            .ToList();
-
-        foreach (var rf in visibleResourceFiles)
+        // Add a Group column when more than one resource group is present
+        if (_isMultiGroup)
         {
-            dt.Columns.Add(rf.Language.Name, typeof(string));
+            dt.Columns.Add("Group", typeof(string));
         }
 
-        // Add internal columns for filtering (hidden from display)
+        // Only the culture columns the user has chosen to see
+        var languageColumns = GetLanguageColumns()
+            .Where(c => _filterCriteria.VisibleLanguageCodes.Contains(c.Code))
+            .ToList();
+        foreach (var (_, header) in languageColumns)
+        {
+            dt.Columns.Add(header, typeof(string));
+        }
+
+        // Add internal columns (hidden from display)
+        var baseNameColumn = dt.Columns.Add("_BaseName", typeof(string));
+        baseNameColumn.ColumnMapping = MappingType.Hidden;
+
+        var actualKeyColumn = dt.Columns.Add("_ActualKey", typeof(string));
+        actualKeyColumn.ColumnMapping = MappingType.Hidden;
+
+        var occurrenceColumn = dt.Columns.Add("_OccurrenceNumber", typeof(int));
+        occurrenceColumn.ColumnMapping = MappingType.Hidden;
+
         var visibleColumn = dt.Columns.Add("_Visible", typeof(bool));
         visibleColumn.ColumnMapping = MappingType.Hidden;
 
         var extraKeyColumn = dt.Columns.Add("_HasExtraKey", typeof(bool));
         extraKeyColumn.ColumnMapping = MappingType.Hidden;
 
-        // Populate rows
-        foreach (var key in _allKeys)
+        // Populate rows - one per entry reference (group + key + occurrence)
+        foreach (var entryRef in _allEntries)
         {
             var row = dt.NewRow();
 
-            // Check if this key has extra key warning
-            var hasExtraKey = false;
-            var displayKey = key;
-
-            // Find original row to get extra key status
-            var originalRow = _dataTable.Rows.Cast<DataRow>()
-                .FirstOrDefault(r => r["Key"].ToString()?.TrimStart('⚠', ' ') == key);
-            if (originalRow != null)
-            {
-                hasExtraKey = (bool)originalRow["_HasExtraKey"];
-                displayKey = hasExtraKey ? $"⚠ {key}" : key;
-            }
+            var hasExtraKey = IsExtraKey(entryRef);
+            var displayKey = hasExtraKey ? $"⚠ {entryRef.DisplayKey}" : entryRef.DisplayKey;
 
             row["Key"] = displayKey;
+            row["_BaseName"] = entryRef.BaseName;
+            row["_ActualKey"] = entryRef.Key;
+            row["_OccurrenceNumber"] = entryRef.OccurrenceNumber;
             row["_Visible"] = true;
             row["_HasExtraKey"] = hasExtraKey;
-
-            foreach (var rf in visibleResourceFiles)
+            if (_isMultiGroup)
             {
-                var entry = rf.Entries.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
-                row[rf.Language.Name] = entry?.Value ?? "";
+                row["Group"] = entryRef.BaseName;
+            }
+
+            foreach (var (code, header) in languageColumns)
+            {
+                var entry = GetEntryForCell(entryRef.BaseName, entryRef.Key, entryRef.OccurrenceNumber, code);
+                row[header] = entry?.Value ?? "";
             }
 
             dt.Rows.Add(row);
@@ -514,6 +658,17 @@ public partial class ResourceEditorWindow : Window
 
         // Reapply filters
         ApplyFilters();
+    }
+
+    /// <summary>
+    /// Whether an entry is an "extra" key (present in a non-default file of its group but
+    /// not in the group's default file).
+    /// </summary>
+    private bool IsExtraKey(EntryReference entryRef)
+    {
+        if (_extraKeysByLanguage.Count == 0) return false;
+        return _extraKeysByLanguage.Values.Any(keys =>
+            keys.Contains(entryRef.Key, StringComparer.OrdinalIgnoreCase));
     }
 
     private void RebuildTableWithCommentRows()
@@ -546,14 +701,30 @@ public partial class ResourceEditorWindow : Window
     /// <returns>The key, or null if not found</returns>
     private void DetectAndMarkExtraKeys()
     {
-        var defaultFile = _resourceFiles.FirstOrDefault(rf => rf.Language.IsDefault);
-        if (defaultFile == null) return;
+        _extraKeysByLanguage = new Dictionary<string, List<string>>();
 
-        // Detect extra keys using the filter service
-        _extraKeysByLanguage = ResourceFilterService.DetectExtraKeysInFilteredFiles(defaultFile, _resourceFiles);
+        // Detect extra keys per group: a key in a non-default file of a group that is not
+        // present in that same group's default file. Comparing across groups would wrongly
+        // flag legitimate keys from other groups as "extra".
+        foreach (var baseName in _groups)
+        {
+            var groupFiles = _resourceFiles
+                .Where(rf => string.Equals(rf.Language.BaseName, baseName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var defaultFile = groupFiles.FirstOrDefault(rf => rf.Language.IsDefault);
+            if (defaultFile == null) continue;
 
-        // Build a set of all extra keys across all languages
-        var allExtraKeys = new HashSet<string>();
+            var perGroup = ResourceFilterService.DetectExtraKeysInFilteredFiles(defaultFile, groupFiles);
+            foreach (var kvp in perGroup)
+            {
+                // Disambiguate the language bucket by group when multiple groups are present.
+                var bucket = _isMultiGroup ? $"{baseName} / {kvp.Key}" : kvp.Key;
+                _extraKeysByLanguage[bucket] = kvp.Value;
+            }
+        }
+
+        // Build a set of all extra keys across all languages/groups
+        var allExtraKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var keysList in _extraKeysByLanguage.Values)
         {
             foreach (var key in keysList)
@@ -562,15 +733,19 @@ public partial class ResourceEditorWindow : Window
             }
         }
 
-        // Mark rows in DataTable with extra keys
+        // Mark rows in DataTable with extra keys (match on the hidden actual key)
         foreach (DataRow row in _dataTable.Rows)
         {
-            var key = row["Key"].ToString() ?? "";
-            if (allExtraKeys.Contains(key))
+            var actualKey = _dataTable.Columns.Contains("_ActualKey") ? row["_ActualKey"] as string ?? "" : "";
+            if (!string.IsNullOrEmpty(actualKey) && allExtraKeys.Contains(actualKey))
             {
                 row["_HasExtraKey"] = true;
                 // Add warning marker to key name for visual indication
-                row["Key"] = $"⚠ {key}";
+                var key = row["Key"].ToString() ?? "";
+                if (!key.StartsWith("⚠"))
+                {
+                    row["Key"] = $"⚠ {key}";
+                }
             }
         }
     }

@@ -254,7 +254,7 @@ public partial class ResourceEditorWindow : Window
                 // Delete each selected entry
                 foreach (var entryRef in selectedEntries)
                 {
-                    DeleteSpecificOccurrence(entryRef.Key, entryRef.OccurrenceNumber);
+                    DeleteSpecificOccurrence(entryRef.Key, entryRef.OccurrenceNumber, entryRef.BaseName);
                 }
 
                 _hasUnsavedChanges = true;

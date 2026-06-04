@@ -211,6 +211,14 @@ public partial class ResourceEditorWindow : Window
             return null;
         }
 
+        // When multiple groups are shown, the visible Group column disambiguates rows that
+        // share a key name across groups.
+        string? displayedGroup = null;
+        if (_isMultiGroup && displayedTable.Columns.Contains("Group"))
+        {
+            displayedGroup = displayedTable.Rows[rowIndex]["Group"]?.ToString();
+        }
+
         // In the filtered/displayed table, we need to map back to _dataTable
         // The displayed table doesn't have the hidden columns, so we match by visible key value
         // Strip status icons (⚠, ⭐, ◆, ∅, ✗) when matching
@@ -218,8 +226,14 @@ public partial class ResourceEditorWindow : Window
             .FirstOrDefault(r =>
             {
                 var keyVal = r["Key"]?.ToString();
-                return keyVal == displayedKeyValue ||
+                var keyMatches = keyVal == displayedKeyValue ||
                        keyVal == displayedKeyValue.TrimStart('⚠', '⭐', '◆', '∅', '✗', ' ');
+                if (!keyMatches) return false;
+                if (displayedGroup != null && _dataTable.Columns.Contains("_BaseName"))
+                {
+                    return string.Equals(r["_BaseName"]?.ToString(), displayedGroup, StringComparison.OrdinalIgnoreCase);
+                }
+                return true;
             });
 
         if (matchingDataRow == null)
@@ -230,15 +244,17 @@ public partial class ResourceEditorWindow : Window
         // Extract from hidden columns
         var actualKey = matchingDataRow["_ActualKey"]?.ToString();
         var occurrenceNumber = matchingDataRow["_OccurrenceNumber"] as int? ?? 1;
+        var baseName = _dataTable.Columns.Contains("_BaseName") ? matchingDataRow["_BaseName"]?.ToString() ?? "" : "";
 
         if (string.IsNullOrEmpty(actualKey))
         {
             return null;
         }
 
-        // Find the matching entry reference
+        // Find the matching entry reference (group-aware)
         return _allEntries.FirstOrDefault(e =>
-            e.Key == actualKey && e.OccurrenceNumber == occurrenceNumber);
+            e.Key == actualKey && e.OccurrenceNumber == occurrenceNumber &&
+            (string.IsNullOrEmpty(baseName) || string.Equals(e.BaseName, baseName, StringComparison.OrdinalIgnoreCase)));
     }
 
     /// <summary>
@@ -310,8 +326,12 @@ public partial class ResourceEditorWindow : Window
     {
         var filteredCount = _dataTable.DefaultView.Count;
         var totalCount = _dataTable.Rows.Count;
-        var langCount = _resourceFiles.Count;
+        var langCount = _resourceFiles.Select(rf => rf.Language.Code).Distinct().Count();
         var status = $"Keys: {filteredCount}/{totalCount} | Languages: {langCount}";
+        if (_isMultiGroup)
+        {
+            status += $" | Groups: {_groups.Count}";
+        }
 
         // Add selection count if any rows are selected
         if (_selectedEntries.Any())
