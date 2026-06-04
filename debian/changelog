@@ -1,6 +1,7 @@
-lrm (0.7.12-1) noble; urgency=medium
+lrm (0.7.13-1) noble; urgency=medium
 
-  * Fixed: Fix web stats calculation to handle plural forms correctly\n- Fix web command static file serving in single-file executable\n
-  * Added: Add multi-base resource group support (closes #6)\n- Add database migration for SourceText columns on ResourceKey\n- Add format-agnostic SourceText support to entities and DTOs\n- Add Source column to grid and improve TranslateDialog UX\n- Add PluralForm tracking and SourceText restoration to sync history\n
+  * Fixed: Fix default-language, recursive discovery, multi-group scanning and VS Code reference paths\n- Fix POT reader test to match new source-text behavior\n
+  * Added: Add multi-base resource group support to the TUI editor\n
+  * Changed: Ignore .superpowers scratch directory\n- Bump Scriban to 7.2.0 and MailKit to 4.16.0 (security)\n- Migrate web GUI to Radzen and propagate PO SourceText to cloud\n
 
- -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Thu, 28 May 2026 20:43:55 +0300
+ -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Fri, 05 Jun 2026 00:10:43 +0300
