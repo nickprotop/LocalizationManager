@@ -49,6 +49,13 @@ public class RazorScanner : PatternMatcher
         if (string.IsNullOrEmpty(content))
             return references;
 
+        // Blank Razor directive lines (@using / @namespace) so qualified type
+        // names are not mistaken for @Resources.Member access. Preserve line count.
+        content = Regex.Replace(content,
+            @"^[ \t]*@(?:using|namespace)[ \t]+[\w.]+[ \t]*$",
+            m => new string(' ', m.Value.Length),
+            RegexOptions.Multiline);
+
         // Use provided configuration or defaults
         var classNames = resourceClassNames ?? DefaultResourceClassNames.ToList();
         var methodNames = localizationMethods ?? DefaultLocalizationMethods.ToList();

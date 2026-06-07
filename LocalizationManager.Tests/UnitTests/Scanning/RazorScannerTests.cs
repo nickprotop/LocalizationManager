@@ -284,6 +284,17 @@ public class RazorScannerTests : IDisposable
     }
 
     [Fact]
+    public void ScanContent_RazorUsingDirective_NotFlagged()
+    {
+        var scanner = new RazorScanner();
+        var code = "@using Vitrum.Resources.Components\n<p>@Resources.Hello</p>";
+        var refs = scanner.ScanContent("Page.razor", code);
+
+        Assert.Contains(refs, r => r.Key == "Hello");
+        Assert.DoesNotContain(refs, r => r.Key == "Components");
+    }
+
+    [Fact]
     public void ScanFile_BothFileTypes_WorksCorrectly()
     {
         // Arrange - .cshtml
@@ -304,5 +315,24 @@ public class RazorScannerTests : IDisposable
 
         Assert.Single(razorResults);
         Assert.Equal("Title", razorResults[0].Key);
+    }
+
+    [Fact]
+    public void ScanContent_RazorNamespaceDirective_NotFlagged()
+    {
+        var scanner = new RazorScanner();
+        var code = "@namespace Vitrum.Resources.Components\n<p>@Resources.Hello</p>";
+        var refs = scanner.ScanContent("Page.razor", code);
+        Assert.Contains(refs, r => r.Key == "Hello");
+        Assert.DoesNotContain(refs, r => r.Key == "Components");
+    }
+
+    [Fact]
+    public void ScanContent_RealResourceAccess_StillDetectedAfterDirectives()
+    {
+        var scanner = new RazorScanner();
+        var code = "@using A.Resources.X\n@namespace A.Y\n<span>@Resources.Title</span>";
+        var refs = scanner.ScanContent("Page.razor", code);
+        Assert.Contains(refs, r => r.Key == "Title");
     }
 }
