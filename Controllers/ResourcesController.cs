@@ -23,20 +23,36 @@ public class ResourcesController : ControllerBase
     }
 
     /// <summary>
-    /// List all resource files
+    /// List the language columns shown in the editor. Returns one entry per
+    /// EFFECTIVE language code across all resource groups (default file and an
+    /// explicit culture file sharing the configured DefaultLanguageCode collapse
+    /// into a single column), so the headers agree with the merged cells from
+    /// <see cref="GetAllKeys"/>. A within-group default-vs-culture collision is
+    /// surfaced via <see cref="ResourceFileInfo.HasLanguageConflict"/>; the
+    /// legitimate cross-group case (two groups each having an "it" file) is NOT
+    /// treated as a conflict.
     /// </summary>
     [HttpGet]
     public ActionResult<IEnumerable<ResourceFileInfo>> GetResources()
     {
         try
         {
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var result = languages.Select(l => new ResourceFileInfo
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
+            var allFiles = directory.Groups.SelectMany(g => g.Files).ToList();
+            var columns = MergedLanguageColumns.Build(allFiles);
+
+            var result = columns.Select(col => new ResourceFileInfo
             {
-                FileName = l.Name,
-                FilePath = l.FilePath,
-                Code = l.Code,
-                IsDefault = l.IsDefault
+                FileName = col.Name,
+                FilePath = col.WinningFilePath,
+                Code = col.Code,
+                IsDefault = col.IsDefault,
+                // Cross-group merge would falsely flag two legit same-code files
+                // (e.g. CustomerResources.it + GlassResources.it). Only flag a
+                // conflict when a SINGLE group has >1 file for this effective code.
+                HasLanguageConflict = directory.Groups.Any(g =>
+                    g.Files.Count(f => MergedLanguageColumns.EffectiveCode(f) == col.Code) > 1),
+                ConflictingFilePaths = col.ConflictingFilePaths.ToList()
             });
             return Ok(result);
         }

@@ -245,6 +245,11 @@ else if (keys != null && languages != null)
                             {
                                 <span>@value</span>
                             }
+                            @if (item.HasLanguageConflict && item.ConflictingLanguages.Contains(langCode))
+                            {
+                                <span class="rz-color-warning rz-ml-1"
+                                      title="@($"Both the default file and a .{langCode} file define this language; showing the default file's value.")">⚠</span>
+                            }
                         </Template>
                     </RadzenDataGridColumn>
                 }

@@ -106,6 +106,60 @@ public class DefaultLanguageMergeTests
         Assert.Empty(row.ConflictingLanguages);
     }
 
+    private static List<ResourceFileInfo> GetResources(ResourcesController controller)
+    {
+        var result = controller.GetResources();
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        return Assert.IsAssignableFrom<IEnumerable<ResourceFileInfo>>(ok.Value).ToList();
+    }
+
+    [Fact]
+    public void GetResources_DefaultLabeledSameAsCulture_ReturnsSingleColumn()
+    {
+        using var sandbox = new TempDir();
+        File.WriteAllText(Path.Combine(sandbox.Path, "Res.resx"), ResxWith("Hi", "Ciao"));
+        File.WriteAllText(Path.Combine(sandbox.Path, "Res.it.resx"), ResxWith("Hi", "CiaoCulture"));
+
+        var controller = BuildController(sandbox.Path, "it");
+        var resources = GetResources(controller);
+
+        // Exactly one "it" column; no duplicate "it" and no separate default/"" column.
+        var itColumn = Assert.Single(resources);
+        Assert.Equal("it", itColumn.Code);
+        Assert.True(itColumn.HasLanguageConflict);
+    }
+
+    [Fact]
+    public void GetResources_NoDefaultCode_ReturnsDefaultAndCulture()
+    {
+        using var sandbox = new TempDir();
+        File.WriteAllText(Path.Combine(sandbox.Path, "Res.resx"), ResxWith("Hi", "Ciao"));
+        File.WriteAllText(Path.Combine(sandbox.Path, "Res.it.resx"), ResxWith("Hi", "CiaoCulture"));
+
+        var controller = BuildController(sandbox.Path, null);
+        var resources = GetResources(controller);
+
+        Assert.Equal(2, resources.Count);
+        var defaultColumn = Assert.Single(resources, r => r.Code == "default");
+        var itColumn = Assert.Single(resources, r => r.Code == "it");
+        Assert.False(defaultColumn.HasLanguageConflict);
+        Assert.False(itColumn.HasLanguageConflict);
+    }
+
+    [Fact]
+    public void GetResources_MultiGroupSameCode_NoFalseConflict()
+    {
+        var multiGroupPath = Path.Combine(AppContext.BaseDirectory, "TestData", "MultiGroupResx");
+
+        // No DefaultLanguageCode configured: CustomerResources.it + GlassResources.it
+        // share code "it" across DIFFERENT groups, which is legitimate, not a conflict.
+        var controller = BuildController(multiGroupPath, null);
+        var resources = GetResources(controller);
+
+        var itColumn = Assert.Single(resources, r => r.Code == "it");
+        Assert.False(itColumn.HasLanguageConflict);
+    }
+
     private sealed class TempDir : IDisposable
     {
         public string Path { get; }

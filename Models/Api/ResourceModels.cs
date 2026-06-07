@@ -9,6 +9,15 @@ public class ResourceFileInfo
     public string FilePath { get; set; } = string.Empty;
     public string? Code { get; set; }
     public bool IsDefault { get; set; }
+
+    /// <summary>True when, within a single resource group, two files map to this
+    /// effective code (e.g. the suffix-less default file labeled with the
+    /// configured DefaultLanguageCode and an explicit culture file). Cross-group
+    /// same-code files are NOT flagged.</summary>
+    public bool HasLanguageConflict { get; set; }
+
+    /// <summary>Paths of the files that collided (within a group) for this column.</summary>
+    public List<string> ConflictingFilePaths { get; set; } = new();
 }
 
 public class ResourceKeyInfo
