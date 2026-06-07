@@ -193,22 +193,49 @@ public class ResourcesController : ControllerBase
 
             var hasDuplicates = occurrences.Count > 1;
 
+            // Merge files of this group into display columns so that the suffix-less
+            // default file and an explicit culture file sharing the same effective code
+            // collapse into one column (default wins; cultures only fill gaps).
+            var byPath = resourceFiles.ToDictionary(rf => rf.Language.FilePath ?? string.Empty);
+            var columns = MergedLanguageColumns.Build(group.Files);
+
+            // Resolves the i-th occurrence of keyName for a column, taking the default
+            // winner first and falling back to a colliding culture file only when the
+            // winner lacks that occurrence.
+            ResourceValue? ResolveOccurrence(LanguageColumn col, int index)
+            {
+                var winnerEntries = byPath[col.WinningFilePath].Entries.Where(e => e.Key == keyName).ToList();
+                var entry = index < winnerEntries.Count ? winnerEntries[index] : null;
+
+                if (entry == null)
+                {
+                    foreach (var lp in col.ConflictingFilePaths)
+                    {
+                        var loserEntries = byPath[lp].Entries.Where(e => e.Key == keyName).ToList();
+                        if (index < loserEntries.Count) { entry = loserEntries[index]; break; }
+                    }
+                }
+
+                if (entry == null) return null;
+                return new ResourceValue
+                {
+                    Value = entry.Value,
+                    Comment = entry.Comment,
+                    IsPlural = entry.IsPlural,
+                    PluralForms = entry.PluralForms
+                };
+            }
+
             // If no duplicates, return simple response
             if (!hasDuplicates)
             {
                 var values = new Dictionary<string, ResourceValue>();
-                foreach (var file in resourceFiles)
+                foreach (var col in columns)
                 {
-                    var entry = file.Entries.FirstOrDefault(e => e.Key == keyName);
-                    if (entry != null)
+                    var resolved = ResolveOccurrence(col, 0);
+                    if (resolved != null)
                     {
-                        values[file.Language.Code ?? "default"] = new ResourceValue
-                        {
-                            Value = entry.Value,
-                            Comment = entry.Comment,
-                            IsPlural = entry.IsPlural,
-                            PluralForms = entry.PluralForms
-                        };
+                        values[col.Code] = resolved;
                     }
                 }
 
@@ -227,18 +254,12 @@ public class ResourcesController : ControllerBase
             for (int i = 0; i < occurrences.Count; i++)
             {
                 var occurrenceValues = new Dictionary<string, ResourceValue>();
-                foreach (var file in resourceFiles)
+                foreach (var col in columns)
                 {
-                    var entries = file.Entries.Where(e => e.Key == keyName).ToList();
-                    if (i < entries.Count)
+                    var resolved = ResolveOccurrence(col, i);
+                    if (resolved != null)
                     {
-                        occurrenceValues[file.Language.Code ?? "default"] = new ResourceValue
-                        {
-                            Value = entries[i].Value,
-                            Comment = entries[i].Comment,
-                            IsPlural = entries[i].IsPlural,
-                            PluralForms = entries[i].PluralForms
-                        };
+                        occurrenceValues[col.Code] = resolved;
                     }
                 }
 
@@ -251,18 +272,12 @@ public class ResourcesController : ControllerBase
 
             // Return first occurrence in Values for backward compatibility
             var firstValues = new Dictionary<string, ResourceValue>();
-            foreach (var file in resourceFiles)
+            foreach (var col in columns)
             {
-                var entry = file.Entries.FirstOrDefault(e => e.Key == keyName);
-                if (entry != null)
+                var resolved = ResolveOccurrence(col, 0);
+                if (resolved != null)
                 {
-                    firstValues[file.Language.Code ?? "default"] = new ResourceValue
-                    {
-                        Value = entry.Value,
-                        Comment = entry.Comment,
-                        IsPlural = entry.IsPlural,
-                        PluralForms = entry.PluralForms
-                    };
+                    firstValues[col.Code] = resolved;
                 }
             }
 

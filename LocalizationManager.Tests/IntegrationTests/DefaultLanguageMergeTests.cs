@@ -160,6 +160,26 @@ public class DefaultLanguageMergeTests
         Assert.False(itColumn.HasLanguageConflict);
     }
 
+    [Fact]
+    public void GetKey_DefaultAndCultureShareCode_DefaultWins()
+    {
+        using var sandbox = new TempDir();
+        File.WriteAllText(Path.Combine(sandbox.Path, "Res.resx"), ResxWith("Hi", "Ciao"));
+        File.WriteAllText(Path.Combine(sandbox.Path, "Res.it.resx"), ResxWith("Hi", "CiaoCulture"));
+
+        var controller = BuildController(sandbox.Path, "it");
+
+        var result = controller.GetKey("Hi", resourceGroup: null);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var details = Assert.IsType<ResourceKeyDetails>(ok.Value);
+
+        // One "it" entry, value from the default file (default wins, not "CiaoCulture").
+        var entry = Assert.Single(details.Values);
+        Assert.Equal("it", entry.Key);
+        Assert.Equal("Ciao", entry.Value.Value);
+        Assert.False(details.Values.ContainsKey("default"));
+    }
+
     private sealed class TempDir : IDisposable
     {
         public string Path { get; }
