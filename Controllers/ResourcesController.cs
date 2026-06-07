@@ -72,6 +72,7 @@ public class ResourcesController : ControllerBase
                     .OrderBy(k => k)
                     .ToList();
 
+                var fileByPath = group.Files.ToDictionary(f => f.FilePath ?? string.Empty);
                 var columns = MergedLanguageColumns.Build(group.Files);
 
                 foreach (var key in keys)
@@ -82,22 +83,21 @@ public class ResourcesController : ControllerBase
 
                     foreach (var col in columns)
                     {
-                        var winnerFile = group.Files.First(f => (f.FilePath ?? "") == col.WinningFilePath);
-                        var winnerEntry = resources[winnerFile].Entries.FirstOrDefault(e => e.Key == key);
+                        var winnerEntry = resources[fileByPath[col.WinningFilePath]].Entries.FirstOrDefault(e => e.Key == key);
+                        var resolvedEntry = winnerEntry;
 
-                        string? value = winnerEntry?.Value;
-                        if (string.IsNullOrEmpty(value))
+                        // default wins; culture files fill the gap only when the winner has no value.
+                        if (string.IsNullOrEmpty(resolvedEntry?.Value))
                         {
                             foreach (var lp in col.ConflictingFilePaths)
                             {
-                                var lf = group.Files.First(f => (f.FilePath ?? "") == lp);
-                                var le = resources[lf].Entries.FirstOrDefault(e => e.Key == key);
-                                if (!string.IsNullOrEmpty(le?.Value)) { value = le.Value; break; }
+                                var le = resources[fileByPath[lp]].Entries.FirstOrDefault(e => e.Key == key);
+                                if (!string.IsNullOrEmpty(le?.Value)) { resolvedEntry = le; break; }
                             }
                         }
 
-                        values[col.Code] = value;
-                        if (winnerEntry?.IsPlural == true) isPlural = true;
+                        values[col.Code] = resolvedEntry?.Value;
+                        if (resolvedEntry?.IsPlural == true) isPlural = true;
                         if (col.HasConflict) conflictCodes.Add(col.Code);
                     }
 

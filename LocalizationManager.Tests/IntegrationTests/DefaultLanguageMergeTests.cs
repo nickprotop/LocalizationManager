@@ -68,6 +68,25 @@ public class DefaultLanguageMergeTests
     }
 
     [Fact]
+    public void GetAllKeys_KeyMissingFromDefault_GapFillsFromCultureFile()
+    {
+        using var sandbox = new TempDir();
+        // Default file lacks "New"; only carries an unrelated key.
+        File.WriteAllText(Path.Combine(sandbox.Path, "Res.resx"), ResxWith("Hello", "Ciao"));
+        File.WriteAllText(Path.Combine(sandbox.Path, "Res.it.resx"), ResxWith("New", "Nuovo"));
+
+        var controller = BuildController(sandbox.Path, "it");
+        var rows = GetRows(controller);
+
+        var row = rows.Single(r => r.Key == "New");
+
+        Assert.True(row.Values.ContainsKey("it"));
+        Assert.Equal("Nuovo", row.Values["it"]); // gap-filled from culture file
+        Assert.True(row.HasLanguageConflict);
+        Assert.Contains("it", row.ConflictingLanguages);
+    }
+
+    [Fact]
     public void GetAllKeys_NoDefaultCodeConfigured_DistinctCodesYieldNoConflict()
     {
         using var sandbox = new TempDir();
