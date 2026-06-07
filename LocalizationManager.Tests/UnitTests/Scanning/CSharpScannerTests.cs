@@ -345,4 +345,61 @@ public class TestClass
         Assert.NotNull(result.Context);
         Assert.Contains("WelcomeMessage", result.Context);
     }
+
+    [Fact]
+    public void ScanContent_NamespaceWithResourcesSegment_IsNotFlagged()
+    {
+        var scanner = new CSharpScanner();
+        var code = @"
+namespace Vitrum.Resources.Components.Account.Pages
+{
+    using Vitrum.Resources.Shared;
+    public class Login
+    {
+        public string M() => Resources.WelcomeMessage;
+    }
+}";
+        var refs = scanner.ScanContent("Login.cs", code);
+
+        Assert.Contains(refs, r => r.Key == "WelcomeMessage");
+        Assert.DoesNotContain(refs, r => r.Key == "Components");
+        Assert.DoesNotContain(refs, r => r.Key == "Shared");
+    }
+
+    [Theory]
+    [InlineData("namespace A.Resources.Components.Pages;")]            // file-scoped
+    [InlineData("namespace A.Resources.Components")]                   // block, brace on next line
+    [InlineData("namespace A.Resources.Components.Pages {")]           // block, brace same line
+    [InlineData("    namespace A.Resources.Components {")]             // indented
+    [InlineData("using A.Resources.Components;")]                       // using
+    [InlineData("using static A.Resources.Components;")]               // using static
+    [InlineData("global using A.Resources.Components;")]               // global using
+    [InlineData("using Res = A.Resources.Components;")]                // alias
+    public void ScanContent_DirectiveLines_ProduceNoKeys(string line)
+    {
+        var scanner = new CSharpScanner();
+        var refs = scanner.ScanContent("F.cs", line + "\npublic class C {}");
+        Assert.Empty(refs);
+    }
+
+    [Fact]
+    public void ScanContent_RealUsageAfterDirectives_StillDetected()
+    {
+        var scanner = new CSharpScanner();
+        var code = "using A.Resources.Components;\nnamespace X.Resources.Y;\nclass C { string s = Resources.Hello; }";
+        var refs = scanner.ScanContent("F.cs", code);
+        Assert.Single(refs);
+        Assert.Equal("Hello", refs[0].Key);
+    }
+
+    [Fact]
+    public void ScanContent_UsingStatement_NotStripped()
+    {
+        // `using (var x = ...)` and `using var` are statements, not directives;
+        // they must not be blanked (they could contain Resources.X access).
+        var scanner = new CSharpScanner();
+        var code = "class C { void M() { using var d = Open(); var t = Resources.Title; } }";
+        var refs = scanner.ScanContent("F.cs", code);
+        Assert.Contains(refs, r => r.Key == "Title");
+    }
 }

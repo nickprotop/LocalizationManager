@@ -49,6 +49,11 @@ public class CSharpScanner : PatternMatcher
         // Remove comments to avoid false positives
         var cleanedContent = RemoveComments(originalContent);
 
+        // Blank out namespace/using declaration lines so dotted names like
+        // `Vitrum.Resources.Components` are not mistaken for `Resources.Components`
+        // property access. Preserve line count by replacing with spaces.
+        cleanedContent = RemoveNamespaceAndUsingLines(cleanedContent);
+
         // Use provided configuration or defaults
         var classNames = resourceClassNames ?? DefaultResourceClassNames.ToList();
         var methodNames = localizationMethods ?? DefaultLocalizationMethods.ToList();
@@ -92,6 +97,23 @@ public class CSharpScanner : PatternMatcher
             // Otherwise it's a comment, replace with spaces to preserve line numbers
             return new string(' ', match.Value.Length);
         }, RegexOptions.Multiline | RegexOptions.Singleline);
+    }
+
+    /// <summary>
+    /// Blanks out C# <c>namespace</c> and <c>using</c> declaration lines while
+    /// preserving line numbers, so namespace-qualified type names are not mistaken
+    /// for resource property access (e.g. <c>namespace A.Resources.Components</c>).
+    /// </summary>
+    private static string RemoveNamespaceAndUsingLines(string content)
+    {
+        // Matches whole lines that are namespace or using declarations:
+        //   namespace Foo.Bar.Baz   (block-scoped, optional trailing {)
+        //   namespace Foo.Bar.Baz;  (file-scoped, trailing ;)
+        //   using Foo.Bar;          (incl. `using static`, `global using`, aliases)
+        // It deliberately does NOT match `using (...)` statements or `using var`.
+        var pattern = @"^[ \t]*(?:global[ \t]+)?(?:namespace[ \t]+[\w.]+[ \t]*[;{]?|using[ \t]+(?:static[ \t]+)?[\w.]+(?:[ \t]*=[ \t]*[\w.<>,? ]+)?[ \t]*;?)[ \t]*$";
+        return Regex.Replace(content, pattern, m => new string(' ', m.Value.Length),
+            RegexOptions.Multiline);
     }
 
     private void ScanPropertyAccess(string content, string originalContent, string filePath, List<KeyReference> references, List<string> classNames)
