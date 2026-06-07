@@ -4,6 +4,7 @@
 using Microsoft.AspNetCore.Mvc;
 using LocalizationManager.Core;
 using LocalizationManager.Core.Abstractions;
+using LocalizationManager.Core.Configuration;
 using LocalizationManager.Core.Scanning;
 using LocalizationManager.Models.Api;
 
@@ -16,13 +17,15 @@ public class ScanController : ControllerBase
     private readonly string _resourcePath;
     private readonly string _sourcePath;
     private readonly IResourceBackend _backend;
+    private readonly ConfigurationService _configService;
     private readonly CodeScanner _scanner;
 
-    public ScanController(IConfiguration configuration, IResourceBackend backend)
+    public ScanController(IConfiguration configuration, IResourceBackend backend, ConfigurationService configService)
     {
         _resourcePath = configuration["ResourcePath"] ?? Directory.GetCurrentDirectory();
         _sourcePath = configuration["SourcePath"] ?? Directory.GetParent(_resourcePath)?.FullName ?? _resourcePath;
         _backend = backend;
+        _configService = configService;
         _scanner = new CodeScanner();
     }
 
@@ -43,9 +46,6 @@ public class ScanController : ControllerBase
                 return StatusCode(500, new ErrorResponse { Error = "No default language file found" });
             }
 
-            // Get all keys from resource files
-            var allResourceKeys = defaultFile.Entries.Select(e => e.Key).Distinct().ToHashSet();
-
             // Scan source code
             var excludePatterns = request?.ExcludePatterns ?? new List<string>
             {
@@ -55,7 +55,12 @@ public class ScanController : ControllerBase
                 "**/.git/**"
             };
 
-            var result = _scanner.Scan(_sourcePath, resourceFiles, false, excludePatterns, null, null);
+            // Apply configured scanning settings (resource class names / localization methods)
+            var scanConfig = _configService.GetConfiguration().Scanning;
+            var classNames = scanConfig?.ResourceClassNames;
+            var methods = scanConfig?.LocalizationMethods;
+
+            var result = _scanner.Scan(_sourcePath, resourceFiles, false, excludePatterns, classNames, methods);
 
             return Ok(new ScanResponse
             {
@@ -125,10 +130,15 @@ public class ScanController : ControllerBase
                 return StatusCode(500, new ErrorResponse { Error = "No default language file found" });
             }
 
+            // Apply configured scanning settings (resource class names / localization methods)
+            var scanConfig = _configService.GetConfiguration().Scanning;
+            var classNames = scanConfig?.ResourceClassNames;
+            var methods = scanConfig?.LocalizationMethods;
+
             // Scan the single file with optional content override
             var result = fileContent != null
-                ? _scanner.ScanSingleFileContent(filePath, fileContent, resourceFiles, false, null, null)
-                : _scanner.ScanSingleFile(filePath, resourceFiles, false, null, null);
+                ? _scanner.ScanSingleFileContent(filePath, fileContent, resourceFiles, false, classNames, methods)
+                : _scanner.ScanSingleFile(filePath, resourceFiles, false, classNames, methods);
 
             // Return same response format as full scan
             return Ok(new ScanResponse
@@ -182,7 +192,11 @@ public class ScanController : ControllerBase
                 "**/bin/**", "**/obj/**", "**/node_modules/**", "**/.git/**"
             };
 
-            var result = _scanner.Scan(_sourcePath, resourceFiles, false, excludePatterns, null, null);
+            var scanConfig = _configService.GetConfiguration().Scanning;
+            var classNames = scanConfig?.ResourceClassNames;
+            var methods = scanConfig?.LocalizationMethods;
+
+            var result = _scanner.Scan(_sourcePath, resourceFiles, false, excludePatterns, classNames, methods);
 
             return Ok(new UnusedKeysResponse { UnusedKeys = result.UnusedKeys });
         }
@@ -214,7 +228,11 @@ public class ScanController : ControllerBase
                 "**/bin/**", "**/obj/**", "**/node_modules/**", "**/.git/**"
             };
 
-            var result = _scanner.Scan(_sourcePath, resourceFiles, false, excludePatterns, null, null);
+            var scanConfig = _configService.GetConfiguration().Scanning;
+            var classNames = scanConfig?.ResourceClassNames;
+            var methods = scanConfig?.LocalizationMethods;
+
+            var result = _scanner.Scan(_sourcePath, resourceFiles, false, excludePatterns, classNames, methods);
 
             return Ok(new MissingKeysResponse { MissingKeys = result.MissingKeys.Select(k => k.Key).ToList() });
         }
@@ -240,7 +258,11 @@ public class ScanController : ControllerBase
                 "**/bin/**", "**/obj/**", "**/node_modules/**", "**/.git/**"
             };
 
-            var result = _scanner.Scan(_sourcePath, resourceFiles, false, excludePatterns, null, null);
+            var scanConfig = _configService.GetConfiguration().Scanning;
+            var classNames = scanConfig?.ResourceClassNames;
+            var methods = scanConfig?.LocalizationMethods;
+
+            var result = _scanner.Scan(_sourcePath, resourceFiles, false, excludePatterns, classNames, methods);
             var keyUsage = result.AllKeyUsages.FirstOrDefault(k => k.Key == keyName);
 
             if (keyUsage == null)
