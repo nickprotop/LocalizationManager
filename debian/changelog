@@ -1,7 +1,7 @@
-lrm (0.7.13-1) noble; urgency=medium
+lrm (0.7.14-1) noble; urgency=medium
 
-  * Fixed: Fix default-language, recursive discovery, multi-group scanning and VS Code reference paths\n- Fix POT reader test to match new source-text behavior\n
-  * Added: Add multi-base resource group support to the TUI editor\n
-  * Changed: Ignore .superpowers scratch directory\n- Bump Scriban to 7.2.0 and MailKit to 4.16.0 (security)\n- Migrate web GUI to Radzen and propagate PO SourceText to cloud\n
+  * Fixed: fix(web): default-wins merge in GetKey detail endpoint (issue #6)\n- fix(vscode): Add-Key resource-group selector, send resourceGroup, surface errors (issue #6)\n- fix(sync): default-wins merge in push extract so default+culture collision doesn't drop values (issue #6)\n- fix(cloud): merge empty-code and default-code language groups (issue #6)\n- fix(tui): default-wins + gap-fill cell resolution for merged language columns (issue #6)\n- fix(web): merge language columns in GetResources + conflict indicator in editor (issue #6)\n- fix(web): propagate IsPlural through column gap-fill + test gap-fill path (issue #6)\n- fix(web): merge default+culture columns with default-wins in GetAllKeys (issue #6)\n- fix(web): pass config (DefaultLanguageCode) to backend factory (issue #6)\n- fix(web): scan applies configured localization methods (issue #6)\n- fix(scan): separator-aware scan-root prefix check in _Imports walk (issue #6)\n- fix(scan): ignore @using/@namespace directives in Razor scanner (issue #6)\n- fix(scan): ignore namespace/using declarations in C# scanner (issue #6)\n
+  * Added: feat(core): add language-column merge helper with default-wins + conflict (issue #6)\n- feat(scan): apply _Imports.razor injected localizers folder-wide (issue #6)\n- feat(scan): detect indexer usage of per-file injected localizers (issue #6)\n- feat(scan): parse @inject IStringLocalizer<T> variable names (issue #6)\n
+  * Changed: docs(scan): correct InjectedLocalizerExtractor doc to match supported types (issue #6)\n- docs: implementation plan for issue #6 round-3 fixes\n- test(sync): verify default-language mapping across push/pull round-trip (issue #6)\n- style(core): full license header + reuse GetDisplayCode in merge helper (issue #6)\n
 
- -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Fri, 05 Jun 2026 00:10:43 +0300
+ -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Sun, 07 Jun 2026 17:55:54 +0300
