@@ -72,16 +72,33 @@ public class ResourcesController : ControllerBase
                     .OrderBy(k => k)
                     .ToList();
 
+                var columns = MergedLanguageColumns.Build(group.Files);
+
                 foreach (var key in keys)
                 {
                     var values = new Dictionary<string, string?>();
                     var isPlural = false;
+                    var conflictCodes = new List<string>();
 
-                    foreach (var (file, resource) in resources)
+                    foreach (var col in columns)
                     {
-                        var entry = resource.Entries.FirstOrDefault(e => e.Key == key);
-                        values[string.IsNullOrEmpty(file.Code) ? "default" : file.Code] = entry?.Value;
-                        if (entry?.IsPlural == true) isPlural = true;
+                        var winnerFile = group.Files.First(f => (f.FilePath ?? "") == col.WinningFilePath);
+                        var winnerEntry = resources[winnerFile].Entries.FirstOrDefault(e => e.Key == key);
+
+                        string? value = winnerEntry?.Value;
+                        if (string.IsNullOrEmpty(value))
+                        {
+                            foreach (var lp in col.ConflictingFilePaths)
+                            {
+                                var lf = group.Files.First(f => (f.FilePath ?? "") == lp);
+                                var le = resources[lf].Entries.FirstOrDefault(e => e.Key == key);
+                                if (!string.IsNullOrEmpty(le?.Value)) { value = le.Value; break; }
+                            }
+                        }
+
+                        values[col.Code] = value;
+                        if (winnerEntry?.IsPlural == true) isPlural = true;
+                        if (col.HasConflict) conflictCodes.Add(col.Code);
                     }
 
                     var occurrenceCount = defaultResource?.Entries.Count(e => e.Key == key) ?? 1;
@@ -93,7 +110,9 @@ public class ResourcesController : ControllerBase
                         Values = values,
                         OccurrenceCount = occurrenceCount,
                         HasDuplicates = occurrenceCount > 1,
-                        IsPlural = isPlural
+                        IsPlural = isPlural,
+                        HasLanguageConflict = conflictCodes.Count > 0,
+                        ConflictingLanguages = conflictCodes
                     });
                 }
             }

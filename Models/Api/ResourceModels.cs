@@ -23,6 +23,13 @@ public class ResourceKeyInfo
     public int OccurrenceCount { get; set; } = 1;
     public bool HasDuplicates { get; set; }
     public bool IsPlural { get; set; }
+
+    /// <summary>True when, for this row's group, two files map to the same language code
+    /// (e.g. the default file labeled with DefaultLanguageCode and an explicit culture file).</summary>
+    public bool HasLanguageConflict { get; set; }
+
+    /// <summary>The effective language codes that had a default-vs-culture collision in this group.</summary>
+    public List<string> ConflictingLanguages { get; set; } = new();
 }
 
 public class ResourceKeyDetails
