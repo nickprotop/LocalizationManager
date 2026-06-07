@@ -872,6 +872,90 @@ public class ResourceServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetProjectLanguagesAsync_DefaultStoredUnderEmptyAndExplicitCode_MergesToOneEntry()
+    {
+        // Arrange - project default is "it"; translations stored under BOTH "" and "it"
+        var user = await CreateTestUserAsync();
+        var project = new Project
+        {
+            Slug = "merge-project",
+            Name = "Merge Project",
+            UserId = user.Id,
+            DefaultLanguage = "it",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        _db.Projects.Add(project);
+        await _db.SaveChangesAsync();
+
+        var key1 = await CreateTestResourceKeyAsync(project.Id, "key1");
+        var key2 = await CreateTestResourceKeyAsync(project.Id, "key2");
+
+        _db.Translations.AddRange(
+            // Default language stored under empty code
+            new Shared.Entities.Translation { ResourceKeyId = key1.Id, LanguageCode = "", Value = "Ciao", UpdatedAt = DateTime.UtcNow },
+            // Default language ALSO stored under explicit "it"
+            new Shared.Entities.Translation { ResourceKeyId = key1.Id, LanguageCode = "it", Value = "Ciao", UpdatedAt = DateTime.UtcNow },
+            new Shared.Entities.Translation { ResourceKeyId = key2.Id, LanguageCode = "it", Value = "Arrivederci", UpdatedAt = DateTime.UtcNow },
+            // A distinct, normal language
+            new Shared.Entities.Translation { ResourceKeyId = key1.Id, LanguageCode = "fr", Value = "Bonjour", UpdatedAt = DateTime.UtcNow }
+        );
+        await _db.SaveChangesAsync();
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        // Act
+        var languages = await _resourceService.GetProjectLanguagesAsync(project.Id, user.Id);
+
+        // Assert - exactly ONE "it" entry (not two), and it is the default
+        var italian = languages.Where(l => l.LanguageCode == "it").ToList();
+        Assert.Single(italian);
+        Assert.True(italian[0].IsDefault);
+        // Default wins: explicit "it" group has 2 translated keys
+        Assert.Equal(2, italian[0].TranslatedCount);
+
+        // Distinct language still appears as its own entry
+        var french = languages.Where(l => l.LanguageCode == "fr").ToList();
+        Assert.Single(french);
+        Assert.False(french[0].IsDefault);
+    }
+
+    [Fact]
+    public async Task GetProjectLanguagesAsync_DefaultStoredOnlyUnderEmptyCode_YieldsOneDefaultEntry()
+    {
+        // Arrange - project default is "it"; translations stored ONLY under empty code
+        var user = await CreateTestUserAsync();
+        var project = new Project
+        {
+            Slug = "empty-only-project",
+            Name = "Empty Only Project",
+            UserId = user.Id,
+            DefaultLanguage = "it",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        _db.Projects.Add(project);
+        await _db.SaveChangesAsync();
+
+        var key = await CreateTestResourceKeyAsync(project.Id, "key1");
+        _db.Translations.Add(
+            new Shared.Entities.Translation { ResourceKeyId = key.Id, LanguageCode = "", Value = "Ciao", UpdatedAt = DateTime.UtcNow });
+        await _db.SaveChangesAsync();
+
+        _mockProjectService.Setup(s => s.CanViewProjectAsync(project.Id, user.Id))
+            .ReturnsAsync(true);
+
+        // Act
+        var languages = await _resourceService.GetProjectLanguagesAsync(project.Id, user.Id);
+
+        // Assert - the empty code resolves to "it" and yields exactly one default entry
+        var italian = languages.Where(l => l.LanguageCode == "it").ToList();
+        Assert.Single(italian);
+        Assert.True(italian[0].IsDefault);
+    }
+
+    [Fact]
     public async Task AddLanguageAsync_Success()
     {
         // Arrange

@@ -1272,20 +1272,32 @@ public class ResourceService : IResourceService
             })
             .ToListAsync();
 
-        // Resolve empty language codes to project's default language for display
-        return languageData.Select(l => {
-            var resolvedLangCode = string.IsNullOrEmpty(l.LanguageCode) ? project.DefaultLanguage : l.LanguageCode;
-            return new ProjectLanguageDto
+        // Resolve empty language codes to project's default language for display,
+        // then MERGE raw groups that resolve to the same effective code (e.g. the
+        // default language stored under both "" and its explicit code "it") so we
+        // don't emit two DTOs for the same language. Default wins for the count to
+        // avoid double-counting the same keys.
+        return languageData
+            .GroupBy(l => string.IsNullOrEmpty(l.LanguageCode) ? project.DefaultLanguage : l.LanguageCode)
+            .Select(g =>
             {
-                LanguageCode = resolvedLangCode,
-                DisplayName = GetLanguageDisplayName(resolvedLangCode),
-                IsDefault = resolvedLangCode == project.DefaultLanguage,
-                TranslatedCount = l.TranslatedCount,
-                TotalKeys = totalKeys,
-                CompletionPercentage = totalKeys > 0 ? Math.Round((double)l.TranslatedCount / totalKeys * 100, 1) : 0,
-                LastUpdated = l.LastUpdated
-            };
-        }).OrderBy(l => !l.IsDefault).ThenBy(l => l.LanguageCode).ToList();
+                var resolvedLangCode = g.Key;
+                // Default wins: prefer the explicit default-code row over the empty-code row.
+                var winner = g.FirstOrDefault(x => x.LanguageCode == project.DefaultLanguage)
+                             ?? g.FirstOrDefault(x => string.IsNullOrEmpty(x.LanguageCode))
+                             ?? g.First();
+                return new ProjectLanguageDto
+                {
+                    LanguageCode = resolvedLangCode,
+                    DisplayName = GetLanguageDisplayName(resolvedLangCode),
+                    IsDefault = resolvedLangCode == project.DefaultLanguage,
+                    TranslatedCount = winner.TranslatedCount,
+                    TotalKeys = totalKeys,
+                    CompletionPercentage = totalKeys > 0 ? Math.Round((double)winner.TranslatedCount / totalKeys * 100, 1) : 0,
+                    LastUpdated = g.Max(x => x.LastUpdated)
+                };
+            })
+            .OrderBy(l => !l.IsDefault).ThenBy(l => l.LanguageCode).ToList();
     }
 
     public async Task<(bool Success, ProjectLanguageDto? Language, string? ErrorMessage)> AddLanguageAsync(
