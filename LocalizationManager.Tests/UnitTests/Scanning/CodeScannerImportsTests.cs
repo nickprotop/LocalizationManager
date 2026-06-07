@@ -85,4 +85,44 @@ public class CodeScannerImportsTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void InjectedNamesFor_SiblingDirWithSharedPrefix_DoesNotLeak()
+    {
+        // Regression for an over-matching loop guard: the ancestor walk used
+        // dir.StartsWith(root) WITHOUT a trailing separator, so a sibling directory
+        // whose name merely shares the root's prefix (root "/proj/src" vs
+        // "/proj/src-gen") would be wrongly treated as inside the root and leak its
+        // _Imports.razor injected names.
+        //
+        // BuildImportsMap only enumerates under the scan root, so this leak is not
+        // reachable through the public Scan() API today; we exercise InjectedNamesFor
+        // directly to prove the guard rejects prefix-sibling directories. (With the old
+        // guard this test fails; with the separator-aware guard it passes.)
+        var baseDir = Path.Combine(Path.GetTempPath(), "lrm");
+        var root = Path.Combine(baseDir, "src");
+        var sibling = Path.Combine(baseDir, "src-gen");
+
+        var importsMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            [root] = new List<string> { "Q" },
+            [sibling] = new List<string> { "Zzz" }
+        };
+
+        // A file physically located under the prefix-sibling "src-gen".
+        var fileInSibling = Path.Combine(sibling, "Page.razor");
+
+        var scanner = new CodeScanner();
+        var method = typeof(CodeScanner).GetMethod(
+            "InjectedNamesFor",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+
+        var names = (List<string>)method.Invoke(scanner, new object[] { fileInSibling, root, importsMap })!;
+
+        // "Zzz" lives in the sibling and must NOT leak; nor should the root's "Q"
+        // apply to a file outside the root subtree.
+        Assert.DoesNotContain("Zzz", names);
+        Assert.DoesNotContain("Q", names);
+        Assert.Empty(names);
+    }
 }

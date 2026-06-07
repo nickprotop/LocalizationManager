@@ -451,7 +451,15 @@ public class CodeScanner
         var dir = Path.GetDirectoryName(Path.GetFullPath(filePath));
         var root = Path.GetFullPath(rootPath);
 
-        while (dir != null && dir.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        // Separator-aware prefix so a sibling directory whose name merely shares the
+        // root's prefix (e.g. root "/proj/src" vs "/proj/src-gen") is NOT treated as
+        // being inside the root.
+        var rootWithSep = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                              + Path.DirectorySeparatorChar;
+
+        while (dir != null &&
+               (string.Equals(dir, root, StringComparison.OrdinalIgnoreCase) ||
+                dir.StartsWith(rootWithSep, StringComparison.OrdinalIgnoreCase)))
         {
             if (importsMap.TryGetValue(dir, out var names))
                 foreach (var n in names)
