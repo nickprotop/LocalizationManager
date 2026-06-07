@@ -45,18 +45,57 @@ public class DefaultLanguageSyncRoundTripTests
             // No entry should be pushed under empty lang once a default code is configured.
             Assert.DoesNotContain(entries, e => e.Key == "Hi" && e.Lang == "");
 
-            // NOTABLE FINDING (documented, not a failure): because the suffix-less
-            // default file is relabeled to code "it" AND an explicit Res.it.resx also
-            // exists, the extract produces TWO entries occupying the same
-            // (BaseName, Key, Lang) = ("Res", "Hi", "it") slot with DIFFERING values
-            // ("Ciao" from the default file, "CiaoCulture" from the culture file).
-            // This collision is asserted here so it is visible; the downstream
-            // KeyLevelMerger / cloud dedupes by (BaseName, Key, Lang), so only one of
-            // these survives the push (last-writer-wins in the dictionary projection).
+            // Default-wins, no collision: the suffix-less default file is relabeled to
+            // code "it" AND an explicit Res.it.resx also exists for the same code, but
+            // the extract now emits EXACTLY ONE entry for the
+            // (BaseName, Key, Lang) = ("Res", "Hi", "it") slot, taking the DEFAULT
+            // file's value ("Ciao"). The culture file's "CiaoCulture" is NOT emitted as
+            // a duplicate, so the push no longer drops a value via downstream dedupe.
             var itHiEntries = entries.Where(e => e.Key == "Hi" && e.Lang == "it").ToList();
-            Assert.Equal(2, itHiEntries.Count);
-            Assert.Contains(itHiEntries, e => e.Value == "Ciao");
-            Assert.Contains(itHiEntries, e => e.Value == "CiaoCulture");
+            Assert.Single(itHiEntries);
+            Assert.Equal("Ciao", itHiEntries[0].Value);
+            Assert.DoesNotContain(entries, e => e.Value == "CiaoCulture");
+        }
+        finally
+        {
+            if (Directory.Exists(testDir)) Directory.Delete(testDir, true);
+        }
+    }
+
+    // Test 1b — Gap-fill: a key present ONLY in the culture file (not the default
+    // file) is still emitted, while the colliding key takes the default's value.
+    [Fact]
+    public async Task LocalEntryExtractor_DefaultWinsButGapFillsKeysOnlyInCultureFile()
+    {
+        var testDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(testDir);
+        try
+        {
+            // Default file has only Hi; culture file has Hi (collides) AND Extra (gap).
+            WriteResx(Path.Combine(testDir, "Res.resx"), ("Hi", "Ciao"));
+            WriteResx(Path.Combine(testDir, "Res.it.resx"), ("Hi", "CiaoCulture"), ("Extra", "SoloIt"));
+
+            var languages = new ResxResourceDiscovery("it").DiscoverLanguages(testDir);
+            var extractor = new LocalEntryExtractor(new ResxResourceBackend("it"));
+            var entries = await extractor.ExtractEntriesAsync(languages);
+
+            // Collision key: default wins, single entry.
+            var hi = entries.Where(e => e.Key == "Hi" && e.Lang == "it").ToList();
+            Assert.Single(hi);
+            Assert.Equal("Ciao", hi[0].Value);
+
+            // Gap-fill key: present only in the culture file, still emitted under "it".
+            var extra = entries.Where(e => e.Key == "Extra" && e.Lang == "it").ToList();
+            Assert.Single(extra);
+            Assert.Equal("SoloIt", extra[0].Value);
+
+            // Exactly two "it" entries for this group (Hi + Extra), no duplicate Hi.
+            var itEntries = entries.Where(e => e.Lang == "it" && e.BaseName == "Res").ToList();
+            Assert.Equal(2, itEntries.Count);
+
+            // No key was lost.
+            Assert.Contains(entries, e => e.Key == "Hi");
+            Assert.Contains(entries, e => e.Key == "Extra");
         }
         finally
         {
