@@ -63,8 +63,11 @@ public class RazorScanner : PatternMatcher
         // Scan for @Resources.KeyName patterns
         ScanResourceProperties(content, filePath, references, classNames);
 
+        // Variable names declared via @inject IStringLocalizer<T> Var in THIS file.
+        var injectedNames = InjectedLocalizerExtractor.Extract(content).ToList();
+
         // Scan for @Localizer["KeyName"] patterns
-        ScanLocalizerIndexers(content, filePath, references);
+        ScanLocalizerIndexers(content, filePath, references, injectedNames);
 
         // Scan for @IHtmlLocalizer["KeyName"] patterns
         ScanLocalizerTypes(content, filePath, references);
@@ -105,7 +108,7 @@ public class RazorScanner : PatternMatcher
         }
     }
 
-    private void ScanLocalizerIndexers(string content, string filePath, List<KeyReference> references)
+    private void ScanLocalizerIndexers(string content, string filePath, List<KeyReference> references, List<string> injectedNames)
     {
         var matches = LocalizerIndexerPattern.Matches(content);
 
@@ -114,8 +117,9 @@ public class RazorScanner : PatternMatcher
             var variableName = match.Groups[1].Value;
             var keyName = match.Groups[2].Value;
 
-            // Check if variable name suggests localization
-            if (IsLikelyLocalizerVariable(variableName))
+            // A variable is a known localizer if it is injected in this file OR
+            // matches the name heuristic.
+            if (injectedNames.Contains(variableName) || IsLikelyLocalizerVariable(variableName))
             {
                 references.Add(new KeyReference
                 {
