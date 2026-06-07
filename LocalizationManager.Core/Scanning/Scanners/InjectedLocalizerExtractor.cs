@@ -5,9 +5,9 @@ namespace LocalizationManager.Core.Scanning.Scanners;
 /// <summary>
 /// Extracts variable names that are declared as injected localizers in Razor
 /// content, e.g. <c>@inject IStringLocalizer&lt;T&gt; VariableName</c> (also
-/// IHtmlLocalizer / IStringLocalizerFactory). These names are then treated as
-/// localizer indexers regardless of the configured method list, so that
-/// <c>@Q["Key"]</c> resolves even when the variable name is project-specific.
+/// <c>IHtmlLocalizer&lt;T&gt;</c>). These names are then treated as localizer
+/// indexers regardless of the configured method list, so that <c>@Q["Key"]</c>
+/// resolves even when the variable name is project-specific.
 /// </summary>
 public static class InjectedLocalizerExtractor
 {
