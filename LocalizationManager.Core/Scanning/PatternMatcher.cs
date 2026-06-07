@@ -14,12 +14,14 @@ public abstract class PatternMatcher
     /// <param name="strictMode">If true, only match high-confidence static references</param>
     /// <param name="resourceClassNames">Optional list of resource class names to detect</param>
     /// <param name="localizationMethods">Optional list of localization method names to detect</param>
+    /// <param name="injectedLocalizerVariables">Optional list of localizer variable names declared externally (e.g. via _Imports.razor) that should be treated as localizer indexers</param>
     /// <returns>List of key references found in the file</returns>
     public abstract List<KeyReference> ScanFile(
         string filePath,
         bool strictMode = false,
         List<string>? resourceClassNames = null,
-        List<string>? localizationMethods = null);
+        List<string>? localizationMethods = null,
+        List<string>? injectedLocalizerVariables = null);
 
     /// <summary>
     /// Scan file content (string) for localization key references
@@ -29,13 +31,15 @@ public abstract class PatternMatcher
     /// <param name="strictMode">If true, only match high-confidence static references</param>
     /// <param name="resourceClassNames">Optional list of resource class names to detect</param>
     /// <param name="localizationMethods">Optional list of localization method names to detect</param>
+    /// <param name="injectedLocalizerVariables">Optional list of localizer variable names declared externally (e.g. via _Imports.razor) that should be treated as localizer indexers</param>
     /// <returns>List of key references found in the content</returns>
     public abstract List<KeyReference> ScanContent(
         string filePath,
         string content,
         bool strictMode = false,
         List<string>? resourceClassNames = null,
-        List<string>? localizationMethods = null);
+        List<string>? localizationMethods = null,
+        List<string>? injectedLocalizerVariables = null);
 
     /// <summary>
     /// Get file extensions supported by this pattern matcher

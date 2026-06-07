@@ -26,10 +26,11 @@ public class CSharpScanner : PatternMatcher
         string filePath,
         bool strictMode = false,
         List<string>? resourceClassNames = null,
-        List<string>? localizationMethods = null)
+        List<string>? localizationMethods = null,
+        List<string>? injectedLocalizerVariables = null)
     {
         var originalContent = ReadFileContent(filePath);
-        return ScanContent(filePath, originalContent, strictMode, resourceClassNames, localizationMethods);
+        return ScanContent(filePath, originalContent, strictMode, resourceClassNames, localizationMethods, injectedLocalizerVariables);
     }
 
     public override List<KeyReference> ScanContent(
@@ -37,7 +38,8 @@ public class CSharpScanner : PatternMatcher
         string content,
         bool strictMode = false,
         List<string>? resourceClassNames = null,
-        List<string>? localizationMethods = null)
+        List<string>? localizationMethods = null,
+        List<string>? injectedLocalizerVariables = null)
     {
         var references = new List<KeyReference>();
 
@@ -48,6 +50,11 @@ public class CSharpScanner : PatternMatcher
 
         // Remove comments to avoid false positives
         var cleanedContent = RemoveComments(originalContent);
+
+        // Blank out namespace/using declaration lines so dotted names like
+        // `Vitrum.Resources.Components` are not mistaken for `Resources.Components`
+        // property access. Preserve line count by replacing with spaces.
+        cleanedContent = RemoveNamespaceAndUsingLines(cleanedContent);
 
         // Use provided configuration or defaults
         var classNames = resourceClassNames ?? DefaultResourceClassNames.ToList();
@@ -60,7 +67,7 @@ public class CSharpScanner : PatternMatcher
         ScanGetStringCalls(cleanedContent, originalContent, filePath, references, methodNames);
 
         // Scan for indexer patterns
-        ScanIndexerAccess(cleanedContent, originalContent, filePath, references);
+        ScanIndexerAccess(cleanedContent, originalContent, filePath, references, injectedLocalizerVariables);
 
         // Scan for dynamic patterns (unless strict mode)
         if (!strictMode)
@@ -92,6 +99,23 @@ public class CSharpScanner : PatternMatcher
             // Otherwise it's a comment, replace with spaces to preserve line numbers
             return new string(' ', match.Value.Length);
         }, RegexOptions.Multiline | RegexOptions.Singleline);
+    }
+
+    /// <summary>
+    /// Blanks out C# <c>namespace</c> and <c>using</c> declaration lines while
+    /// preserving line numbers, so namespace-qualified type names are not mistaken
+    /// for resource property access (e.g. <c>namespace A.Resources.Components</c>).
+    /// </summary>
+    private static string RemoveNamespaceAndUsingLines(string content)
+    {
+        // Matches whole lines that are namespace or using declarations:
+        //   namespace Foo.Bar.Baz   (block-scoped, optional trailing {)
+        //   namespace Foo.Bar.Baz;  (file-scoped, trailing ;)
+        //   using Foo.Bar;          (incl. `using static`, `global using`, aliases)
+        // It deliberately does NOT match `using (...)` statements or `using var`.
+        var pattern = @"^[ \t]*(?:global[ \t]+)?(?:namespace[ \t]+[\w.]+[ \t]*[;{]?|using[ \t]+(?:static[ \t]+)?[\w.]+(?:[ \t]*=[ \t]*[\w.<>,? ]+)?[ \t]*;?)[ \t]*$";
+        return Regex.Replace(content, pattern, m => new string(' ', m.Value.Length),
+            RegexOptions.Multiline);
     }
 
     private void ScanPropertyAccess(string content, string originalContent, string filePath, List<KeyReference> references, List<string> classNames)
@@ -148,7 +172,7 @@ public class CSharpScanner : PatternMatcher
         }
     }
 
-    private void ScanIndexerAccess(string content, string originalContent, string filePath, List<KeyReference> references)
+    private void ScanIndexerAccess(string content, string originalContent, string filePath, List<KeyReference> references, List<string>? injected)
     {
         var matches = IndexerPattern.Matches(content);
 
@@ -157,8 +181,9 @@ public class CSharpScanner : PatternMatcher
             var variableName = match.Groups[1].Value;
             var keyName = match.Groups[2].Value;
 
-            // Check if variable name suggests localization
-            if (IsLikelyLocalizerVariable(variableName))
+            // Check if variable name suggests localization, or matches an externally
+            // declared injected localizer name (e.g. from _Imports.razor).
+            if ((injected != null && injected.Contains(variableName)) || IsLikelyLocalizerVariable(variableName))
             {
                 references.Add(new KeyReference
                 {

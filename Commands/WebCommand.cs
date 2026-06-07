@@ -197,10 +197,10 @@ public class WebCommand : Command<WebCommand.Settings>
                 return new JsonResourceBackend(config.Json);
 
             if (!string.IsNullOrEmpty(format))
-                return factory.GetBackend(format);
+                return factory.GetBackend(format, config);
 
-            // Auto-detect from path
-            return factory.ResolveFromPath(absoluteResourcePath);
+            // Auto-detect from path (pass config so DefaultLanguageCode is honored)
+            return factory.ResolveFromPath(absoluteResourcePath, config);
         });
 
         // Configure CORS if enabled in configuration

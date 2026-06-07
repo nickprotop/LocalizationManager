@@ -443,6 +443,119 @@ public class ControllerIntegrationTests : IDisposable
 
     #endregion
 
+    #region ScanController Tests
+
+    /// <summary>
+    /// Verifies that the web/VS Code scan path honors configured localization methods
+    /// from lrm.json (issue #6). A non-default method name "Q" must be detected only when
+    /// it is configured via Scanning.LocalizationMethods.
+    /// </summary>
+    [Fact]
+    public void ScanController_AppliesConfiguredLocalizationMethods()
+    {
+        // Arrange - dedicated dir tree: resources + a sibling source file using Q("MyKey")
+        var root = Path.Combine(_tempDirectory, $"scancfg_{Guid.NewGuid():N}");
+        var resourceDir = Path.Combine(root, "Resources");
+        var sourceDir = Path.Combine(root, "src");
+        Directory.CreateDirectory(resourceDir);
+        Directory.CreateDirectory(sourceDir);
+
+        WriteDefaultResx(resourceDir, "MyKey", "My value");
+        File.WriteAllText(
+            Path.Combine(sourceDir, "Sample.cs"),
+            "public class Sample { public string Get() => Q(\"MyKey\"); }");
+
+        // Configure Scanning.LocalizationMethods = ["Q"] via lrm.json in the resource dir
+        var configService = new ConfigurationService(resourceDir);
+        configService.SaveConfiguration(new ConfigurationModel
+        {
+            Scanning = new ScanningConfiguration { LocalizationMethods = new List<string> { "Q" } }
+        });
+
+        var config = CreateScanConfiguration(resourceDir, sourceDir);
+        var backend = new ResxResourceBackend();
+        var controller = new ScanController(config, backend, configService);
+
+        // Act
+        var result = controller.Scan(null);
+
+        // Assert - MyKey is detected as a reference and NOT reported missing
+        var okResult = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
+        var response = Assert.IsType<Models.Api.ScanResponse>(okResult.Value);
+        Assert.Contains(response.References, r => r.Key == "MyKey");
+        Assert.DoesNotContain("MyKey", response.Missing);
+    }
+
+    /// <summary>
+    /// Negative control: with NO configured localization methods, Q("MyKey") is NOT detected,
+    /// proving that the configuration is what enabled detection in the positive test.
+    /// </summary>
+    [Fact]
+    public void ScanController_WithoutConfiguredMethods_DoesNotDetectCustomMethod()
+    {
+        // Arrange
+        var root = Path.Combine(_tempDirectory, $"scannocfg_{Guid.NewGuid():N}");
+        var resourceDir = Path.Combine(root, "Resources");
+        var sourceDir = Path.Combine(root, "src");
+        Directory.CreateDirectory(resourceDir);
+        Directory.CreateDirectory(sourceDir);
+
+        WriteDefaultResx(resourceDir, "MyKey", "My value");
+        File.WriteAllText(
+            Path.Combine(sourceDir, "Sample.cs"),
+            "public class Sample { public string Get() => Q(\"MyKey\"); }");
+
+        // No lrm.json written -> no scanning config
+        var configService = new ConfigurationService(resourceDir);
+
+        var config = CreateScanConfiguration(resourceDir, sourceDir);
+        var backend = new ResxResourceBackend();
+        var controller = new ScanController(config, backend, configService);
+
+        // Act
+        var result = controller.Scan(null);
+
+        // Assert - Q("MyKey") is not a recognized localization call, so MyKey is not referenced
+        var okResult = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
+        var response = Assert.IsType<Models.Api.ScanResponse>(okResult.Value);
+        Assert.DoesNotContain(response.References, r => r.Key == "MyKey");
+    }
+
+    private static void WriteDefaultResx(string resourceDir, string key, string value)
+    {
+        var backend = new ResxResourceBackend();
+        var file = new ResourceFile
+        {
+            Language = new LanguageInfo
+            {
+                BaseName = "Resources",
+                Code = "",
+                Name = "Default",
+                IsDefault = true,
+                FilePath = Path.Combine(resourceDir, "Resources.resx")
+            },
+            Entries = new List<ResourceEntry>
+            {
+                new() { Key = key, Value = value }
+            }
+        };
+        backend.Writer.Write(file);
+    }
+
+    private static IConfiguration CreateScanConfiguration(string resourcePath, string sourcePath)
+    {
+        var configDict = new Dictionary<string, string?>
+        {
+            ["ResourcePath"] = resourcePath,
+            ["SourcePath"] = sourcePath
+        };
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(configDict)
+            .Build();
+    }
+
+    #endregion
+
     #region Backend Parity Tests
 
     [Fact]

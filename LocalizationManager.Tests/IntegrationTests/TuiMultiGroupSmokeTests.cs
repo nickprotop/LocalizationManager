@@ -99,4 +99,75 @@ public class TuiMultiGroupSmokeTests : IDisposable
             Application.Shutdown();
         }
     }
+
+    /// <summary>
+    /// BUG #1 (issue #6): with DefaultLanguageCode=it, the suffix-less default file
+    /// (Res.resx) and an explicit Res.it.resx both carry effective code "it" within one
+    /// group. The "it" column must show the DEFAULT file's value, not the culture file's.
+    /// </summary>
+    [Fact]
+    public void GetEntryForCell_DefaultAndCultureShareCode_DefaultWins()
+    {
+        WriteResx("Res.resx", ("Hi", "Ciao"));
+        WriteResx("Res.it.resx", ("Hi", "CiaoCulture"));
+
+        var resourceFiles = DiscoverAndRead();
+        var backend = new ResxResourceBackend("it");
+
+        Application.Init(new FakeDriver());
+        try
+        {
+            var window = new ResourceEditorWindow(resourceFiles, backend, "it", _tempDir);
+
+            var entry = InvokeGetEntryForCell(window, "Res", "Hi", 1, "it");
+
+            Assert.NotNull(entry);
+            // Default file (Res.resx) must win over the colliding culture file (Res.it.resx).
+            Assert.Equal("Ciao", entry!.Value);
+        }
+        finally
+        {
+            Application.Shutdown();
+        }
+    }
+
+    /// <summary>
+    /// Gap-fill: when the winning (default) file has no value for a key but a colliding
+    /// culture file does, the culture value is surfaced so the cell is not blank.
+    /// </summary>
+    [Fact]
+    public void GetEntryForCell_DefaultMissingKey_GapFillsFromCultureFile()
+    {
+        // Default has only "Hi"; the colliding culture file additionally has "Only".
+        WriteResx("Res.resx", ("Hi", "Ciao"));
+        WriteResx("Res.it.resx", ("Hi", "CiaoCulture"), ("Only", "SoloIt"));
+
+        var resourceFiles = DiscoverAndRead();
+        var backend = new ResxResourceBackend("it");
+
+        Application.Init(new FakeDriver());
+        try
+        {
+            var window = new ResourceEditorWindow(resourceFiles, backend, "it", _tempDir);
+
+            var entry = InvokeGetEntryForCell(window, "Res", "Only", 1, "it");
+
+            Assert.NotNull(entry);
+            Assert.Equal("SoloIt", entry!.Value);
+        }
+        finally
+        {
+            Application.Shutdown();
+        }
+    }
+
+    private static ResourceEntry? InvokeGetEntryForCell(
+        ResourceEditorWindow window, string baseName, string key, int occurrenceNumber, string code)
+    {
+        var method = typeof(ResourceEditorWindow).GetMethod(
+            "GetEntryForCell",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(method);
+        return (ResourceEntry?)method!.Invoke(window, new object[] { baseName, key, occurrenceNumber, code });
+    }
 }

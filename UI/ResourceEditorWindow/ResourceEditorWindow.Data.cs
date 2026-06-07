@@ -378,10 +378,40 @@ public partial class ResourceEditorWindow : Window
     /// </summary>
     private ResourceEntry? GetEntryForCell(string baseName, string key, int occurrenceNumber, string code)
     {
-        var file = _resourceFiles.FirstOrDefault(rf =>
-            string.Equals(rf.Language.BaseName, baseName, StringComparison.OrdinalIgnoreCase) &&
-            rf.Language.Code == code);
-        return file == null ? null : GetNthOccurrence(file, key, occurrenceNumber);
+        var groupFiles = GetGroupFiles(baseName);
+        var columns = MergedLanguageColumns.Build(groupFiles.Select(f => f.Language));
+
+        // The column code passed in comes from GetLanguageColumns (the raw file Code, which is
+        // "" for the suffix-less default). MergedLanguageColumns keys columns by the effective
+        // code ("default" when blank). Match against both so either source resolves correctly.
+        var effectiveCode = string.IsNullOrEmpty(code) ? "default" : code;
+        var column = columns.FirstOrDefault(c =>
+            string.Equals(c.Code, code, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(c.Code, effectiveCode, StringComparison.OrdinalIgnoreCase));
+        if (column == null) return null;
+
+        ResourceFile? FileFor(string path) =>
+            groupFiles.FirstOrDefault(f => (f.Language.FilePath ?? string.Empty) == path);
+
+        var winner = FileFor(column.WinningFilePath);
+        var winnerEntry = winner == null ? null : GetNthOccurrence(winner, key, occurrenceNumber);
+        if (winnerEntry != null && !string.IsNullOrEmpty(winnerEntry.Value))
+            return winnerEntry;
+
+        // Gap-fill only for the primary occurrence: if the default winner has no value for this
+        // key, fall back through the colliding culture files to the first non-empty value.
+        if (occurrenceNumber == 1)
+        {
+            foreach (var lp in column.ConflictingFilePaths)
+            {
+                var lf = FileFor(lp);
+                var le = lf == null ? null : GetNthOccurrence(lf, key, 1);
+                if (le != null && !string.IsNullOrEmpty(le.Value)) return le;
+            }
+        }
+
+        // Fall back to the winner entry even if empty/null (preserves prior behavior for empties).
+        return winnerEntry;
     }
 
     /// <summary>

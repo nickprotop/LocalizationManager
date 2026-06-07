@@ -284,6 +284,17 @@ public class RazorScannerTests : IDisposable
     }
 
     [Fact]
+    public void ScanContent_RazorUsingDirective_NotFlagged()
+    {
+        var scanner = new RazorScanner();
+        var code = "@using Vitrum.Resources.Components\n<p>@Resources.Hello</p>";
+        var refs = scanner.ScanContent("Page.razor", code);
+
+        Assert.Contains(refs, r => r.Key == "Hello");
+        Assert.DoesNotContain(refs, r => r.Key == "Components");
+    }
+
+    [Fact]
     public void ScanFile_BothFileTypes_WorksCorrectly()
     {
         // Arrange - .cshtml
@@ -304,5 +315,54 @@ public class RazorScannerTests : IDisposable
 
         Assert.Single(razorResults);
         Assert.Equal("Title", razorResults[0].Key);
+    }
+
+    [Fact]
+    public void ScanContent_RazorNamespaceDirective_NotFlagged()
+    {
+        var scanner = new RazorScanner();
+        var code = "@namespace Vitrum.Resources.Components\n<p>@Resources.Hello</p>";
+        var refs = scanner.ScanContent("Page.razor", code);
+        Assert.Contains(refs, r => r.Key == "Hello");
+        Assert.DoesNotContain(refs, r => r.Key == "Components");
+    }
+
+    [Fact]
+    public void ScanContent_RealResourceAccess_StillDetectedAfterDirectives()
+    {
+        var scanner = new RazorScanner();
+        var code = "@using A.Resources.X\n@namespace A.Y\n<span>@Resources.Title</span>";
+        var refs = scanner.ScanContent("Page.razor", code);
+        Assert.Contains(refs, r => r.Key == "Title");
+    }
+
+    [Fact]
+    public void ScanContent_InjectedLocalizerVariable_DetectsIndexerUsage()
+    {
+        var scanner = new RazorScanner();
+        var code = "@inject IStringLocalizer<QuoteResources> Q\n<p>@Q[\"Customer_BusinessName_Label\"]</p>";
+        var refs = scanner.ScanContent("Page.razor", code);
+
+        Assert.Contains(refs, r => r.Key == "Customer_BusinessName_Label");
+    }
+
+    [Fact]
+    public void ScanContent_InjectedLocalizer_MultipleVarsResolve()
+    {
+        var scanner = new RazorScanner();
+        var code = "@inject IStringLocalizer<A> Q\n@inject IHtmlLocalizer<B> Z\n<p>@Q[\"K1\"] @Z[\"K2\"]</p>";
+        var refs = scanner.ScanContent("Page.razor", code);
+        Assert.Contains(refs, r => r.Key == "K1");
+        Assert.Contains(refs, r => r.Key == "K2");
+    }
+
+    [Fact]
+    public void ScanContent_NonInjectedNonHeuristicVar_NotDetected()
+    {
+        // A variable that is neither injected nor heuristic-matching is NOT treated as a localizer.
+        var scanner = new RazorScanner();
+        var code = "<p>@data[\"NotAKey\"]</p>";
+        var refs = scanner.ScanContent("Page.razor", code);
+        Assert.DoesNotContain(refs, r => r.Key == "NotAKey");
     }
 }

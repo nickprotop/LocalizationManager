@@ -28,18 +28,21 @@ public class XamlScanner : PatternMatcher
         string filePath,
         bool strictMode = false,
         List<string>? resourceClassNames = null,
-        List<string>? localizationMethods = null)
+        List<string>? localizationMethods = null,
+        List<string>? injectedLocalizerVariables = null)
     {
         var content = ReadFileContent(filePath);
-        return ScanContent(filePath, content, strictMode, resourceClassNames, localizationMethods);
+        return ScanContent(filePath, content, strictMode, resourceClassNames, localizationMethods, injectedLocalizerVariables);
     }
 
+    // injectedLocalizerVariables is accepted for API parity but ignored: XAML has no @inject.
     public override List<KeyReference> ScanContent(
         string filePath,
         string content,
         bool strictMode = false,
         List<string>? resourceClassNames = null,
-        List<string>? localizationMethods = null)
+        List<string>? localizationMethods = null,
+        List<string>? injectedLocalizerVariables = null)
     {
         var references = new List<KeyReference>();
 

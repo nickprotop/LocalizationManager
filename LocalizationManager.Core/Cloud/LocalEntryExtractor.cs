@@ -30,45 +30,125 @@ public class LocalEntryExtractor
     {
         var entries = new List<LocalEntry>();
 
-        foreach (var lang in languages)
+        var languageList = languages.ToList();
+
+        // Cache reads so a file shared between columns (or read while resolving
+        // collisions) is only parsed once.
+        var fileCache = new Dictionary<string, ResourceFile>(StringComparer.OrdinalIgnoreCase);
+        async Task<ResourceFile> ReadCachedAsync(LanguageInfo lang)
+        {
+            var path = lang.FilePath ?? string.Empty;
+            if (!fileCache.TryGetValue(path, out var file))
+            {
+                file = await _backend.Reader.ReadAsync(lang, cancellationToken);
+                fileCache[path] = file;
+            }
+            return file;
+        }
+
+        // Process each resource group independently so shared key names across
+        // groups don't collide, and so column-merging is scoped per group.
+        foreach (var group in languageList.GroupBy(l => l.BaseName ?? string.Empty))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var resourceFile = await _backend.Reader.ReadAsync(lang, cancellationToken);
+            var groupLanguages = group.ToList();
+            var byPath = groupLanguages
+                .Where(l => l.FilePath != null)
+                .GroupBy(l => l.FilePath!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-            foreach (var entry in resourceFile.Entries)
+            // Merge the group's files into one column per effective language code.
+            // When the suffix-less default file (labeled with the configured
+            // DefaultLanguageCode, e.g. "it") and an explicit culture file share
+            // the same code, they collapse into a single column. The default file
+            // wins; the colliding file is only consulted to gap-fill keys the
+            // winner lacks. This mirrors the display merge and ensures push emits
+            // exactly one entry per (BaseName, Key, effectiveCode) slot.
+            var columns = MergedLanguageColumns.Build(groupLanguages);
+
+            foreach (var column in columns)
             {
-                string hash;
-                if (entry.IsPlural && entry.PluralForms != null && entry.PluralForms.Count > 0)
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Winner-first ordered list of files for this column.
+                var orderedPaths = new List<string> { column.WinningFilePath };
+                orderedPaths.AddRange(column.ConflictingFilePaths);
+
+                var orderedLangs = orderedPaths
+                    .Where(p => !string.IsNullOrEmpty(p) && byPath.ContainsKey(p))
+                    .Select(p => byPath[p])
+                    .ToList();
+
+                if (orderedLangs.Count == 0)
                 {
-                    hash = EntryHasher.ComputePluralHash(entry.PluralForms, entry.Comment);
-                }
-                else
-                {
-                    hash = EntryHasher.ComputeHash(entry.Value ?? string.Empty, entry.Comment);
+                    continue;
                 }
 
-                entries.Add(new LocalEntry
+                // The winner determines the emitted Lang/BaseName/IsDefault so the
+                // default file's entries still go out under its raw code (e.g. "it"
+                // or "" for a blank default) - never the synthetic "default" code.
+                var winnerLang = orderedLangs[0];
+
+                // For each distinct key (winner-first order), emit ONE entry from
+                // the first file that has it: default-wins + gap-fill.
+                var emittedKeys = new HashSet<string>(StringComparer.Ordinal);
+
+                foreach (var fileLang in orderedLangs)
                 {
-                    Key = entry.Key,
-                    BaseName = lang.BaseName ?? string.Empty,
-                    Lang = lang.Code,
-                    Value = entry.Value ?? string.Empty,
-                    Comment = entry.Comment,
-                    IsPlural = entry.IsPlural,
-                    PluralForms = entry.PluralForms,
-                    Hash = hash,
-                    // Pass SourceText for storage in ResourceKey.SourceText
-                    // For default language: use entry.SourceText (e.g. msgid for PO) or fall back to Value
-                    // For non-default language: pass entry.SourceText if available (PO format has msgid in all files)
-                    SourceText = lang.IsDefault ? (entry.SourceText ?? entry.Value) : entry.SourceText,
-                    // Pass SourcePluralText (msgid_plural for PO, available in all PO files)
-                    SourcePluralText = entry.SourcePluralText
-                });
+                    var resourceFile = await ReadCachedAsync(fileLang);
+
+                    foreach (var entry in resourceFile.Entries)
+                    {
+                        if (!emittedKeys.Add(entry.Key))
+                        {
+                            // A higher-priority file (winner or earlier conflict)
+                            // already supplied this key - skip the duplicate.
+                            continue;
+                        }
+
+                        entries.Add(BuildLocalEntry(entry, winnerLang));
+                    }
+                }
             }
         }
 
         return entries;
+    }
+
+    /// <summary>
+    /// Builds a <see cref="LocalEntry"/> for a resource entry, labeling it with the
+    /// winning language file's code/base-name/default-flag.
+    /// </summary>
+    private static LocalEntry BuildLocalEntry(ResourceEntry entry, LanguageInfo winnerLang)
+    {
+        string hash;
+        if (entry.IsPlural && entry.PluralForms != null && entry.PluralForms.Count > 0)
+        {
+            hash = EntryHasher.ComputePluralHash(entry.PluralForms, entry.Comment);
+        }
+        else
+        {
+            hash = EntryHasher.ComputeHash(entry.Value ?? string.Empty, entry.Comment);
+        }
+
+        return new LocalEntry
+        {
+            Key = entry.Key,
+            BaseName = winnerLang.BaseName ?? string.Empty,
+            Lang = winnerLang.Code,
+            Value = entry.Value ?? string.Empty,
+            Comment = entry.Comment,
+            IsPlural = entry.IsPlural,
+            PluralForms = entry.PluralForms,
+            Hash = hash,
+            // Pass SourceText for storage in ResourceKey.SourceText
+            // For default language: use entry.SourceText (e.g. msgid for PO) or fall back to Value
+            // For non-default language: pass entry.SourceText if available (PO format has msgid in all files)
+            SourceText = winnerLang.IsDefault ? (entry.SourceText ?? entry.Value) : entry.SourceText,
+            // Pass SourcePluralText (msgid_plural for PO, available in all PO files)
+            SourcePluralText = entry.SourcePluralText
+        };
     }
 
     /// <summary>

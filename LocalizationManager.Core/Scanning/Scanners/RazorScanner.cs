@@ -31,10 +31,11 @@ public class RazorScanner : PatternMatcher
         string filePath,
         bool strictMode = false,
         List<string>? resourceClassNames = null,
-        List<string>? localizationMethods = null)
+        List<string>? localizationMethods = null,
+        List<string>? injectedLocalizerVariables = null)
     {
         var content = ReadFileContent(filePath);
-        return ScanContent(filePath, content, strictMode, resourceClassNames, localizationMethods);
+        return ScanContent(filePath, content, strictMode, resourceClassNames, localizationMethods, injectedLocalizerVariables);
     }
 
     public override List<KeyReference> ScanContent(
@@ -42,12 +43,20 @@ public class RazorScanner : PatternMatcher
         string content,
         bool strictMode = false,
         List<string>? resourceClassNames = null,
-        List<string>? localizationMethods = null)
+        List<string>? localizationMethods = null,
+        List<string>? injectedLocalizerVariables = null)
     {
         var references = new List<KeyReference>();
 
         if (string.IsNullOrEmpty(content))
             return references;
+
+        // Blank Razor directive lines (@using / @namespace) so qualified type
+        // names are not mistaken for @Resources.Member access. Preserve line count.
+        content = Regex.Replace(content,
+            @"^[ \t]*@(?:using|namespace)[ \t]+[\w.]+[ \t]*$",
+            m => new string(' ', m.Value.Length),
+            RegexOptions.Multiline);
 
         // Use provided configuration or defaults
         var classNames = resourceClassNames ?? DefaultResourceClassNames.ToList();
@@ -56,8 +65,15 @@ public class RazorScanner : PatternMatcher
         // Scan for @Resources.KeyName patterns
         ScanResourceProperties(content, filePath, references, classNames);
 
+        // Variable names declared via @inject IStringLocalizer<T> Var in THIS file,
+        // unioned with externally-supplied names (e.g. from _Imports.razor that
+        // apply folder-wide).
+        var injectedNames = InjectedLocalizerExtractor.Extract(content).ToList();
+        if (injectedLocalizerVariables != null)
+            injectedNames.AddRange(injectedLocalizerVariables.Where(n => !injectedNames.Contains(n)));
+
         // Scan for @Localizer["KeyName"] patterns
-        ScanLocalizerIndexers(content, filePath, references);
+        ScanLocalizerIndexers(content, filePath, references, injectedNames);
 
         // Scan for @IHtmlLocalizer["KeyName"] patterns
         ScanLocalizerTypes(content, filePath, references);
@@ -65,7 +81,7 @@ public class RazorScanner : PatternMatcher
         // Scan for code blocks
         if (!strictMode)
         {
-            ScanCodeBlocks(content, filePath, references, classNames, methodNames);
+            ScanCodeBlocks(content, filePath, references, classNames, methodNames, injectedNames);
         }
 
         return references;
@@ -98,7 +114,7 @@ public class RazorScanner : PatternMatcher
         }
     }
 
-    private void ScanLocalizerIndexers(string content, string filePath, List<KeyReference> references)
+    private void ScanLocalizerIndexers(string content, string filePath, List<KeyReference> references, List<string> injectedNames)
     {
         var matches = LocalizerIndexerPattern.Matches(content);
 
@@ -107,8 +123,9 @@ public class RazorScanner : PatternMatcher
             var variableName = match.Groups[1].Value;
             var keyName = match.Groups[2].Value;
 
-            // Check if variable name suggests localization
-            if (IsLikelyLocalizerVariable(variableName))
+            // A variable is a known localizer if it is injected in this file OR
+            // matches the name heuristic.
+            if (injectedNames.Contains(variableName) || IsLikelyLocalizerVariable(variableName))
             {
                 references.Add(new KeyReference
                 {
@@ -143,22 +160,22 @@ public class RazorScanner : PatternMatcher
         }
     }
 
-    private void ScanCodeBlocks(string content, string filePath, List<KeyReference> references, List<string> classNames, List<string> methodNames)
+    private void ScanCodeBlocks(string content, string filePath, List<KeyReference> references, List<string> classNames, List<string> methodNames, List<string> injectedNames)
     {
         // Scan @{...} blocks
-        ScanSimpleCodeBlocks(content, filePath, references, classNames, methodNames);
+        ScanSimpleCodeBlocks(content, filePath, references, classNames, methodNames, injectedNames);
 
         // Scan @code {...} blocks
-        ScanNamedCodeBlocks(content, filePath, references, classNames, methodNames, "code");
+        ScanNamedCodeBlocks(content, filePath, references, classNames, methodNames, "code", injectedNames);
 
         // Scan @functions {...} blocks
-        ScanNamedCodeBlocks(content, filePath, references, classNames, methodNames, "functions");
+        ScanNamedCodeBlocks(content, filePath, references, classNames, methodNames, "functions", injectedNames);
 
         // Scan for dynamic keys in code blocks
         ScanDynamicCodeBlockKeys(content, filePath, references, methodNames);
     }
 
-    private void ScanSimpleCodeBlocks(string content, string filePath, List<KeyReference> references, List<string> classNames, List<string> methodNames)
+    private void ScanSimpleCodeBlocks(string content, string filePath, List<KeyReference> references, List<string> classNames, List<string> methodNames, List<string> injectedNames)
     {
         // Match @{...} blocks (simple code blocks)
         // Use the same approach as ScanNamedCodeBlocks for consistency
@@ -224,7 +241,7 @@ public class RazorScanner : PatternMatcher
                 var keyName = indexerMatch.Groups[2].Value;
                 var absoluteIndex = blockStartIndex + indexerMatch.Index;
 
-                if (IsLikelyLocalizerVariable(variableName))
+                if (injectedNames.Contains(variableName) || IsLikelyLocalizerVariable(variableName))
                 {
                     references.Add(new KeyReference
                     {
@@ -240,7 +257,7 @@ public class RazorScanner : PatternMatcher
         }
     }
 
-    private void ScanNamedCodeBlocks(string content, string filePath, List<KeyReference> references, List<string> classNames, List<string> methodNames, string blockName)
+    private void ScanNamedCodeBlocks(string content, string filePath, List<KeyReference> references, List<string> classNames, List<string> methodNames, string blockName, List<string> injectedNames)
     {
         // Match @code {...} or @functions {...} blocks
         // This pattern extracts the entire block content, then we scan within it
@@ -306,7 +323,7 @@ public class RazorScanner : PatternMatcher
                 var keyName = indexerMatch.Groups[2].Value;
                 var absoluteIndex = blockStartIndex + indexerMatch.Index;
 
-                if (IsLikelyLocalizerVariable(variableName))
+                if (injectedNames.Contains(variableName) || IsLikelyLocalizerVariable(variableName))
                 {
                     references.Add(new KeyReference
                     {

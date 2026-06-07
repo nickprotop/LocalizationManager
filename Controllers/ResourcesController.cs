@@ -23,20 +23,36 @@ public class ResourcesController : ControllerBase
     }
 
     /// <summary>
-    /// List all resource files
+    /// List the language columns shown in the editor. Returns one entry per
+    /// EFFECTIVE language code across all resource groups (default file and an
+    /// explicit culture file sharing the configured DefaultLanguageCode collapse
+    /// into a single column), so the headers agree with the merged cells from
+    /// <see cref="GetAllKeys"/>. A within-group default-vs-culture collision is
+    /// surfaced via <see cref="ResourceFileInfo.HasLanguageConflict"/>; the
+    /// legitimate cross-group case (two groups each having an "it" file) is NOT
+    /// treated as a conflict.
     /// </summary>
     [HttpGet]
     public ActionResult<IEnumerable<ResourceFileInfo>> GetResources()
     {
         try
         {
-            var languages = _backend.Discovery.DiscoverLanguages(_resourcePath);
-            var result = languages.Select(l => new ResourceFileInfo
+            var directory = _backend.Discovery.DiscoverResourceGroups(_resourcePath);
+            var allFiles = directory.Groups.SelectMany(g => g.Files).ToList();
+            var columns = MergedLanguageColumns.Build(allFiles);
+
+            var result = columns.Select(col => new ResourceFileInfo
             {
-                FileName = l.Name,
-                FilePath = l.FilePath,
-                Code = l.Code,
-                IsDefault = l.IsDefault
+                FileName = col.Name,
+                FilePath = col.WinningFilePath,
+                Code = col.Code,
+                IsDefault = col.IsDefault,
+                // Cross-group merge would falsely flag two legit same-code files
+                // (e.g. CustomerResources.it + GlassResources.it). Only flag a
+                // conflict when a SINGLE group has >1 file for this effective code.
+                HasLanguageConflict = directory.Groups.Any(g =>
+                    g.Files.Count(f => MergedLanguageColumns.EffectiveCode(f) == col.Code) > 1),
+                ConflictingFilePaths = col.ConflictingFilePaths.ToList()
             });
             return Ok(result);
         }
@@ -72,16 +88,33 @@ public class ResourcesController : ControllerBase
                     .OrderBy(k => k)
                     .ToList();
 
+                var fileByPath = group.Files.ToDictionary(f => f.FilePath ?? string.Empty);
+                var columns = MergedLanguageColumns.Build(group.Files);
+
                 foreach (var key in keys)
                 {
                     var values = new Dictionary<string, string?>();
                     var isPlural = false;
+                    var conflictCodes = new List<string>();
 
-                    foreach (var (file, resource) in resources)
+                    foreach (var col in columns)
                     {
-                        var entry = resource.Entries.FirstOrDefault(e => e.Key == key);
-                        values[string.IsNullOrEmpty(file.Code) ? "default" : file.Code] = entry?.Value;
-                        if (entry?.IsPlural == true) isPlural = true;
+                        var winnerEntry = resources[fileByPath[col.WinningFilePath]].Entries.FirstOrDefault(e => e.Key == key);
+                        var resolvedEntry = winnerEntry;
+
+                        // default wins; culture files fill the gap only when the winner has no value.
+                        if (string.IsNullOrEmpty(resolvedEntry?.Value))
+                        {
+                            foreach (var lp in col.ConflictingFilePaths)
+                            {
+                                var le = resources[fileByPath[lp]].Entries.FirstOrDefault(e => e.Key == key);
+                                if (!string.IsNullOrEmpty(le?.Value)) { resolvedEntry = le; break; }
+                            }
+                        }
+
+                        values[col.Code] = resolvedEntry?.Value;
+                        if (resolvedEntry?.IsPlural == true) isPlural = true;
+                        if (col.HasConflict) conflictCodes.Add(col.Code);
                     }
 
                     var occurrenceCount = defaultResource?.Entries.Count(e => e.Key == key) ?? 1;
@@ -93,7 +126,9 @@ public class ResourcesController : ControllerBase
                         Values = values,
                         OccurrenceCount = occurrenceCount,
                         HasDuplicates = occurrenceCount > 1,
-                        IsPlural = isPlural
+                        IsPlural = isPlural,
+                        HasLanguageConflict = conflictCodes.Count > 0,
+                        ConflictingLanguages = conflictCodes
                     });
                 }
             }
@@ -158,22 +193,49 @@ public class ResourcesController : ControllerBase
 
             var hasDuplicates = occurrences.Count > 1;
 
+            // Merge files of this group into display columns so that the suffix-less
+            // default file and an explicit culture file sharing the same effective code
+            // collapse into one column (default wins; cultures only fill gaps).
+            var byPath = resourceFiles.ToDictionary(rf => rf.Language.FilePath ?? string.Empty);
+            var columns = MergedLanguageColumns.Build(group.Files);
+
+            // Resolves the i-th occurrence of keyName for a column, taking the default
+            // winner first and falling back to a colliding culture file only when the
+            // winner lacks that occurrence.
+            ResourceValue? ResolveOccurrence(LanguageColumn col, int index)
+            {
+                var winnerEntries = byPath[col.WinningFilePath].Entries.Where(e => e.Key == keyName).ToList();
+                var entry = index < winnerEntries.Count ? winnerEntries[index] : null;
+
+                if (entry == null)
+                {
+                    foreach (var lp in col.ConflictingFilePaths)
+                    {
+                        var loserEntries = byPath[lp].Entries.Where(e => e.Key == keyName).ToList();
+                        if (index < loserEntries.Count) { entry = loserEntries[index]; break; }
+                    }
+                }
+
+                if (entry == null) return null;
+                return new ResourceValue
+                {
+                    Value = entry.Value,
+                    Comment = entry.Comment,
+                    IsPlural = entry.IsPlural,
+                    PluralForms = entry.PluralForms
+                };
+            }
+
             // If no duplicates, return simple response
             if (!hasDuplicates)
             {
                 var values = new Dictionary<string, ResourceValue>();
-                foreach (var file in resourceFiles)
+                foreach (var col in columns)
                 {
-                    var entry = file.Entries.FirstOrDefault(e => e.Key == keyName);
-                    if (entry != null)
+                    var resolved = ResolveOccurrence(col, 0);
+                    if (resolved != null)
                     {
-                        values[file.Language.Code ?? "default"] = new ResourceValue
-                        {
-                            Value = entry.Value,
-                            Comment = entry.Comment,
-                            IsPlural = entry.IsPlural,
-                            PluralForms = entry.PluralForms
-                        };
+                        values[col.Code] = resolved;
                     }
                 }
 
@@ -192,18 +254,12 @@ public class ResourcesController : ControllerBase
             for (int i = 0; i < occurrences.Count; i++)
             {
                 var occurrenceValues = new Dictionary<string, ResourceValue>();
-                foreach (var file in resourceFiles)
+                foreach (var col in columns)
                 {
-                    var entries = file.Entries.Where(e => e.Key == keyName).ToList();
-                    if (i < entries.Count)
+                    var resolved = ResolveOccurrence(col, i);
+                    if (resolved != null)
                     {
-                        occurrenceValues[file.Language.Code ?? "default"] = new ResourceValue
-                        {
-                            Value = entries[i].Value,
-                            Comment = entries[i].Comment,
-                            IsPlural = entries[i].IsPlural,
-                            PluralForms = entries[i].PluralForms
-                        };
+                        occurrenceValues[col.Code] = resolved;
                     }
                 }
 
@@ -216,18 +272,12 @@ public class ResourcesController : ControllerBase
 
             // Return first occurrence in Values for backward compatibility
             var firstValues = new Dictionary<string, ResourceValue>();
-            foreach (var file in resourceFiles)
+            foreach (var col in columns)
             {
-                var entry = file.Entries.FirstOrDefault(e => e.Key == keyName);
-                if (entry != null)
+                var resolved = ResolveOccurrence(col, 0);
+                if (resolved != null)
                 {
-                    firstValues[file.Language.Code ?? "default"] = new ResourceValue
-                    {
-                        Value = entry.Value,
-                        Comment = entry.Comment,
-                        IsPlural = entry.IsPlural,
-                        PluralForms = entry.PluralForms
-                    };
+                    firstValues[col.Code] = resolved;
                 }
             }
 

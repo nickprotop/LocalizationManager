@@ -248,10 +248,12 @@ export class ResourceEditorPanel {
 
             await this.handleLoadResources();
         } catch (error: any) {
+            const message = `Failed to add key: ${error.message}`;
             this._panel.webview.postMessage({
                 command: 'error',
-                message: `Failed to add key: ${error.message}`
+                message
             });
+            vscode.window.showErrorMessage(message);
         }
     }
 
@@ -838,6 +840,10 @@ export class ResourceEditorPanel {
                     <label for="newKeyValue">Default Value:</label>
                     <input type="text" id="newKeyValue" placeholder="Default text">
                 </div>
+                <div class="form-group" id="newKeyGroupRow" style="display:none;">
+                    <label for="newKeyGroup">Resource Group:</label>
+                    <select id="newKeyGroup"></select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="secondary" onclick="closeAddKeyModal()">Cancel</button>
@@ -1322,6 +1328,23 @@ export class ResourceEditorPanel {
         }
 
         function addNewKey() {
+            // Populate the resource-group selector from the loaded resources.
+            // Multi-group projects require a resourceGroup on the add-key request.
+            const groupRow = document.getElementById('newKeyGroupRow');
+            const groupSel = document.getElementById('newKeyGroup');
+            const distinctGroups = Array.from(
+                new Set((allResources || []).map(r => r.resourceGroup).filter(g => g))
+            );
+            if (distinctGroups.length > 1) {
+                groupSel.innerHTML = distinctGroups
+                    .map(g => '<option value="' + g + '">' + g + '</option>')
+                    .join('');
+                groupRow.style.display = '';
+            } else {
+                groupSel.innerHTML = '';
+                groupRow.style.display = 'none';
+            }
+
             document.getElementById('addKeyModal').style.display = 'block';
             document.getElementById('newKeyName').focus();
         }
@@ -1330,23 +1353,28 @@ export class ResourceEditorPanel {
             document.getElementById('addKeyModal').style.display = 'none';
             document.getElementById('newKeyName').value = '';
             document.getElementById('newKeyValue').value = '';
+            document.getElementById('newKeyGroupRow').style.display = 'none';
+            document.getElementById('newKeyGroup').innerHTML = '';
         }
 
+        // NOTE: mirror of buildAddKeyMessage() in views/addKeyMessage.ts.
+        // The inline webview script cannot import the TS module; the unit test
+        // guards the canonical builder. Keep these two in sync.
         function submitNewKey() {
-            const keyName = document.getElementById('newKeyName').value.trim();
-            const keyValue = document.getElementById('newKeyValue').value.trim();
+            const keyName = document.getElementById('newKeyName').value;
+            const keyValue = document.getElementById('newKeyValue').value;
+            const groupRow = document.getElementById('newKeyGroupRow');
+            const groupSel = document.getElementById('newKeyGroup');
+            const multiGroup = groupRow.style.display !== 'none';
+            const resourceGroup = multiGroup ? groupSel.value : undefined;
 
-            if (!keyName) {
-                setStatus('Key name is required', 3000);
-                return;
-            }
+            const key = (keyName || '').trim();
+            if (!key) { setStatus('Key name is required', 3000); return; }
+            if (multiGroup && !resourceGroup) { setStatus('Select a resource group', 3000); return; }
 
-            vscode.postMessage({
-                command: 'addKey',
-                key: keyName,
-                values: { default: keyValue }
-            });
-
+            const msg = { command: 'addKey', key: key, values: { default: keyValue || '' } };
+            if (resourceGroup) { msg.resourceGroup = resourceGroup; }
+            vscode.postMessage(msg);
             closeAddKeyModal();
         }
 
