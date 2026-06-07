@@ -57,8 +57,12 @@ public class CodeScanner
         var sourceFiles = _fileDiscovery.DiscoverSourceFiles(sourcePath, allExtensions, excludePatterns);
         result.FilesScanned = sourceFiles.Count;
 
+        // Build a map of folder -> injected localizer names declared in that folder's
+        // _Imports.razor, so injected names apply folder-wide (and to subfolders).
+        var importsMap = BuildImportsMap(sourcePath);
+
         // Scan all files
-        var allReferences = ScanFiles(sourceFiles, strictMode, resourceClassNames, localizationMethods);
+        var allReferences = ScanFiles(sourceFiles, strictMode, resourceClassNames, localizationMethods, sourcePath, importsMap);
         result.TotalReferences = allReferences.Count;
 
         // Separate dynamic keys from regular keys
@@ -167,8 +171,11 @@ public class CodeScanner
 
         try
         {
-            // Scan the file
-            var allReferences = scanner.ScanFile(filePath, strictMode, resourceClassNames, localizationMethods);
+            // Scan the file. For single-file scans we don't have an explicit scan
+            // root, so collect injected names from every _Imports.razor in the file's
+            // own directory and all ancestor directories.
+            var injectedNames = InjectedNamesFromAncestors(filePath);
+            var allReferences = scanner.ScanFile(filePath, strictMode, resourceClassNames, localizationMethods, injectedNames);
             result.TotalReferences = allReferences.Count;
 
             // Separate dynamic keys from regular keys
@@ -282,8 +289,10 @@ public class CodeScanner
 
         try
         {
-            // Scan the content
-            var allReferences = scanner.ScanContent(filePath, content, strictMode, resourceClassNames, localizationMethods);
+            // Scan the content. As with ScanSingleFile, collect injected names from
+            // every _Imports.razor in the file's directory and ancestor directories.
+            var injectedNames = InjectedNamesFromAncestors(filePath);
+            var allReferences = scanner.ScanContent(filePath, content, strictMode, resourceClassNames, localizationMethods, injectedNames);
             result.TotalReferences = allReferences.Count;
 
             // Separate dynamic keys from regular keys
@@ -359,7 +368,9 @@ public class CodeScanner
         List<string> sourceFiles,
         bool strictMode,
         List<string>? resourceClassNames,
-        List<string>? localizationMethods)
+        List<string>? localizationMethods,
+        string sourcePath,
+        Dictionary<string, List<string>> importsMap)
     {
         var allReferences = new List<KeyReference>();
 
@@ -375,7 +386,8 @@ public class CodeScanner
             {
                 try
                 {
-                    var references = scanner.ScanFile(filePath, strictMode, resourceClassNames, localizationMethods);
+                    var injectedNames = InjectedNamesFor(filePath, sourcePath, importsMap);
+                    var references = scanner.ScanFile(filePath, strictMode, resourceClassNames, localizationMethods, injectedNames);
 
                     lock (lockObject)
                     {
@@ -390,6 +402,100 @@ public class CodeScanner
         });
 
         return allReferences.OrderBy(r => r.FilePath).ThenBy(r => r.Line).ToList();
+    }
+
+    /// <summary>
+    /// Builds a map of folder path -> injected localizer variable names declared in
+    /// that folder's <c>_Imports.razor</c> file (Blazor shared imports).
+    /// </summary>
+    private Dictionary<string, List<string>> BuildImportsMap(string rootPath)
+    {
+        var map = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+        if (!Directory.Exists(rootPath))
+            return map;
+
+        var options = new EnumerationOptions
+        {
+            MatchCasing = MatchCasing.CaseInsensitive,
+            RecurseSubdirectories = true
+        };
+
+        foreach (var imp in Directory.EnumerateFiles(rootPath, "_Imports.razor", options))
+        {
+            var dir = Path.GetDirectoryName(imp);
+            if (dir == null)
+                continue;
+
+            try
+            {
+                map[dir] = InjectedLocalizerExtractor.Extract(File.ReadAllText(imp)).ToList();
+            }
+            catch
+            {
+                // Ignore unreadable _Imports.razor files.
+            }
+        }
+
+        return map;
+    }
+
+    /// <summary>
+    /// Returns the injected localizer names that apply to <paramref name="filePath"/>:
+    /// the union of names from every <c>_Imports.razor</c> at the file's folder or any
+    /// ancestor folder up to (and including) the scan root.
+    /// </summary>
+    private List<string> InjectedNamesFor(string filePath, string rootPath, Dictionary<string, List<string>> importsMap)
+    {
+        var result = new List<string>();
+        var dir = Path.GetDirectoryName(Path.GetFullPath(filePath));
+        var root = Path.GetFullPath(rootPath);
+
+        while (dir != null && dir.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        {
+            if (importsMap.TryGetValue(dir, out var names))
+                foreach (var n in names)
+                    if (!result.Contains(n)) result.Add(n);
+
+            if (string.Equals(dir, root, StringComparison.OrdinalIgnoreCase)) break;
+            dir = Path.GetDirectoryName(dir);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Collects injected localizer names from every <c>_Imports.razor</c> found in the
+    /// file's own directory and all ancestor directories. Used by single-file scan paths
+    /// (e.g. the web/VS Code APIs) where no explicit scan root is available.
+    /// </summary>
+    private List<string> InjectedNamesFromAncestors(string filePath)
+    {
+        var result = new List<string>();
+        var dir = Path.GetDirectoryName(Path.GetFullPath(filePath));
+
+        while (dir != null)
+        {
+            var imp = Path.Combine(dir, "_Imports.razor");
+            if (File.Exists(imp))
+            {
+                try
+                {
+                    foreach (var n in InjectedLocalizerExtractor.Extract(File.ReadAllText(imp)))
+                        if (!result.Contains(n)) result.Add(n);
+                }
+                catch
+                {
+                    // Ignore unreadable _Imports.razor files.
+                }
+            }
+
+            var parent = Path.GetDirectoryName(dir);
+            if (parent == dir) break;
+            dir = parent;
+        }
+
+        return result;
     }
 
     private HashSet<string> GetAllResourceKeys(List<ResourceFile> resourceFiles)

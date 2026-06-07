@@ -26,10 +26,11 @@ public class CSharpScanner : PatternMatcher
         string filePath,
         bool strictMode = false,
         List<string>? resourceClassNames = null,
-        List<string>? localizationMethods = null)
+        List<string>? localizationMethods = null,
+        List<string>? injectedLocalizerVariables = null)
     {
         var originalContent = ReadFileContent(filePath);
-        return ScanContent(filePath, originalContent, strictMode, resourceClassNames, localizationMethods);
+        return ScanContent(filePath, originalContent, strictMode, resourceClassNames, localizationMethods, injectedLocalizerVariables);
     }
 
     public override List<KeyReference> ScanContent(
@@ -37,7 +38,8 @@ public class CSharpScanner : PatternMatcher
         string content,
         bool strictMode = false,
         List<string>? resourceClassNames = null,
-        List<string>? localizationMethods = null)
+        List<string>? localizationMethods = null,
+        List<string>? injectedLocalizerVariables = null)
     {
         var references = new List<KeyReference>();
 
@@ -65,7 +67,7 @@ public class CSharpScanner : PatternMatcher
         ScanGetStringCalls(cleanedContent, originalContent, filePath, references, methodNames);
 
         // Scan for indexer patterns
-        ScanIndexerAccess(cleanedContent, originalContent, filePath, references);
+        ScanIndexerAccess(cleanedContent, originalContent, filePath, references, injectedLocalizerVariables);
 
         // Scan for dynamic patterns (unless strict mode)
         if (!strictMode)
@@ -170,7 +172,7 @@ public class CSharpScanner : PatternMatcher
         }
     }
 
-    private void ScanIndexerAccess(string content, string originalContent, string filePath, List<KeyReference> references)
+    private void ScanIndexerAccess(string content, string originalContent, string filePath, List<KeyReference> references, List<string>? injected)
     {
         var matches = IndexerPattern.Matches(content);
 
@@ -179,8 +181,9 @@ public class CSharpScanner : PatternMatcher
             var variableName = match.Groups[1].Value;
             var keyName = match.Groups[2].Value;
 
-            // Check if variable name suggests localization
-            if (IsLikelyLocalizerVariable(variableName))
+            // Check if variable name suggests localization, or matches an externally
+            // declared injected localizer name (e.g. from _Imports.razor).
+            if ((injected != null && injected.Contains(variableName)) || IsLikelyLocalizerVariable(variableName))
             {
                 references.Add(new KeyReference
                 {
