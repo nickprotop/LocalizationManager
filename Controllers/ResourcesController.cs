@@ -324,12 +324,10 @@ public class ResourcesController : ControllerBase
             // Add the key to all resource files in this group
             foreach (var resourceFile in resourceFiles)
             {
-                var langCode = resourceFile.Language.Code ?? "default";
-
                 if (request.IsPlural && request.PluralValues != null)
                 {
                     // Add plural key
-                    var pluralForms = request.PluralValues.GetValueOrDefault(langCode)
+                    var pluralForms = ResolveForFile(request.PluralValues, resourceFile.Language)
                         ?? new Dictionary<string, string> { ["other"] = "" };
 
                     resourceFile.Entries.Add(new ResourceEntry
@@ -344,7 +342,7 @@ public class ResourcesController : ControllerBase
                 else
                 {
                     // Add simple key
-                    var value = request.Values?.GetValueOrDefault(langCode) ?? string.Empty;
+                    var value = ResolveForFile(request.Values, resourceFile.Language) ?? string.Empty;
 
                     resourceFile.Entries.Add(new ResourceEntry
                     {
@@ -367,6 +365,27 @@ public class ResourcesController : ControllerBase
         {
             return StatusCode(500, new ErrorResponse { Error = "An error occurred while processing your request" });
         }
+    }
+
+    /// <summary>
+    /// Resolves the per-language value to write into a given file from a
+    /// language-keyed payload. The Add-Key webview sends the default value under
+    /// the "default" key, while explicit cultures are keyed by their code. The
+    /// default file may have a blank code or an explicit DefaultLanguageCode
+    /// (e.g. "it"), so we try, in order: the file's effective display code, its
+    /// raw code, and — for the default file only — the literal "default" key.
+    /// </summary>
+    private static TValue? ResolveForFile<TValue>(
+        Dictionary<string, TValue>? values,
+        Core.Models.LanguageInfo language)
+    {
+        if (values == null) return default;
+
+        if (values.TryGetValue(language.GetDisplayCode(), out var byDisplay)) return byDisplay;
+        if (!string.IsNullOrEmpty(language.Code) && values.TryGetValue(language.Code, out var byCode)) return byCode;
+        if (language.IsDefault && values.TryGetValue("default", out var byDefault)) return byDefault;
+
+        return default;
     }
 
     /// <summary>

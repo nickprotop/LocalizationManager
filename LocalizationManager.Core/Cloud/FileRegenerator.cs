@@ -45,10 +45,21 @@ public class FileRegenerator
 
         // Lookup for existing language files keyed by (BaseName, Code).
         var existingLangFiles = new Dictionary<(string BaseName, string Code), LanguageInfo>();
+        // Directory each resource group lives in, so a NEW language file for that group is
+        // created alongside its siblings (e.g. Resources/Components/Account/Pages/) instead
+        // of at the project root (issue #6: subfolder groups).
+        var groupDirectories = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var lang in existingLanguages)
         {
             var key = (lang.BaseName ?? string.Empty, lang.Code);
             existingLangFiles[key] = lang;
+
+            var bn = lang.BaseName ?? string.Empty;
+            if (!groupDirectories.ContainsKey(bn) && !string.IsNullOrEmpty(lang.FilePath))
+            {
+                var dir = Path.GetDirectoryName(lang.FilePath);
+                if (!string.IsNullOrEmpty(dir)) groupDirectories[bn] = dir;
+            }
         }
 
         // Check if the backend uses explicit language codes for the default language
@@ -93,13 +104,15 @@ public class FileRegenerator
                 }
                 else
                 {
-                    // Create new language file
+                    // Create new language file alongside the group's existing files.
+                    groupDirectories.TryGetValue(baseName, out var groupDir);
                     await CreateNewLanguageFileAsync(
                         baseName,
                         resolvedLang,
                         entries,
                         tempDir,
                         result,
+                        groupDir,
                         cancellationToken);
                 }
             }
@@ -232,10 +245,12 @@ public class FileRegenerator
         List<MergedEntry> entries,
         string tempDir,
         RegenerationResult result,
+        string? groupDirectory,
         CancellationToken cancellationToken)
     {
-        // Determine file path for new language, honoring the resource group's base name.
-        var filePath = GetNewLanguageFilePath(baseName, lang);
+        // Determine file path for new language, honoring the resource group's base name
+        // and the directory the group lives in (so subfolder groups stay in their folder).
+        var filePath = GetNewLanguageFilePath(baseName, lang, groupDirectory);
 
         // Create language info for new file
         var languageInfo = new LanguageInfo
@@ -357,11 +372,15 @@ public class FileRegenerator
     /// and the resource group's base name. Empty <paramref name="baseName"/>
     /// falls back to the historical default naming.
     /// </summary>
-    private string GetNewLanguageFilePath(string baseName, string lang)
+    private string GetNewLanguageFilePath(string baseName, string lang, string? groupDirectory = null)
     {
         // Get path convention from backend
         var backendName = _backend.Name.ToLowerInvariant();
         var isDefaultLang = string.IsNullOrEmpty(lang);
+
+        // Place the new file in the group's own directory when known (preserves subfolder
+        // layout, e.g. Resources/Components/Account/Pages/), else at the project root.
+        var baseDir = string.IsNullOrEmpty(groupDirectory) ? _projectDirectory : groupDirectory;
 
         // For backends where the file name embeds the base name (resx, json,
         // xliff), use the base name as the file root; otherwise fall back to
@@ -374,29 +393,29 @@ public class FileRegenerator
         return backendName switch
         {
             "resx" => isDefaultLang
-                ? Path.Combine(_projectDirectory, $"{resxRoot}.resx")
-                : Path.Combine(_projectDirectory, $"{resxRoot}.{lang}.resx"),
+                ? Path.Combine(baseDir, $"{resxRoot}.resx")
+                : Path.Combine(baseDir, $"{resxRoot}.{lang}.resx"),
             "json" or "jsonlocalization" => isDefaultLang
-                ? Path.Combine(_projectDirectory, $"{jsonRoot}.json")
-                : Path.Combine(_projectDirectory, $"{jsonRoot}.{lang}.json"),
+                ? Path.Combine(baseDir, $"{jsonRoot}.json")
+                : Path.Combine(baseDir, $"{jsonRoot}.{lang}.json"),
             "android" => isDefaultLang
-                ? Path.Combine(_projectDirectory, "values", "strings.xml")
-                : Path.Combine(_projectDirectory, $"values-{lang}", "strings.xml"),
+                ? Path.Combine(baseDir, "values", "strings.xml")
+                : Path.Combine(baseDir, $"values-{lang}", "strings.xml"),
             "ios" or "strings" => isDefaultLang
-                ? Path.Combine(_projectDirectory, "en.lproj", "Localizable.strings")
-                : Path.Combine(_projectDirectory, $"{lang}.lproj", "Localizable.strings"),
+                ? Path.Combine(baseDir, "en.lproj", "Localizable.strings")
+                : Path.Combine(baseDir, $"{lang}.lproj", "Localizable.strings"),
             "i18next" => isDefaultLang
-                ? Path.Combine(_projectDirectory, "en.json")
-                : Path.Combine(_projectDirectory, $"{lang}.json"),
+                ? Path.Combine(baseDir, "en.json")
+                : Path.Combine(baseDir, $"{lang}.json"),
             "xliff" => isDefaultLang
-                ? Path.Combine(_projectDirectory, $"{xlfRoot}.xlf")
-                : Path.Combine(_projectDirectory, $"{xlfRoot}.{lang}.xlf"),
+                ? Path.Combine(baseDir, $"{xlfRoot}.xlf")
+                : Path.Combine(baseDir, $"{xlfRoot}.{lang}.xlf"),
             "po" or "gettext" => isDefaultLang
-                ? Path.Combine(_projectDirectory, $"{poRoot}.pot")
-                : Path.Combine(_projectDirectory, $"{lang}.po"),
+                ? Path.Combine(baseDir, $"{poRoot}.pot")
+                : Path.Combine(baseDir, $"{lang}.po"),
             _ => isDefaultLang
-                ? Path.Combine(_projectDirectory, $"strings.{backendName}")
-                : Path.Combine(_projectDirectory, $"strings.{lang}.{backendName}")
+                ? Path.Combine(baseDir, $"strings.{backendName}")
+                : Path.Combine(baseDir, $"strings.{lang}.{backendName}")
         };
     }
 

@@ -213,53 +213,52 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
      * Shows above resource key references:
      * - Key value (e.g., "Welcome to our app")
      * - Missing languages warning (e.g., "Missing: el, de")
+     * - Key not found warning
+     *
+     * Key discovery is delegated to the backend scanner (`scanFile`) rather than
+     * client-side regex. This is deliberate: the backend ignores `namespace` /
+     * `using` declarations (so a nested namespace like `Vitrum.Resources.Components`
+     * no longer produces a phantom `Components` key — issue #6 Bug 2), and it honors
+     * configured `localizationMethods` plus auto-detected `@inject IStringLocalizer<T>`
+     * variables (so value hints appear for `Q["..."]`, `Loc["..."]`, etc., not only
+     * `L` — issue #6 Feature). The CodeLens and the diagnostics now share one source
+     * of truth.
      */
     private async provideCodeFileCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken): Promise<vscode.CodeLens[]> {
         const lenses: vscode.CodeLens[] = [];
-        const text = document.getText();
         const config = vscode.workspace.getConfiguration('lrm');
 
-        console.log(`LRM CodeLens: provideCodeFileCodeLenses for ${document.fileName}, text length: ${text.length}`);
+        console.log(`LRM CodeLens: provideCodeFileCodeLenses for ${document.fileName}`);
 
-        // Patterns to find resource key usage
-        const patterns = [
-            // Resources.KeyName
-            /\bResources\.([A-Za-z_][A-Za-z0-9_]*)\b/g,
-            // Resources["KeyName"]
-            /\bResources\["([^"]+)"\]/g,
-            // Resources['KeyName']
-            /\bResources\['([^']+)'\]/g,
-            // GetString("KeyName")
-            /\bGetString\("([^"]+)"\)/g,
-            // XAML: {x:Static res:Resources.KeyName}
-            /\{x:Static\s+[^:]+:Resources\.([A-Za-z_][A-Za-z0-9_]*)\}/g,
-            // @Resources.KeyName (Razor)
-            /@Resources\.([A-Za-z_][A-Za-z0-9_]*)\b/g,
-            // SharedResource.KeyName (common pattern)
-            /\bSharedResource\.([A-Za-z_][A-Za-z0-9_]*)\b/g,
-            // Localizer["KeyName"] (IStringLocalizer)
-            /\bLocalizer\["([^"]+)"\]/g,
-            // L["KeyName"] (short localizer)
-            /\bL\["([^"]+)"\]/g
-        ];
+        // Ask the backend what keys this file references (and which are missing).
+        let scan;
+        try {
+            scan = await this.cacheService.scanFile(document.uri.fsPath, document.getText());
+        } catch (error) {
+            console.log('LRM CodeLens: scanFile error:', error);
+            return [];
+        }
 
-        // Track processed keys to avoid duplicate lenses on the same line
+        if (token.isCancellationRequested) {
+            return [];
+        }
+
+        const missingSet = new Set(scan.missing || []);
+
+        // Track processed (line, key) pairs to avoid duplicate lenses on the same line.
         const processedLines = new Map<number, Set<string>>();
 
-        for (const pattern of patterns) {
-            let match;
-            pattern.lastIndex = 0; // Reset regex state
+        for (const usage of scan.references || []) {
+            if (token.isCancellationRequested) {
+                break;
+            }
 
-            while ((match = pattern.exec(text)) !== null) {
-                if (token.isCancellationRequested) {
-                    break;
-                }
+            const keyName = usage.key;
 
-                const keyName = match[1];
-                const startPos = document.positionAt(match.index);
-                const lineNumber = startPos.line;
+            for (const reference of usage.references || []) {
+                // Backend reports 1-based line numbers; CodeLens positions are 0-based.
+                const lineNumber = Math.max(0, (reference.line ?? 1) - 1);
 
-                // Skip if we already processed this key on this line
                 if (!processedLines.has(lineNumber)) {
                     processedLines.set(lineNumber, new Set());
                 }
@@ -268,7 +267,18 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
                 }
                 processedLines.get(lineNumber)!.add(keyName);
 
+                const startPos = new vscode.Position(lineNumber, 0);
                 const range = new vscode.Range(startPos, startPos);
+
+                if (missingSet.has(keyName)) {
+                    // Key referenced but not defined in resources.
+                    lenses.push(new vscode.CodeLens(range, {
+                        title: `$(error) Key not found: ${keyName}`,
+                        command: 'lrm.addKeyWithValueQuickFix',
+                        arguments: [keyName]
+                    }));
+                    continue;
+                }
 
                 try {
                     const details = await this.cacheService.getKeyDetails(keyName);
@@ -310,7 +320,8 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
                         }
                     }
                 } catch (error) {
-                    // Key might not exist - show warning
+                    // Details lookup failed even though the key wasn't reported missing;
+                    // surface it as not-found so the user still gets a quick fix.
                     lenses.push(new vscode.CodeLens(range, {
                         title: `$(error) Key not found: ${keyName}`,
                         command: 'lrm.addKeyWithValueQuickFix',

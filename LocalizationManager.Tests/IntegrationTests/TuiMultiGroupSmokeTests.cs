@@ -161,6 +161,47 @@ public class TuiMultiGroupSmokeTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// BUG (issue #6, write side): adding a key in a group where the default file and an
+    /// explicit culture file share the effective code "it" must route the value to the
+    /// DEFAULT file (the merge winner), not to whichever same-code file is enumerated
+    /// first. Pins the AddNewKey routing helper directly.
+    /// </summary>
+    [Fact]
+    public void TargetFileForColumn_DefaultAndCultureShareCode_ResolvesToDefaultFile()
+    {
+        WriteResx("Res.resx", ("Hi", "Ciao"));
+        WriteResx("Res.it.resx", ("Hi", "CiaoCulture"));
+
+        var groupFiles = DiscoverAndRead();
+        var columns = MergedLanguageColumns.Build(groupFiles.Select(f => f.Language));
+
+        // The dialog column code for the merged default column is the raw file code "it".
+        var target = InvokeTargetFileForColumn(groupFiles, columns, "it");
+
+        Assert.NotNull(target);
+        Assert.True(target!.Language.IsDefault, "value must route to the default file");
+        Assert.EndsWith("Res.resx", target.Language.FilePath);
+        Assert.DoesNotContain(".it.resx", target.Language.FilePath);
+    }
+
+    [Fact]
+    public void TargetFileForColumn_BlankColumnCode_ResolvesToDefaultFile()
+    {
+        // No DefaultLanguageCode configured: default file code is "" → column code "".
+        var discovery = new ResxResourceDiscovery();
+        WriteResx("Res.resx", ("Hi", "Hi"));
+        WriteResx("Res.it.resx", ("Hi", "Ciao"));
+        var groupFiles = discovery.DiscoverLanguages(_tempDir).Select(l => _reader.Read(l)).ToList();
+        var columns = MergedLanguageColumns.Build(groupFiles.Select(f => f.Language));
+
+        var target = InvokeTargetFileForColumn(groupFiles, columns, "");
+
+        Assert.NotNull(target);
+        Assert.True(target!.Language.IsDefault);
+        Assert.EndsWith("Res.resx", target.Language.FilePath);
+    }
+
     private static ResourceEntry? InvokeGetEntryForCell(
         ResourceEditorWindow window, string baseName, string key, int occurrenceNumber, string code)
     {
@@ -169,5 +210,15 @@ public class TuiMultiGroupSmokeTests : IDisposable
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         Assert.NotNull(method);
         return (ResourceEntry?)method!.Invoke(window, new object[] { baseName, key, occurrenceNumber, code });
+    }
+
+    private static ResourceFile? InvokeTargetFileForColumn(
+        List<ResourceFile> groupFiles, IReadOnlyList<LanguageColumn> columns, string columnCode)
+    {
+        var method = typeof(ResourceEditorWindow).GetMethod(
+            "TargetFileForColumn",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+        return (ResourceFile?)method!.Invoke(null, new object[] { groupFiles, columns, columnCode });
     }
 }

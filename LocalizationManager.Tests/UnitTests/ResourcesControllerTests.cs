@@ -268,6 +268,90 @@ public class ResourcesControllerTests : IDisposable
     }
 
     [Fact]
+    public void AddKey_DefaultValue_WritesToDefaultFile_WhenDefaultCodeBlank()
+    {
+        // Regression for issue #6: the Add-Key webview sends the entered value under
+        // the "default" key. The default file's Code is "" (no DefaultLanguageCode
+        // configured) so a naive `Code ?? "default"` lookup misses and the value is lost.
+        var request = new AddKeyRequest
+        {
+            Key = "Greeting",
+            Values = new Dictionary<string, string> { { "default", "Hello" } }
+        };
+
+        var result = _controller.AddKey(request);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<OperationResponse>(okResult.Value);
+        Assert.True(response.Success);
+
+        var defaultLang = _backend.Discovery.DiscoverLanguages(_testDirectory).First(l => l.IsDefault);
+        var entry = _backend.Reader.Read(defaultLang).Entries.FirstOrDefault(e => e.Key == "Greeting");
+        Assert.NotNull(entry);
+        Assert.Equal("Hello", entry.Value);
+    }
+
+    [Fact]
+    public void AddKey_DefaultValue_WritesToDefaultFile_WhenDefaultCodeConfigured()
+    {
+        // Regression for issue #6: with DefaultLanguageCode = "it" the default file's
+        // Code becomes "it", so the "default"-keyed value from the webview must still
+        // land in the suffix-less default file.
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                { "ResourcePath", _testDirectory },
+                { "DefaultLanguageCode", "it" }
+            })
+            .Build();
+        var backend = new ResxResourceBackend("it");
+        var controller = new ResourcesController(configuration, backend);
+
+        var request = new AddKeyRequest
+        {
+            Key = "Greeting",
+            Values = new Dictionary<string, string> { { "default", "Ciao" } }
+        };
+
+        var result = controller.AddKey(request);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.True(Assert.IsType<OperationResponse>(okResult.Value).Success);
+
+        // The suffix-less default file (TestResource.resx) must contain the value.
+        var defaultFilePath = Path.Combine(_testDirectory, "TestResource.resx");
+        var defaultLang = backend.Discovery.DiscoverLanguages(_testDirectory)
+            .First(l => l.FilePath == defaultFilePath);
+        var entry = backend.Reader.Read(defaultLang).Entries.FirstOrDefault(e => e.Key == "Greeting");
+        Assert.NotNull(entry);
+        Assert.Equal("Ciao", entry.Value);
+    }
+
+    [Fact]
+    public void AddKey_PerLanguageValue_WritesToCultureFile()
+    {
+        // The default value goes to the default file; an explicit culture value
+        // (keyed by its code) goes to that culture file.
+        var request = new AddKeyRequest
+        {
+            Key = "Greeting",
+            Values = new Dictionary<string, string> { { "default", "Hello" }, { "el", "Γεια" } }
+        };
+
+        var result = _controller.AddKey(request);
+        Assert.IsType<OkObjectResult>(result.Result);
+
+        var languages = _backend.Discovery.DiscoverLanguages(_testDirectory);
+        var defaultEntry = _backend.Reader.Read(languages.First(l => l.IsDefault))
+            .Entries.FirstOrDefault(e => e.Key == "Greeting");
+        var greekEntry = _backend.Reader.Read(languages.First(l => l.Code == "el"))
+            .Entries.FirstOrDefault(e => e.Key == "Greeting");
+
+        Assert.Equal("Hello", defaultEntry?.Value);
+        Assert.Equal("Γεια", greekEntry?.Value);
+    }
+
+    [Fact]
     public void UpdateKey_PartialLanguageUpdate_OnlyUpdatesProvidedLanguages()
     {
         // Arrange - Only update Greek, leave default unchanged

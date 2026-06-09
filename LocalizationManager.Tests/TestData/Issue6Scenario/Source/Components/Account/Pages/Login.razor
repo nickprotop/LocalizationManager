@@ -1,0 +1,16 @@
+@page "/account/login"
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<CustomerResources> Q
+@inject IStringLocalizer<GlassResources> G
+
+@* Issue #6 Feature: injected localizer variables (Q, G) declared per-file, plus
+   Loc declared folder-wide in _Imports.razor, must all be recognized as localizers. *@
+
+<h1>@Q["Customer_BusinessName_Label"]</h1>
+<label>@Q["Customer_Email_Label"]</label>
+<span>@G["Glass_Thickness_Label"]</span>
+<button>@Loc["Shared_Save_Button"]</button>
+<button>@Loc["Shared_Cancel_Button"]</button>
+
+@* A genuinely missing key — SHOULD be flagged. *@
+<p>@Q["Customer_DoesNotExist_Label"]</p>

@@ -60,6 +60,14 @@ class Disposable {
     }
 }
 
+// CodeLens class
+class CodeLens {
+    constructor(range, command) {
+        this.range = range;
+        this.command = command;
+    }
+}
+
 // EventEmitter class
 class EventEmitter {
     constructor() {
@@ -93,13 +101,16 @@ const mockVscode = {
     },
     Position,
     Range,
+    CodeLens,
     TextDocument: {},
     workspace: {
         fs: {
             readFile: async () => { throw new Error('Mock readFile - stub in test'); }
         },
         getConfiguration: () => ({
-            get: () => undefined,
+            // Return the caller-provided default so feature flags like
+            // 'codeLens.showValue' default to enabled in unit tests.
+            get: (_key, defaultValue) => defaultValue,
             has: () => false,
             inspect: () => undefined,
             update: async () => {}

@@ -1,4 +1,4 @@
-import { ApiClient, ScanResult, ResourceKeyDetails, ValidationResult, KeyUsage, ResourceKey } from './apiClient';
+import { ApiClient, ScanResult, ScanFileResponse, ResourceKeyDetails, ValidationResult, KeyUsage, ResourceKey } from './apiClient';
 
 /**
  * Resource format type
@@ -58,6 +58,19 @@ export class CacheService {
         }
 
         return this.scanResultsCache;
+    }
+
+    /**
+     * Scan a single file via the backend and return the authoritative references.
+     *
+     * CodeLens for code files uses this instead of client-side regex so it inherits
+     * the backend scanner's logic: namespace/using lines are ignored (no phantom
+     * keys), and configured `localizationMethods` plus auto-detected
+     * `@inject IStringLocalizer<T>` variables are honored. Not cached — the file
+     * content changes as the user types.
+     */
+    async scanFile(filePath: string, content?: string): Promise<ScanFileResponse> {
+        return this.apiClient.scanFile({ filePath, content });
     }
 
     /**

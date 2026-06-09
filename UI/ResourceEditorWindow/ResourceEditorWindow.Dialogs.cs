@@ -850,10 +850,14 @@ public partial class ResourceEditorWindow : Window
             }
             else
             {
-                // Add simple entries to every file in the target group
+                // Add simple entries to the file each column maps to. A column's value
+                // must go to the merge WINNER (default file wins a default-vs-culture
+                // collision), not to whichever same-code file happens to come first —
+                // mirrors the read path in GetEntryForCell. (issue #6)
+                var addColumns = MergedLanguageColumns.Build(targetFiles.Select(f => f.Language));
                 foreach (var kvp in simpleValueFields)
                 {
-                    var rf = targetFiles.FirstOrDefault(r => r.Language.Code == kvp.Key);
+                    var rf = TargetFileForColumn(targetFiles, addColumns, kvp.Key);
                     if (rf != null)
                     {
                         var comment = simpleCommentFields.ContainsKey(kvp.Key)
@@ -903,6 +907,34 @@ public partial class ResourceEditorWindow : Window
         dialog.Add(btnAdd, btnCancel);
         Application.Run(dialog);
         dialog.Dispose();
+    }
+
+    /// <summary>
+    /// Resolves the file a new key's value should be written to for a given dialog
+    /// column code. The column code comes from GetLanguageColumns (raw file Code, "" for
+    /// the suffix-less default); MergedLanguageColumns keys by effective code ("default"
+    /// when blank). The merge winner is returned so a default-vs-culture collision writes
+    /// to the default file. Falls back to a raw Code match if no column resolves.
+    /// </summary>
+    private static ResourceFile? TargetFileForColumn(
+        List<ResourceFile> groupFiles,
+        IReadOnlyList<LanguageColumn> columns,
+        string columnCode)
+    {
+        var effectiveCode = string.IsNullOrEmpty(columnCode) ? "default" : columnCode;
+        var column = columns.FirstOrDefault(c =>
+            string.Equals(c.Code, columnCode, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(c.Code, effectiveCode, StringComparison.OrdinalIgnoreCase));
+
+        if (column != null)
+        {
+            var winner = groupFiles.FirstOrDefault(f =>
+                (f.Language.FilePath ?? string.Empty) == column.WinningFilePath);
+            if (winner != null) return winner;
+        }
+
+        return groupFiles.FirstOrDefault(f =>
+            string.Equals(f.Language.Code, columnCode, StringComparison.OrdinalIgnoreCase));
     }
 
     private void DeleteSelectedKey()

@@ -836,13 +836,16 @@ export class ResourceEditorPanel {
                     <label for="newKeyName">Key Name:</label>
                     <input type="text" id="newKeyName" placeholder="MyNewKey">
                 </div>
-                <div class="form-group">
-                    <label for="newKeyValue">Default Value:</label>
-                    <input type="text" id="newKeyValue" placeholder="Default text">
-                </div>
                 <div class="form-group" id="newKeyGroupRow" style="display:none;">
                     <label for="newKeyGroup">Resource Group:</label>
                     <select id="newKeyGroup"></select>
+                </div>
+                <!-- Per-language value inputs are injected here by addNewKey(). The
+                     default language is rendered first and flagged so the user sees
+                     exactly which language each value applies to. -->
+                <div id="newKeyValues"></div>
+                <div id="newKeyDefaultWarning" class="form-group" style="display:none; color: var(--vscode-editorWarning-foreground); font-size: 12px;">
+                    ⚠ The default language value is empty.
                 </div>
             </div>
             <div class="modal-footer">
@@ -1327,6 +1330,32 @@ export class ResourceEditorPanel {
             }
         }
 
+        // Escapes a string for safe interpolation into an HTML attribute.
+        function escapeAttr(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // The value-key used for the default language. Server maps this to the
+        // suffix-less default file regardless of the configured DefaultLanguageCode.
+        const DEFAULT_LANG_KEY = 'default';
+
+        // The languages offered in the Add-Key dialog, default first. Mirrors the
+        // grid columns; falls back to a single default column when none are loaded.
+        function addKeyLanguages() {
+            const langs = (Array.isArray(languages) ? languages : []).slice();
+            langs.sort((a, b) => (a.isDefault === b.isDefault) ? 0 : (a.isDefault ? -1 : 1));
+            if (langs.length === 0) { return [{ code: '', isDefault: true }]; }
+            return langs;
+        }
+
+        // The value-key for a language: 'default' for the default language so the
+        // server can route it to the suffix-less file; the code otherwise.
+        function addKeyValueKey(lang) {
+            return lang.isDefault ? DEFAULT_LANG_KEY : lang.code;
+        }
+
         function addNewKey() {
             // Populate the resource-group selector from the loaded resources.
             // Multi-group projects require a resourceGroup on the add-key request.
@@ -1337,13 +1366,29 @@ export class ResourceEditorPanel {
             );
             if (distinctGroups.length > 1) {
                 groupSel.innerHTML = distinctGroups
-                    .map(g => '<option value="' + g + '">' + g + '</option>')
+                    .map(g => '<option value="' + escapeAttr(g) + '">' + escapeAttr(g) + '</option>')
                     .join('');
                 groupRow.style.display = '';
             } else {
                 groupSel.innerHTML = '';
                 groupRow.style.display = 'none';
             }
+
+            // Build one value input per language so it is explicit which language
+            // each value applies to (issue #6: "no language selector").
+            const valuesContainer = document.getElementById('newKeyValues');
+            valuesContainer.innerHTML = addKeyLanguages().map(lang => {
+                const vkey = addKeyValueKey(lang);
+                const label = (lang.code || DEFAULT_LANG_KEY) + (lang.isDefault ? ' (Default)' : '');
+                return '<div class="form-group">' +
+                    '<label for="newKeyValue-' + escapeAttr(vkey) + '">' + escapeAttr(label) + ':</label>' +
+                    '<input type="text" id="newKeyValue-' + escapeAttr(vkey) + '"' +
+                    ' data-vkey="' + escapeAttr(vkey) + '"' +
+                    (lang.isDefault ? ' data-default="1" oninput="updateAddKeyDefaultWarning()"' : '') +
+                    ' placeholder="' + escapeAttr(lang.isDefault ? 'Default text' : 'Translation (optional)') + '">' +
+                    '</div>';
+            }).join('');
+            document.getElementById('newKeyDefaultWarning').style.display = 'none';
 
             document.getElementById('addKeyModal').style.display = 'block';
             document.getElementById('newKeyName').focus();
@@ -1352,9 +1397,32 @@ export class ResourceEditorPanel {
         function closeAddKeyModal() {
             document.getElementById('addKeyModal').style.display = 'none';
             document.getElementById('newKeyName').value = '';
-            document.getElementById('newKeyValue').value = '';
+            document.getElementById('newKeyValues').innerHTML = '';
+            document.getElementById('newKeyDefaultWarning').style.display = 'none';
             document.getElementById('newKeyGroupRow').style.display = 'none';
             document.getElementById('newKeyGroup').innerHTML = '';
+        }
+
+        // Collects the per-language values from the dialog inputs.
+        function collectAddKeyValues() {
+            const values = {};
+            document.querySelectorAll('#newKeyValues input[data-vkey]').forEach(inp => {
+                values[inp.dataset.vkey] = inp.value || '';
+            });
+            if (!(DEFAULT_LANG_KEY in values)) { values[DEFAULT_LANG_KEY] = ''; }
+            return values;
+        }
+
+        // Mirror of isDefaultValueEmpty() in views/addKeyMessage.ts.
+        function isAddKeyDefaultEmpty(values) {
+            const v = values[DEFAULT_LANG_KEY];
+            return v === undefined || v === null || v.trim() === '';
+        }
+
+        // Live-updates the empty-default warning as the user types.
+        function updateAddKeyDefaultWarning() {
+            const warn = document.getElementById('newKeyDefaultWarning');
+            warn.style.display = isAddKeyDefaultEmpty(collectAddKeyValues()) ? '' : 'none';
         }
 
         // NOTE: mirror of buildAddKeyMessage() in views/addKeyMessage.ts.
@@ -1362,7 +1430,6 @@ export class ResourceEditorPanel {
         // guards the canonical builder. Keep these two in sync.
         function submitNewKey() {
             const keyName = document.getElementById('newKeyName').value;
-            const keyValue = document.getElementById('newKeyValue').value;
             const groupRow = document.getElementById('newKeyGroupRow');
             const groupSel = document.getElementById('newKeyGroup');
             const multiGroup = groupRow.style.display !== 'none';
@@ -1372,7 +1439,20 @@ export class ResourceEditorPanel {
             if (!key) { setStatus('Key name is required', 3000); return; }
             if (multiGroup && !resourceGroup) { setStatus('Select a resource group', 3000); return; }
 
-            const msg = { command: 'addKey', key: key, values: { default: keyValue || '' } };
+            const values = collectAddKeyValues();
+
+            // Warn (but do not block) when the default value is empty — same signal
+            // the grid shows for empty culture values (issue #6).
+            if (isAddKeyDefaultEmpty(values)) {
+                const warn = document.getElementById('newKeyDefaultWarning');
+                if (warn.style.display === 'none') {
+                    warn.style.display = '';
+                    setStatus('Default value is empty — click Add again to confirm', 4000);
+                    return;
+                }
+            }
+
+            const msg = { command: 'addKey', key: key, values: values };
             if (resourceGroup) { msg.resourceGroup = resourceGroup; }
             vscode.postMessage(msg);
             closeAddKeyModal();

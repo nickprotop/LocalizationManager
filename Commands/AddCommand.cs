@@ -164,17 +164,10 @@ public class AddCommand : Command<AddCommandSettings>
                 var code = parts[0].Trim();
                 var value = parts[1];
 
-                // Normalize "default" alias to empty string
-                if (code.Equals("default", StringComparison.OrdinalIgnoreCase))
-                {
-                    code = "";
-                }
-
-                // Validate language code exists
-                var matchingLang = languages.FirstOrDefault(l => l.Code.Equals(code, StringComparison.OrdinalIgnoreCase));
+                var matchingLang = ResolveLanguageForCode(languages, code);
                 if (matchingLang == null)
                 {
-                    var availableCodes = string.Join(", ", languages.Select(l => l.Code));
+                    var availableCodes = string.Join(", ", languages.Select(l => string.IsNullOrEmpty(l.Code) ? "default" : l.Code));
                     AnsiConsole.MarkupLine($"[red]✗ Unknown language code: '{code}'[/]");
                     AnsiConsole.MarkupLine($"[yellow]Available languages: {availableCodes}[/]");
                     return 1;
@@ -233,6 +226,22 @@ public class AddCommand : Command<AddCommandSettings>
                 Comment = settings.Comment
             };
         });
+    }
+
+    /// <summary>
+    /// Resolves a <c>--lang code:value</c> code to a discovered language. The "default"
+    /// alias maps to the default file regardless of its actual code: that code may be
+    /// blank, or a configured DefaultLanguageCode such as "it", so resolving by IsDefault
+    /// (rather than assuming "") keeps <c>--lang default:value</c> working in both cases
+    /// (issue #6). Returns null when no language matches.
+    /// </summary>
+    internal static LanguageInfo? ResolveLanguageForCode(List<LanguageInfo> languages, string code)
+    {
+        if (code.Equals("default", StringComparison.OrdinalIgnoreCase))
+        {
+            return languages.FirstOrDefault(l => l.IsDefault);
+        }
+        return languages.FirstOrDefault(l => l.Code.Equals(code, StringComparison.OrdinalIgnoreCase));
     }
 
     private int ExecutePluralAdd(AddCommandSettings settings, List<LanguageInfo> languages, List<ResourceFile> resourceFiles, string resourcePath)
