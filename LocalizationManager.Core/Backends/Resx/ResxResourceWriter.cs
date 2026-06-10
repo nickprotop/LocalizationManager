@@ -80,11 +80,18 @@ public class ResxResourceWriter : IResourceWriter
                 WriteWithUniqueKeys(root, file.Entries);
             }
 
-            // Save with proper formatting using atomic write to prevent file corruption
+            // Save with proper formatting using atomic write to prevent file corruption.
+            // We re-indent the whole document on save (via NormalizeWhitespace) so newly
+            // added <data> elements get the same multi-line layout as existing/hand-edited
+            // entries instead of being collapsed onto a single line (issue #6). The
+            // standard .resx layout is 2-space indentation, which is idempotent for
+            // already-formatted files.
+            NormalizeWhitespace(xdoc.Root!);
+
             var tempPath = file.Language.FilePath + $".tmp.{Guid.NewGuid()}";
             try
             {
-                xdoc.Save(tempPath);
+                SaveIndented(xdoc, tempPath);
                 File.Move(tempPath, file.Language.FilePath, overwrite: true);
             }
             finally
@@ -196,7 +203,24 @@ public class ResxResourceWriter : IResourceWriter
             root.Add(CreateDataElement(entry));
         }
 
-        return xdoc.Declaration + Environment.NewLine + xdoc.ToString();
+        // Re-indent so new entries are multi-line (issue #6), consistent with Write().
+        NormalizeWhitespace(root);
+
+        var settings = new XmlWriterSettings
+        {
+            Indent = true,
+            IndentChars = "  ",
+            NewLineChars = "\n",
+            OmitXmlDeclaration = false
+        };
+        // Use a UTF-8-reporting writer so the emitted declaration keeps encoding="utf-8"
+        // (a plain StringWriter would force encoding="utf-16"), matching the on-disk file.
+        using var sw = new Utf8StringWriter();
+        using (var writer = XmlWriter.Create(sw, settings))
+        {
+            xdoc.Save(writer);
+        }
+        return sw.ToString();
     }
 
     /// <summary>
@@ -331,6 +355,53 @@ public class ResxResourceWriter : IResourceWriter
     }
 
     /// <summary>
+    /// Removes whitespace-only text nodes that sit between elements so the document can
+    /// be cleanly re-indented on save. Without this, existing files keep their original
+    /// whitespace text nodes while newly-added elements have none, producing a mix of
+    /// multi-line and single-line entries (issue #6). Text content inside a leaf element
+    /// (e.g. the actual value text) is left untouched.
+    /// </summary>
+    private static void NormalizeWhitespace(XElement element)
+    {
+        // Only strip inter-element whitespace from container elements (those that have
+        // child elements). Leaf elements like <value> hold the real text and are left as-is.
+        if (element.HasElements)
+        {
+            foreach (var text in element.Nodes().OfType<XText>().ToList())
+            {
+                if (string.IsNullOrWhiteSpace(text.Value))
+                {
+                    text.Remove();
+                }
+            }
+
+            foreach (var child in element.Elements())
+            {
+                NormalizeWhitespace(child);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Saves the document with consistent 2-space indentation, preserving the
+    /// declaration. Mirrors the layout produced by the standard .resx writer.
+    /// </summary>
+    private static void SaveIndented(XDocument xdoc, string path)
+    {
+        var settings = new XmlWriterSettings
+        {
+            Indent = true,
+            IndentChars = "  ",
+            Encoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            NewLineChars = "\n",
+            OmitXmlDeclaration = false
+        };
+
+        using var writer = XmlWriter.Create(path, settings);
+        xdoc.Save(writer);
+    }
+
+    /// <summary>
     /// Creates a new data element for an entry.
     /// </summary>
     private static XElement CreateDataElement(ResourceEntry entry)
@@ -387,5 +458,14 @@ public class ResxResourceWriter : IResourceWriter
             culture = null;
             return false;
         }
+    }
+
+    /// <summary>
+    /// StringWriter that reports UTF-8 as its encoding so XmlWriter emits
+    /// <c>encoding="utf-8"</c> in the declaration instead of the default utf-16.
+    /// </summary>
+    private sealed class Utf8StringWriter : StringWriter
+    {
+        public override System.Text.Encoding Encoding => System.Text.Encoding.UTF8;
     }
 }

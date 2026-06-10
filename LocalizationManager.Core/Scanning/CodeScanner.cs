@@ -51,6 +51,7 @@ public class CodeScanner
 
         // Get all keys from resource files
         var resourceKeys = GetAllResourceKeys(resourceFiles);
+        var keysByGroup = GetKeysByGroup(resourceFiles);
 
         // Discover source files
         var allExtensions = _scanners.SelectMany(s => s.SupportedExtensions).Distinct();
@@ -87,7 +88,7 @@ public class CodeScanner
                 Key = key,
                 ReferenceCount = references.Count,
                 References = references,
-                ExistsInResources = resourceKeys.Contains(key),
+                ExistsInResources = KeyExists(references, key, resourceKeys, keysByGroup),
                 DefinedInLanguages = GetLanguagesForKey(resourceFiles, key)
             };
 
@@ -158,6 +159,7 @@ public class CodeScanner
 
         // Get all keys from resource files
         var resourceKeys = GetAllResourceKeys(resourceFiles);
+        var keysByGroup = GetKeysByGroup(resourceFiles);
 
         // Detect file type and get appropriate scanner
         var extension = Path.GetExtension(filePath);
@@ -200,7 +202,7 @@ public class CodeScanner
                     Key = key,
                     ReferenceCount = references.Count,
                     References = references,
-                    ExistsInResources = resourceKeys.Contains(key),
+                    ExistsInResources = KeyExists(references, key, resourceKeys, keysByGroup),
                     DefinedInLanguages = GetLanguagesForKey(resourceFiles, key)
                 };
 
@@ -276,6 +278,7 @@ public class CodeScanner
 
         // Get all keys from resource files
         var resourceKeys = GetAllResourceKeys(resourceFiles);
+        var keysByGroup = GetKeysByGroup(resourceFiles);
 
         // Detect file type and get appropriate scanner
         var extension = Path.GetExtension(filePath);
@@ -317,7 +320,7 @@ public class CodeScanner
                     Key = key,
                     ReferenceCount = references.Count,
                     References = references,
-                    ExistsInResources = resourceKeys.Contains(key),
+                    ExistsInResources = KeyExists(references, key, resourceKeys, keysByGroup),
                     DefinedInLanguages = GetLanguagesForKey(resourceFiles, key)
                 };
 
@@ -521,6 +524,81 @@ public class CodeScanner
         return new HashSet<string>(
             defaultFiles.SelectMany(f => f.Entries.Select(e => e.Key)),
             StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Builds a map of resource-group BaseName -> set of keys defined in that group's
+    /// default file(s). Used to resolve Data Annotation references that name a specific
+    /// <c>ResourceType</c> against the correct group rather than the global union.
+    /// </summary>
+    private static Dictionary<string, HashSet<string>> GetKeysByGroup(List<ResourceFile> resourceFiles)
+    {
+        var map = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        var defaultFiles = resourceFiles.Where(f => f.Language.IsDefault).ToList();
+        if (defaultFiles.Count == 0)
+            defaultFiles = resourceFiles;
+
+        foreach (var file in defaultFiles)
+        {
+            var baseName = file.Language.BaseName;
+            if (string.IsNullOrEmpty(baseName))
+                continue;
+
+            if (!map.TryGetValue(baseName, out var set))
+            {
+                set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                map[baseName] = set;
+            }
+
+            foreach (var entry in file.Entries)
+                set.Add(entry.Key);
+        }
+
+        return map;
+    }
+
+    /// <summary>
+    /// Decides whether a key group exists in resources. References that name a
+    /// specific <c>ResourceType</c> (Data Annotations) must be resolved against that
+    /// group; untyped references fall back to the global union (<paramref name="allKeys"/>).
+    /// </summary>
+    private static bool KeyExists(
+        IReadOnlyList<KeyReference> references,
+        string key,
+        HashSet<string> allKeys,
+        Dictionary<string, HashSet<string>> keysByGroup)
+    {
+        // A key can be referenced both ways at once (e.g. `Resources.K` AND a
+        // `[Display(..., ResourceType = typeof(R))]`). The key exists if ANY of its
+        // references can resolve it:
+        //  - an untyped reference resolves against the global union;
+        //  - a typed reference resolves against its own group (or the union if that
+        //    group's resx is unknown, to avoid spurious "missing" noise).
+        var hasUntyped = references.Any(r => string.IsNullOrEmpty(r.ResourceTypeClassName));
+        if (hasUntyped && allKeys.Contains(key))
+        {
+            return true;
+        }
+
+        foreach (var boundType in references
+                     .Select(r => r.ResourceTypeClassName)
+                     .Where(t => !string.IsNullOrEmpty(t))
+                     .Distinct())
+        {
+            var existsInBoundGroup = keysByGroup.TryGetValue(boundType!, out var groupKeys)
+                ? groupKeys.Contains(key)
+                : allKeys.Contains(key);
+            if (existsInBoundGroup)
+            {
+                return true;
+            }
+        }
+
+        // No reference could resolve the key. If there were only untyped references we
+        // already returned false above via the allKeys check; this also covers the
+        // all-typed case where none of the bound groups contain the key.
+        return false;
     }
 
     private List<string> GetLanguagesForKey(List<ResourceFile> resourceFiles, string key)

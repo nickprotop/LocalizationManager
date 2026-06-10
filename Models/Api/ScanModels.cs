@@ -32,6 +32,12 @@ public class CodeReference
     public int Line { get; set; }
     public string Pattern { get; set; } = string.Empty;
     public string Confidence { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Resource class named by a Data Annotation attribute's ResourceType (simple
+    /// class name, e.g. "GlassResources"), or null for ordinary references.
+    /// </summary>
+    public string? ResourceTypeClassName { get; set; }
 }
 
 public class UnusedKeysResponse

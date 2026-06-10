@@ -4,7 +4,7 @@ import { ApiClient } from '../backend/apiClient';
 export class DashboardPanel {
     public static currentPanel: DashboardPanel | undefined;
     private readonly panel: vscode.WebviewPanel;
-    private readonly apiClient: ApiClient;
+    private apiClient: ApiClient;
     private disposables: vscode.Disposable[] = [];
     private autoRefreshInterval: NodeJS.Timeout | undefined;
 
@@ -41,13 +41,29 @@ export class DashboardPanel {
         this.startAutoRefresh();
     }
 
+    /** Repoints this panel at a new API client (e.g. after a backend restart). */
+    public setApiClient(apiClient: ApiClient): void {
+        this.apiClient = apiClient;
+    }
+
+    /**
+     * Updates the open panel's API client if one exists. Safe to call when no panel
+     * is open. Used by the restart flow so an already-open dashboard doesn't keep
+     * querying the dead port.
+     */
+    public static refreshApiClient(apiClient: ApiClient): void {
+        DashboardPanel.currentPanel?.setApiClient(apiClient);
+    }
+
     public static createOrShow(apiClient: ApiClient): void {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
 
-        // If we already have a panel, show it
+        // If we already have a panel, show it (and repoint it at the current API client,
+        // which may differ after a backend restart on a new port).
         if (DashboardPanel.currentPanel) {
+            DashboardPanel.currentPanel.setApiClient(apiClient);
             DashboardPanel.currentPanel.panel.reveal(column);
             DashboardPanel.currentPanel.update();
             return;

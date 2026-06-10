@@ -80,7 +80,8 @@ public class ScanController : ControllerBase
                         File = r.FilePath,
                         Line = r.Line,
                         Pattern = r.Pattern,
-                        Confidence = r.Confidence.ToString()
+                        Confidence = r.Confidence.ToString(),
+                        ResourceTypeClassName = r.ResourceTypeClassName
                     }).ToList()
                 }).ToList()
             });
@@ -159,7 +160,8 @@ public class ScanController : ControllerBase
                         File = r.FilePath,
                         Line = r.Line,
                         Pattern = r.Pattern,
-                        Confidence = r.Confidence.ToString()
+                        Confidence = r.Confidence.ToString(),
+                        ResourceTypeClassName = r.ResourceTypeClassName
                     }).ToList()
                 }).ToList()
             });
@@ -279,7 +281,8 @@ public class ScanController : ControllerBase
                     File = r.FilePath,
                     Line = r.Line,
                     Pattern = r.Pattern,
-                    Confidence = r.Confidence.ToString()
+                    Confidence = r.Confidence.ToString(),
+                    ResourceTypeClassName = r.ResourceTypeClassName
                 }).ToList()
             });
         }

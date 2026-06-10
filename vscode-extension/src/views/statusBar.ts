@@ -26,6 +26,16 @@ export class StatusBarManager {
         this.startAutoUpdate();
     }
 
+    /**
+     * Points the status bar at a new API client. Required after the backend is
+     * restarted or the resource path changes, because the client bakes the
+     * (now stale) port into its base URL — without this, update() would keep
+     * probing the dead port and report "Failed" even on a healthy backend.
+     */
+    public setApiClient(apiClient: ApiClient): void {
+        this.apiClient = apiClient;
+    }
+
     private startAutoUpdate(): void {
         // Initial update
         this.update();
@@ -36,7 +46,13 @@ export class StatusBarManager {
         }, 30000);
     }
 
-    public async update(): Promise<void> {
+    /**
+     * Refreshes the status bar from the backend. Returns true when the backend was
+     * reachable and stats were rendered, false when it appears down (status shows
+     * "Failed"). Callers (e.g. the restart command) rely on this return value to
+     * avoid reporting success while the backend is actually down (issue #6).
+     */
+    public async update(): Promise<boolean> {
         try {
             // Get stats from API
             const stats = await this.apiClient.getStats();
@@ -71,11 +87,13 @@ export class StatusBarManager {
             // Update tooltip with detailed info
             this.statusBarItem.tooltip = this.buildTooltip(stats, avgCoverage, totalMissing);
 
+            return true;
         } catch (error) {
             // Service is down
             this.statusBarItem.text = '$(error) LRM: Failed';
             this.statusBarItem.tooltip = 'Localization Manager service is not running. Click to restart.';
             this.statusBarItem.command = 'lrm.restartBackend';
+            return false;
         }
     }
 

@@ -402,4 +402,53 @@ namespace Vitrum.Resources.Components.Account.Pages
         var refs = scanner.ScanContent("F.cs", code);
         Assert.Contains(refs, r => r.Key == "Title");
     }
+
+    [Fact]
+    public void ScanContent_DataAnnotation_DetectsKeyWithResourceType()
+    {
+        // issue #6: [Display(Name=..., ResourceType=typeof(...))] and validation
+        // attributes' ErrorMessageResourceName must be detected and carry the type.
+        var scanner = new CSharpScanner();
+        var code =
+            "public class Model {\n" +
+            "    [Display(Name = \"Product_Name_Label\", ResourceType = typeof(GlassResources))]\n" +
+            "    [Required(ErrorMessageResourceName = \"Req\", ErrorMessageResourceType = typeof(SharedResources))]\n" +
+            "    public string Name { get; set; }\n" +
+            "}";
+
+        var refs = scanner.ScanContent("Model.cs", code);
+
+        var display = Assert.Single(refs, r => r.Key == "Product_Name_Label");
+        Assert.Equal("GlassResources", display.ResourceTypeClassName);
+        Assert.Equal(ConfidenceLevel.High, display.Confidence);
+
+        var required = Assert.Single(refs, r => r.Key == "Req");
+        Assert.Equal("SharedResources", required.ResourceTypeClassName);
+    }
+
+    [Fact]
+    public void ScanContent_DataAnnotationInComment_IsIgnored()
+    {
+        // Attributes inside comments are blanked before scanning, so no key is found.
+        var scanner = new CSharpScanner();
+        var code =
+            "public class M {\n" +
+            "    // [Display(Name = \"Commented\", ResourceType = typeof(R))]\n" +
+            "    public string X { get; set; }\n" +
+            "}";
+
+        var refs = scanner.ScanContent("M.cs", code);
+        Assert.DoesNotContain(refs, r => r.Key == "Commented");
+    }
+
+    [Fact]
+    public void ScanContent_DataAnnotation_NameWithoutResourceType_NotDetected()
+    {
+        // A literal display name (no ResourceType) is not a localization key.
+        var scanner = new CSharpScanner();
+        var code = "public class M { [Display(Name = \"Just a label\")] public string X { get; set; } }";
+
+        var refs = scanner.ScanContent("M.cs", code);
+        Assert.DoesNotContain(refs, r => r.Key == "Just a label");
+    }
 }

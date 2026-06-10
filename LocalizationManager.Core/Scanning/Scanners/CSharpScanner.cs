@@ -69,6 +69,10 @@ public class CSharpScanner : PatternMatcher
         // Scan for indexer patterns
         ScanIndexerAccess(cleanedContent, originalContent, filePath, references, injectedLocalizerVariables);
 
+        // Scan for Data Annotation attributes that name a resource key + ResourceType,
+        // e.g. [Display(Name = "K", ResourceType = typeof(GlassResources))].
+        ScanDataAnnotations(cleanedContent, filePath, references);
+
         // Scan for dynamic patterns (unless strict mode)
         if (!strictMode)
         {
@@ -195,6 +199,23 @@ public class CSharpScanner : PatternMatcher
                     Confidence = ConfidenceLevel.High
                 });
             }
+        }
+    }
+
+    private void ScanDataAnnotations(string content, string filePath, List<KeyReference> references)
+    {
+        foreach (var match in DataAnnotationExtractor.Extract(content))
+        {
+            references.Add(new KeyReference
+            {
+                Key = match.Key,
+                FilePath = filePath,
+                Line = match.Line,
+                Pattern = match.Pattern,
+                Context = match.Pattern,
+                Confidence = ConfidenceLevel.High,
+                ResourceTypeClassName = match.ResourceTypeClassName
+            });
         }
     }
 

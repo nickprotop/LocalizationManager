@@ -147,6 +147,82 @@ public class MultiGroupControllerTests
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
+    [Fact]
+    public void GetKey_MultiBaseWithGroupSpecified_ReturnsThatGroupsDetails()
+    {
+        // The edit modal fetches key details by group; a key name present in two groups
+        // must return the requested group's values (issue #6 multi-group edit).
+        var controller = BuildResourcesController();
+
+        var result = controller.GetKey("CustomerTitle", resourceGroup: "CustomerResources");
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var details = Assert.IsType<ResourceKeyDetails>(ok.Value);
+        Assert.Equal("CustomerTitle", details.Key);
+    }
+
+    [Fact]
+    public void GetKey_MultiBaseWithoutGroup_FallsBackToFirstGroupContainingKey()
+    {
+        // GetKey (unlike Update/Delete) keeps a "first group containing the key"
+        // fallback so existing no-group callers (CodeLens hover, quick-fix) still work.
+        // The edit modal avoids the wrong-group load by always passing the group now.
+        var controller = BuildResourcesController();
+
+        var result = controller.GetKey("CustomerTitle", resourceGroup: null);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var details = Assert.IsType<ResourceKeyDetails>(ok.Value);
+        Assert.Equal("CustomerTitle", details.Key);
+    }
+
+    [Fact]
+    public void DeleteKey_MultiBaseWithGroupSpecified_RemovesFromTargetGroupOnlyAndPersists()
+    {
+        // issue #6: VS Code delete must pass resourceGroup so the right group is hit.
+        using var sandbox = TempDirectory.CopyOf(_testDataPath);
+        var controller = BuildResourcesController(sandbox.Path);
+
+        var result = controller.DeleteKey("CustomerTitle", occurrence: null, resourceGroup: "CustomerResources");
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<DeleteKeyResponse>(ok.Value);
+        Assert.True(response.Success);
+        Assert.True(response.DeletedCount > 0);
+
+        // Removed from CustomerResources (default + it), untouched in GlassResources.
+        var customerDefault = File.ReadAllText(Path.Combine(sandbox.Path, "CustomerResources.resx"));
+        var customerIt = File.ReadAllText(Path.Combine(sandbox.Path, "CustomerResources.it.resx"));
+        Assert.DoesNotContain("name=\"CustomerTitle\"", customerDefault);
+        Assert.DoesNotContain("name=\"CustomerTitle\"", customerIt);
+
+        var glassIt = File.ReadAllText(Path.Combine(sandbox.Path, "GlassResources.it.resx"));
+        Assert.Contains("name=\"GlassThickness\"", glassIt);
+    }
+
+    [Fact]
+    public void DeleteKey_MultiBaseWithoutGroup_ReturnsBadRequest()
+    {
+        // This is the root cause of the silent VS Code delete: a multi-group directory
+        // with no resourceGroup must 400 rather than guess (issue #6).
+        var controller = BuildResourcesController();
+
+        var result = controller.DeleteKey("CustomerTitle", occurrence: null, resourceGroup: null);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public void DeleteKey_UnknownKey_ReturnsNotFound()
+    {
+        using var sandbox = TempDirectory.CopyOf(_testDataPath);
+        var controller = BuildResourcesController(sandbox.Path);
+
+        var result = controller.DeleteKey("DoesNotExist", occurrence: null, resourceGroup: "CustomerResources");
+
+        Assert.IsType<NotFoundObjectResult>(result.Result);
+    }
+
     /// <summary>
     /// End-to-end scenario mirroring issue #6: a directory with multiple base
     /// resx files (CustomerResources, GlassResources) should report one

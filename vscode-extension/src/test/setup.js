@@ -117,6 +117,7 @@ const mockVscode = {
         })
     },
     window: {
+        activeTextEditor: undefined,
         showInformationMessage: async () => undefined,
         showWarningMessage: async () => undefined,
         showErrorMessage: async () => undefined,
@@ -126,8 +127,32 @@ const mockVscode = {
             show: () => {},
             hide: () => {},
             dispose: () => {}
+        }),
+        createStatusBarItem: () => ({
+            text: '',
+            tooltip: '',
+            command: undefined,
+            show: () => {},
+            hide: () => {},
+            dispose: () => {}
+        }),
+        createWebviewPanel: () => ({
+            webview: {
+                html: '',
+                options: {},
+                cspSource: '',
+                asWebviewUri: (u) => u,
+                onDidReceiveMessage: () => ({ dispose: () => {} }),
+                postMessage: async () => true
+            },
+            reveal: () => {},
+            onDidDispose: () => ({ dispose: () => {} }),
+            onDidChangeViewState: () => ({ dispose: () => {} }),
+            dispose: () => {}
         })
     },
+    StatusBarAlignment: { Left: 1, Right: 2 },
+    ViewColumn: { One: 1, Two: 2, Three: 3, Active: -1, Beside: -2 },
     commands: {
         registerCommand: () => ({ dispose: () => {} }),
         executeCommand: async () => undefined

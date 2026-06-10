@@ -44,4 +44,13 @@ public class KeyReference
     /// Warning message if confidence is low
     /// </summary>
     public string? Warning { get; set; }
+
+    /// <summary>
+    /// For keys referenced via a Data Annotation attribute (e.g.
+    /// <c>[Display(Name = "K", ResourceType = typeof(GlassResources))]</c>), the
+    /// simple class name of the resource type (<c>GlassResources</c>). Maps to a
+    /// resx group's BaseName so the key can be resolved against the correct group.
+    /// Null for ordinary references that are not bound to a specific resource type.
+    /// </summary>
+    public string? ResourceTypeClassName { get; set; }
 }

@@ -4,7 +4,7 @@ import { ApiClient } from '../backend/apiClient';
 export class SettingsPanel {
     public static currentPanel: SettingsPanel | undefined;
     private readonly panel: vscode.WebviewPanel;
-    private readonly apiClient: ApiClient;
+    private apiClient: ApiClient;
     private disposables: vscode.Disposable[] = [];
 
     private constructor(panel: vscode.WebviewPanel, apiClient: ApiClient) {
@@ -37,13 +37,25 @@ export class SettingsPanel {
         );
     }
 
+    /** Repoints this panel at a new API client (e.g. after a backend restart). */
+    public setApiClient(apiClient: ApiClient): void {
+        this.apiClient = apiClient;
+    }
+
+    /** Updates the open panel's API client if one exists. Safe when no panel is open. */
+    public static refreshApiClient(apiClient: ApiClient): void {
+        SettingsPanel.currentPanel?.setApiClient(apiClient);
+    }
+
     public static createOrShow(apiClient: ApiClient): void {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
 
-        // If we already have a panel, show it
+        // If we already have a panel, show it (and repoint it at the current API client,
+        // which may differ after a backend restart on a new port).
         if (SettingsPanel.currentPanel) {
+            SettingsPanel.currentPanel.setApiClient(apiClient);
             SettingsPanel.currentPanel.panel.reveal(column);
             SettingsPanel.currentPanel.update();
             return;

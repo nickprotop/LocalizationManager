@@ -352,6 +352,58 @@ public class ResourcesControllerTests : IDisposable
     }
 
     [Fact]
+    public void AddKey_SingleGroup_WritesMultiLineDataFormat()
+    {
+        // issue #6: new keys must use the standard multi-line <data> layout, not a
+        // single-line collapse, even when added via the API (used by VS Code).
+        var request = new AddKeyRequest
+        {
+            Key = "NewKey",
+            Values = new Dictionary<string, string> { { "default", "Brand New" } }
+        };
+
+        Assert.IsType<OkObjectResult>(_controller.AddKey(request).Result);
+
+        var text = File.ReadAllText(Path.Combine(_testDirectory, "TestResource.resx"));
+        Assert.DoesNotContain("<value>Brand New</value></data>", text);
+        Assert.Matches("<data name=\"NewKey\"[^>]*>\\s*\\n\\s+<value>Brand New</value>", text);
+    }
+
+    [Fact]
+    public void DeleteKey_SingleGroup_NoGroupNeeded_RemovesFromAllFilesAndPersists()
+    {
+        // Single-group directory: resourceGroup may be omitted and delete must persist
+        // across the default and culture files.
+        var result = _controller.DeleteKey("Save", occurrence: null, resourceGroup: null);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.True(Assert.IsType<DeleteKeyResponse>(ok.Value).Success);
+
+        var defaultText = File.ReadAllText(Path.Combine(_testDirectory, "TestResource.resx"));
+        Assert.DoesNotContain("name=\"Save\"", defaultText);
+
+        // Other keys remain untouched.
+        Assert.Contains("name=\"Cancel\"", defaultText);
+    }
+
+    [Fact]
+    public void DeleteKey_SingleGroup_UnknownKey_ReturnsNotFound()
+    {
+        var result = _controller.DeleteKey("NoSuchKey", occurrence: null, resourceGroup: null);
+        Assert.IsType<NotFoundObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public void GetKey_SingleGroup_NoGroupNeeded_ReturnsDetails()
+    {
+        var result = _controller.GetKey("Save", resourceGroup: null);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var details = Assert.IsType<ResourceKeyDetails>(ok.Value);
+        Assert.Equal("Save", details.Key);
+    }
+
+    [Fact]
     public void UpdateKey_PartialLanguageUpdate_OnlyUpdatesProvidedLanguages()
     {
         // Arrange - Only update Greek, leave default unchanged

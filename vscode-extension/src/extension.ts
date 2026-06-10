@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { LrmService } from './backend/lrmService';
 import { ApiClient } from './backend/apiClient';
 import { CacheService } from './backend/cacheService';
+import { restartSucceeded } from './backend/backendHealth';
 import { CodeDiagnosticProvider } from './providers/codeDiagnostics';
 import { ResxDiagnosticProvider } from './providers/resxDiagnostics';
 import { ResourceTreeView } from './views/resourceTreeView';
@@ -227,6 +228,12 @@ export async function activate(context: vscode.ExtensionContext) {
                             // Recreate API client and cache service with new port
                             apiClient = new ApiClient(lrmService.getBaseUrl());
                             cacheService = new CacheService(apiClient);
+                            if (statusBarManager) {
+                                statusBarManager.setApiClient(apiClient);
+                            }
+                            DashboardPanel.refreshApiClient(apiClient);
+                            SettingsPanel.refreshApiClient(apiClient);
+                            ResourceEditorPanel.refreshClients(apiClient, cacheService);
 
                             // Refresh views
                             await resourceTreeView.loadResources();
@@ -921,16 +928,36 @@ function registerCommands(context: vscode.ExtensionContext) {
             try {
                 await lrmService.restart();
 
-                // Recreate API client and cache service
+                // Recreate API client and cache service against the (possibly new) port
                 apiClient = new ApiClient(lrmService.getBaseUrl());
                 cacheService = new CacheService(apiClient);
 
-                // Update status bar
+                // Repoint every component that captured the old client at the new port;
+                // otherwise the status bar would report Failed and any open panel would
+                // keep querying the dead port after a restart.
                 if (statusBarManager) {
-                    await statusBarManager.update();
+                    statusBarManager.setApiClient(apiClient);
+                }
+                DashboardPanel.refreshApiClient(apiClient);
+                SettingsPanel.refreshApiClient(apiClient);
+                ResourceEditorPanel.refreshClients(apiClient, cacheService);
+
+                // Verify the backend is actually reachable before claiming success.
+                // statusBarManager.update() returns false (and shows "Failed") when the
+                // backend is down — previously success was reported unconditionally
+                // while the status bar showed Failed (issue #6).
+                let healthy = false;
+                if (statusBarManager) {
+                    healthy = await statusBarManager.update();
+                } else {
+                    healthy = await lrmService.isHealthy();
                 }
 
-                vscode.window.showInformationMessage('LRM backend restarted successfully');
+                if (restartSucceeded(healthy)) {
+                    vscode.window.showInformationMessage('LRM backend restarted successfully');
+                } else {
+                    vscode.window.showErrorMessage('LRM backend restart failed: backend is not responding. Check the LRM output log.');
+                }
             } catch (error: any) {
                 vscode.window.showErrorMessage(`Failed to restart backend: ${error.message}`);
             }

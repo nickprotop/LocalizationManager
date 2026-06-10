@@ -15,8 +15,10 @@ export class ResourceEditorPanel {
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
 
-        // If we already have a panel, show it
+        // If we already have a panel, show it (and repoint it at the current API client /
+        // cache, which may differ after a backend restart on a new port).
         if (ResourceEditorPanel.currentPanel) {
+            ResourceEditorPanel.currentPanel.setClients(apiClient, cacheService);
             ResourceEditorPanel.currentPanel._panel.reveal(column);
             // If options provided, send message to select key
             if (options?.selectKey) {
@@ -38,6 +40,17 @@ export class ResourceEditorPanel {
         );
 
         ResourceEditorPanel.currentPanel = new ResourceEditorPanel(panel, extensionUri, apiClient, cacheService, options);
+    }
+
+    /** Repoints this panel at a new API client / cache (e.g. after a backend restart). */
+    public setClients(apiClient: ApiClient, cacheService: CacheService): void {
+        this.apiClient = apiClient;
+        this.cacheService = cacheService;
+    }
+
+    /** Updates the open panel's clients if one exists. Safe when no panel is open. */
+    public static refreshClients(apiClient: ApiClient, cacheService: CacheService): void {
+        ResourceEditorPanel.currentPanel?.setClients(apiClient, cacheService);
     }
 
     /**
@@ -93,7 +106,7 @@ export class ResourceEditorPanel {
                         await this.handleDeleteKey(message.key, message.resourceGroup);
                         return;
                     case 'getKeyDetails':
-                        await this.handleGetKeyDetails(message.key);
+                        await this.handleGetKeyDetails(message.key, message.resourceGroup);
                         return;
                     case 'translateKey':
                         await this.handleTranslateKey(message.key, message.provider, message.languages, message.onlyMissing);
@@ -316,9 +329,9 @@ export class ResourceEditorPanel {
         }
     }
 
-    private async handleGetKeyDetails(keyName: string) {
+    private async handleGetKeyDetails(keyName: string, resourceGroup?: string) {
         try {
-            const keyDetails = await this.cacheService.getKeyDetails(keyName);
+            const keyDetails = await this.cacheService.getKeyDetails(keyName, false, resourceGroup);
             this._panel.webview.postMessage({
                 command: 'keyDetailsLoaded',
                 data: keyDetails
@@ -855,6 +868,20 @@ export class ResourceEditorPanel {
         </div>
     </div>
 
+    <!-- Delete Key Confirm Modal (native confirm() is blocked in VS Code webviews) -->
+    <div id="deleteKeyModal" class="modal">
+        <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">Delete Key</div>
+            <div class="modal-body">
+                <div id="deleteKeyPrompt">Delete this key?</div>
+            </div>
+            <div class="modal-footer">
+                <button class="secondary" onclick="closeDeleteKeyModal()">Cancel</button>
+                <button onclick="confirmDeleteKey()">Delete</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Translate Modal -->
     <div id="translateModal" class="modal">
         <div class="modal-content" style="max-width: 600px;">
@@ -1051,9 +1078,18 @@ export class ResourceEditorPanel {
                     providers = Array.isArray(message.data) ? message.data : [];
                     renderProviderOptions();
                     break;
-                case 'updateSuccess':
-                case 'addSuccess':
                 case 'deleteSuccess':
+                    setStatus('Key deleted', 3000);
+                    loadResources();
+                    break;
+                case 'addSuccess':
+                    setStatus('Key added', 3000);
+                    loadResources();
+                    break;
+                case 'updateSuccess':
+                    setStatus('Key updated', 3000);
+                    loadResources();
+                    break;
                 case 'translateSuccess':
                 case 'translateAllSuccess':
                     closeTranslateModal();
@@ -1276,10 +1312,10 @@ export class ResourceEditorPanel {
                 const actionsCell = document.createElement('td');
                 actionsCell.className = 'actions';
                 actionsCell.innerHTML = \`
-                    <button class="icon-button" onclick="translateKey('\${resource.key}')" title="Translate">
+                    <button class="icon-button" onclick="translateKey('\${escapeJs(resource.key)}', '\${escapeJs(resource.resourceGroup || '')}')" title="Translate">
                         🌐
                     </button>
-                    <button class="icon-button" onclick="deleteKey('\${resource.key}')" title="Delete">
+                    <button class="icon-button" onclick="deleteKey('\${escapeJs(resource.key)}', '\${escapeJs(resource.resourceGroup || '')}')" title="Delete">
                         🗑️
                     </button>
                 \`;
@@ -1335,6 +1371,26 @@ export class ResourceEditorPanel {
             return String(s == null ? '' : s)
                 .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
                 .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // Escapes a string for embedding inside a single-quoted JS string literal that
+        // itself lives inside a double-quoted HTML on* attribute. Two contexts apply at
+        // once, so we escape for BOTH: first JS (backslash, quote, newlines) so the JS
+        // string literal is valid, then HTML entities (&, <, >, ", ') so the attribute
+        // and surrounding markup can't be broken by keys containing those characters.
+        function escapeJs(s) {
+            const jsEscaped = String(s == null ? '' : s)
+                .replace(/\\\\/g, '\\\\\\\\')   // backslash -> doubled
+                .replace(/'/g, "\\\\'")          // single quote -> escaped
+                .replace(/\\r/g, '')             // drop CR
+                .replace(/\\n/g, '\\\\n');       // newline -> \n
+            // HTML-entity encode (& first) so the value is safe in an attribute context.
+            return jsEscaped
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
 
         // The value-key used for the default language. Server maps this to the
@@ -1458,26 +1514,52 @@ export class ResourceEditorPanel {
             closeAddKeyModal();
         }
 
-        function deleteKey(key) {
-            if (confirm('Delete key "' + key + '"?')) {
-                vscode.postMessage({
-                    command: 'deleteKey',
-                    key: key
-                });
-            }
+        // Pending delete target, set when the trash icon is clicked and consumed when
+        // the user confirms in the modal.
+        let pendingDelete = null;
+
+        // Opens the custom confirm modal. We cannot use window.confirm() here: VS Code
+        // webviews block native confirm()/alert(), so the old guard never returned true
+        // and delete silently no-opped (issue #6).
+        function deleteKey(key, resourceGroup) {
+            pendingDelete = { key: key, resourceGroup: resourceGroup || undefined };
+            document.getElementById('deleteKeyPrompt').textContent = 'Delete key "' + key + '"? This removes it from every language file in the group.';
+            document.getElementById('deleteKeyModal').style.display = 'block';
+        }
+
+        function closeDeleteKeyModal() {
+            document.getElementById('deleteKeyModal').style.display = 'none';
+            pendingDelete = null;
+        }
+
+        // NOTE: mirror of buildDeleteKeyMessage() in views/deleteKeyMessage.ts.
+        // The inline webview script cannot import the TS module; the unit test
+        // guards the canonical builder. Keep these two in sync.
+        function confirmDeleteKey() {
+            if (!pendingDelete) { closeDeleteKeyModal(); return; }
+            const key = (pendingDelete.key || '').trim();
+            if (!key) { setStatus('Key is required', 3000); closeDeleteKeyModal(); return; }
+            const msg = { command: 'deleteKey', key: key };
+            if (pendingDelete.resourceGroup) { msg.resourceGroup = pendingDelete.resourceGroup; }
+            vscode.postMessage(msg);
+            closeDeleteKeyModal();
+            setStatus('Deleting "' + key + '"...');
         }
 
         let currentEditingKey = null;
+        // Resource group of the key being edited, so the save targets the correct group
+        // in multi-group projects (mirrors the delete/inline-edit flows).
+        let currentEditingGroup = undefined;
 
-        function translateKey(key) {
+        function translateKey(key, resourceGroup) {
             // Open edit modal for this key
             currentEditingKey = key;
+            currentEditingGroup = resourceGroup || undefined;
 
             // Fetch full key details including comments
-            vscode.postMessage({
-                command: 'getKeyDetails',
-                key: key
-            });
+            const msg = { command: 'getKeyDetails', key: key };
+            if (currentEditingGroup) { msg.resourceGroup = currentEditingGroup; }
+            vscode.postMessage(msg);
 
             setStatus('Loading key details...');
         }
@@ -1722,11 +1804,13 @@ export class ResourceEditorPanel {
                 }
             });
 
-            vscode.postMessage({
+            const msg = {
                 command: 'updateKey',
                 key: currentEditingKey,
                 values: values
-            });
+            };
+            if (currentEditingGroup) { msg.resourceGroup = currentEditingGroup; }
+            vscode.postMessage(msg);
 
             closeEditKeyModal();
             setStatus('Saving...');

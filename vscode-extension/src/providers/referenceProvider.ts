@@ -36,6 +36,10 @@ export class LrmReferenceProvider implements vscode.ReferenceProvider {
         // t("KeyName") (i18next style)
         /\bt\("([^"]+)"\)/g,
         /\bt\('([^']+)'\)/g,
+        // Data Annotation attributes:
+        //   [Display(Name = "KeyName", ResourceType = typeof(...))]
+        //   [Required(ErrorMessageResourceName = "KeyName", ErrorMessageResourceType = typeof(...))]
+        /\b(?:ErrorMessageResourceName|Name)\s*=\s*"([^"]+)"/g,
     ];
 
     constructor() {

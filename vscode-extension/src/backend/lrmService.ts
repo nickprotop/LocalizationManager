@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { spawn, ChildProcess } from 'child_process';
 import { createServer } from 'net';
 import axios from 'axios';
+import { isHealthyResponse } from './backendHealth';
 
 export interface LrmServiceConfig {
     extensionPath: string;
@@ -37,6 +38,23 @@ export class LrmService implements vscode.Disposable {
 
     public isRunning(): boolean {
         return this.process !== null && this.port !== 0;
+    }
+
+    /**
+     * Probes the backend's health endpoint over HTTP. Unlike isRunning() (which only
+     * checks that a child process exists), this confirms the backend is actually
+     * accepting requests — used to verify a restart truly succeeded (issue #6).
+     */
+    public async isHealthy(): Promise<boolean> {
+        if (!this.isRunning()) {
+            return false;
+        }
+        try {
+            const response = await axios.get(`${this.getBaseUrl()}/api/resources`, { timeout: 2000 });
+            return isHealthyResponse(response.status);
+        } catch {
+            return false;
+        }
     }
 
     public getResourcePath(): string | null {
@@ -127,23 +145,27 @@ export class LrmService implements vscode.Disposable {
             this.healthCheckInterval = null;
         }
 
-        // Kill process
-        if (this.process) {
-            this.process.kill('SIGTERM');
+        // Kill process. Capture the reference locally: the exit handler registered in
+        // start() calls cleanup() which nulls this.process, so we must not rely on the
+        // field inside the wait below (it can become null mid-shutdown).
+        const proc = this.process;
+        if (proc) {
+            proc.kill('SIGTERM');
 
-            // Wait for graceful shutdown
-            await new Promise((resolve) => {
+            // Wait for graceful shutdown. Use once() so the listener is removed after it
+            // fires (no accumulation across restarts) and always clear the timeout.
+            await new Promise<void>((resolve) => {
                 const timeout = setTimeout(() => {
-                    if (this.process && !this.process.killed) {
+                    if (!proc.killed) {
                         this.outputChannel.appendLine('Forcing backend shutdown...');
-                        this.process.kill('SIGKILL');
+                        proc.kill('SIGKILL');
                     }
-                    resolve(undefined);
+                    resolve();
                 }, 5000);
 
-                this.process?.on('exit', () => {
+                proc.once('exit', () => {
                     clearTimeout(timeout);
-                    resolve(undefined);
+                    resolve();
                 });
             });
         }
@@ -154,6 +176,10 @@ export class LrmService implements vscode.Disposable {
 
     public async restart(): Promise<void> {
         await this.stop();
+        // Brief settle so the old process fully releases its socket before we probe
+        // for a free port; start() picks a fresh random port anyway, but this avoids
+        // racing the OS on teardown.
+        await new Promise(resolve => setTimeout(resolve, 250));
         await this.start();
     }
 
@@ -267,12 +293,18 @@ export class LrmService implements vscode.Disposable {
         this.outputChannel.appendLine('Waiting for backend to be ready...');
 
         while (Date.now() - startTime < timeout) {
+            // Guard against the process having died during startup (e.g. port taken by
+            // the old instance still in TIME_WAIT). No point polling a dead process.
+            if (!this.isRunning()) {
+                throw new Error('Backend process exited during startup. Check logs for details.');
+            }
+
             try {
                 const response = await axios.get(`${this.getBaseUrl()}/api/resources`, {
                     timeout: 1000
                 });
 
-                if (response.status === 200) {
+                if (isHealthyResponse(response.status)) {
                     this.outputChannel.appendLine('Backend is ready!');
                     return;
                 }
@@ -307,7 +339,12 @@ export class LrmService implements vscode.Disposable {
                     if (choice === 'Restart') {
                         try {
                             await this.restart();
-                            vscode.window.showInformationMessage('LRM backend restarted successfully');
+                            // Confirm the backend actually came back before claiming success.
+                            if (await this.isHealthy()) {
+                                vscode.window.showInformationMessage('LRM backend restarted successfully');
+                            } else {
+                                vscode.window.showErrorMessage('LRM backend restart failed: backend is not responding. Check the LRM output log.');
+                            }
                         } catch (error: any) {
                             vscode.window.showErrorMessage(`Failed to restart backend: ${error.message}`);
                         }
