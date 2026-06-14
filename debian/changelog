@@ -1,5 +1,5 @@
-lrm (0.7.16-1) noble; urgency=medium
+lrm (0.7.17-1) noble; urgency=medium
 
-  * Fixed: fix(issue-6): round-5 — delete key, restart flow, single-line resx, data annotations\n
+  * Fixed: fix(vscode): resolve correctness & robustness bugs from extension bug hunt\n- fix(issue-6): invalidate stale scan cache on resource edits in editor\n
 
- -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Wed, 10 Jun 2026 20:04:18 +0300
+ -- Nikolaos Protopapas <nikolaos.protopapas@gmail.com>  Sun, 14 Jun 2026 12:30:49 +0300
