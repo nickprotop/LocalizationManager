@@ -126,7 +126,10 @@ export class ResxDiagnosticProvider {
 
         try {
             const document = await vscode.workspace.openTextDocument(fileUri);
-            const fileName = fileUri.fsPath.substring(fileUri.fsPath.lastIndexOf('/') + 1);
+            // Use path.basename so this works on Windows too: fsPath uses backslashes
+            // there, and lastIndexOf('/') would return -1 and yield the whole path,
+            // breaking language-code extraction (no diagnostics on Windows).
+            const fileName = path.basename(fileUri.fsPath);
 
             // Determine language code from filename
             // e.g., Resources.el.resx -> el, Resources.resx -> default

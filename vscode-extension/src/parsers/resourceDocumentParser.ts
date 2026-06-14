@@ -10,10 +10,12 @@ export interface ResourceKey {
     value: string;
     /** Optional comment/description */
     comment?: string;
-    /** Line number in the document (0-based) */
+    /** Line number in the document (0-based). -1 means the key could not be located. */
     lineNumber: number;
     /** Column start position */
     columnStart: number;
+    /** End line number (0-based). Defaults to lineNumber when the value is single-line. */
+    endLine?: number;
     /** Column end position */
     columnEnd: number;
     /** Whether this is a plural key */

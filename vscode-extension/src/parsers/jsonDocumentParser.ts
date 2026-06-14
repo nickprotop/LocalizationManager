@@ -42,8 +42,11 @@ export class JsonDocumentParser implements IResourceDocumentParser {
 
         // Find the key whose range contains the position
         for (const key of keys) {
+            if (key.lineNumber < 0) {
+                continue;
+            }
             const keyOffset = document.offsetAt(new vscode.Position(key.lineNumber, key.columnStart));
-            const endOffset = document.offsetAt(new vscode.Position(key.lineNumber, key.columnEnd));
+            const endOffset = document.offsetAt(new vscode.Position(key.endLine ?? key.lineNumber, key.columnEnd));
 
             // Expand range to include the full key-value pair
             // Look backwards for the key start
@@ -64,8 +67,13 @@ export class JsonDocumentParser implements IResourceDocumentParser {
 
         for (const key of keys) {
             if (key.key === keyName) {
+                // lineNumber -1 means the key was parsed but its text location could
+                // not be resolved; return null rather than a bogus range at 0,0.
+                if (key.lineNumber < 0) {
+                    return null;
+                }
                 const startPos = new vscode.Position(key.lineNumber, key.columnStart);
-                const endPos = new vscode.Position(key.lineNumber, key.columnEnd);
+                const endPos = new vscode.Position(key.endLine ?? key.lineNumber, key.columnEnd);
                 return new vscode.Range(startPos, endPos);
             }
         }
@@ -81,11 +89,17 @@ export class JsonDocumentParser implements IResourceDocumentParser {
         prefix: string,
         keys: ResourceKey[],
         text: string,
-        document: vscode.TextDocument
+        document: vscode.TextDocument,
+        searchFrom = 0
     ): void {
         if (typeof obj !== 'object' || obj === null) {
             return;
         }
+
+        // Local cursor advanced past each key as it is consumed, so sibling keys —
+        // and identical simple names nested under different parents — resolve to
+        // distinct, in-order locations rather than all matching the first occurrence.
+        let cursor = searchFrom;
 
         for (const [key, value] of Object.entries(obj)) {
             // Skip metadata properties (except when they contain the value)
@@ -97,7 +111,8 @@ export class JsonDocumentParser implements IResourceDocumentParser {
 
             if (typeof value === 'string') {
                 // Simple string value
-                const location = this.findKeyLocation(text, document, prefix ? key : fullKey);
+                const { endOffset, ...location } = this.findKeyLocation(text, document, key, cursor);
+                if (location.lineNumber !== -1) cursor = endOffset;
                 keys.push({
                     key: fullKey,
                     value,
@@ -107,7 +122,8 @@ export class JsonDocumentParser implements IResourceDocumentParser {
                 if (this.isPluralObject(value)) {
                     // Plural object
                     const pluralForms = this.extractPluralForms(value);
-                    const location = this.findKeyLocation(text, document, key);
+                    const { endOffset, ...location } = this.findKeyLocation(text, document, key, cursor);
+                    if (location.lineNumber !== -1) cursor = endOffset;
                     keys.push({
                         key: fullKey,
                         value: pluralForms['other'] || pluralForms['one'] || Object.values(pluralForms)[0] || '',
@@ -120,7 +136,8 @@ export class JsonDocumentParser implements IResourceDocumentParser {
                     const valueObj = value as Record<string, unknown>;
                     const val = valueObj._value as string;
                     const comment = valueObj._comment as string | undefined;
-                    const location = this.findKeyLocation(text, document, key);
+                    const { endOffset, ...location } = this.findKeyLocation(text, document, key, cursor);
+                    if (location.lineNumber !== -1) cursor = endOffset;
                     keys.push({
                         key: fullKey,
                         value: val,
@@ -128,8 +145,15 @@ export class JsonDocumentParser implements IResourceDocumentParser {
                         ...location
                     });
                 } else {
-                    // Recurse into nested object
-                    this.extractKeys(value, fullKey, keys, text, document);
+                    // Recurse into nested object. Locate the parent key first so the
+                    // child scope is searched from inside the parent's braces — this
+                    // is what disambiguates duplicate simple names across scopes.
+                    const parent = this.findKeyLocation(text, document, key, cursor);
+                    if (parent.lineNumber !== -1) cursor = parent.endOffset;
+                    const childStart = parent.lineNumber !== -1
+                        ? document.offsetAt(new vscode.Position(parent.lineNumber, parent.columnStart))
+                        : cursor;
+                    this.extractKeys(value, fullKey, keys, text, document, childStart);
                 }
             }
         }
@@ -186,7 +210,8 @@ export class JsonDocumentParser implements IResourceDocumentParser {
                             keys[existingIndex].pluralForms = pluralForms;
                         } else {
                             // Add as new plural key
-                            const location = this.findKeyLocation(text, document, `${baseKey}_one`);
+                            const { endOffset, ...location } = this.findKeyLocation(text, document, `${baseKey}_one`);
+                            void endOffset;
                             keys.push({
                                 key: fullKey,
                                 value: pluralForms['other'] || pluralForms['one'] || Object.values(pluralForms)[0],
@@ -255,12 +280,17 @@ export class JsonDocumentParser implements IResourceDocumentParser {
     private findKeyLocation(
         text: string,
         document: vscode.TextDocument,
-        key: string
-    ): { lineNumber: number; columnStart: number; columnEnd: number; comment?: string } {
-        // Search for the key in the text
+        key: string,
+        searchFrom = 0
+    ): { lineNumber: number; columnStart: number; endLine: number; columnEnd: number; comment?: string; endOffset: number } {
+        // Search for the key in the text starting at searchFrom. The caller advances
+        // searchFrom past each key it has already consumed so that the same simple
+        // name appearing in different nesting scopes (e.g. users.id vs posts.id)
+        // resolves to its OWN occurrence rather than always the first global match.
         // Pattern: "key": "value" or "key": { ... }
         const escapedKey = this.escapeRegexChars(key);
-        const keyPattern = new RegExp(`"${escapedKey}"\\s*:`);
+        const keyPattern = new RegExp(`"${escapedKey}"\\s*:`, 'g');
+        keyPattern.lastIndex = Math.max(0, searchFrom);
         const match = keyPattern.exec(text);
 
         if (match) {
@@ -307,15 +337,23 @@ export class JsonDocumentParser implements IResourceDocumentParser {
             return {
                 lineNumber: startPos.line,
                 columnStart: startPos.character,
-                columnEnd: endPos.character
+                // Carry the real end line so multi-line values (multiline strings,
+                // object values) produce a correct range instead of collapsing the
+                // end onto the start line.
+                endLine: endPos.line,
+                columnEnd: endPos.character,
+                endOffset
             };
         }
 
-        // Key not found - return defaults
+        // Key not found. Use lineNumber -1 as a sentinel so callers (getKeyRange)
+        // can return null instead of pointing at a bogus 0,0 location.
         return {
-            lineNumber: 0,
+            lineNumber: -1,
             columnStart: 0,
-            columnEnd: 0
+            endLine: -1,
+            columnEnd: 0,
+            endOffset: Math.max(0, searchFrom)
         };
     }
 

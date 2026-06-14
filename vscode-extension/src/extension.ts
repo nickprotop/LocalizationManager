@@ -341,8 +341,8 @@ function setupEventListeners(context: vscode.ExtensionContext, enableRealtimeSca
     const iosWatcher = vscode.workspace.createFileSystemWatcher('**/*.lproj/*.strings');
     const lrmConfigWatcher = vscode.workspace.createFileSystemWatcher('**/lrm.json');
 
-    // Helper to handle resource file changes
-    const handleResourceChange = async () => {
+    // The actual refresh. Kept private; callers go through the debounced wrapper below.
+    const runResourceRefresh = async () => {
         // Invalidate shared cache first
         if (cacheService) {
             cacheService.invalidate();
@@ -355,6 +355,48 @@ function setupEventListeners(context: vscode.ExtensionContext, enableRealtimeSca
         if (codeLensProvider) {
             codeLensProvider.refresh();
         }
+    };
+
+    // Debounce + serialize resource-change handling. Without this, saving several
+    // resource files at once fires many concurrent handlers that each invalidate the
+    // cache and refetch, interleaving into an inconsistent tree/diagnostics view and
+    // doing redundant work. We coalesce a burst into a single trailing refresh, and
+    // never run two refreshes concurrently (a change arriving mid-refresh schedules
+    // one more run afterwards).
+    let refreshTimer: NodeJS.Timeout | undefined;
+    let refreshInFlight: Promise<void> | undefined;
+    let rerunRequested = false;
+    const RESOURCE_REFRESH_DEBOUNCE_MS = 250;
+
+    const handleResourceChange = async (): Promise<void> => {
+        if (refreshTimer) {
+            clearTimeout(refreshTimer);
+        }
+        await new Promise<void>(resolve => {
+            refreshTimer = setTimeout(() => {
+                refreshTimer = undefined;
+                resolve();
+            }, RESOURCE_REFRESH_DEBOUNCE_MS);
+        });
+
+        // If a refresh is already running, ask it to run once more when it finishes
+        // rather than starting an overlapping one.
+        if (refreshInFlight) {
+            rerunRequested = true;
+            return refreshInFlight;
+        }
+
+        const drain = async (): Promise<void> => {
+            do {
+                rerunRequested = false;
+                await runResourceRefresh();
+            } while (rerunRequested);
+        };
+
+        refreshInFlight = drain().finally(() => {
+            refreshInFlight = undefined;
+        });
+        return refreshInFlight;
     };
 
     // Helper to filter JSON events to only resource files (exclude config files)
@@ -439,10 +481,29 @@ function setupEventListeners(context: vscode.ExtensionContext, enableRealtimeSca
     });
 }
 
+/**
+ * True once the backend and its dependent globals (apiClient, cacheService, …) were
+ * initialized successfully during activation. When the backend fails to start, those
+ * globals stay undefined but registerCommands() still runs, so command handlers must
+ * check this before dereferencing them — otherwise any command throws a confusing
+ * "Cannot read properties of undefined". lrmService itself is created before the
+ * try block, so the Restart Backend command remains usable to recover.
+ */
+function ensureBackendReady(): boolean {
+    if (!apiClient || !cacheService) {
+        vscode.window.showErrorMessage(
+            'LRM backend is not running. Use "LRM: Restart Backend" to try again, or check the LRM output log.'
+        );
+        return false;
+    }
+    return true;
+}
+
 function registerCommands(context: vscode.ExtensionContext) {
     // Scan Code
     context.subscriptions.push(
         vscode.commands.registerCommand('lrm.scanCode', async () => {
+            if (!ensureBackendReady()) return;
             try {
                 const result = await vscode.window.withProgress({
                     location: vscode.ProgressLocation.Notification,
@@ -501,6 +562,7 @@ function registerCommands(context: vscode.ExtensionContext) {
     // Validate Resources
     context.subscriptions.push(
         vscode.commands.registerCommand('lrm.validateResources', async () => {
+            if (!ensureBackendReady()) return;
             try {
                 const result = await vscode.window.withProgress({
                     location: vscode.ProgressLocation.Notification,
@@ -530,6 +592,7 @@ function registerCommands(context: vscode.ExtensionContext) {
     // Open Resource Editor
     context.subscriptions.push(
         vscode.commands.registerCommand('lrm.openResourceEditor', async () => {
+            if (!ensureBackendReady()) return;
             ResourceEditorPanel.createOrShow(context.extensionUri, apiClient, cacheService);
         })
     );
@@ -981,6 +1044,7 @@ function registerCommands(context: vscode.ExtensionContext) {
     // Open Dashboard
     context.subscriptions.push(
         vscode.commands.registerCommand('lrm.openDashboard', () => {
+            if (!ensureBackendReady()) return;
             DashboardPanel.createOrShow(apiClient);
         })
     );
@@ -988,6 +1052,7 @@ function registerCommands(context: vscode.ExtensionContext) {
     // Open Settings
     context.subscriptions.push(
         vscode.commands.registerCommand('lrm.openSettings', () => {
+            if (!ensureBackendReady()) return;
             SettingsPanel.createOrShow(apiClient);
         })
     );

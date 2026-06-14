@@ -239,5 +239,9 @@ export class LocalizationCompletionProvider implements vscode.CompletionItemProv
      */
     public invalidateCache(): void {
         this.keysCache = null;
+        // Also drop the cached configuration: changes to lrm.json (resource class
+        // names, localizationMethods) must take effect on the next completion rather
+        // than waiting out the config TTL.
+        this.configCache = null;
     }
 }

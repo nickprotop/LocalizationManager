@@ -228,8 +228,11 @@ export class LrmDefinitionProvider implements vscode.DefinitionProvider {
                 const match = pattern.exec(text);
 
                 if (match) {
-                    const pos = document.positionAt(match.index);
-                    return new vscode.Location(fileUri, pos);
+                    // Return a Range (not a bare Position) so Go-to-Definition
+                    // highlights the match, matching the parser path's behavior.
+                    const start = document.positionAt(match.index);
+                    const end = document.positionAt(match.index + match[0].length);
+                    return new vscode.Location(fileUri, new vscode.Range(start, end));
                 }
             } else if (fileName.endsWith('.json')) {
                 // JSON pattern: "KeyName":
@@ -240,8 +243,9 @@ export class LrmDefinitionProvider implements vscode.DefinitionProvider {
                 const match = pattern.exec(text);
 
                 if (match) {
-                    const pos = document.positionAt(match.index);
-                    return new vscode.Location(fileUri, pos);
+                    const start = document.positionAt(match.index);
+                    const end = document.positionAt(match.index + match[0].length);
+                    return new vscode.Location(fileUri, new vscode.Range(start, end));
                 }
             }
         } catch (error) {

@@ -255,6 +255,16 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
 
             const keyName = usage.key;
 
+            // If any reference binds this key to a specific resource group via a Data
+            // Annotation's ResourceType (e.g. typeof(GlassResources)), resolve details
+            // against THAT group. Otherwise the key is group-agnostic and we fall back
+            // to whichever group the backend resolved it against (its union default).
+            // Without this, getKeyDetails(keyName) returns the first-cached group's
+            // details, showing the wrong value/coverage in multi-group projects.
+            const boundGroup = (usage.references || [])
+                .map(r => r.resourceTypeClassName)
+                .find(g => g && g.trim() !== '') || undefined;
+
             for (const reference of usage.references || []) {
                 // Backend reports 1-based line numbers; CodeLens positions are 0-based.
                 const lineNumber = Math.max(0, (reference.line ?? 1) - 1);
@@ -281,7 +291,7 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
                 }
 
                 try {
-                    const details = await this.cacheService.getKeyDetails(keyName);
+                    const details = await this.cacheService.getKeyDetails(keyName, false, boundGroup);
 
                     // Show value lens
                     if (config.get<boolean>('codeLens.showValue', true)) {
@@ -305,7 +315,7 @@ export class LrmCodeLensProvider implements vscode.CodeLensProvider {
                     }
 
                     // Show missing languages lens
-                    const missingLanguages = this.cacheService.getMissingLanguages(keyName);
+                    const missingLanguages = this.cacheService.getMissingLanguages(keyName, boundGroup);
                     if (missingLanguages && missingLanguages.length > 0) {
                         // Filter out 'default' from missing list
                         const displayMissing = missingLanguages.filter(l => l !== 'default' && l !== '');

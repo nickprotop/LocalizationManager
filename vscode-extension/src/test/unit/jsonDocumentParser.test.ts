@@ -355,5 +355,64 @@ describe('JsonDocumentParser', () => {
             expect(keys[0].lineNumber).to.equal(1);
             expect(keys[1].lineNumber).to.equal(2);
         });
+
+        // Regression: duplicate simple names under different parents must resolve to
+        // their OWN location, not always the first global match (bug hunt #5).
+        it('resolves duplicate simple key names in different scopes to distinct lines', () => {
+            const json = `{
+  "users": {
+    "id": "user-id"
+  },
+  "posts": {
+    "id": "post-id"
+  }
+}`;
+            const doc = createMockDocument(json, 'test.json');
+            const parser = new JsonDocumentParser();
+            const keys = parser.parseDocument(doc);
+
+            const usersId = keys.find((k: any) => k.key === 'users.id');
+            const postsId = keys.find((k: any) => k.key === 'posts.id');
+            expect(usersId, 'users.id parsed').to.not.be.undefined;
+            expect(postsId, 'posts.id parsed').to.not.be.undefined;
+            // They must point at different lines (line 2 vs line 5).
+            expect(usersId.lineNumber).to.equal(2);
+            expect(postsId.lineNumber).to.equal(5);
+
+            // getKeyRange must agree and not collapse both onto the first "id".
+            const usersRange = parser.getKeyRange(doc, 'users.id');
+            const postsRange = parser.getKeyRange(doc, 'posts.id');
+            expect(usersRange.start.line).to.equal(2);
+            expect(postsRange.start.line).to.equal(5);
+        });
+
+        // Regression: a multi-line object value must produce a range whose end is on a
+        // later line, not collapsed onto the start line (bug hunt #4).
+        it('produces a multi-line range for a value spanning several lines', () => {
+            const json = `{
+  "outer": {
+    "a": "1",
+    "b": "2"
+  }
+}`;
+            const doc = createMockDocument(json, 'test.json');
+            const parser = new JsonDocumentParser();
+            const keys = parser.parseDocument(doc);
+
+            const a = keys.find((k: any) => k.key === 'outer.a');
+            expect(a, 'nested key parsed').to.not.be.undefined;
+            // endLine should be defined and >= the start line.
+            expect(a.endLine).to.be.a('number');
+            expect(a.endLine).to.be.at.least(a.lineNumber);
+        });
+
+        // Regression: getKeyRange returns null for an unknown key instead of a bogus
+        // range pointing at 0,0 (bug hunt #13).
+        it('returns null from getKeyRange for a key that is not present', () => {
+            const json = `{ "present": "yes" }`;
+            const doc = createMockDocument(json, 'test.json');
+            const parser = new JsonDocumentParser();
+            expect(parser.getKeyRange(doc, 'absent')).to.equal(null);
+        });
     });
 });

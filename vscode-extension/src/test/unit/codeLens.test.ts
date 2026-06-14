@@ -101,6 +101,59 @@ describe('LrmCodeLensProvider (code files)', () => {
         expect(cache.getKeyDetails.called).to.be.false;
     });
 
+    it('resolves a data-annotation key against the group named by its ResourceType (Bug hunt #3)', async () => {
+        // [Display(Name = "Product_Name_Label", ResourceType = typeof(GlassResources))]
+        // The backend tags the reference with resourceTypeClassName. CodeLens must
+        // resolve details/coverage against THAT group, not the first-cached group.
+        cache.scanFile.resolves(scanResponse({
+            references: [{
+                key: 'Product_Name_Label',
+                referenceCount: 1,
+                references: [{
+                    file: 'Model.cs', line: 2, pattern: '[Display(...)]', confidence: 'high',
+                    resourceTypeClassName: 'GlassResources'
+                }]
+            }]
+        }));
+        cache.getKeyDetails.resolves({
+            key: 'Product_Name_Label', resourceGroup: 'GlassResources',
+            values: { default: { value: 'Glass product name' } },
+            occurrenceCount: 1, hasDuplicates: false
+        } as any);
+        cache.getMissingLanguages.returns([]);
+
+        const doc = createMockDocument('\n[Display(Name = "Product_Name_Label", ResourceType = typeof(GlassResources))]\npublic string Name { get; set; }', 'Model.cs');
+        await provider.provideCodeLenses(doc as any, noToken);
+
+        // Details and coverage must be looked up scoped to the bound group.
+        expect(cache.getKeyDetails.calledWith('Product_Name_Label', false, 'GlassResources'),
+            'getKeyDetails called with the bound group').to.be.true;
+        expect(cache.getMissingLanguages.calledWith('Product_Name_Label', 'GlassResources'),
+            'getMissingLanguages called with the bound group').to.be.true;
+    });
+
+    it('passes no group for an untyped reference (group-agnostic key)', async () => {
+        cache.scanFile.resolves(scanResponse({
+            references: [{
+                key: 'Plain_Key',
+                referenceCount: 1,
+                references: [{ file: 'a.razor', line: 2, pattern: 'L[...]', confidence: 'high' }]
+            }]
+        }));
+        cache.getKeyDetails.resolves({
+            key: 'Plain_Key', resourceGroup: 'R', values: { default: { value: 'X' } },
+            occurrenceCount: 1, hasDuplicates: false
+        } as any);
+        cache.getMissingLanguages.returns([]);
+
+        const doc = createMockDocument('<div>\n@L["Plain_Key"]\n</div>', 'Page.razor');
+        await provider.provideCodeLenses(doc as any, noToken);
+
+        // boundGroup resolves to undefined -> details fetched without a group.
+        expect(cache.getKeyDetails.calledWith('Plain_Key', false, undefined),
+            'getKeyDetails called without a group for untyped refs').to.be.true;
+    });
+
     it('does not emit duplicate lenses for the same key on the same line', async () => {
         cache.scanFile.resolves(scanResponse({
             references: [{

@@ -39,7 +39,9 @@ export class ResourceTreeView implements vscode.TreeDataProvider<ResourceTreeIte
             }
 
             return this.resourceKeys.map(key => {
-                const hasTranslations = Object.keys(key.values).length > 0;
+                // Guard against a malformed key whose values is null/undefined;
+                // Object.keys(null) would throw and crash the whole tree render.
+                const hasTranslations = Object.keys(key.values ?? {}).length > 0;
                 return new ResourceTreeItem(
                     key.key,
                     key,
@@ -56,7 +58,7 @@ export class ResourceTreeView implements vscode.TreeDataProvider<ResourceTreeIte
     private getTranslationsForKey(resourceKey: ResourceKey): ResourceTreeItem[] {
         const items: ResourceTreeItem[] = [];
 
-        for (const [language, value] of Object.entries(resourceKey.values)) {
+        for (const [language, value] of Object.entries(resourceKey.values ?? {})) {
             const item = new ResourceTreeItem(
                 `${language}: ${value}`,
                 resourceKey,
@@ -95,7 +97,7 @@ export class ResourceTreeItem extends vscode.TreeItem {
 
         if (!language) {
             // Root level - key item (parent)
-            this.tooltip = `${resourceKey.key} (${Object.keys(resourceKey.values).length} translations)`;
+            this.tooltip = `${resourceKey.key} (${Object.keys(resourceKey.values ?? {}).length} translations)`;
             this.iconPath = new vscode.ThemeIcon('key');
 
             // Add badges for issues

@@ -40,6 +40,14 @@ export interface KeyReference {
     pattern: string;
     confidence: string;
     warning?: string;
+    /**
+     * For keys referenced via a Data Annotation (e.g.
+     * `[Display(..., ResourceType = typeof(GlassResources))]`), the simple class name
+     * of the bound resource type ("GlassResources"). Maps to a resx group's base name,
+     * so a typed reference can be resolved against the correct group in multi-group
+     * projects. Undefined for ordinary, group-agnostic references.
+     */
+    resourceTypeClassName?: string;
 }
 
 export interface KeyUsage {

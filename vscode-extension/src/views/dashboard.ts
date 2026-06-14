@@ -125,8 +125,12 @@ export class DashboardPanel {
         const totalMissingAcrossAllLangs = languageStats
             .filter((lang: any) => !lang.isDefault)
             .reduce((sum: number, lang: any) => {
-                const missing = lang.totalCount - lang.translatedCount;
-                return sum + missing;
+                // Coerce to numbers: a malformed/partial stats response with
+                // undefined counts would otherwise make the whole total NaN and
+                // render as "NaN" in the dashboard.
+                const total = Number(lang.totalCount) || 0;
+                const translated = Number(lang.translatedCount) || 0;
+                return sum + Math.max(0, total - translated);
             }, 0);
 
         return `<!DOCTYPE html>
@@ -288,8 +292,10 @@ export class DashboardPanel {
         </div>
 
         ${languageStats.map((lang: any) => {
-            const percentage = Math.round(lang.coverage);
-            const translated = lang.translatedCount;
+            // Coerce numeric fields so a malformed stats response never renders NaN/undefined.
+            const percentage = Math.round(Number(lang.coverage) || 0);
+            const translated = Number(lang.translatedCount) || 0;
+            const langTotal = Number(lang.totalCount) || 0;
 
             // Format language name from languageCode. The default file carries the
             // configured defaultLanguageCode (e.g. "it"); only fall back to a generic
@@ -310,7 +316,7 @@ export class DashboardPanel {
                     <div class="language-name">${langName}</div>
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: ${percentage}%"></div>
-                        <div class="progress-text">${translated}/${lang.totalCount} (${percentage}%)</div>
+                        <div class="progress-text">${translated}/${langTotal} (${percentage}%)</div>
                     </div>
                 </div>
             `;

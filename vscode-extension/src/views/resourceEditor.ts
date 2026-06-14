@@ -1701,13 +1701,19 @@ export class ResourceEditorPanel {
             document.getElementById('translateContext').style.display = 'block';
             document.getElementById('translateKeyName').textContent = currentEditingKey;
 
-            // Get source text from default language
+            // Get source text from default language. If no default language exists we
+            // can't determine the source text, so tell the user instead of silently
+            // showing "(empty)" and translating from nothing.
             const defaultLang = languages.find(l => l.isDefault);
-            const sourceValue = document.getElementById(\`edit-value-\${defaultLang?.code}\`)?.value || '';
+            if (!defaultLang) {
+                setStatus('No default language configured — cannot determine source text to translate from', 4000);
+                return;
+            }
+            const sourceValue = document.getElementById(\`edit-value-\${defaultLang.code}\`)?.value || '';
             document.getElementById('translateSourceText').textContent = sourceValue || '(empty)';
 
             // Show comment if exists
-            const comment = document.getElementById(\`edit-comment-\${defaultLang?.code}\`)?.value;
+            const comment = document.getElementById(\`edit-comment-\${defaultLang.code}\`)?.value;
             if (comment) {
                 document.getElementById('translateComment').style.display = 'block';
                 document.getElementById('translateCommentText').textContent = comment;

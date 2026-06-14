@@ -121,7 +121,7 @@ export class StatusBarManager {
             `  ${resourcePath}`,
             '',
             `Translation Coverage: ${avgCoverage}%`,
-            `  Total Keys: ${stats.totalKeys}`,
+            `  Total Keys: ${stats.totalKeys ?? 0}`,
             `  Languages: ${languages.length}`,
             `  Missing Translations: ${totalMissing}`,
             '',
