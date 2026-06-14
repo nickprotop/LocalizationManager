@@ -1147,6 +1147,16 @@ export class ResourceEditorPanel {
 
         function loadResources() {
             setStatus('Loading...');
+            // Drop the cached scan results so the next "Scan Code" re-queries the
+            // backend. loadResources() runs on every add/update/delete and on the
+            // Refresh button, so without this the modal kept showing the scan
+            // snapshot taken when the editor first opened — a key added in the
+            // editor was still reported missing until the tab was closed/reopened.
+            // The backend cache is already invalidated on mutations, so a fresh
+            // re-query returns correct results. If the extension re-sends valid
+            // cached scan results right after (handleLoadResources), that simply
+            // repopulates with the backend's current state, which is what we want.
+            scanResultsCache = null;
             vscode.postMessage({ command: 'loadResources' });
         }
 
