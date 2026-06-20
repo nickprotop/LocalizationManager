@@ -328,7 +328,7 @@ Summary Table:
 - `--regex` - Treat KEY as a regular expression pattern
 - `--search-in|--scope <SCOPE>` - Where to search: `keys` (default), `values`, `both`, `comments`, or `all`
 - `--case-sensitive` - Make search case-sensitive (default is case-insensitive)
-- `--count` - Show only the count of matching keys (no details)
+- `--count` - Show only the count of matching keys (no details). Doubles as a quiet existence probe: exit code is `0` when at least one key matches and `1` when none do, and a missing exact key reports `Found 0 matching key(s)` instead of the `✗ Key not found` error. Useful in scripts/agents for a reuse-before-add check.
 - `--status <STATUS>` - Filter by translation status: `empty`, `missing`, `untranslated`, `complete`, or `partial`
 - `--not <PATTERNS>` - Exclude keys matching these patterns (comma-separated, supports wildcards)
 - `--show-comments` - Include comments in output
@@ -579,6 +579,20 @@ lrm view "*" --status complete --count
 # Count with multiple filters
 lrm view "*" --cultures fr --status untranslated --count
 # Output: Found 12 matching key(s)
+```
+
+**Existence Probe (reuse-before-add):**
+
+`--count` is also the quietest way to ask "does this key already exist?" — it never
+prints the `✗ Key not found` error, and its exit code is the answer:
+
+```bash
+# Exit 0 if the key exists, 1 if not — no error noise either way
+if lrm view "Save.Button" --count --format simple --path Resources >/dev/null; then
+  echo "exists — reuse it"
+else
+  lrm add "Save.Button" -l default:"Save" --path Resources
+fi
 ```
 
 **Status Filtering:**

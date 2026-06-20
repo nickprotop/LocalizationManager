@@ -386,14 +386,16 @@ public class JsonResourceDiscovery : IResourceDiscovery
 
     /// <summary>
     /// Directories that should never be treated as resource sources when recursing.
+    /// Shared with <see cref="JsonResourceBackend.CanHandle"/> so format auto-detection
+    /// applies the same exclusions as discovery (e.g. lrm's own .lrm/ backup metadata).
     /// </summary>
-    private static readonly string[] ExcludedDirectories =
+    internal static readonly string[] ExcludedDirectories =
         { ".lrm", ".backups", "bin", "obj", ".git", "node_modules" };
 
     /// <summary>
     /// Returns true if the file lives under an excluded directory relative to the search root.
     /// </summary>
-    private static bool IsInExcludedDirectory(string filePath, string searchPath)
+    internal static bool IsInExcludedDirectory(string filePath, string searchPath)
     {
         var relative = Path.GetRelativePath(searchPath, filePath);
         var segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);

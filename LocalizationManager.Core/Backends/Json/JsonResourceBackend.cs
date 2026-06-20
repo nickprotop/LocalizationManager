@@ -99,8 +99,12 @@ public class JsonResourceBackend : IResourceBackend
         if (!Directory.Exists(path))
             return false;
 
-        // Check for JSON files (including nested subfolders), excluding lrm*.json config files
+        // Check for JSON files (including nested subfolders), excluding lrm*.json config
+        // files and anything under excluded folders. Without the folder exclusion, lrm's
+        // own backup metadata (.lrm/backups/.../manifest.json) would cause a resx-only
+        // directory to be misdetected as JSON. Mirrors JsonResourceDiscovery's exclusions.
         return Directory.EnumerateFiles(path, "*.json", SearchOption.AllDirectories)
+            .Where(f => !JsonResourceDiscovery.IsInExcludedDirectory(f, path))
             .Any(f => !Path.GetFileName(f).StartsWith("lrm", StringComparison.OrdinalIgnoreCase));
     }
 }

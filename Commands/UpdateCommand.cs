@@ -81,7 +81,9 @@ public class UpdateCommand : Command<UpdateCommand.Settings>
 
             if (!languages.Any())
             {
-                AnsiConsole.MarkupLine($"[red]✗ No {backendName.ToUpper()} files found![/]");
+                var searchedPath = Path.GetFullPath(resourcePath);
+                AnsiConsole.MarkupLine($"[red]✗ No {backendName.ToUpper()} files found at {Markup.Escape(searchedPath)}[/]");
+                AnsiConsole.MarkupLine("[yellow]  (searched current directory — did you mean to pass --path, e.g. --path Resources?)[/]");
                 return 1;
             }
 

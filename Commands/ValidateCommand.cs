@@ -153,13 +153,15 @@ public class ValidateCommand : Command<ValidateCommandSettings>
 
             if (!languages.Any())
             {
+                var searchedPath = Path.GetFullPath(resourcePath);
                 if (isTableFormat)
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ No {backendName.ToUpper()} resource files found![/]");
+                    AnsiConsole.MarkupLine($"[red]✗ No {backendName.ToUpper()} resource files found at {Markup.Escape(searchedPath)}[/]");
+                    AnsiConsole.MarkupLine("[yellow]  (searched current directory — did you mean to pass --path, e.g. --path Resources?)[/]");
                 }
                 else
                 {
-                    Console.Error.WriteLine($"No {backendName.ToUpper()} resource files found!");
+                    Console.Error.WriteLine($"No {backendName.ToUpper()} resource files found at {searchedPath} (did you mean to pass --path?)");
                 }
                 return 1;
             }

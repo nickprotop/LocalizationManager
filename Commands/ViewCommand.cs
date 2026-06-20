@@ -100,7 +100,7 @@ public class ViewCommand : Command<ViewCommand.Settings>
         public bool CaseSensitive { get; set; } = false;
 
         [CommandOption("--count")]
-        [Description("Show only the count of matching keys")]
+        [Description("Show only the count of matching keys. Acts as a quiet existence probe: exits 0 if any key matches, 1 if none (no '✗ not found' noise).")]
         [DefaultValue(false)]
         public bool Count { get; set; } = false;
 
@@ -177,7 +177,9 @@ public class ViewCommand : Command<ViewCommand.Settings>
 
             if (!languages.Any())
             {
-                AnsiConsole.MarkupLine($"[red]✗ No {backendName.ToUpper()} resource files found![/]");
+                var searchedPath = Path.GetFullPath(resourcePath);
+                AnsiConsole.MarkupLine($"[red]✗ No {backendName.ToUpper()} resource files found at {Markup.Escape(searchedPath)}[/]");
+                AnsiConsole.MarkupLine("[yellow]  (searched current directory — did you mean to pass --path, e.g. --path Resources?)[/]");
                 return 1;
             }
 
@@ -234,8 +236,10 @@ public class ViewCommand : Command<ViewCommand.Settings>
             {
                 matchedKeys = FindMatchingKeys(defaultFile, resourceFiles, settings.Key, settings.SearchIn, settings.UseRegex, settings.CaseSensitive);
 
-                // For exact match with keys-only scope, show error if not found
-                if (!settings.UseRegex && settings.SearchIn == SearchScope.Keys && matchedKeys.Count == 0)
+                // For exact match with keys-only scope, show error if not found.
+                // Skip this when --count is used: a count probe should report "Found 0"
+                // (and signal absence via exit code) rather than emit a noisy error.
+                if (!settings.Count && !settings.UseRegex && settings.SearchIn == SearchScope.Keys && matchedKeys.Count == 0)
                 {
                     AnsiConsole.MarkupLine($"[red]✗ Key '{Markup.Escape(settings.Key)}' not found![/]");
                     return 1;
@@ -324,11 +328,15 @@ public class ViewCommand : Command<ViewCommand.Settings>
                 matchedKeys = matchedKeys.Take(effectiveLimit).ToList();
             }
 
-            // Handle --count flag (exit early)
+            // Handle --count flag (exit early).
+            // Acts as an existence probe: exit 0 when at least one key matches,
+            // exit 1 when none do — so it can drive a reuse-before-add loop without
+            // parsing output. Output itself stays clean ("Found 0 matching key(s)").
             if (settings.Count)
             {
-                DisplayCount(matchedKeys.Count, settings, usedWildcards, originalPattern, format);
-                return 0;
+                // Report the true match total, not the --limit-truncated view.
+                DisplayCount(totalMatches, settings, usedWildcards, originalPattern, format);
+                return totalMatches > 0 ? 0 : 1;
             }
 
             // Detect extra keys in filtered languages (not in default)
