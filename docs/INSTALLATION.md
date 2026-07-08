@@ -249,7 +249,7 @@ wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/
 tar -xzf lrm-osx-x64.tar.gz
 
 # Install to system binary directory
-sudo cp osx-x64/lrm /usr/local/bin/
+sudo cp lrm /usr/local/bin/
 sudo chmod +x /usr/local/bin/lrm
 
 # Verify installation
@@ -271,7 +271,7 @@ tar -xzf lrm-osx-x64.tar.gz
 mkdir -p ~/.local/bin
 
 # Install to user binary directory
-cp osx-x64/lrm ~/.local/bin/
+cp lrm ~/.local/bin/
 chmod +x ~/.local/bin/lrm
 
 # Add to PATH (if not already in PATH)
@@ -297,7 +297,7 @@ wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/
 
 # Extract and install (same steps as Intel)
 tar -xzf lrm-osx-arm64.tar.gz
-sudo cp osx-arm64/lrm /usr/local/bin/
+sudo cp lrm /usr/local/bin/
 sudo chmod +x /usr/local/bin/lrm
 
 # Verify

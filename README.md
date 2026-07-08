@@ -302,12 +302,12 @@ Linux:
 # Intel/AMD (x64)
 wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-linux-x64.tar.gz
 tar -xzf lrm-linux-x64.tar.gz
-sudo cp linux-x64/lrm /usr/local/bin/
+sudo cp lrm /usr/local/bin/
 
 # ARM64 (Raspberry Pi, etc.)
 wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-linux-arm64.tar.gz
 tar -xzf lrm-linux-arm64.tar.gz
-sudo cp linux-arm64/lrm /usr/local/bin/
+sudo cp lrm /usr/local/bin/
 ```
 
 macOS:
@@ -315,12 +315,12 @@ macOS:
 # Intel Mac
 wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-osx-x64.tar.gz
 tar -xzf lrm-osx-x64.tar.gz
-sudo cp osx-x64/lrm /usr/local/bin/
+sudo cp lrm /usr/local/bin/
 
 # Apple Silicon (M1/M2/M3)
 wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-osx-arm64.tar.gz
 tar -xzf lrm-osx-arm64.tar.gz
-sudo cp osx-arm64/lrm /usr/local/bin/
+sudo cp lrm /usr/local/bin/
 ```
 
 See [INSTALLATION.md](docs/INSTALLATION.md) for .deb packages, Windows, and detailed installation options.

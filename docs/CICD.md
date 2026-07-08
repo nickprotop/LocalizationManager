@@ -71,10 +71,10 @@ For all CI/CD platforms (GitHub Actions, GitLab CI, Azure DevOps, Jenkins):
 # Download the latest release
 wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-linux-x64.tar.gz
 tar -xzf lrm-linux-x64.tar.gz
-chmod +x linux-x64/lrm
+chmod +x lrm
 
 # Run commands
-./linux-x64/lrm validate --path ./Resources
+./lrm validate --path ./Resources
 ```
 
 **Available platforms:**
@@ -249,8 +249,8 @@ jobs:
         run: |
           wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-linux-x64.tar.gz
           tar -xzf lrm-linux-x64.tar.gz
-          chmod +x linux-x64/lrm
-          echo "${{ github.workspace }}/linux-x64" >> $GITHUB_PATH
+          chmod +x lrm
+          echo "${{ github.workspace }}" >> $GITHUB_PATH
 
       - name: ✅ Step 1 - Validate .resx Files
         id: validate
@@ -454,8 +454,8 @@ jobs:
         run: |
           wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-linux-x64.tar.gz
           tar -xzf lrm-linux-x64.tar.gz
-          chmod +x linux-x64/lrm
-          echo "${{ github.workspace }}/linux-x64" >> $GITHUB_PATH
+          chmod +x lrm
+          echo "${{ github.workspace }}" >> $GITHUB_PATH
 
       - name: ✅ Step 1 - Initial Validation
         id: validate
@@ -644,8 +644,8 @@ validate:
     - apt-get update && apt-get install -y wget jq
     - wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-linux-x64.tar.gz
     - tar -xzf lrm-linux-x64.tar.gz
-    - chmod +x linux-x64/lrm
-    - export PATH="$PWD/linux-x64:$PATH"
+    - chmod +x lrm
+    - export PATH="$PWD:$PATH"
   script:
     - lrm validate
     - lrm validate --missing-only --format json > missing.json
@@ -668,8 +668,8 @@ auto-translate:
     - apt-get update && apt-get install -y wget jq
     - wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-linux-x64.tar.gz
     - tar -xzf lrm-linux-x64.tar.gz
-    - chmod +x linux-x64/lrm
-    - export PATH="$PWD/linux-x64:$PATH"
+    - chmod +x lrm
+    - export PATH="$PWD:$PATH"
   script:
     - |
       if [ -s missing.json ]; then
@@ -744,8 +744,8 @@ steps:
     script: |
       wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-linux-x64.tar.gz
       tar -xzf lrm-linux-x64.tar.gz
-      chmod +x linux-x64/lrm
-      echo "##vso[task.prependpath]$(Build.SourcesDirectory)/linux-x64"
+      chmod +x lrm
+      echo "##vso[task.prependpath]$(Build.SourcesDirectory)"
 
 - script: |
     lrm validate
@@ -813,8 +813,8 @@ pipeline {
                 sh '''
                     wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-linux-x64.tar.gz
                     tar -xzf lrm-linux-x64.tar.gz
-                    chmod +x linux-x64/lrm
-                    ./linux-x64/lrm validate --path ./Resources
+                    chmod +x lrm
+                    ./lrm validate --path ./Resources
                 '''
             }
         }
@@ -822,7 +822,7 @@ pipeline {
         stage('Check Missing') {
             steps {
                 sh '''
-                    ./linux-x64/lrm validate --missing-only --format json > missing.json
+                    ./lrm validate --missing-only --format json > missing.json
                     cat missing.json
                 '''
             }
@@ -840,8 +840,8 @@ pipeline {
             }
             steps {
                 sh '''
-                    ./linux-x64/lrm translate --only-missing --provider google --format json > results.json
-                    ./linux-x64/lrm validate
+                    ./lrm translate --only-missing --provider google --format json > results.json
+                    ./lrm validate
                 '''
             }
         }
@@ -1244,7 +1244,7 @@ For Windows runners in GitHub Actions, use the Windows binary:
     Expand-Archive -Path "lrm.zip" -DestinationPath "."
 
 - name: Validate resources
-  run: .\win-x64\lrm.exe validate --path .\Resources
+  run: .\lrm.exe validate --path .\Resources
 ```
 
 ### ARM64 Runners
@@ -1256,7 +1256,7 @@ For ARM64 runners (e.g., AWS Graviton), use the ARM64 binaries:
   run: |
     wget https://github.com/nickprotop/LocalizationManager/releases/latest/download/lrm-linux-arm64.tar.gz
     tar -xzf lrm-linux-arm64.tar.gz
-    chmod +x linux-arm64/lrm
+    chmod +x lrm
 ```
 
 ## Best Practices

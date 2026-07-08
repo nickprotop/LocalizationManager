@@ -154,7 +154,10 @@ tar -xzf "$FILENAME"
 INSTALL_DIR="$HOME/.local/bin"
 mkdir -p "$INSTALL_DIR"
 
-cp "${PLATFORM}/lrm" "$INSTALL_DIR/lrm"
+# The tarball contains 'lrm' and README.txt at the top level (see build.sh,
+# which archives from inside the platform directory), so the binary is not
+# wrapped in a "${PLATFORM}/" directory.
+cp "lrm" "$INSTALL_DIR/lrm"
 chmod +x "$INSTALL_DIR/lrm"
 
 echo -e "${GREEN}✓${NC} Installed to $INSTALL_DIR/lrm"
