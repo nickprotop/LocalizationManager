@@ -325,6 +325,11 @@ sudo cp lrm /usr/local/bin/
 
 See [INSTALLATION.md](docs/INSTALLATION.md) for .deb packages, Windows, and detailed installation options.
 
+**Uninstall:**
+```bash
+curl -sSL https://raw.githubusercontent.com/nickprotop/LocalizationManager/main/uninstall-lrm.sh | bash
+```
+
 ### Basic Usage
 
 ```bash
